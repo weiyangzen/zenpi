@@ -401,6 +401,53 @@ impl SessionStore {
             .find(|turn| turn.role == crate::core::TurnRole::Assistant)
     }
 
+    /// Copy this journal to a new destination without mutating the source.
+    /// The destination is opened and recovered first, so malformed or
+    /// incompatible input cannot silently become an exported session.
+    pub fn export_to(&self, destination: impl AsRef<Path>) -> Result<(), SessionError> {
+        let destination = destination.as_ref();
+        if destination == self.path {
+            return Err(SessionError::InvalidRecord(
+                "cannot export a session over itself".into(),
+            ));
+        }
+        if destination.exists() {
+            return Err(SessionError::InvalidRecord(
+                "export destination already exists".into(),
+            ));
+        }
+        if let Some(parent) = destination.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&self.path, destination)?;
+        restrict_session_permissions(destination)?;
+        Ok(())
+    }
+
+    /// Build a new session from this journal's immutable prefix. The source
+    /// remains untouched and the destination receives a fresh session header.
+    pub fn fork_to(&self, destination: impl AsRef<Path>) -> Result<Self, SessionError> {
+        let destination = destination.as_ref();
+        if destination.exists() {
+            return Err(SessionError::InvalidRecord(
+                "fork destination already exists".into(),
+            ));
+        }
+        let mut fork = Self::open(destination)?;
+        for turn in &self.turns {
+            fork.append_turn(turn.clone())?;
+        }
+        for handoff in &self.handoffs {
+            fork.append_handoff(handoff.clone())?;
+        }
+        for record in &self.handoff_records {
+            fork.append_handoff_record(record.clone())?;
+        }
+        Ok(fork)
+    }
+
     fn append_json(&mut self, value: &Value) -> Result<(), SessionError> {
         if !value.is_object() {
             return Err(SessionError::InvalidRecord(

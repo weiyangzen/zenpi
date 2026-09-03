@@ -773,6 +773,25 @@ pub fn status(paths: &ConfigPaths) -> Result<ConfigStatus, ConfigError> {
     })
 }
 
+/// Return a path inside the configured zenpi root. Reject absolute paths and
+/// parent traversal so session/skill/extension commands cannot escape it.
+pub fn scoped_path(
+    paths: &ConfigPaths,
+    relative: impl AsRef<Path>,
+) -> Result<PathBuf, ConfigError> {
+    let relative = relative.as_ref();
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(ConfigError::Invalid(
+            "path must stay inside ~/.zenpi".into(),
+        ));
+    }
+    Ok(paths.root.join(relative))
+}
+
 pub fn load_config(paths: &ConfigPaths) -> Result<ConfigFile, ConfigError> {
     match fs::symlink_metadata(&paths.config) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => {

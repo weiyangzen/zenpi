@@ -25,6 +25,9 @@ pub const MAX_TEXT_BYTES: usize = 256 * 1024;
 pub const MAX_HANDOFF_ARTIFACTS: usize = B3_MAX_HANDOFF_ARTIFACTS;
 /// Version of the headless request/response envelope.
 pub const PROTOCOL_VERSION: u16 = 1;
+/// Version for clients that consume asynchronous lifecycle events. Version 1
+/// remains accepted and receives the terminal-response projection.
+pub const ASYNC_PROTOCOL_VERSION: u16 = 2;
 /// Maximum bytes in a correlation identifier.
 pub const MAX_ID_BYTES: usize = 128;
 
@@ -345,6 +348,37 @@ pub struct StdioResponse {
     /// success (`ok`) and failure (`error` or a typed protocol code).
     #[serde(rename = "code")]
     pub error_code: String,
+}
+
+/// An event envelope emitted by asynchronous hosts. Keeping events separate
+/// from terminal responses lets clients replay or acknowledge them without
+/// treating progress as a second command result.
+#[derive(Debug, Clone, Serialize)]
+pub struct StdioEvent {
+    pub schema_version: u16,
+    pub sequence: u64,
+    #[serde(rename = "request_id", skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
+    #[serde(rename = "turn_id", skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
+    pub event: Value,
+}
+
+impl StdioEvent {
+    pub fn new(
+        sequence: u64,
+        request_id: Option<String>,
+        turn_id: Option<String>,
+        event: Value,
+    ) -> Self {
+        Self {
+            schema_version: ASYNC_PROTOCOL_VERSION,
+            sequence,
+            request_id,
+            turn_id,
+            event,
+        }
+    }
 }
 
 impl StdioResponse {

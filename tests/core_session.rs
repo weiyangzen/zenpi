@@ -44,6 +44,9 @@ impl Backend for ToolLoopBackend {
                     name: "constant".into(),
                     arguments: json!({}),
                 }],
+                response_id: None,
+                refusal: None,
+                annotations: Vec::new(),
             });
         }
         assert!(request.turns.iter().any(|turn| turn.role == TurnRole::Tool));

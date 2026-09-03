@@ -18,7 +18,7 @@ use thiserror::Error;
 use crate::{
     b3::{HandoffRecord, unix_ms_to_rfc3339},
     core::{Agent, AgentError, ProcessResult, TurnInputRequest},
-    protocol::{Command, StdioResponse, encode_line, parse_line},
+    protocol::{Command, StdioEvent, StdioResponse, encode_line, parse_line},
     session::unix_time_ms,
 };
 
@@ -40,6 +40,7 @@ pub fn run_headless<R: BufRead, W: Write>(
     mut input: R,
     mut output: W,
 ) -> Result<(), HeadlessError> {
+    let mut event_sequence = 0_u64;
     // Keep at most one bounded frame in memory. `BufRead::read_line` grows its
     // destination until LF, which lets an untrusted peer force an arbitrarily
     // large allocation before the protocol limit is checked. The chunked
@@ -118,7 +119,7 @@ pub fn run_headless<R: BufRead, W: Write>(
                 continue;
             }
         };
-        let should_stop = handle_command(agent, id, command, &mut output)?;
+        let should_stop = handle_command(agent, id, command, &mut output, &mut event_sequence)?;
         if should_stop {
             return Ok(());
         }
@@ -265,6 +266,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     );
     let mut jobs: HashMap<crate::runtime::JobId, AsyncWork> = HashMap::new();
     let mut request_to_job: HashMap<String, crate::runtime::JobId> = HashMap::new();
+    let mut event_sequence = 0_u64;
     let mut stopping = false;
     let mut shutdown_sent = false;
     loop {
@@ -275,6 +277,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &mut request_to_job,
                 &shared,
                 &mut output,
+                &mut event_sequence,
                 stopping,
                 shutdown_sent,
             )? {
@@ -294,6 +297,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         &mut request_to_job,
                         &shared,
                         &mut output,
+                        &mut event_sequence,
                         true,
                         shutdown_sent,
                     )? {
@@ -313,6 +317,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &mut jobs,
                 &mut request_to_job,
                 &mut output,
+                &mut event_sequence,
                 &mut stopping,
             )?,
             Ok(ReaderMessage::Eof) => {
@@ -333,12 +338,14 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_runtime_event<W: Write>(
     event: crate::runtime::RuntimeEvent<ProcessResult, AgentError>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     shared: &Arc<Mutex<Agent>>,
     output: &mut W,
+    event_sequence: &mut u64,
     stopping: bool,
     shutdown_sent: bool,
 ) -> Result<bool, HeadlessError> {
@@ -348,6 +355,7 @@ fn handle_runtime_event<W: Write>(
             let Some(meta) = jobs.remove(&id) else {
                 return Ok(false);
             };
+            let event_request_id = meta.id.clone();
             if let Some(request_id) = meta.id.as_ref() {
                 request_to_job.remove(request_id);
             }
@@ -359,13 +367,13 @@ fn handle_runtime_event<W: Write>(
                     });
                     write_response(
                         output,
-                        StdioResponse::success(meta.id, meta.command, Some(data)),
+                        StdioResponse::success(meta.id.clone(), meta.command, Some(data)),
                     )?;
                 }
                 JobOutcome::Failed(error) => write_response(
                     output,
                     StdioResponse::error_with_code(
-                        meta.id,
+                        meta.id.clone(),
                         meta.command,
                         error.code(),
                         error.to_string(),
@@ -374,7 +382,7 @@ fn handle_runtime_event<W: Write>(
                 JobOutcome::Cancelled => write_response(
                     output,
                     StdioResponse::error_with_code(
-                        meta.id,
+                        meta.id.clone(),
                         meta.command,
                         "backend_cancelled",
                         "request was cancelled",
@@ -383,7 +391,7 @@ fn handle_runtime_event<W: Write>(
                 JobOutcome::Panicked => write_response(
                     output,
                     StdioResponse::error_with_code(
-                        meta.id,
+                        meta.id.clone(),
                         meta.command,
                         "runtime_panic",
                         "background request panicked",
@@ -391,7 +399,7 @@ fn handle_runtime_event<W: Write>(
                 )?,
             }
             if let Ok(mut agent) = shared.lock() {
-                write_events(&mut agent, output)?;
+                write_events(&mut agent, output, event_sequence, event_request_id)?;
             }
             Ok(false)
         }
@@ -400,6 +408,7 @@ fn handle_runtime_event<W: Write>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_async_line<W, F>(
     line: String,
     shared: &Arc<Mutex<Agent>>,
@@ -407,6 +416,7 @@ fn process_async_line<W, F>(
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     output: &mut W,
+    event_sequence: &mut u64,
     stopping: &mut bool,
 ) -> Result<(), HeadlessError>
 where
@@ -533,7 +543,7 @@ where
         }
         other => match shared.try_lock() {
             Ok(mut agent) => {
-                let should_stop = handle_command(&mut agent, id, other, output)?;
+                let should_stop = handle_command(&mut agent, id, other, output, event_sequence)?;
                 if should_stop {
                     *stopping = true;
                 }
@@ -552,6 +562,7 @@ fn handle_command<W: Write>(
     id: Option<String>,
     command: Command,
     output: &mut W,
+    event_sequence: &mut u64,
 ) -> Result<bool, HeadlessError> {
     let name = crate::protocol::command_name(&command);
     match command {
@@ -571,15 +582,20 @@ fn handle_command<W: Write>(
                         "submission": result.submission,
                         "assistant": result.assistant,
                     });
-                    write_response(output, StdioResponse::success(id, name, Some(data)))?;
-                    write_events(agent, output)?;
+                    write_response(output, StdioResponse::success(id.clone(), name, Some(data)))?;
+                    write_events(agent, output, event_sequence, id.clone())?;
                 }
                 Err(error) => {
                     write_response(
                         output,
-                        StdioResponse::error_with_code(id, name, error.code(), error.to_string()),
+                        StdioResponse::error_with_code(
+                            id.clone(),
+                            name,
+                            error.code(),
+                            error.to_string(),
+                        ),
                     )?;
-                    write_events(agent, output)?;
+                    write_events(agent, output, event_sequence, id.clone())?;
                 }
             }
         }
@@ -598,15 +614,20 @@ fn handle_command<W: Write>(
                         "submission": result.submission,
                         "assistant": result.assistant,
                     });
-                    write_response(output, StdioResponse::success(id, name, Some(data)))?;
-                    write_events(agent, output)?;
+                    write_response(output, StdioResponse::success(id.clone(), name, Some(data)))?;
+                    write_events(agent, output, event_sequence, id.clone())?;
                 }
                 Err(error) => {
                     write_response(
                         output,
-                        StdioResponse::error_with_code(id, name, error.code(), error.to_string()),
+                        StdioResponse::error_with_code(
+                            id.clone(),
+                            name,
+                            error.code(),
+                            error.to_string(),
+                        ),
                     )?;
-                    write_events(agent, output)?;
+                    write_events(agent, output, event_sequence, id.clone())?;
                 }
             }
         }
@@ -649,12 +670,12 @@ fn handle_command<W: Write>(
                         write_response(
                             output,
                             StdioResponse::success(
-                                id,
+                                id.clone(),
                                 name,
                                 Some(json!({"accepted": true, "handoff": handoff})),
                             ),
                         )?;
-                        write_events(agent, output)?;
+                        write_events(agent, output, event_sequence, id.clone())?;
                     }
                     Err(error) => {
                         write_response(
@@ -709,9 +730,31 @@ fn write_response<W: Write>(output: &mut W, response: StdioResponse) -> Result<(
     Ok(())
 }
 
-fn write_events<W: Write>(agent: &mut Agent, output: &mut W) -> Result<(), HeadlessError> {
+fn write_events<W: Write>(
+    agent: &mut Agent,
+    output: &mut W,
+    sequence: &mut u64,
+    request_id: Option<String>,
+) -> Result<(), HeadlessError> {
     for event in agent.take_events() {
-        let line = encode_line(&event)?;
+        let line = if request_id.is_some() {
+            let value = serde_json::to_value(&event)?;
+            let turn_id = value
+                .get("turn_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            let envelope = StdioEvent::new(*sequence, request_id.clone(), turn_id, value);
+            encode_line(&envelope)?
+        } else {
+            let value = serde_json::to_value(&event)?;
+            let turn_id = value
+                .get("turn_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            let envelope = StdioEvent::new(*sequence, None, turn_id, value);
+            encode_line(&envelope)?
+        };
+        *sequence = sequence.saturating_add(1);
         output.write_all(line.as_bytes())?;
     }
     output.flush()?;

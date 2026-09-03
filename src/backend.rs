@@ -27,6 +27,92 @@ pub struct CompletionRequest<'a> {
     /// Tools advertised for this turn. Providers must not infer or invent
     /// capabilities that are absent from this bounded list.
     pub tools: &'a [ToolDefinition],
+    pub instructions: Option<&'a str>,
+    pub metadata: Option<&'a Value>,
+}
+
+impl<'a> CompletionRequest<'a> {
+    pub fn new(
+        turn_id: &'a str,
+        turns: &'a [Turn],
+        model: Option<&'a str>,
+        tools: &'a [ToolDefinition],
+    ) -> Self {
+        Self {
+            turn_id,
+            turns,
+            model,
+            tools,
+            instructions: None,
+            metadata: None,
+        }
+    }
+
+    pub fn with_instructions(mut self, instructions: Option<&'a str>) -> Self {
+        self.instructions = instructions;
+        self
+    }
+
+    pub fn with_metadata(mut self, metadata: Option<&'a Value>) -> Self {
+        self.metadata = metadata;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProviderEvent {
+    ResponseCreated {
+        response_id: Option<String>,
+        model: Option<String>,
+    },
+    TextDelta {
+        delta: String,
+    },
+    TextDone {
+        text: String,
+    },
+    Refusal {
+        text: String,
+    },
+    ToolCallDelta {
+        call_id: Option<String>,
+        name: Option<String>,
+        arguments_delta: String,
+    },
+    ToolCallDone {
+        call: ToolCall,
+    },
+    Usage {
+        usage: Usage,
+    },
+    Warning {
+        message: String,
+    },
+    Completed {
+        response_id: Option<String>,
+        model: Option<String>,
+    },
+    Failed {
+        message: String,
+    },
+}
+
+impl ProviderEvent {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::ResponseCreated { .. } => "response_created",
+            Self::TextDelta { .. } => "text_delta",
+            Self::TextDone { .. } => "text_done",
+            Self::Refusal { .. } => "refusal",
+            Self::ToolCallDelta { .. } => "tool_call_delta",
+            Self::ToolCallDone { .. } => "tool_call_done",
+            Self::Usage { .. } => "usage",
+            Self::Warning { .. } => "warning",
+            Self::Completed { .. } => "completed",
+            Self::Failed { .. } => "failed",
+        }
+    }
 }
 
 /// Optional usage information returned by a provider.
@@ -44,6 +130,9 @@ pub struct Completion {
     pub usage: Option<Usage>,
     pub model: Option<String>,
     pub tool_calls: Vec<ToolCall>,
+    pub response_id: Option<String>,
+    pub refusal: Option<String>,
+    pub annotations: Vec<Value>,
 }
 
 impl Completion {
@@ -53,6 +142,9 @@ impl Completion {
             usage: None,
             model: None,
             tool_calls: Vec::new(),
+            response_id: None,
+            refusal: None,
+            annotations: Vec::new(),
         }
     }
 }
@@ -73,6 +165,8 @@ pub enum BackendError {
     EmptyResponse,
     #[error("backend request was cancelled")]
     Cancelled,
+    #[error("backend request was superseded by a steer")]
+    Steered,
 }
 
 impl BackendError {
@@ -91,7 +185,8 @@ impl BackendError {
             Self::Configuration(_)
             | Self::InvalidResponse(_)
             | Self::EmptyResponse
-            | Self::Cancelled => false,
+            | Self::Cancelled
+            | Self::Steered => false,
         }
     }
 
@@ -103,6 +198,7 @@ impl BackendError {
             Self::InvalidResponse(_) => "backend_invalid_response",
             Self::EmptyResponse => "backend_empty_response",
             Self::Cancelled => "backend_cancelled",
+            Self::Steered => "backend_steered",
         }
     }
 }
@@ -112,6 +208,31 @@ impl BackendError {
 /// independent agents in their own processes.
 pub trait Backend: Send + Sync {
     fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError>;
+
+    fn complete_with_control(
+        &self,
+        request: CompletionRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+    ) -> Result<Completion, BackendError> {
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        let completion = self.complete(request)?;
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        if !completion.content.is_empty() {
+            sink(ProviderEvent::TextDelta {
+                delta: completion.content.clone(),
+            })?;
+        }
+        sink(ProviderEvent::Completed {
+            response_id: completion.response_id.clone(),
+            model: completion.model.clone(),
+        })?;
+        Ok(completion)
+    }
 
     fn name(&self) -> &str {
         "backend"
@@ -294,6 +415,7 @@ impl OpenAiCompatibleBackend {
         }
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
+            .timeout_recv_body(Some(Duration::from_millis(250)))
             .build();
         Ok(Self {
             client: ureq::Agent::new_with_config(config),
@@ -458,8 +580,16 @@ fn is_openai_endpoint(endpoint: &str) -> bool {
         == Some("api.openai.com")
 }
 
-impl Backend for OpenAiCompatibleBackend {
-    fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+impl OpenAiCompatibleBackend {
+    fn complete_openai(
+        &self,
+        request: CompletionRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+    ) -> Result<Completion, BackendError> {
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
         let model = request.model.unwrap_or(&self.model);
         if model.trim().is_empty() || model.len() > 256 || model.chars().any(char::is_control) {
             return Err(BackendError::Configuration(
@@ -492,6 +622,12 @@ impl Backend for OpenAiCompatibleBackend {
                             .collect(),
                     );
                     body["tool_choice"] = json!("auto");
+                }
+                if let Some(instructions) = request.instructions {
+                    body["instructions"] = json!(instructions);
+                }
+                if let Some(metadata) = request.metadata {
+                    body["metadata"] = metadata.clone();
                 }
                 body
             }
@@ -530,6 +666,12 @@ impl Backend for OpenAiCompatibleBackend {
                     );
                     body["tool_choice"] = json!("auto");
                 }
+                if let Some(instructions) = request.instructions {
+                    body["instructions"] = json!(instructions);
+                }
+                if let Some(metadata) = request.metadata {
+                    body["metadata"] = metadata.clone();
+                }
                 body
             }
         };
@@ -541,6 +683,9 @@ impl Backend for OpenAiCompatibleBackend {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
         }
         let mut response = request_builder.send_json(&body).map_err(map_ureq_error)?;
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
         match self.wire_api {
             OpenAiWireApi::ChatCompletions => {
                 let payload: Value = response
@@ -560,7 +705,7 @@ impl Backend for OpenAiCompatibleBackend {
                 if content.trim().is_empty() && tool_calls.is_empty() {
                     return Err(BackendError::EmptyResponse);
                 }
-                Ok(Completion {
+                let completion = Completion {
                     content,
                     usage: payload.get("usage").and_then(parse_usage),
                     model: payload
@@ -568,10 +713,30 @@ impl Backend for OpenAiCompatibleBackend {
                         .and_then(Value::as_str)
                         .map(str::to_owned),
                     tool_calls,
-                })
+                    response_id: payload.get("id").and_then(Value::as_str).map(str::to_owned),
+                    refusal: extract_chat_refusal(&payload),
+                    annotations: extract_annotations(&payload),
+                };
+                emit_completion_events(&completion, sink)?;
+                Ok(completion)
             }
-            OpenAiWireApi::Responses => read_responses_stream(response.body_mut()),
+            OpenAiWireApi::Responses => read_responses_stream(response.body_mut(), cancelled, sink),
         }
+    }
+}
+
+impl Backend for OpenAiCompatibleBackend {
+    fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        self.complete_openai(request, &|| false, &mut |_| Ok(()))
+    }
+
+    fn complete_with_control(
+        &self,
+        request: CompletionRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+    ) -> Result<Completion, BackendError> {
+        self.complete_openai(request, cancelled, sink)
     }
 
     fn name(&self) -> &str {
@@ -701,6 +866,60 @@ fn extract_content(payload: &Value) -> Result<String, BackendError> {
     }
 }
 
+fn extract_chat_refusal(payload: &Value) -> Option<String> {
+    payload
+        .get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|message| message.get("refusal"))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+}
+
+fn extract_responses_refusal(payload: &Value) -> Option<String> {
+    if let Some(refusal) = payload.get("refusal").and_then(Value::as_str) {
+        return Some(refusal.to_owned());
+    }
+    payload
+        .get("output")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|item| item.get("type").and_then(Value::as_str) == Some("message"))
+        .flat_map(|item| item.get("content").and_then(Value::as_array))
+        .flatten()
+        .find_map(|part| {
+            if part.get("type").and_then(Value::as_str) == Some("refusal") {
+                part.get("refusal")
+                    .or_else(|| part.get("text"))
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            } else {
+                None
+            }
+        })
+}
+
+fn extract_annotations(payload: &Value) -> Vec<Value> {
+    let mut annotations = Vec::new();
+    if let Some(values) = payload.get("annotations").and_then(Value::as_array) {
+        annotations.extend(values.iter().cloned());
+    }
+    if let Some(output) = payload.get("output").and_then(Value::as_array) {
+        for item in output {
+            if let Some(content) = item.get("content").and_then(Value::as_array) {
+                for part in content {
+                    if let Some(values) = part.get("annotations").and_then(Value::as_array) {
+                        annotations.extend(values.iter().cloned());
+                    }
+                }
+            }
+        }
+    }
+    annotations
+}
+
 fn extract_responses_content(payload: &Value) -> Result<String, BackendError> {
     if let Some(text) = payload.get("output_text").and_then(Value::as_str) {
         return Ok(text.to_owned());
@@ -738,7 +957,11 @@ fn extract_responses_content(payload: &Value) -> Result<String, BackendError> {
     Ok(text)
 }
 
-fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendError> {
+fn read_responses_stream(
+    body: &mut ureq::Body,
+    cancelled: &dyn Fn() -> bool,
+    sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+) -> Result<Completion, BackendError> {
     use std::io::{BufRead, BufReader};
 
     let configured = body.with_config().limit(MAX_RESPONSE_BYTES as u64).reader();
@@ -751,20 +974,30 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
     let mut model = None;
     let mut saw_completed = false;
     let mut tool_calls = Vec::new();
+    let mut response_id: Option<String> = None;
+    let mut refusal: Option<String> = None;
+    let mut annotations = Vec::new();
     let mut line_buffer = String::new();
     while reader
         .read_line(&mut line_buffer)
         .map_err(|error| BackendError::Transport(error.to_string()))?
         > 0
     {
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
         let line = std::mem::take(&mut line_buffer);
-        if line.trim_start().starts_with('{') && !line.contains("data:") {
-            let payload: Value = serde_json::from_str(line.trim()).map_err(|error| {
+        let clean_line = line
+            .trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
+        if clean_line.starts_with('{') && !clean_line.contains("data:") {
+            let payload: Value = serde_json::from_str(clean_line).map_err(|error| {
                 BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
             })?;
-            return completion_from_responses_json(&payload);
+            let completion = completion_from_responses_json(&payload)?;
+            emit_completion_events(&completion, sink)?;
+            return Ok(completion);
         }
-        let Some(data) = line.strip_prefix("data:") else {
+        let Some(data) = clean_line.strip_prefix("data:") else {
             continue;
         };
         // Some compatible gateways pad SSE frames with NUL bytes between
@@ -781,14 +1014,35 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
             Some("response.output_text.delta") => {
                 if let Some(delta) = event.get("delta").and_then(Value::as_str) {
                     content.push_str(delta);
+                    sink(ProviderEvent::TextDelta {
+                        delta: delta.to_owned(),
+                    })?;
                 }
             }
             Some("response.output_text.done") => {
-                if content.is_empty()
-                    && let Some(value) = event.get("text").and_then(Value::as_str)
-                {
-                    content.push_str(value);
+                if let Some(value) = event.get("text").and_then(Value::as_str) {
+                    if content.is_empty() {
+                        content.push_str(value);
+                    }
+                    sink(ProviderEvent::TextDone {
+                        text: value.to_owned(),
+                    })?;
                 }
+            }
+            Some("response.created") => {
+                let response = event.get("response").unwrap_or(&event);
+                response_id = response
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+                model = response
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+                sink(ProviderEvent::ResponseCreated {
+                    response_id: response_id.clone(),
+                    model: model.clone(),
+                })?;
             }
             Some("response.output_item.done") => {
                 if let Some(item) = event.get("item")
@@ -796,7 +1050,24 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
                     && let Some(call) = parse_response_function_call(item)
                 {
                     push_unique_tool_call(&mut tool_calls, call);
+                    if let Some(call) = tool_calls.last().cloned() {
+                        sink(ProviderEvent::ToolCallDone { call })?;
+                    }
                 }
+            }
+            Some("response.function_call_arguments.delta") => {
+                sink(ProviderEvent::ToolCallDelta {
+                    call_id: event
+                        .get("call_id")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                    name: event.get("name").and_then(Value::as_str).map(str::to_owned),
+                    arguments_delta: event
+                        .get("delta")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned(),
+                })?;
             }
             Some("response.function_call_arguments.done") => {
                 if let Some(call_id) = event.get("call_id").and_then(Value::as_str)
@@ -806,10 +1077,9 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
                         .get("arguments")
                         .and_then(Value::as_str)
                         .unwrap_or("{}");
-                    push_unique_tool_call(
-                        &mut tool_calls,
-                        parse_tool_call(call_id, name, arguments)?,
-                    );
+                    let call = parse_tool_call(call_id, name, arguments)?;
+                    push_unique_tool_call(&mut tool_calls, call.clone());
+                    sink(ProviderEvent::ToolCallDone { call })?;
                 }
             }
             Some("response.completed") => {
@@ -820,11 +1090,41 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
                     .get("model")
                     .and_then(Value::as_str)
                     .map(str::to_owned);
+                response_id = response
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .or(response_id);
+                refusal = extract_responses_refusal(response);
+                annotations = extract_annotations(response);
+                if let Some(usage_value) = response.get("usage")
+                    && let Some(parsed) = parse_usage(usage_value)
+                {
+                    sink(ProviderEvent::Usage { usage: parsed })?;
+                }
+                sink(ProviderEvent::Completed {
+                    response_id: response_id.clone(),
+                    model: model.clone(),
+                })?;
+            }
+            Some("response.refusal.delta") | Some("response.refusal.done") => {
+                if let Some(value) = event
+                    .get("delta")
+                    .or_else(|| event.get("text"))
+                    .and_then(Value::as_str)
+                {
+                    refusal.get_or_insert_with(String::new).push_str(value);
+                    sink(ProviderEvent::Refusal {
+                        text: value.to_owned(),
+                    })?;
+                }
             }
             Some("response.failed") | Some("error") => {
-                return Err(BackendError::InvalidResponse(extract_responses_error(
-                    &event,
-                )));
+                let message = extract_responses_error(&event);
+                let _ = sink(ProviderEvent::Failed {
+                    message: message.clone(),
+                });
+                return Err(BackendError::InvalidResponse(message));
             }
             _ => {}
         }
@@ -841,6 +1141,9 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
                 usage,
                 model,
                 tool_calls,
+                response_id,
+                refusal,
+                annotations,
             });
         }
         return Err(BackendError::EmptyResponse);
@@ -850,6 +1153,9 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
         usage,
         model,
         tool_calls,
+        response_id,
+        refusal,
+        annotations,
     })
 }
 
@@ -866,6 +1172,42 @@ fn completion_from_responses_json(payload: &Value) -> Result<Completion, Backend
             .and_then(Value::as_str)
             .map(str::to_owned),
         tool_calls: extract_responses_tool_calls(payload)?,
+        response_id: payload.get("id").and_then(Value::as_str).map(str::to_owned),
+        refusal: extract_responses_refusal(payload),
+        annotations: extract_annotations(payload),
+    })
+}
+
+fn emit_completion_events(
+    completion: &Completion,
+    sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+) -> Result<(), BackendError> {
+    if let Some(response_id) = completion.response_id.clone() {
+        sink(ProviderEvent::ResponseCreated {
+            response_id: Some(response_id),
+            model: completion.model.clone(),
+        })?;
+    }
+    if !completion.content.is_empty() {
+        sink(ProviderEvent::TextDelta {
+            delta: completion.content.clone(),
+        })?;
+        sink(ProviderEvent::TextDone {
+            text: completion.content.clone(),
+        })?;
+    }
+    if let Some(refusal) = completion.refusal.clone() {
+        sink(ProviderEvent::Refusal { text: refusal })?;
+    }
+    for call in &completion.tool_calls {
+        sink(ProviderEvent::ToolCallDone { call: call.clone() })?;
+    }
+    if let Some(usage) = completion.usage {
+        sink(ProviderEvent::Usage { usage })?;
+    }
+    sink(ProviderEvent::Completed {
+        response_id: completion.response_id.clone(),
+        model: completion.model.clone(),
     })
 }
 
