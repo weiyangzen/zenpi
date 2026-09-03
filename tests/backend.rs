@@ -5,11 +5,11 @@ use std::time::Duration;
 
 use serde_json::Value;
 use tempfile::tempdir;
-use zenpi::backend::OpenAiCompatibleBackend;
+use zenpi::backend::{OpenAiCompatibleBackend, OpenAiWireApi};
 use zenpi::core::{Agent, TurnInputRequest};
 use zenpi::session::SessionStore;
 
-fn respond(mut stream: TcpStream) -> Result<(), String> {
+fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String> {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| error.to_string())?;
@@ -29,7 +29,11 @@ fn respond(mut stream: TcpStream) -> Result<(), String> {
         }
     };
     let headers = String::from_utf8_lossy(&request[..header_end]);
-    if !headers.starts_with("POST /v1/chat/completions HTTP/1.1") {
+    let expected_path = match wire_api {
+        OpenAiWireApi::ChatCompletions => "/v1/chat/completions",
+        OpenAiWireApi::Responses => "/v1/responses",
+    };
+    if !headers.starts_with(&format!("POST {expected_path} HTTP/1.1")) {
         return Err(format!("unexpected request line: {headers}"));
     }
     if !headers
@@ -56,16 +60,58 @@ fn respond(mut stream: TcpStream) -> Result<(), String> {
     }
     let body: Value = serde_json::from_slice(&request[header_end..header_end + content_length])
         .map_err(|error| error.to_string())?;
+    let expected_stream = matches!(wire_api, OpenAiWireApi::Responses);
     if body.get("model").and_then(Value::as_str) != Some("mock-model")
-        || body.get("stream").and_then(Value::as_bool) != Some(false)
+        || body.get("stream").and_then(Value::as_bool) != Some(expected_stream)
     {
         return Err(format!("unexpected request body: {body}"));
     }
 
-    let payload = r#"{"id":"fixture","model":"mock-model","choices":[{"message":{"content":"fixture answer"}}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}"#;
+    match wire_api {
+        OpenAiWireApi::ChatCompletions => {
+            if body.get("messages").and_then(Value::as_array).is_none() {
+                return Err(format!("chat request omitted messages: {body}"));
+            }
+        }
+        OpenAiWireApi::Responses => {
+            let input = body
+                .get("input")
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("responses request omitted input: {body}"))?;
+            if input
+                .first()
+                .and_then(|item| item.get("role"))
+                .and_then(Value::as_str)
+                != Some("user")
+            {
+                return Err(format!("responses request had unexpected input: {body}"));
+            }
+            if input
+                .first()
+                .and_then(|item| item.get("content"))
+                .and_then(Value::as_str)
+                != Some("hello responses")
+            {
+                return Err(format!("responses request lost user content: {body}"));
+            }
+        }
+    }
+    let payload = match wire_api {
+        OpenAiWireApi::ChatCompletions => {
+            r#"{"id":"fixture","model":"mock-model","choices":[{"message":{"content":"fixture answer"}}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}"#
+        }
+        OpenAiWireApi::Responses => {
+            "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_fixture\"}}\0\0\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"responses answer\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_fixture\",\"model\":\"mock-model\",\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"total_tokens\":9}}}\n\ndata: [DONE]\n"
+        }
+    };
+    let content_type = if expected_stream {
+        "text/event-stream"
+    } else {
+        "application/json"
+    };
     write!(
         stream,
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         payload.len(),
         payload
     )
@@ -79,7 +125,7 @@ fn openai_compatible_backend_works_against_local_fixture() {
     let port = listener.local_addr().unwrap().port();
     let server = thread::spawn(move || -> Result<(), String> {
         let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
-        respond(stream)
+        respond(stream, OpenAiWireApi::ChatCompletions)
     });
     let backend = OpenAiCompatibleBackend::new(
         format!("http://127.0.0.1:{port}/v1"),
@@ -98,5 +144,34 @@ fn openai_compatible_backend_works_against_local_fixture() {
     let assistant = result.assistant.unwrap();
     assert_eq!(assistant.content, "fixture answer");
     assert_eq!(assistant.metadata.unwrap()["usage"]["total_tokens"], 3);
+    server.join().unwrap().unwrap();
+}
+
+#[test]
+fn responses_backend_works_against_local_fixture() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || -> Result<(), String> {
+        let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        respond(stream, OpenAiWireApi::Responses)
+    });
+    let backend = OpenAiCompatibleBackend::new_with_wire_api(
+        format!("http://127.0.0.1:{port}/v1"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+    )
+    .unwrap();
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(dir.path().join("responses.jsonl")).unwrap(),
+        Box::new(backend),
+    );
+    let result = agent
+        .process(TurnInputRequest::new("hello responses"))
+        .unwrap();
+    let assistant = result.assistant.unwrap();
+    assert_eq!(assistant.content, "responses answer");
+    assert_eq!(assistant.metadata.unwrap()["usage"]["total_tokens"], 9);
     server.join().unwrap().unwrap();
 }

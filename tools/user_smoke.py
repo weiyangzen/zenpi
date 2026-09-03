@@ -24,14 +24,14 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(command: list[str], *, input_text: str = "", env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def run(command: list[str], *, input_text: str = "", env: dict[str, str] | None = None, timeout: float = 180) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=ROOT,
         input=input_text,
         text=True,
         capture_output=True,
-        timeout=45,
+        timeout=timeout,
         env=env,
         check=False,
     )
@@ -138,7 +138,11 @@ def assert_resume_reopens_process(binary: Path, session: Path, root: Path) -> No
 
 def assert_invalid_inputs(binary: Path, root: Path) -> None:
     missing_key_session = root / "missing-key.jsonl"
+    isolated_home = root / "empty-home"
+    isolated_home.mkdir()
     env = {key: value for key, value in os.environ.items() if key not in {"ZENPI_API_KEY", "OPENAI_API_KEY"}}
+    env["HOME"] = str(isolated_home)
+    env["ZENPI_HOME"] = str(isolated_home / ".zenpi")
     # Deliberately omit the path: the binary must normalize the host before
     # applying its credential guard.
     env["ZENPI_BASE_URL"] = "https://api.openai.com"
@@ -169,19 +173,21 @@ class _MockHandler(BaseHTTPRequestHandler):
             "model": body.get("model"),
             "stream": body.get("stream"),
             "authorization": self.headers.get("authorization"),
-            "messages": body.get("messages"),
+            "input": body.get("input"),
         }
-        response = json.dumps(
-            {
-                "id": "chatcmpl-user-smoke",
-                "model": "mock-model",
-                "choices": [{"message": {"role": "assistant", "content": "provider works"}}],
-                "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},
-            }
+        if self.path != "/v1/responses" or body.get("stream") is not True:
+            self.send_error(400, "Responses fixture requires /v1/responses with stream=true")
+            return
+        response = (
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp-user-smoke\",\"model\":\"mock-model\"}}\n\n"
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"provider works\"}\n\n"
+            "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-user-smoke\",\"model\":\"mock-model\",\"usage\":{\"input_tokens\":3,\"output_tokens\":2,\"total_tokens\":5}}}\n\n"
+            "data: [DONE]\n"
         ).encode("utf-8")
         self.send_response(200)
-        self.send_header("content-type", "application/json")
+        self.send_header("content-type", "text/event-stream")
         self.send_header("content-length", str(len(response)))
+        self.send_header("connection", "close")
         self.end_headers()
         self.wfile.write(response)
 
@@ -196,7 +202,15 @@ def assert_openai_fixture(binary: Path, root: Path) -> None:
     server_thread = threading.Thread(target=server.handle_request, daemon=True)
     server_thread.start()
     session = root / "provider-session.jsonl"
-    env = {**os.environ, "ZENPI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1", "ZENPI_API_KEY": "user-smoke-key"}
+    env = {
+        **os.environ,
+        "ZENPI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1",
+        "ZENPI_API_KEY": "user-smoke-key",
+        "ZENPI_WIRE_API": "responses",
+        "ZENPI_HOME": str(root / "provider-zenpi"),
+        "HOME": str(root / "provider-home"),
+    }
+    Path(env["HOME"]).mkdir()
     payload = (
         '{"type":"prompt","id":"p","text":"provider prompt"}\n'
         '{"type":"shutdown","id":"q"}\n'
@@ -212,9 +226,9 @@ def assert_openai_fixture(binary: Path, root: Path) -> None:
         raise AssertionError("OpenAI fixture did not receive the request")
     assert_success(result, "OpenAI-compatible fixture")
     request = _MockHandler.request
-    if request.get("path") != "/v1/chat/completions":
+    if request.get("path") != "/v1/responses":
         raise AssertionError(f"unexpected provider path: {request!r}")
-    if request.get("model") != "mock-model" or request.get("stream") is not False:
+    if request.get("model") != "mock-model" or request.get("stream") is not True:
         raise AssertionError(f"provider request contract mismatch: {request!r}")
     if request.get("authorization") != "Bearer user-smoke-key":
         raise AssertionError("provider authorization header was not sent")
@@ -383,7 +397,7 @@ def main() -> int:
         assert_invalid_inputs(binary, root)
         assert_openai_fixture(binary, root)
         assert_tui(binary, root)
-        print("user smoke passed: release, install, echo, resume, OpenAI fixture, and TUI")
+    print("user smoke passed: release, install, echo, resume, Responses fixture, and TUI")
     return 0
 
 

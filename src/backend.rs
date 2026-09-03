@@ -5,13 +5,14 @@
 //! returns one normalized completion.  This keeps the headless and TUI modes
 //! behaviorally identical and makes a deterministic backend useful in tests.
 
-use std::{env, time::Duration};
+use std::{env, str::FromStr, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::core::{Turn, TurnRole};
+use crate::tools::{ToolCall, ToolDefinition};
 
 /// Keep provider responses bounded even when an endpoint omits a content
 /// length.  The core applies the smaller per-turn text limit afterwards.
@@ -23,6 +24,9 @@ pub struct CompletionRequest<'a> {
     pub turn_id: &'a str,
     pub turns: &'a [Turn],
     pub model: Option<&'a str>,
+    /// Tools advertised for this turn. Providers must not infer or invent
+    /// capabilities that are absent from this bounded list.
+    pub tools: &'a [ToolDefinition],
 }
 
 /// Optional usage information returned by a provider.
@@ -34,11 +38,12 @@ pub struct Usage {
 }
 
 /// Provider-independent completion result.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Completion {
     pub content: String,
     pub usage: Option<Usage>,
     pub model: Option<String>,
+    pub tool_calls: Vec<ToolCall>,
 }
 
 impl Completion {
@@ -47,6 +52,7 @@ impl Completion {
             content: content.into(),
             usage: None,
             model: None,
+            tool_calls: Vec::new(),
         }
     }
 }
@@ -110,6 +116,12 @@ pub trait Backend: Send + Sync {
     fn name(&self) -> &str {
         "backend"
     }
+
+    /// Return the configured model when the backend has one. Hosts use this
+    /// for status snapshots without downcasting a provider implementation.
+    fn model(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Deterministic backend used by default.  It returns the latest user text
@@ -134,17 +146,58 @@ impl Backend for EchoBackend {
     }
 }
 
-/// A minimal OpenAI-compatible chat-completions backend.
+/// Wire protocol used by an OpenAI-compatible HTTP endpoint.
 ///
-/// It intentionally implements the non-streaming endpoint only.  Streaming
-/// remains a UI concern and can be added behind this same trait without
-/// changing session or protocol ownership.  `ureq` is blocking and connection
-/// pooling keeps the steady-state process smaller than an async runtime.
+/// Chat Completions remains the default for backwards compatibility with
+/// existing local proxies.  The Responses API is selected explicitly (or by
+/// `ZENPI_WIRE_API=responses`) and is the protocol used by current Codex
+/// configuration files.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OpenAiWireApi {
+    #[default]
+    ChatCompletions,
+    Responses,
+}
+
+impl OpenAiWireApi {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ChatCompletions => "chat_completions",
+            Self::Responses => "responses",
+        }
+    }
+}
+
+impl FromStr for OpenAiWireApi {
+    type Err = BackendError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "chat" | "chat_completions" | "chat-completions" | "chatcompletions" => {
+                Ok(Self::ChatCompletions)
+            }
+            "responses" | "response" => Ok(Self::Responses),
+            other => Err(BackendError::Configuration(format!(
+                "unsupported OpenAI wire API {other:?}; use chat_completions or responses"
+            ))),
+        }
+    }
+}
+
+/// A synchronous OpenAI-compatible HTTP backend.
+///
+/// Chat Completions uses a bounded JSON response; Responses uses the
+/// provider's server-sent event stream and folds text deltas into the same
+/// normalized completion. `ureq` is blocking and connection pooling keeps
+/// the steady-state process smaller than an async runtime.
 pub struct OpenAiCompatibleBackend {
     client: ureq::Agent,
     endpoint: String,
     api_key: Option<String>,
     model: String,
+    wire_api: OpenAiWireApi,
+    reasoning_effort: Option<String>,
+    verbosity: Option<String>,
 }
 
 impl std::fmt::Debug for OpenAiCompatibleBackend {
@@ -154,6 +207,9 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("endpoint", &self.endpoint)
             .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
             .field("model", &self.model)
+            .field("wire_api", &self.wire_api)
+            .field("reasoning_effort", &self.reasoning_effort)
+            .field("verbosity", &self.verbosity)
             .finish()
     }
 }
@@ -164,7 +220,27 @@ impl OpenAiCompatibleBackend {
         api_key: Option<String>,
         model: impl Into<String>,
     ) -> Result<Self, BackendError> {
-        let endpoint = normalize_endpoint(endpoint.into())?;
+        Self::new_with_wire_api(endpoint, api_key, model, OpenAiWireApi::ChatCompletions)
+    }
+
+    pub fn new_with_wire_api(
+        endpoint: impl Into<String>,
+        api_key: Option<String>,
+        model: impl Into<String>,
+        wire_api: OpenAiWireApi,
+    ) -> Result<Self, BackendError> {
+        Self::new_with_settings(endpoint, api_key, model, wire_api, None, None)
+    }
+
+    pub fn new_with_settings(
+        endpoint: impl Into<String>,
+        api_key: Option<String>,
+        model: impl Into<String>,
+        wire_api: OpenAiWireApi,
+        reasoning_effort: Option<String>,
+        verbosity: Option<String>,
+    ) -> Result<Self, BackendError> {
+        let endpoint = normalize_endpoint(endpoint.into(), wire_api)?;
         let model = model.into();
         if model.trim().is_empty() || model.len() > 256 || model.chars().any(char::is_control) {
             return Err(BackendError::Configuration(
@@ -179,6 +255,18 @@ impl OpenAiCompatibleBackend {
                 "API key must be non-empty and contain no control characters".into(),
             ));
         }
+        for (name, value) in [
+            ("reasoning effort", reasoning_effort.as_deref()),
+            ("verbosity", verbosity.as_deref()),
+        ] {
+            if value.is_some_and(|value| {
+                value.trim().is_empty() || value.len() > 64 || value.chars().any(char::is_control)
+            }) {
+                return Err(BackendError::Configuration(format!(
+                    "{name} must be non-empty, at most 64 bytes, and contain no control characters"
+                )));
+            }
+        }
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(120)))
             .build();
@@ -187,34 +275,66 @@ impl OpenAiCompatibleBackend {
             endpoint,
             api_key,
             model,
+            wire_api,
+            reasoning_effort,
+            verbosity,
         })
     }
 
     pub fn from_env() -> Result<Self, BackendError> {
         let endpoint = env::var("ZENPI_BASE_URL")
             .or_else(|_| env::var("OPENAI_BASE_URL"))
-            .unwrap_or_else(|_| "https://api.openai.com/v1/chat/completions".into());
+            .unwrap_or_else(|_| "https://api.openai.com/v1".into());
         let api_key = env::var("ZENPI_API_KEY")
             .or_else(|_| env::var("OPENAI_API_KEY"))
             .ok();
         let model = env::var("ZENPI_MODEL")
             .or_else(|_| env::var("OPENAI_MODEL"))
             .unwrap_or_else(|_| "gpt-4o-mini".into());
-        Self::from_values(endpoint, api_key, model)
+        let wire_api = match env::var("ZENPI_WIRE_API").or_else(|_| env::var("OPENAI_WIRE_API")) {
+            Ok(value) => value.parse()?,
+            Err(_) => OpenAiWireApi::default(),
+        };
+        Self::from_values_with_wire_api(endpoint, api_key, model, wire_api)
     }
 
-    fn from_values(
+    pub fn from_values_with_wire_api(
         endpoint: String,
         api_key: Option<String>,
         model: String,
+        wire_api: OpenAiWireApi,
     ) -> Result<Self, BackendError> {
-        let normalized_endpoint = normalize_endpoint(endpoint)?;
+        let normalized_endpoint = normalize_endpoint(endpoint, wire_api)?;
         if is_openai_endpoint(&normalized_endpoint) && api_key.is_none() {
             return Err(BackendError::Configuration(
                 "ZENPI_API_KEY or OPENAI_API_KEY is required for api.openai.com".into(),
             ));
         }
-        Self::new(normalized_endpoint, api_key, model)
+        Self::new_with_wire_api(normalized_endpoint, api_key, model, wire_api)
+    }
+
+    pub fn from_values_with_settings(
+        endpoint: String,
+        api_key: Option<String>,
+        model: String,
+        wire_api: OpenAiWireApi,
+        reasoning_effort: Option<String>,
+        verbosity: Option<String>,
+    ) -> Result<Self, BackendError> {
+        let normalized_endpoint = normalize_endpoint(endpoint, wire_api)?;
+        if is_openai_endpoint(&normalized_endpoint) && api_key.is_none() {
+            return Err(BackendError::Configuration(
+                "ZENPI_API_KEY or OPENAI_API_KEY is required for api.openai.com".into(),
+            ));
+        }
+        Self::new_with_settings(
+            normalized_endpoint,
+            api_key,
+            model,
+            wire_api,
+            reasoning_effort,
+            verbosity,
+        )
     }
 
     pub fn endpoint(&self) -> &str {
@@ -224,9 +344,16 @@ impl OpenAiCompatibleBackend {
     pub fn model(&self) -> &str {
         &self.model
     }
+
+    pub const fn wire_api(&self) -> OpenAiWireApi {
+        self.wire_api
+    }
 }
 
-fn normalize_endpoint(mut endpoint: String) -> Result<String, BackendError> {
+fn normalize_endpoint(
+    mut endpoint: String,
+    wire_api: OpenAiWireApi,
+) -> Result<String, BackendError> {
     if endpoint.trim().is_empty() || endpoint.len() > 2048 {
         return Err(BackendError::Configuration(
             "endpoint must be non-empty and at most 2048 bytes".into(),
@@ -245,8 +372,35 @@ fn normalize_endpoint(mut endpoint: String) -> Result<String, BackendError> {
     while endpoint.ends_with('/') {
         endpoint.pop();
     }
-    if !endpoint.ends_with("/chat/completions") {
-        endpoint.push_str("/chat/completions");
+    let canonical_openai_host = is_openai_endpoint(&endpoint);
+    let suffix = match wire_api {
+        OpenAiWireApi::ChatCompletions => "/chat/completions",
+        OpenAiWireApi::Responses => "/responses",
+    };
+    if endpoint.ends_with("/chat/completions") {
+        endpoint.truncate(endpoint.len() - "/chat/completions".len());
+    } else if endpoint.ends_with("/responses") {
+        endpoint.truncate(endpoint.len() - "/responses".len());
+    }
+    while endpoint.ends_with('/') {
+        endpoint.pop();
+    }
+    if endpoint.ends_with("/v1") {
+        endpoint.push_str(suffix);
+    } else if endpoint
+        .strip_prefix("http://")
+        .or_else(|| endpoint.strip_prefix("https://"))
+        .is_some_and(|rest| !rest.contains('/'))
+    {
+        // OpenAI's canonical Responses endpoint lives under `/v1`, while
+        // preserving the historical Chat Completions behavior for generic
+        // OpenAI-compatible hosts that supplied an origin-only URL.
+        if matches!(wire_api, OpenAiWireApi::Responses) && canonical_openai_host {
+            endpoint.push_str("/v1");
+        }
+        endpoint.push_str(suffix);
+    } else {
+        endpoint.push_str(suffix);
     }
     Ok(endpoint)
 }
@@ -266,24 +420,73 @@ impl Backend for OpenAiCompatibleBackend {
                 "model must be non-empty and at most 256 bytes".into(),
             ));
         }
-        let messages: Vec<Value> = request
-            .turns
-            .iter()
-            .map(|turn| {
-                let role = match turn.role {
-                    TurnRole::System => "system",
-                    TurnRole::User => "user",
-                    TurnRole::Assistant => "assistant",
-                    TurnRole::Tool => "tool",
-                };
-                json!({ "role": role, "content": turn.content })
-            })
-            .collect();
-        let body = json!({
-            "model": model,
-            "messages": messages,
-            "stream": false,
-        });
+        let body = match self.wire_api {
+            OpenAiWireApi::ChatCompletions => {
+                let messages: Vec<Value> = request.turns.iter().map(chat_message).collect();
+                let mut body = json!({
+                    "model": model,
+                    "messages": messages,
+                    "stream": false,
+                });
+                if !request.tools.is_empty() {
+                    body["tools"] = Value::Array(
+                        request
+                            .tools
+                            .iter()
+                            .map(|tool| {
+                                json!({
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool.name,
+                                        "description": tool.description,
+                                        "parameters": tool.input_schema,
+                                    }
+                                })
+                            })
+                            .collect(),
+                    );
+                    body["tool_choice"] = json!("auto");
+                }
+                body
+            }
+            OpenAiWireApi::Responses => {
+                let input: Vec<Value> = request
+                    .turns
+                    .iter()
+                    .flat_map(responses_input_items)
+                    .collect();
+                let mut body = json!({
+                    "model": model,
+                    "input": input,
+                    "stream": true,
+                    "store": false,
+                });
+                if let Some(effort) = &self.reasoning_effort {
+                    body["reasoning"] = json!({"effort": effort});
+                }
+                if let Some(verbosity) = &self.verbosity {
+                    body["text"] = json!({"verbosity": verbosity});
+                }
+                if !request.tools.is_empty() {
+                    body["tools"] = Value::Array(
+                        request
+                            .tools
+                            .iter()
+                            .map(|tool| {
+                                json!({
+                                    "type": "function",
+                                    "name": tool.name,
+                                    "description": tool.description,
+                                    "parameters": tool.input_schema,
+                                })
+                            })
+                            .collect(),
+                    );
+                    body["tool_choice"] = json!("auto");
+                }
+                body
+            }
+        };
         let mut request_builder = self
             .client
             .post(&self.endpoint)
@@ -292,30 +495,131 @@ impl Backend for OpenAiCompatibleBackend {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
         }
         let mut response = request_builder.send_json(&body).map_err(map_ureq_error)?;
-        let payload: Value = response
-            .body_mut()
-            .with_config()
-            .limit(MAX_RESPONSE_BYTES as u64)
-            .read_json()
-            .map_err(map_ureq_error)?;
-        let content = extract_content(&payload)?;
-        if content.trim().is_empty() {
-            return Err(BackendError::EmptyResponse);
+        match self.wire_api {
+            OpenAiWireApi::ChatCompletions => {
+                let payload: Value = response
+                    .body_mut()
+                    .with_config()
+                    .limit(MAX_RESPONSE_BYTES as u64)
+                    .read_json()
+                    .map_err(map_ureq_error)?;
+                let tool_calls = extract_chat_tool_calls(&payload)?;
+                let content = match extract_content(&payload) {
+                    Ok(content) => content,
+                    Err(BackendError::InvalidResponse(_)) if !tool_calls.is_empty() => {
+                        String::new()
+                    }
+                    Err(error) => return Err(error),
+                };
+                if content.trim().is_empty() && tool_calls.is_empty() {
+                    return Err(BackendError::EmptyResponse);
+                }
+                Ok(Completion {
+                    content,
+                    usage: payload.get("usage").and_then(parse_usage),
+                    model: payload
+                        .get("model")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                    tool_calls,
+                })
+            }
+            OpenAiWireApi::Responses => read_responses_stream(response.body_mut()),
         }
-        let usage = payload.get("usage").and_then(parse_usage);
-        Ok(Completion {
-            content,
-            usage,
-            model: payload
-                .get("model")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-        })
     }
 
     fn name(&self) -> &str {
         "openai-compatible"
     }
+
+    fn model(&self) -> Option<&str> {
+        Some(&self.model)
+    }
+}
+
+fn chat_message(turn: &Turn) -> Value {
+    let role = match turn.role {
+        TurnRole::System => "system",
+        TurnRole::User => "user",
+        TurnRole::Assistant => "assistant",
+        TurnRole::Tool => "tool",
+    };
+    let mut message = json!({"role": role, "content": turn.content});
+    if turn.role == TurnRole::Tool {
+        if let Some(call_id) = turn
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("tool_call_id"))
+        {
+            message["tool_call_id"] = call_id.clone();
+        }
+    } else if turn.role == TurnRole::Assistant
+        && let Some(calls) = turn
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("tool_calls"))
+    {
+        message["tool_calls"] = Value::Array(
+            calls
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|item| {
+                    json!({
+                        "type": "function",
+                        "id": item.get("id"),
+                        "function": {
+                            "name": item.get("name"),
+                            "arguments": item.get("arguments").map_or_else(|| "{}".into(), Value::to_string),
+                        }
+                    })
+                })
+                .collect(),
+        );
+    }
+    message
+}
+
+fn responses_input_items(turn: &Turn) -> Vec<Value> {
+    if turn.role == TurnRole::Tool {
+        let call_id = turn
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("tool_call_id"))
+            .and_then(Value::as_str)
+            .unwrap_or(&turn.id);
+        return vec![json!({
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": turn.content,
+        })];
+    }
+    if turn.role == TurnRole::Assistant
+        && let Some(calls) = turn
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("tool_calls"))
+            .and_then(Value::as_array)
+    {
+        return calls
+            .iter()
+            .filter_map(|item| {
+                Some(json!({
+                    "type": "function_call",
+                    "call_id": item.get("id")?.as_str()?,
+                    "name": item.get("name")?.as_str()?,
+                    "arguments": item.get("arguments")?.to_string(),
+                }))
+            })
+            .collect();
+    }
+    let role = match turn.role {
+        TurnRole::System => "system",
+        TurnRole::User => "user",
+        TurnRole::Assistant => "assistant",
+        TurnRole::Tool => unreachable!(),
+    };
+    vec![json!({"role": role, "content": turn.content})]
 }
 
 fn map_ureq_error(error: ureq::Error) -> BackendError {
@@ -351,6 +655,260 @@ fn extract_content(payload: &Value) -> Result<String, BackendError> {
     }
 }
 
+fn extract_responses_content(payload: &Value) -> Result<String, BackendError> {
+    if let Some(text) = payload.get("output_text").and_then(Value::as_str) {
+        return Ok(text.to_owned());
+    }
+    let output = payload
+        .get("output")
+        .and_then(Value::as_array)
+        .ok_or_else(|| BackendError::InvalidResponse("missing output".into()))?;
+    let mut text = String::new();
+    for item in output {
+        let Some(content) = item.get("content") else {
+            continue;
+        };
+        match content {
+            Value::String(value) => text.push_str(value),
+            Value::Array(parts) => {
+                for part in parts {
+                    if let Some(value) = part.get("text").and_then(Value::as_str) {
+                        text.push_str(value);
+                    }
+                }
+            }
+            other => {
+                return Err(BackendError::InvalidResponse(format!(
+                    "response content must be a string or text parts, got {other}"
+                )));
+            }
+        }
+    }
+    if text.is_empty() {
+        return Err(BackendError::InvalidResponse(
+            "missing response output text".into(),
+        ));
+    }
+    Ok(text)
+}
+
+fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendError> {
+    let text = body
+        .with_config()
+        .limit(MAX_RESPONSE_BYTES as u64)
+        .read_to_string()
+        .map_err(map_ureq_error)?;
+    // Some OpenAI-compatible proxies ignore `stream:true` and return a
+    // regular Responses JSON object. Accept that shape as a compatibility
+    // fallback while keeping the normal path event-aware.
+    if text.trim_start().starts_with('{') {
+        let payload: Value = serde_json::from_str(text.trim()).map_err(|error| {
+            BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
+        })?;
+        let content = extract_responses_content(&payload)?;
+        if content.trim().is_empty() {
+            return Err(BackendError::EmptyResponse);
+        }
+        return Ok(Completion {
+            content,
+            usage: payload.get("usage").and_then(parse_usage),
+            model: payload
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            tool_calls: extract_responses_tool_calls(&payload)?,
+        });
+    }
+    let mut content = String::new();
+    let mut usage = None;
+    let mut model = None;
+    let mut saw_completed = false;
+    let mut tool_calls = Vec::new();
+    for line in text.lines() {
+        let Some(data) = line.strip_prefix("data:") else {
+            continue;
+        };
+        // Some compatible gateways pad SSE frames with NUL bytes between
+        // events. They are transport padding, not part of the JSON payload.
+        let data = data.trim_matches('\0').trim();
+        if data.is_empty() || data == "[DONE]" {
+            continue;
+        }
+        let event: Value = serde_json::from_str(data).map_err(|error| {
+            BackendError::InvalidResponse(format!("invalid SSE event: {error}"))
+        })?;
+        match event.get("type").and_then(Value::as_str) {
+            Some("response.output_text.delta") => {
+                if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                    content.push_str(delta);
+                }
+            }
+            Some("response.output_text.done") => {
+                if content.is_empty()
+                    && let Some(value) = event.get("text").and_then(Value::as_str)
+                {
+                    content.push_str(value);
+                }
+            }
+            Some("response.output_item.done") => {
+                if let Some(item) = event.get("item")
+                    && item.get("type").and_then(Value::as_str) == Some("function_call")
+                    && let Some(call) = parse_response_function_call(item)
+                {
+                    push_unique_tool_call(&mut tool_calls, call);
+                }
+            }
+            Some("response.function_call_arguments.done") => {
+                if let Some(call_id) = event.get("call_id").and_then(Value::as_str)
+                    && let Some(name) = event.get("name").and_then(Value::as_str)
+                {
+                    let arguments = event
+                        .get("arguments")
+                        .and_then(Value::as_str)
+                        .unwrap_or("{}");
+                    push_unique_tool_call(
+                        &mut tool_calls,
+                        parse_tool_call(call_id, name, arguments)?,
+                    );
+                }
+            }
+            Some("response.completed") => {
+                saw_completed = true;
+                let response = event.get("response").unwrap_or(&event);
+                usage = response.get("usage").and_then(parse_usage);
+                model = response
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+            }
+            Some("response.failed") | Some("error") => {
+                return Err(BackendError::InvalidResponse(extract_responses_error(
+                    &event,
+                )));
+            }
+            _ => {}
+        }
+    }
+    if !saw_completed {
+        return Err(BackendError::InvalidResponse(
+            "Responses stream ended without response.completed".into(),
+        ));
+    }
+    if content.trim().is_empty() {
+        if !tool_calls.is_empty() {
+            return Ok(Completion {
+                content,
+                usage,
+                model,
+                tool_calls,
+            });
+        }
+        return Err(BackendError::EmptyResponse);
+    }
+    Ok(Completion {
+        content,
+        usage,
+        model,
+        tool_calls,
+    })
+}
+
+fn push_unique_tool_call(calls: &mut Vec<ToolCall>, call: ToolCall) {
+    if !calls.iter().any(|existing| existing.id == call.id) {
+        calls.push(call);
+    }
+}
+
+fn extract_chat_tool_calls(payload: &Value) -> Result<Vec<ToolCall>, BackendError> {
+    let Some(calls) = payload
+        .get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+        .and_then(|choice| choice.get("message"))
+        .and_then(|message| message.get("tool_calls"))
+        .and_then(Value::as_array)
+    else {
+        return Ok(Vec::new());
+    };
+    calls
+        .iter()
+        .map(|call| {
+            let id = call
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| BackendError::InvalidResponse("tool call is missing id".into()))?;
+            let function = call.get("function").ok_or_else(|| {
+                BackendError::InvalidResponse("tool call is missing function".into())
+            })?;
+            let name = function
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    BackendError::InvalidResponse("tool call is missing function name".into())
+                })?;
+            let arguments = function
+                .get("arguments")
+                .and_then(Value::as_str)
+                .unwrap_or("{}");
+            parse_tool_call(id, name, arguments)
+        })
+        .collect()
+}
+
+fn extract_responses_tool_calls(payload: &Value) -> Result<Vec<ToolCall>, BackendError> {
+    let Some(output) = payload.get("output").and_then(Value::as_array) else {
+        return Ok(Vec::new());
+    };
+    output
+        .iter()
+        .filter(|item| item.get("type").and_then(Value::as_str) == Some("function_call"))
+        .map(parse_response_function_call)
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| BackendError::InvalidResponse("response function call is incomplete".into()))
+}
+
+fn parse_response_function_call(item: &Value) -> Option<ToolCall> {
+    let id = item
+        .get("call_id")
+        .or_else(|| item.get("id"))
+        .and_then(Value::as_str)?;
+    let name = item.get("name").and_then(Value::as_str)?;
+    let arguments = item
+        .get("arguments")
+        .and_then(Value::as_str)
+        .unwrap_or("{}");
+    parse_tool_call(id, name, arguments).ok()
+}
+
+fn parse_tool_call(id: &str, name: &str, arguments: &str) -> Result<ToolCall, BackendError> {
+    let arguments = serde_json::from_str(arguments).map_err(|error| {
+        BackendError::InvalidResponse(format!("invalid tool call arguments: {error}"))
+    })?;
+    Ok(ToolCall {
+        id: id.to_owned(),
+        name: name.to_owned(),
+        arguments,
+    })
+}
+
+fn extract_responses_error(event: &Value) -> String {
+    let error = event.get("error").or_else(|| {
+        event
+            .get("response")
+            .and_then(|response| response.get("error"))
+    });
+    match error {
+        Some(Value::String(message)) => message.to_owned(),
+        Some(Value::Object(error)) => error
+            .get("message")
+            .and_then(Value::as_str)
+            .or_else(|| error.get("code").and_then(Value::as_str))
+            .unwrap_or("Responses stream failed")
+            .to_owned(),
+        _ => "Responses stream failed".to_owned(),
+    }
+}
+
 fn parse_usage(value: &Value) -> Option<Usage> {
     let input = value
         .get("prompt_tokens")
@@ -375,24 +933,87 @@ fn parse_usage(value: &Value) -> Option<Usage> {
 
 #[cfg(test)]
 mod tests {
-    use super::OpenAiCompatibleBackend;
+    use super::{OpenAiCompatibleBackend, OpenAiWireApi, extract_responses_content};
+    use serde_json::json;
 
     #[test]
     fn openai_host_requires_credentials_after_endpoint_normalization() {
-        let error = OpenAiCompatibleBackend::from_values(
+        let error = OpenAiCompatibleBackend::from_values_with_wire_api(
             "https://api.openai.com".into(),
             None,
             "gpt-4o-mini".into(),
+            OpenAiWireApi::ChatCompletions,
         )
         .expect_err("the normalized OpenAI host must require an API key");
         assert!(error.to_string().contains("API_KEY"));
 
-        let query_error = OpenAiCompatibleBackend::from_values(
+        let query_error = OpenAiCompatibleBackend::from_values_with_wire_api(
             "https://api.openai.com?tenant=default".into(),
             None,
             "gpt-4o-mini".into(),
+            OpenAiWireApi::ChatCompletions,
         )
         .expect_err("query-bearing endpoints must be rejected before any request");
         assert!(query_error.to_string().contains("endpoint"));
+    }
+
+    #[test]
+    fn responses_wire_api_normalizes_and_parses_names() {
+        let backend = OpenAiCompatibleBackend::new_with_wire_api(
+            "https://api.openai.com/v1",
+            Some("secret".into()),
+            "gpt-5",
+            OpenAiWireApi::Responses,
+        )
+        .unwrap();
+        assert_eq!(backend.endpoint(), "https://api.openai.com/v1/responses");
+        assert_eq!(backend.wire_api(), OpenAiWireApi::Responses);
+        assert_eq!(
+            "responses".parse::<OpenAiWireApi>().unwrap(),
+            OpenAiWireApi::Responses
+        );
+        assert!("wat".parse::<OpenAiWireApi>().is_err());
+
+        let codex_proxy = OpenAiCompatibleBackend::new_with_wire_api(
+            "http://192.168.50.168:18080",
+            Some("secret".into()),
+            "gpt-5",
+            OpenAiWireApi::Responses,
+        )
+        .unwrap();
+        assert_eq!(
+            codex_proxy.endpoint(),
+            "http://192.168.50.168:18080/responses"
+        );
+
+        let missing_key = OpenAiCompatibleBackend::from_values_with_wire_api(
+            "https://api.openai.com".into(),
+            None,
+            "gpt-5".into(),
+            OpenAiWireApi::Responses,
+        )
+        .expect_err("canonical OpenAI Responses host must require a key");
+        assert!(missing_key.to_string().contains("API_KEY"));
+    }
+
+    #[test]
+    fn responses_output_text_variants_are_extracted() {
+        assert_eq!(
+            extract_responses_content(&json!({"output_text":"top-level"})).unwrap(),
+            "top-level"
+        );
+        assert_eq!(
+            extract_responses_content(&json!({
+                "output": [
+                    {"type":"reasoning","summary":[]},
+                    {"type":"message","content":[
+                        {"type":"output_text","text":"first"},
+                        {"type":"output_text","text":" second"}
+                    ]}
+                ]
+            }))
+            .unwrap(),
+            "first second"
+        );
     }
 }

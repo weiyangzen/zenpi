@@ -1,14 +1,62 @@
+use serde_json::{Map, Value, json};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::tempdir;
 use zenpi::{
     backend::{Backend, BackendError, Completion, CompletionRequest},
     core::{Agent, AgentError, TurnInputRequest, TurnRole, TurnSubmission},
     session::SessionStore,
+    tools::{
+        SideEffectPolicy, Tool, ToolCall, ToolContext, ToolDefinition, ToolError, ToolRegistry,
+    },
 };
 
 struct FailingBackend;
 impl Backend for FailingBackend {
     fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
         Err(BackendError::Transport("offline".into()))
+    }
+}
+
+struct ToolLoopBackend {
+    calls: AtomicUsize,
+}
+
+impl Backend for ToolLoopBackend {
+    fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        let call = self.calls.fetch_add(1, Ordering::SeqCst);
+        if call == 0 {
+            assert_eq!(request.tools.len(), 1);
+            return Ok(Completion {
+                content: String::new(),
+                usage: None,
+                model: None,
+                tool_calls: vec![ToolCall {
+                    id: "call-1".into(),
+                    name: "constant".into(),
+                    arguments: json!({}),
+                }],
+            });
+        }
+        assert!(request.turns.iter().any(|turn| turn.role == TurnRole::Tool));
+        Ok(Completion::text("tool result incorporated"))
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ConstantTool;
+
+impl Tool for ConstantTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "constant".into(),
+            description: "Return a deterministic value for testing.".into(),
+            input_schema: json!({"type": "object", "additionalProperties": false}),
+            side_effect: zenpi::tools::ToolSideEffect::ReadOnly,
+        }
+    }
+
+    fn invoke(&self, _: &ToolContext, _: &Map<String, Value>) -> Result<Value, ToolError> {
+        Ok(json!({"value": 42}))
     }
 }
 
@@ -96,4 +144,40 @@ fn steer_requires_an_active_turn_and_expected_id_matches() {
         .steer_turn(TurnInputRequest::new("right").expecting(turn_id))
         .unwrap();
     assert!(matches!(steered, TurnSubmission::Steered { .. }));
+}
+
+#[test]
+fn provider_tool_calls_execute_and_continue_until_final_text() {
+    let workspace = tempdir().unwrap();
+    let session = SessionStore::open(workspace.path().join("tool-loop.jsonl")).unwrap();
+    let mut registry = ToolRegistry::new();
+    registry.register(ConstantTool).unwrap();
+    let context = ToolContext::new(workspace.path()).unwrap();
+    let mut agent = Agent::new(
+        session,
+        Box::new(ToolLoopBackend {
+            calls: AtomicUsize::new(0),
+        }),
+    );
+    agent.set_tools(registry, context, SideEffectPolicy::read_only());
+
+    let result = agent
+        .process(TurnInputRequest::new("use the tool"))
+        .unwrap();
+    assert_eq!(
+        result.assistant.unwrap().content,
+        "tool result incorporated"
+    );
+    assert_eq!(
+        agent
+            .history()
+            .iter()
+            .filter(|turn| turn.role == TurnRole::Tool)
+            .count(),
+        1
+    );
+    assert!(agent.take_events().iter().any(|event| matches!(
+        event,
+        zenpi::core::AgentEvent::ToolResult { success: true, .. }
+    )));
 }

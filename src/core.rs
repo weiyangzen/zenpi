@@ -18,10 +18,14 @@ use thiserror::Error;
 
 use crate::{
     b3::{B3Error, Handoff, HandoffRecord},
-    backend::{Backend, BackendError, CompletionRequest, EchoBackend, OpenAiCompatibleBackend},
+    backend::{
+        Backend, BackendError, CompletionRequest, EchoBackend, OpenAiCompatibleBackend,
+        OpenAiWireApi,
+    },
     error::ZenpiError,
     protocol::{MAX_ID_BYTES, MAX_TEXT_BYTES, TurnMode},
     session::{SessionError, SessionStore, SessionSummary},
+    tools::{SideEffectPolicy, ToolContext, ToolError, ToolRegistry},
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -187,6 +191,16 @@ pub enum AgentEvent {
         handoff_id: String,
         to: Option<String>,
     },
+    ToolCall {
+        turn_id: String,
+        call_id: String,
+        tool: String,
+    },
+    ToolResult {
+        turn_id: String,
+        call_id: String,
+        success: bool,
+    },
     Error {
         message: String,
     },
@@ -218,6 +232,10 @@ pub enum AgentError {
     Session(#[from] SessionError),
     #[error("b3 handoff: {0}")]
     B3(#[from] B3Error),
+    #[error("tool: {0}")]
+    Tool(#[from] ToolError),
+    #[error("tool loop exceeded {0} iterations")]
+    ToolLoopLimit(usize),
 }
 
 impl AgentError {
@@ -231,6 +249,8 @@ impl AgentError {
             Self::Backend(error) => error.code(),
             Self::Session(_) => "session_error",
             Self::B3(_) => "handoff_error",
+            Self::Tool(_) => "tool_error",
+            Self::ToolLoopLimit(_) => "tool_loop_limit",
         }
     }
 }
@@ -245,6 +265,13 @@ pub struct Agent {
     model: Option<String>,
     last_error: Option<String>,
     events: Vec<AgentEvent>,
+    tools: Option<ToolRuntime>,
+}
+
+struct ToolRuntime {
+    registry: ToolRegistry,
+    context: ToolContext,
+    policy: SideEffectPolicy,
 }
 
 impl std::fmt::Debug for Agent {
@@ -262,15 +289,17 @@ impl std::fmt::Debug for Agent {
 
 impl Agent {
     pub fn new(session: SessionStore, backend: Box<dyn Backend>) -> Self {
+        let model = backend.model().map(str::to_owned);
         Self {
             backend,
             session,
             phase: AgentPhase::Idle,
             active_turn_id: None,
             active_steerable: true,
-            model: None,
+            model,
             last_error: None,
             events: Vec::new(),
+            tools: None,
         }
     }
 
@@ -344,6 +373,21 @@ impl Agent {
 
     pub fn take_events(&mut self) -> Vec<AgentEvent> {
         std::mem::take(&mut self.events)
+    }
+
+    /// Install a bounded tool registry for subsequent provider turns. The
+    /// default agent has no tools, so embedders must opt in explicitly.
+    pub fn set_tools(
+        &mut self,
+        registry: ToolRegistry,
+        context: ToolContext,
+        policy: SideEffectPolicy,
+    ) {
+        self.tools = Some(ToolRuntime {
+            registry,
+            context,
+            policy,
+        });
     }
 
     /// Admit a request without invoking the backend.  This named boundary is
@@ -486,12 +530,8 @@ impl Agent {
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
-        let request = CompletionRequest {
-            turn_id: &turn_id,
-            turns: self.session.turns(),
-            model: self.model.as_deref(),
-        };
-        let completion = match self.backend.complete(request) {
+        const MAX_TOOL_ITERATIONS: usize = 8;
+        let completion = match self.complete_with_tools(&turn_id, MAX_TOOL_ITERATIONS) {
             Ok(completion) => completion,
             Err(error) => {
                 self.last_error = Some(error.to_string());
@@ -500,7 +540,7 @@ impl Agent {
                 self.events.push(AgentEvent::Error {
                     message: error.to_string(),
                 });
-                return Err(error.into());
+                return Err(error);
             }
         };
         if completion.content.trim().is_empty() {
@@ -547,6 +587,93 @@ impl Agent {
         self.events
             .push(AgentEvent::AssistantMessage { turn_id, content });
         Ok(Some(assistant))
+    }
+
+    fn complete_with_tools(
+        &mut self,
+        turn_id: &str,
+        max_iterations: usize,
+    ) -> Result<crate::backend::Completion, AgentError> {
+        for iteration in 0..=max_iterations {
+            let definitions = self
+                .tools
+                .as_ref()
+                .map(|runtime| runtime.registry.definitions())
+                .unwrap_or_default();
+            let request = CompletionRequest {
+                turn_id,
+                turns: self.session.turns(),
+                model: self.model.as_deref(),
+                tools: &definitions,
+            };
+            let completion = self.backend.complete(request)?;
+            if completion.tool_calls.is_empty() {
+                return Ok(completion);
+            }
+            if iteration == max_iterations {
+                return Err(AgentError::ToolLoopLimit(max_iterations));
+            }
+            let Some(runtime) = self.tools.as_ref() else {
+                return Err(AgentError::InvalidTurn(
+                    "provider requested tools but no tool registry is configured".into(),
+                ));
+            };
+            let calls = completion.tool_calls;
+            // Preserve the provider's assistant function-call message in the
+            // journal. Responses and Chat Completions both require that
+            // message to precede their corresponding tool outputs when a
+            // continuation request is issued.
+            let call_metadata = calls
+                .iter()
+                .map(|call| {
+                    serde_json::json!({
+                        "id": call.id,
+                        "name": call.name,
+                        "arguments": call.arguments,
+                    })
+                })
+                .collect::<Vec<_>>();
+            let mut assistant_call = Turn::with_parent(
+                next_id("assistant-tool-call"),
+                turn_id.to_owned(),
+                TurnRole::Assistant,
+                String::new(),
+            );
+            assistant_call.metadata = Some(serde_json::json!({ "tool_calls": call_metadata }));
+            self.session.append_turn(assistant_call)?;
+            for call in calls {
+                self.events.push(AgentEvent::ToolCall {
+                    turn_id: turn_id.to_owned(),
+                    call_id: call.id.clone(),
+                    tool: call.name.clone(),
+                });
+                let result =
+                    runtime
+                        .registry
+                        .execute(&runtime.context, runtime.policy, call.clone());
+                let success = result.is_success();
+                let serialized = serde_json::to_string(&result).map_err(|error| {
+                    AgentError::InvalidTurn(format!("tool result serialization failed: {error}"))
+                })?;
+                let mut tool_turn = Turn::with_parent(
+                    next_id("tool"),
+                    turn_id.to_owned(),
+                    TurnRole::Tool,
+                    serialized,
+                );
+                tool_turn.metadata = Some(serde_json::json!({
+                    "tool_call_id": call.id,
+                    "tool_name": call.name,
+                }));
+                self.session.append_turn(tool_turn)?;
+                self.events.push(AgentEvent::ToolResult {
+                    turn_id: turn_id.to_owned(),
+                    call_id: call.id,
+                    success,
+                });
+            }
+        }
+        Err(AgentError::ToolLoopLimit(max_iterations))
     }
 
     /// Admit and, when accepted, immediately run one turn.
@@ -648,8 +775,18 @@ pub struct CliOptions {
     pub mode: RunMode,
     pub session: PathBuf,
     pub backend: String,
+    pub backend_explicit: bool,
     pub model: Option<String>,
+    pub command: Option<CliCommand>,
     pub help: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliCommand {
+    ConfigImportCodex,
+    ConfigDoctor,
+    PairImportCodex,
+    PairStatus,
 }
 
 impl Default for CliOptions {
@@ -657,8 +794,10 @@ impl Default for CliOptions {
         Self {
             mode: RunMode::Tui,
             session: SessionStore::default_path(),
-            backend: "echo".into(),
+            backend: "openai".into(),
+            backend_explicit: false,
             model: None,
+            command: None,
             help: false,
         }
     }
@@ -671,6 +810,32 @@ where
 {
     let mut options = CliOptions::default();
     let mut args = args.into_iter().map(Into::into).peekable();
+    if args
+        .peek()
+        .is_some_and(|argument| argument == "config" || argument == "pair")
+    {
+        let group = args.next().unwrap_or_default();
+        let action = args
+            .next()
+            .ok_or_else(|| ZenpiError::arguments(format!("{group} requires an action")))?;
+        options.command = Some(match (group.as_str(), action.as_str()) {
+            ("config", "import-codex") => CliCommand::ConfigImportCodex,
+            ("config", "doctor") => CliCommand::ConfigDoctor,
+            ("pair", "import-codex") => CliCommand::PairImportCodex,
+            ("pair", "status") => CliCommand::PairStatus,
+            _ => {
+                return Err(ZenpiError::arguments(format!(
+                    "unknown {group} action `{action}`"
+                )));
+            }
+        });
+        if args.next().is_some() {
+            return Err(ZenpiError::arguments(format!(
+                "{group} {action} does not accept additional arguments"
+            )));
+        }
+        return Ok(options);
+    }
     while let Some(argument) = args.next() {
         let (flag, inline) = argument
             .split_once('=')
@@ -717,6 +882,7 @@ where
                     .map(str::to_owned)
                     .or_else(|| args.next())
                     .ok_or_else(|| ZenpiError::arguments("--backend requires echo or openai"))?;
+                options.backend_explicit = true;
                 if options.backend.trim().is_empty()
                     || options.backend.chars().any(char::is_control)
                 {
@@ -753,18 +919,44 @@ where
 
 fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
     match options.backend.as_str() {
-        "echo" => Ok(Box::new(EchoBackend)),
+        "echo" if options.backend_explicit => Ok(Box::new(EchoBackend)),
+        "echo" => Err(ZenpiError::arguments(
+            "echo is a test fixture; configure a provider or pass --backend echo explicitly",
+        )),
         "openai" => {
-            let mut backend = OpenAiCompatibleBackend::from_env()?;
-            if let Some(model) = &options.model {
-                backend = OpenAiCompatibleBackend::new(
-                    backend.endpoint().to_owned(),
-                    env::var("ZENPI_API_KEY")
-                        .or_else(|_| env::var("OPENAI_API_KEY"))
-                        .ok(),
-                    model,
-                )?;
-            }
+            let effective = crate::config::resolve_default(&crate::config::ConfigOverrides {
+                backend: options.backend_explicit.then(|| options.backend.clone()),
+                model: options.model.clone(),
+                ..crate::config::ConfigOverrides::default()
+            })?;
+            let base_url = effective.base_url.ok_or_else(|| {
+                ZenpiError::arguments(
+                    "no provider URL configured; run `zenpi config import-codex` or set ZENPI_BASE_URL",
+                )
+            })?;
+            let api_key = effective.api_key.ok_or_else(|| {
+                ZenpiError::arguments(
+                    "no provider API key configured; run `zenpi config import-codex` or set ZENPI_API_KEY",
+                )
+            })?;
+            let model = effective.model.ok_or_else(|| {
+                ZenpiError::arguments(
+                    "no provider model configured; run `zenpi config import-codex` or set ZENPI_MODEL",
+                )
+            })?;
+            let wire_api = effective
+                .wire_api
+                .as_deref()
+                .unwrap_or("responses")
+                .parse::<OpenAiWireApi>()?;
+            let backend = OpenAiCompatibleBackend::from_values_with_settings(
+                base_url,
+                Some(api_key),
+                model,
+                wire_api,
+                effective.model_reasoning_effort,
+                effective.model_verbosity,
+            )?;
             Ok(Box::new(backend))
         }
         other => Err(ZenpiError::arguments(format!(
@@ -774,7 +966,12 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
 }
 
 fn print_help() {
-    println!("zenpi [--mode tui|headless] [--session PATH] [--backend echo|openai] [--model NAME]");
+    println!("zenpi [--mode tui|headless] [--session PATH] [--backend openai|echo] [--model NAME]");
+    println!("zenpi config import-codex|doctor");
+    println!("zenpi pair import-codex|status");
+    println!(
+        "default provider: ~/.zenpi (or read-only ~/.codex fallback); echo requires explicit --backend echo"
+    );
 }
 
 /// Binary entry point shared with tests and embedders.
@@ -784,15 +981,66 @@ pub fn run() -> Result<(), ZenpiError> {
         print_help();
         return Ok(());
     }
+    if let Some(command) = options.command {
+        return match command {
+            CliCommand::ConfigImportCodex | CliCommand::PairImportCodex => {
+                let summary = crate::config::import_codex()?;
+                println!("{}", summary.display());
+                Ok(())
+            }
+            CliCommand::ConfigDoctor | CliCommand::PairStatus => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let report = crate::config::status(&paths)?;
+                print_config_status(&report);
+                Ok(())
+            }
+        };
+    }
     let backend = make_backend(&options)?;
     let session = SessionStore::open(&options.session)?;
     let mut agent = Agent::new(session, backend);
+    // Expose only the bounded, read-only workspace tools by default. Writes
+    // and command execution are never implicitly granted to a provider.
+    let workspace = env::current_dir()?;
+    let tools = crate::tools::ToolRegistry::with_read_only_builtins()
+        .map_err(|error| ZenpiError::Message(format!("tool registry: {error}")))?;
+    let tool_context = crate::tools::ToolContext::new(workspace)
+        .map_err(|error| ZenpiError::Message(format!("tool workspace: {error}")))?;
+    agent.set_tools(
+        tools,
+        tool_context,
+        crate::tools::SideEffectPolicy::read_only(),
+    );
     if let Some(model) = options.model {
         agent.set_model(Some(model))?;
     }
     match options.mode {
-        RunMode::Headless => crate::headless::run_stdio(&mut agent)
+        RunMode::Headless => crate::headless::run_stdio_owned(agent)
             .map_err(|error| ZenpiError::Message(error.to_string())),
-        RunMode::Tui => crate::tui::run(&mut agent),
+        RunMode::Tui => crate::tui::run_async(agent),
     }
+}
+
+fn display_option(value: Option<&str>) -> &str {
+    value.unwrap_or("<not configured>")
+}
+
+fn print_config_status(report: &crate::config::ConfigStatus) {
+    println!(
+        "ready={}",
+        report.api_key_present && report.base_url.is_some() && report.model.is_some()
+    );
+    println!("backend={}", report.backend);
+    println!("provider={}", display_option(report.provider.as_deref()));
+    println!("base_url={}", display_option(report.base_url.as_deref()));
+    println!("wire_api={}", display_option(report.wire_api.as_deref()));
+    println!("model={}", display_option(report.model.as_deref()));
+    println!(
+        "api_key={}",
+        if report.api_key_present {
+            "present"
+        } else {
+            "missing"
+        }
+    );
 }

@@ -5,7 +5,8 @@ use std::io;
 use thiserror::Error;
 
 use crate::{
-    backend::BackendError, core::AgentError, protocol::ProtocolError, session::SessionError,
+    backend::BackendError, config::ConfigError, core::AgentError, protocol::ProtocolError,
+    session::SessionError,
 };
 
 /// The top-level error returned by the command-line binary.
@@ -17,6 +18,8 @@ pub enum ZenpiError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Backend(#[from] BackendError),
+    #[error(transparent)]
+    Config(#[from] ConfigError),
     #[error(transparent)]
     Session(#[from] SessionError),
     #[error(transparent)]

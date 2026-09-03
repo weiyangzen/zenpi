@@ -10,6 +10,7 @@
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::io;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crossterm::cursor::{Hide, Show};
@@ -646,6 +647,177 @@ pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiErro
         }
     })
     .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))
+}
+
+/// Run the production TUI with provider work on the bounded runtime worker.
+/// The older callback-based `run_with_state` remains available for embedders
+/// and deterministic tests; the binary uses this owned form so a worker can
+/// safely hold the agent for the duration of one request.
+pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiError> {
+    use crate::core::{AgentError, ProcessResult};
+    use crate::runtime::{BackgroundRunner, JobOutcome, RuntimeConfig, RuntimeEvent};
+
+    let shared = Arc::new(Mutex::new(agent));
+    let worker_state = Arc::clone(&shared);
+    let runner = BackgroundRunner::spawn(
+        move |text: String, token| -> Result<ProcessResult, AgentError> {
+            if token.is_cancelled() {
+                return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
+            }
+            let mut agent = worker_state
+                .lock()
+                .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
+            let result = agent.process_sync(text)?;
+            if token.is_cancelled() {
+                return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
+            }
+            Ok(result)
+        },
+        RuntimeConfig::default(),
+    );
+    let mut state = TuiState::default();
+    if let Ok(agent) = shared.lock() {
+        for turn in agent.history() {
+            let role = match turn.role {
+                crate::core::TurnRole::User => MessageRole::User,
+                crate::core::TurnRole::Assistant => MessageRole::Assistant,
+                crate::core::TurnRole::Tool => MessageRole::Tool,
+                crate::core::TurnRole::System => MessageRole::System,
+            };
+            state.push_message(role, &turn.content);
+        }
+    }
+    let config = TuiConfig::default();
+    let mut guard = TerminalGuard::enter()
+        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal = Terminal::new(backend)
+        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+    let frame_interval = config.frame_interval.max(MIN_LOOP_INTERVAL);
+    let poll_interval = config.poll_interval.max(MIN_LOOP_INTERVAL);
+    let mut scheduler = RenderScheduler::new(frame_interval);
+    let mut resize_pending = false;
+    let mut last_tick = Instant::now();
+    let mut active_job = None;
+    'outer: loop {
+        while let Ok(event) = runner.try_next_event() {
+            match event {
+                RuntimeEvent::Completed { id, outcome } if Some(id) == active_job => {
+                    active_job = None;
+                    state.set_busy(false);
+                    match outcome {
+                        JobOutcome::Succeeded(result) => {
+                            if let Some(assistant) = result.assistant {
+                                state.push_message(MessageRole::Assistant, assistant.content);
+                            }
+                            state.set_status("Ready");
+                        }
+                        JobOutcome::Failed(error) => {
+                            state.push_message(MessageRole::Error, error.to_string());
+                            state.set_status("Request failed");
+                        }
+                        JobOutcome::Cancelled => state.set_status("Interrupted"),
+                        JobOutcome::Panicked => {
+                            state.push_message(MessageRole::Error, "background job panicked");
+                            state.set_status("Request failed");
+                        }
+                    }
+                    scheduler.request();
+                }
+                RuntimeEvent::Rejected { id, reason } if Some(id) == active_job => {
+                    active_job = None;
+                    state.set_busy(false);
+                    state.push_message(MessageRole::Error, reason.to_string());
+                    state.set_status("Request rejected");
+                    scheduler.request();
+                }
+                RuntimeEvent::Closed => break,
+                _ => {}
+            }
+        }
+        let now = Instant::now();
+        if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
+            state.tick();
+            scheduler.request();
+            last_tick = now;
+        }
+        if state.take_dirty() {
+            scheduler.request();
+        }
+        if scheduler.due(now) {
+            if resize_pending {
+                terminal
+                    .autoresize()
+                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+                resize_pending = false;
+            }
+            terminal
+                .draw(|frame| state.render(frame, &config.title))
+                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+            scheduler.rendered(Instant::now());
+        }
+        let wait = if scheduler.is_dirty() {
+            frame_interval.min(poll_interval)
+        } else {
+            poll_interval
+        };
+        if !event::poll(wait)
+            .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
+        {
+            continue;
+        }
+        let mut processed = 0usize;
+        loop {
+            let event = event::read()
+                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+            if matches!(event, Event::Resize(_, _)) {
+                resize_pending = true;
+            }
+            match state.handle_event(event) {
+                TuiAction::Submit(text) => {
+                    state.push_message(MessageRole::User, &text);
+                    if active_job.is_some() {
+                        state.push_message(MessageRole::Error, "a request is already running");
+                        state.set_status("Busy");
+                    } else {
+                        match runner.try_submit(text) {
+                            Ok(id) => {
+                                active_job = Some(id);
+                                state.set_busy(true);
+                                state.set_status("Working");
+                            }
+                            Err(error) => {
+                                state.push_message(MessageRole::Error, error.to_string());
+                                state.set_status("Request rejected");
+                            }
+                        }
+                    }
+                }
+                TuiAction::Interrupt => {
+                    if let Some(id) = active_job {
+                        let _ = runner.try_cancel(id);
+                        state.set_status("Interrupt requested");
+                    } else {
+                        state.set_status("Ready");
+                    }
+                }
+                TuiAction::Quit => break 'outer,
+                TuiAction::Redraw | TuiAction::None => {}
+            }
+            scheduler.request();
+            processed += 1;
+            if processed >= 256
+                || !event::poll(Duration::ZERO)
+                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
+            {
+                break;
+            }
+        }
+    }
+    let _ = runner.try_shutdown();
+    drop(runner);
+    guard.leave();
+    Ok(())
 }
 
 /// Run a TUI with a synchronous submit callback.  Callback errors become

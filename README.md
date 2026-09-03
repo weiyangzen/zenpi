@@ -19,7 +19,7 @@ with other agents. A headless process can be started with one pipe, persist a
 recoverable session, and exchange a bounded handoff without a broker. The TUI
 uses a coalesced render loop and terminal-buffer diffing so resize and rapid
 local updates do not replay the whole transcript unnecessarily. Provider calls
-are synchronous in this small release.
+use the configured OpenAI-compatible endpoint.
 
 ### Quick start
 
@@ -28,25 +28,41 @@ are synchronous in this small release.
 cargo install --path . --locked
 zenpi --help
 
-# Interactive terminal mode, using the credential-free echo backend.
+# Pair with the provider already configured for Codex.
+zenpi config import-codex
+zenpi config doctor
+
+# Interactive terminal mode, using the imported provider.
 zenpi --mode tui
 
 # Scriptable JSONL mode.
 printf '%s\n' '{"type":"prompt","id":"1","text":"Say hello"}' \
-  | zenpi --mode headless --backend echo --session ./session.jsonl
+  | zenpi --mode headless --session ./session.jsonl
 ```
 
-The default backend is deterministic `echo`, which makes local tests and
-protocol integration safe without credentials. Select `--backend openai` for
-an OpenAI-compatible endpoint and configure `ZENPI_API_KEY`, optional
-`ZENPI_BASE_URL`, and `ZENPI_MODEL`.
+The production default is the configured OpenAI-compatible provider. zenpi
+never fabricates an answer when credentials are missing: it exits before
+creating a session and tells you to run `zenpi config import-codex` or set
+`ZENPI_BASE_URL`, `ZENPI_API_KEY`, and `ZENPI_MODEL`. The profile is stored in
+`~/.zenpi/config.toml`; the imported key is stored only in the owner-readable
+`~/.zenpi/auth.json`. `config doctor` reports the effective endpoint host, API
+family, model, and credential presence without printing the key. A read-only
+fallback can use `~/.codex` on the first run; the explicit import persists it.
 
-This is a usable synchronous MVP: the `echo` path works offline, while the
-OpenAI-compatible path sends a non-streaming chat-completions request. The
-provider call intentionally blocks the current turn; streaming and background
-worker orchestration are not implemented in this release. This repository is
-currently distributed as source rather than a crates.io package or prebuilt
-GitHub Release, so installation requires Rust 1.88 or newer and a local clone.
+The Responses API is the primary wire protocol (`/responses` and
+`/v1/responses`) and is consumed as SSE, including text deltas, completion
+usage, and Codex gateways that insert NUL padding. Chat Completions remains an
+explicit compatibility adapter. `--backend echo` is a test fixture only and
+must be named explicitly; it is not an AI provider.
+
+This checkout is under complete-framework delivery. The current foundation
+includes real provider requests, Codex pairing, bounded SSE parsing, a typed
+read-only tool registry, and a bounded background runner. The complete feature
+contract and remaining acceptance work are tracked in
+[`Docs/Zenpi_Complete_Feature_Gap.md`](Docs/Zenpi_Complete_Feature_Gap.md);
+the older execution Blueprint records the original MVP contract and must not
+be read as proof that the full framework is finished. Installation requires
+Rust 1.88 or newer and a local clone.
 
 ### Headless protocol
 
@@ -55,11 +71,11 @@ contain U+2028 or U+2029; only LF frames a record. Diagnostics go to stderr so
 stdout remains machine-readable.
 
 Supported commands are `prompt`, `steer`, `status`, `handoff`, `resume`, and
-`shutdown`. In this synchronous release, `steer` can only be evaluated between
-completed provider requests; stdin is not consumed while a provider call is in
-flight. Every accepted prompt and resulting assistant message is appended to
-the session JSONL file before its completion event is emitted. A malformed line
-receives a typed error and does not mutate the session.
+`shutdown`. Every accepted prompt and resulting assistant message is appended
+to the session JSONL file before its completion response. Full non-blocking
+headless event streaming, in-flight cancellation, and provider tool-call
+continuation remain tracked complete-feature work rather than being silently
+represented as synchronous success.
 
 Example:
 
@@ -102,11 +118,20 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 窗口调整及快速流式更新时的重复绘制。
 当前版本的 provider 调用是同步的，网络延迟可能暂时阻塞输入处理。
 
-默认 `echo` backend 不需要凭据，适合本地测试。需要模型服务时可配置
-OpenAI-compatible backend。协议、资源预算、验收门和迁移证据见 `Docs/`。
-可用方式是先执行 `cargo install --path . --locked`，然后运行 `zenpi --mode tui`，
-或使用 `zenpi --mode headless --backend echo` 接收 JSONL。OpenAI-compatible
-调用是同步的非流式请求；本版本不包含后台 worker 编排。
+生产默认 backend 是配置的 OpenAI-compatible provider，不再静默使用
+`echo`。首次使用先执行 `zenpi config import-codex`，它从
+`~/.codex/config.toml` 读取 URL、Responses API 和模型，从
+`~/.codex/auth.json` 读取 key，并将非 secret 配置写入
+`~/.zenpi/config.toml`、key 写入权限为 0600 的 `~/.zenpi/auth.json`。
+随后执行 `zenpi config doctor`，再运行 `zenpi --mode tui` 或不带
+`--backend` 的 headless。也可用 `ZENPI_BASE_URL`、`ZENPI_API_KEY`、
+`ZENPI_MODEL` 覆盖配置。只有测试时才显式传 `--backend echo`；缺少 provider
+时 zenpi 会在创建 session 前失败，不会伪造回复。
+
+当前基础层已支持真实 provider、Codex 配对、Responses SSE（含 NUL padding
+兼容）、有界只读工具注册表和后台 runner；完整工具循环、实时取消/steer、
+上下文压缩、session 分支、skills/extensions 和发布包仍按完整功能清单验收，
+不会用 MVP 的绿色测试冒充完成。
 每个 Blueprint item 都为其实现/测试代码声明小于 5000 的 `Estimated LOC` 预估值；仓库 Rust 总行数只作
 信息性盘点，不是项目级上限。
 
@@ -122,12 +147,20 @@ b3ehive handoff レコードを共有します。headless は一本のパイプ�
 復元可能な session を保存し、他の agent と限定された handoff を交換できます。
 TUI はフレームをまとめ、端末バッファ差分を使うため、リサイズや高速な応答
 更新でも不要な全画面再描画を避けます。
-この小さなリリースでは provider 呼び出しは同期式で、ネットワーク遅延中は
-入力処理が一時的に待機します。
-`cargo install --path . --locked` で `zenpi` をインストールし、
-`zenpi --mode tui` または `zenpi --mode headless --backend echo` として実行できます。
-OpenAI-compatible 呼び出しは同期・非ストリーミングで、バックグラウンド worker の
-オーケストレーションはこのリリースに含まれません。
+本番の既定 backend は設定済みの OpenAI-compatible provider です。暗黙の
+`echo` mock は使いません。最短手順は `zenpi config import-codex`、
+`zenpi config doctor`、`zenpi --mode tui` です。最初のコマンドは
+`~/.codex/config.toml` の URL、Responses API、モデルと
+`~/.codex/auth.json` の key を読み、`~/.zenpi/config.toml` と権限 0600 の
+`~/.zenpi/auth.json` に安全に保存します。環境変数
+`ZENPI_BASE_URL`、`ZENPI_API_KEY`、`ZENPI_MODEL` も使用できます。テスト用の
+`echo` は `--backend echo` を明示した場合だけ有効で、provider がない場合は
+session 作成前に失敗します。
+
+Responses SSE と Codex gateway の NUL padding、Codex pairing、型付きの
+read-only tool registry、background runner は実装済みです。完全な tool loop、
+in-flight cancel/steer、context compaction、session fork、skills/extensions、
+release artifacts は完全機能清单に従って引き続き受け入れます。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（5000 未満）を記載します。リポジトリ全体の
 Rust 行数は情報表示のみで、プロジェクト全体の上限ではありません。
 
