@@ -1,0 +1,11 @@
+source_id	mapping_mode	target_owner	mapping_rule	validation
+SRC-001	one_to_one	src/core.rs	Collapse pi text/json/rpc parser choices into RunMode::{Tui,Headless}; reject all other values	cargo test; mode scan
+SRC-002	one_to_one	src/core.rs	Keep one pre-side-effect dispatcher and shared session/backend construction	cargo test; invalid-mode no-file probe
+SRC-003	one_to_one	src/protocol.rs	Retain strict LF framing and CRLF tolerance without Unicode separator splitting	protocol tests; smoke
+SRC-004	one_to_one	src/headless.rs	Retain long-lived stdio request/event loop while dropping RPC UI/server surface	headless smoke; stdout JSONL parse
+SRC-005	one_to_one	src/session.rs	Retain versioned append/recovery and isolate compatibility at persistence boundary	session tests; truncated-tail fixture
+SRC-006	one_to_one	src/tui.rs	Retain terminal-safe input, viewport and differential redraw concepts with one Ratatui buffer	TUI tests; resize benchmark
+SRC-007	one_to_one	src/tui.rs	Retain raw-mode, paste, resize and cursor cleanup ownership	TUI cleanup tests
+SRC-008	one_to_one	Docs/Zenpi_Execution_Blueprint.md	Retain one authoritative checklist, stable IDs, DAG, and dual cursor	blueprint validator
+SRC-009	one_to_one	src/b3.rs	Retain compact leases, gates, evidence and handoff attribution without b3 scheduler	b3 tests; side-effect negative tests
+SRC-010	one_to_one	Docs/quality/rust-deslop-gate.md	Translate ownership/state/failure/cleanup principles into acceptance gates	clippy; tests; master review
