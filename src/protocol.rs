@@ -68,6 +68,8 @@ pub struct StdioRequest {
     #[serde(default)]
     pub expected_turn_id: Option<String>,
     #[serde(default)]
+    pub target_id: Option<String>,
+    #[serde(default)]
     pub to: Option<String>,
     #[serde(default)]
     pub summary: Option<String>,
@@ -89,6 +91,9 @@ pub enum Command {
     Steer {
         text: String,
         expected_turn_id: Option<String>,
+    },
+    Cancel {
+        target_id: String,
     },
     Status,
     Handoff {
@@ -124,6 +129,14 @@ impl StdioRequest {
                 text: bounded_text(self.text.or(self.message), "steer")?,
                 expected_turn_id: self.expected_turn_id,
             }),
+            "cancel" => {
+                let target_id = self
+                    .target_id
+                    .or(self.expected_turn_id)
+                    .ok_or(ProtocolError::MissingField { field: "target_id" })?;
+                validate_identifier(&target_id, "target_id")?;
+                Ok(Command::Cancel { target_id })
+            }
             "status" => Ok(Command::Status),
             "handoff" => {
                 let summary = bounded_text(self.summary.or(self.text), "handoff summary")?;
@@ -387,6 +400,7 @@ pub fn command_name(command: &Command) -> &'static str {
     match command {
         Command::Prompt { .. } => "prompt",
         Command::Steer { .. } => "steer",
+        Command::Cancel { .. } => "cancel",
         Command::Status => "status",
         Command::Handoff { .. } => "handoff",
         Command::Resume { .. } => "resume",

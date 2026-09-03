@@ -264,6 +264,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
         crate::runtime::RuntimeConfig::default(),
     );
     let mut jobs: HashMap<crate::runtime::JobId, AsyncWork> = HashMap::new();
+    let mut request_to_job: HashMap<String, crate::runtime::JobId> = HashMap::new();
     let mut stopping = false;
     let mut shutdown_sent = false;
     loop {
@@ -271,6 +272,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             if handle_runtime_event(
                 event,
                 &mut jobs,
+                &mut request_to_job,
                 &shared,
                 &mut output,
                 stopping,
@@ -289,6 +291,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                     if handle_runtime_event(
                         event,
                         &mut jobs,
+                        &mut request_to_job,
                         &shared,
                         &mut output,
                         true,
@@ -308,6 +311,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &shared,
                 &runner,
                 &mut jobs,
+                &mut request_to_job,
                 &mut output,
                 &mut stopping,
             )?,
@@ -332,6 +336,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
 fn handle_runtime_event<W: Write>(
     event: crate::runtime::RuntimeEvent<ProcessResult, AgentError>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
+    request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     shared: &Arc<Mutex<Agent>>,
     output: &mut W,
     stopping: bool,
@@ -343,6 +348,9 @@ fn handle_runtime_event<W: Write>(
             let Some(meta) = jobs.remove(&id) else {
                 return Ok(false);
             };
+            if let Some(request_id) = meta.id.as_ref() {
+                request_to_job.remove(request_id);
+            }
             match outcome {
                 JobOutcome::Succeeded(result) => {
                     let data = json!({
@@ -397,6 +405,7 @@ fn process_async_line<W, F>(
     shared: &Arc<Mutex<Agent>>,
     runner: &crate::runtime::BackgroundRunner<TurnInputRequest, ProcessResult, AgentError, F>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
+    request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     output: &mut W,
     stopping: &mut bool,
 ) -> Result<(), HeadlessError>
@@ -449,10 +458,13 @@ where
             jobs.insert(
                 job_id,
                 AsyncWork {
-                    id,
+                    id: id.clone(),
                     command: "prompt",
                 },
             );
+            if let Some(request_id) = id.clone() {
+                request_to_job.insert(request_id, job_id);
+            }
         }
         Command::Steer {
             text,
@@ -469,10 +481,38 @@ where
             jobs.insert(
                 job_id,
                 AsyncWork {
-                    id,
+                    id: id.clone(),
                     command: "steer",
                 },
             );
+            if let Some(request_id) = id.clone() {
+                request_to_job.insert(request_id, job_id);
+            }
+        }
+        Command::Cancel { target_id } => {
+            let Some(job_id) = request_to_job.get(&target_id).copied() else {
+                write_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "unknown_request",
+                        "target request is not running",
+                    ),
+                )?;
+                return Ok(());
+            };
+            runner.try_cancel(job_id).map_err(|error| {
+                HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
+            })?;
+            write_response(
+                output,
+                StdioResponse::success(
+                    id,
+                    name,
+                    Some(json!({ "target_id": target_id, "cancel_requested": true })),
+                ),
+            )?;
         }
         Command::Status => match shared.try_lock() {
             Ok(agent) => write_response(
@@ -570,6 +610,15 @@ fn handle_command<W: Write>(
                 }
             }
         }
+        Command::Cancel { .. } => write_response(
+            output,
+            StdioResponse::error_with_code(
+                id,
+                name,
+                "unsupported_sync_command",
+                "cancel is available in asynchronous stdio mode",
+            ),
+        )?,
         Command::Status => {
             write_response(
                 output,
