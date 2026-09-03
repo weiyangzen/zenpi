@@ -526,23 +526,44 @@ impl Agent {
     /// response.  The active marker is cleared on both success and failure so
     /// a failed provider cannot strand the process in a permanently busy state.
     pub fn run_active_turn(&mut self) -> Result<Option<Turn>, AgentError> {
+        self.run_active_turn_cancelable(|| false)
+    }
+
+    /// Run the active turn while allowing the host to veto a completion
+    /// before it is persisted. This keeps a late cancellation from leaking an
+    /// assistant answer into the journal after the caller requested stop.
+    pub fn run_active_turn_cancelable<F>(
+        &mut self,
+        is_cancelled: F,
+    ) -> Result<Option<Turn>, AgentError>
+    where
+        F: Fn() -> bool,
+    {
         let turn_id = self
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
         const MAX_TOOL_ITERATIONS: usize = 8;
-        let completion = match self.complete_with_tools(&turn_id, MAX_TOOL_ITERATIONS) {
-            Ok(completion) => completion,
-            Err(error) => {
-                self.last_error = Some(error.to_string());
-                self.phase = AgentPhase::Idle;
-                self.active_turn_id = None;
-                self.events.push(AgentEvent::Error {
-                    message: error.to_string(),
-                });
-                return Err(error);
-            }
-        };
+        let completion =
+            match self.complete_with_tools(&turn_id, MAX_TOOL_ITERATIONS, &is_cancelled) {
+                Ok(completion) => completion,
+                Err(error) => {
+                    self.last_error = Some(error.to_string());
+                    self.phase = AgentPhase::Idle;
+                    self.active_turn_id = None;
+                    self.events.push(AgentEvent::Error {
+                        message: error.to_string(),
+                    });
+                    return Err(error);
+                }
+            };
+        if is_cancelled() {
+            let error = BackendError::Cancelled;
+            self.last_error = Some(error.to_string());
+            self.phase = AgentPhase::Idle;
+            self.active_turn_id = None;
+            return Err(error.into());
+        }
         if completion.content.trim().is_empty() {
             let error = BackendError::EmptyResponse;
             self.last_error = Some(error.to_string());
@@ -589,12 +610,19 @@ impl Agent {
         Ok(Some(assistant))
     }
 
-    fn complete_with_tools(
+    fn complete_with_tools<F>(
         &mut self,
         turn_id: &str,
         max_iterations: usize,
-    ) -> Result<crate::backend::Completion, AgentError> {
+        is_cancelled: &F,
+    ) -> Result<crate::backend::Completion, AgentError>
+    where
+        F: Fn() -> bool,
+    {
         for iteration in 0..=max_iterations {
+            if is_cancelled() {
+                return Err(BackendError::Cancelled.into());
+            }
             let definitions = self
                 .tools
                 .as_ref()
@@ -607,6 +635,9 @@ impl Agent {
                 tools: &definitions,
             };
             let completion = self.backend.complete(request)?;
+            if is_cancelled() {
+                return Err(BackendError::Cancelled.into());
+            }
             if completion.tool_calls.is_empty() {
                 return Ok(completion);
             }
@@ -678,9 +709,21 @@ impl Agent {
 
     /// Admit and, when accepted, immediately run one turn.
     pub fn process(&mut self, request: TurnInputRequest) -> Result<ProcessResult, AgentError> {
+        self.process_with_cancel(request, || false)
+    }
+
+    /// Admit and run a turn with a cooperative cancellation predicate.
+    pub fn process_with_cancel<F>(
+        &mut self,
+        request: TurnInputRequest,
+        is_cancelled: F,
+    ) -> Result<ProcessResult, AgentError>
+    where
+        F: Fn() -> bool,
+    {
         let submission = self.submit(request)?;
         if submission.accepted() {
-            let assistant = self.run_active_turn()?;
+            let assistant = self.run_active_turn_cancelable(is_cancelled)?;
             Ok(ProcessResult {
                 submission,
                 assistant,

@@ -17,6 +17,15 @@ impl Backend for FailingBackend {
     }
 }
 
+struct SlowBackend;
+
+impl Backend for SlowBackend {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        Ok(Completion::text("must not persist"))
+    }
+}
+
 struct ToolLoopBackend {
     calls: AtomicUsize,
 }
@@ -180,4 +189,27 @@ fn provider_tool_calls_execute_and_continue_until_final_text() {
         event,
         zenpi::core::AgentEvent::ToolResult { success: true, .. }
     )));
+}
+
+#[test]
+fn cancellation_is_checked_before_assistant_persistence() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("cancel.jsonl");
+    let mut agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(SlowBackend));
+    let error = agent
+        .process_with_cancel(TurnInputRequest::new("cancel me"), || true)
+        .expect_err("cancelled turn must not return an assistant");
+    assert!(matches!(
+        error,
+        AgentError::Backend(BackendError::Cancelled)
+    ));
+    assert_eq!(
+        agent
+            .history()
+            .iter()
+            .filter(|turn| turn.role == TurnRole::Assistant)
+            .count(),
+        0
+    );
+    assert_eq!(agent.history().len(), 1);
 }

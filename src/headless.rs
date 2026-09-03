@@ -255,7 +255,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             let mut agent = worker_state
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
-            let result = agent.process(request)?;
+            let result = agent.process_with_cancel(request, || token.is_cancelled())?;
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }

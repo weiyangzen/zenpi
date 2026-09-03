@@ -667,7 +667,10 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             let mut agent = worker_state
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
-            let result = agent.process_sync(text)?;
+            let result = agent
+                .process_with_cancel(crate::core::TurnInputRequest::new(text), || {
+                    token.is_cancelled()
+                })?;
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
