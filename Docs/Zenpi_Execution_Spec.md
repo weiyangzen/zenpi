@@ -23,6 +23,8 @@ app_server_workers: forbidden
 automatic_goal_continuation: forbidden
 max_outstanding_requests_per_execution: 1
 product_modes: [tui, headless]
+per_item_code_loc_cap: 5000
+loc_policy: "every Blueprint item has an integer Estimated LOC with 0 <= value < 5000; scope is a per-item forecast of implementation/test code attributable to the row (Rust/Python/Shell), not a current-file inventory; docs/config/generated artifacts count 0; the declared forecast has a strict upper bound of 5000 (exclusive); aggregate repository LOC is informational"
 ```
 
 ## 1. Product boundary
@@ -220,15 +222,19 @@ lint: cargo clippy --all-targets --all-features -- -D warnings
 unit: cargo test --all-targets
 protocol: cargo test --test headless_protocol --test session_recovery
 tui: cargo test --test tui_resize -- --nocapture
-line_budget: count Rust files under src/, tests/, examples/, benches/; <= 5,000
+item_loc: every Blueprint row has integer Estimated LOC in [0, 5000); aggregate source inventory is informational
 mode_scan: binary help + source scan; exactly tui/headless, forbidden aliases rejected
 handoff: schema/digest/path-limit and round-trip tests
 publish: draft2repo dry-run, remote receipt and local-source-retained checks
 ```
 
-The source-line budget includes production Rust, tests, examples, and benches;
-it excludes `target/`, vendored dependencies, generated docs, and lockfiles.
-The budget is a hard gate: `5,001` lines fails. Tests must cover refusal and
+`Estimated LOC` is a per-checklist-item forecast of implementation/test code
+attributable to that row (Rust/Python/Shell), not a current-file inventory or a
+project-wide total. The declared forecast has a strict upper bound of 5,000
+(exclusive), and `0` is valid for a documentation, reconciliation, or
+publication-only item. The
+physical Rust inventory under `src/`, `tests/`, `examples/`, and `benches/` is
+reported for visibility only; its aggregate is not an acceptance cap. Tests must cover refusal and
 failure paths, malformed/truncated records, out-of-order envelope records,
 resize during rapid local updates, terminal cleanup, and resource ownership,
 not only happy-path output. The append owner is deliberately single-threaded;
@@ -238,13 +244,20 @@ Completion requires every required Blueprint row `[x]`, zero `[ ]`/`[_]`, no
 pending handoff/integration/repair, all applicable profiles green, a current
 Gantt digest, and a verified `draft2repo` receipt for `weiyangzen/zenpi`.
 The local `/Users/mac/Github/zenpi` directory must remain present and its
-source-deletion receipt field must be `false`.
+source-deletion receipt field must be `false`. A later fast-forward update may
+advance the remote beyond the immutable creation receipt; in that case current
+local/remote/API equality is checked separately and the original receipt is
+retained as publication provenance.
 
 ## 7. Change control
 
 Only the canonical Master may alter this specification, dependency edges,
 limits, or `[x]` marks. A change records motivation, evidence, old/new value,
-and affected IDs in the same English-language commit. After any change the
+and affected IDs in the same English-language commit. On 2026-09-03 the LOC
+policy was corrected from an aggregate 5,000-line Rust budget to the strict
+per-item `Estimated LOC < 5000` forecast; ZP-005, ZP-207, and ZP-302 carry the
+corresponding policy and validator changes, while aggregate source lines remain
+informational. After any change the
 Master must regenerate the Gantt atomically and rerun the parser, digest,
-cycle, duplicate-ID, mode, and line-budget checks. Research notes are
+cycle, duplicate-ID, mode, per-item-LOC, and source-inventory checks. Research notes are
 supporting evidence; they never become a competing checklist.

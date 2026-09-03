@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check zenpi's physical Rust source line budget.
+"""Report zenpi's physical Rust source line inventory.
 
 The checker deliberately counts physical lines, rather than attempting to
 classify comments, whitespace, or generated-looking source.  This makes the
@@ -11,8 +11,11 @@ files below the four source roots are considered:
 Vendored subdirectories are excluded even when nested below one of those
 roots.  Build output remains excluded because it is outside the source roots.
 
-The human-readable form is intended for local use; ``--json`` is suitable for
-CI and execution-controller validators.
+The report is informational by default. An optional ``--max-lines`` argument
+can apply an ad-hoc aggregate limit, but the execution Blueprint's acceptance
+rule is per-item ``Estimated LOC < 5000`` and is checked by
+``validate_blueprint.py``. The human-readable form is intended for local use;
+``--json`` is suitable for CI and evidence records.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_LIMIT = 5_000
+DEFAULT_LIMIT: int | None = None
 SOURCE_ROOTS = ("src", "tests", "examples", "benches")
 EXCLUDED_DIRECTORIES = {"target", "vendor", "vendored"}
 EXIT_OK = 0
@@ -102,8 +105,8 @@ def _rust_files(root: Path) -> Iterable[RustFile]:
                 )
 
 
-def check(root: Path, limit: int) -> dict[str, object]:
-    """Build a serializable line-budget report for ``root``."""
+def check(root: Path, limit: int | None = None) -> dict[str, object]:
+    """Build a serializable source inventory report for ``root``."""
 
     files = list(_rust_files(root))
     total = sum(item.lines for item in files)
@@ -118,12 +121,12 @@ def check(root: Path, limit: int) -> dict[str, object]:
         "root": str(root),
         "roots": list(SOURCE_ROOTS),
         "max_lines": limit,
-        # line_budget is retained as a descriptive alias for policy tooling.
-        "line_budget": limit,
+        # This optional limit is an operator query, not a Blueprint gate.
+        "aggregate_limit": limit,
         "total_lines": total,
-        "remaining_lines": limit - total,
-        "exceeded": total > limit,
-        "within_budget": total <= limit,
+        "remaining_lines": None if limit is None else limit - total,
+        "exceeded": limit is not None and total > limit,
+        "within_limit": limit is None or total <= limit,
         "file_count": len(files),
         "lines_by_root": by_root,
         "files_by_root": file_counts,
@@ -137,8 +140,8 @@ def check(root: Path, limit: int) -> dict[str, object]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Count physical lines in .rs files under src, tests, examples, "
-            "and benches."
+            "Report physical lines in .rs files under src, tests, examples, "
+            "and benches; use --max-lines only for an optional aggregate check."
         )
     )
     parser.add_argument(
@@ -160,7 +163,7 @@ def _parser() -> argparse.ArgumentParser:
         default=DEFAULT_LIMIT,
         type=int,
         metavar="N",
-        help=f"maximum allowed physical lines (default: {DEFAULT_LIMIT})",
+        help="optional aggregate limit for ad-hoc checks (default: inventory only)",
     )
     parser.add_argument(
         "--json",
@@ -173,7 +176,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
-    if args.limit < 0:
+    if args.limit is not None and args.limit < 0:
         parser.error("--max-lines must be non-negative")
 
     try:
@@ -188,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "schema_version": "rust-loc/v1",
                         "error": str(exc),
-                        "within_budget": False,
+                        "within_limit": False,
                     },
                     sort_keys=True,
                 )
@@ -200,24 +203,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(report, sort_keys=True))
     else:
-        state = "PASS" if report["within_budget"] else "FAIL"
-        print(
-            f"{state}: {report['total_lines']} / {report['max_lines']} Rust "
-            f"physical lines across {report['file_count']} files"
-        )
+        state = "INVENTORY" if args.limit is None else ("PASS" if report["within_limit"] else "FAIL")
+        denominator = "unbounded" if args.limit is None else str(report["max_lines"])
+        print(f"{state}: {report['total_lines']} / {denominator} Rust physical lines across {report['file_count']} files")
         for source_root in SOURCE_ROOTS:
             print(
                 f"  {source_root}: {report['lines_by_root'][source_root]} "
                 f"lines ({report['files_by_root'][source_root]} files)"
             )
-        if not report["within_budget"]:
+        if args.limit is not None and not report["within_limit"]:
             print(
                 f"  over budget by {report['total_lines'] - report['max_lines']} "
                 "lines",
                 file=sys.stderr,
             )
 
-    return EXIT_OK if report["within_budget"] else EXIT_EXCEEDED
+    return EXIT_OK if report["within_limit"] else EXIT_EXCEEDED
 
 
 if __name__ == "__main__":

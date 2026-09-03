@@ -7,11 +7,11 @@
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-03T13:08:06Z
+generated_at: 2026-09-03T13:36:45Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: f09363513c6efc4fbfa4a0f982a54e30b30a9e70dbf80d0ba6b1c767b79f0d86
+source_sha256: a83ea854a9600f2de0bd2dc97599c7346e824c707c964ab94f6d52ef1520b559
 spec_path: Docs/Zenpi_Execution_Spec.md
-spec_sha256: a39a4a2f697140f7b425bc9bbab927f72edfa047437fe752cffd2dbef3762606
+spec_sha256: f7b4a48361468e2718d71bd85808306b24bb91ec0420734771a564c8d1e99bd5
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:
@@ -39,7 +39,7 @@ gantt
     Mode boundary and README :i4, after i3, 2
     section Verification
     Contract tests and resize benchmark :v1, after i4, 3
-    Deslop and source budget gates :v2, after v1, 2
+    Deslop and per-item LOC gates :v2, after v1, 2
     section Reconciliation and publish
     Evidence reconciliation and projection :r2, after v2, 2
     Draft2repo and local retention :p1, after r2, 1
@@ -49,7 +49,8 @@ The axis is a relative effort projection derived from Blueprint estimates, not
 a promise of calendar dates. Research is read-only and can overlap only where
 the dependency table permits. Implementation rows have disjoint owners except
 for explicitly sequenced mode wiring. Verification and publication remain
-Master-gated.
+Master-gated. Per-item `Estimated LOC` values are authoritative in the
+Blueprint and intentionally omitted from this relative-time projection.
 
 ## Monitoring index
 

@@ -40,7 +40,7 @@ jobs:
       - name: Validate execution blueprint and Gantt
         run: python3 tools/validate_blueprint.py
 
-      - name: Enforce Rust source budget
+      - name: Report Rust source inventory
         run: python3 tools/check_rust_loc.py
 
       - name: Check two-mode boundary

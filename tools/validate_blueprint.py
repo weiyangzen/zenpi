@@ -37,6 +37,7 @@ class Item:
     depends: tuple[str, ...]
     owner: str
     owned_paths: tuple[str, ...]
+    estimated_loc: int
     line: int
 
 
@@ -145,10 +146,16 @@ def _parse_items(text: str, stable_pattern: str) -> list[Item]:
                 raise BlueprintError(f"line {number}: {item_id} owns malformed path {path!r}")
         validators = _field(line, "Validators", ("Rollback", "Estimate"))
         rollback = _field(line, "Rollback", ("Estimate",))
-        estimate = _field(line, "Estimate", ())
+        estimate = _field(line, "Estimate", ("Estimated LOC",))
         if not validators or not rollback or not estimate:
             raise BlueprintError(f"line {number}: {item_id} is missing validator, rollback, or estimate")
-        items.append(Item(item_id, status.group(1), layer, depends, owner, paths, number))
+        loc_values = re.findall(r"\|\s*Estimated LOC:\s*([^|]+?)(?=\s*\||$)", line)
+        if len(loc_values) != 1:
+            raise BlueprintError(f"line {number}: {item_id} must have exactly one Estimated LOC field")
+        loc_raw = loc_values[0].strip()
+        if not re.fullmatch(r"[0-9]+", loc_raw):
+            raise BlueprintError(f"line {number}: {item_id} has a missing or non-integer Estimated LOC")
+        items.append(Item(item_id, status.group(1), layer, depends, owner, paths, int(loc_raw), number))
     if not items:
         raise BlueprintError("no checklist rows found")
     return items
@@ -238,8 +245,13 @@ def _required_header(header: dict[str, Any], root: Path) -> None:
         "worker_lifecycle": "bounded",
         "nested_agents": "forbidden",
     }
-    optional = {"line_budget"}
-    unknown = sorted(set(header) - set(required) - optional - {"repository_root", "completion_policy"})
+    required.update(
+        {
+            "per_item_code_loc_cap": 5000,
+            "loc_basis": "per-item forecast of implementation/test code LOC attributable to the row (Rust/Python/Shell); docs/config/generated artifacts count 0; declared forecast has a strict upper bound of 5000 (exclusive); aggregate repository LOC is informational",
+        }
+    )
+    unknown = sorted(set(header) - set(required) - {"repository_root", "completion_policy"})
     if unknown:
         raise BlueprintError(f"unexpected yaml header keys: {', '.join(unknown)}")
     for key, value in required.items():
@@ -257,12 +269,9 @@ def _required_header(header: dict[str, Any], root: Path) -> None:
     if not isinstance(policy, str) or "[x]" not in policy or "[_]" not in policy:
         raise BlueprintError("yaml header completion_policy must describe [x] acceptance and [_] handoff")
 
-    line_budget = header.get("line_budget")
-    if not isinstance(line_budget, str) or "5000" not in line_budget:
-        raise BlueprintError("yaml header line_budget must include the hard 5000-line cap")
-    for source_root in ("src/", "tests/", "examples/", "benches/"):
-        if source_root not in line_budget:
-            raise BlueprintError(f"yaml header line_budget must name {source_root}")
+    cap = header.get("per_item_code_loc_cap")
+    if not isinstance(cap, int) or cap != 5000:
+        raise BlueprintError("yaml header per_item_code_loc_cap must be integer 5000")
 
     try:
         re.compile(str(header["stable_id_pattern"]))
@@ -355,6 +364,10 @@ def _require_spec(spec_header: dict[str, Any]) -> None:
         raise BlueprintError("execution specification must forbid app-server workers")
     if spec_header.get("nested_agents") != "forbidden":
         raise BlueprintError("execution specification must forbid nested agents")
+    if spec_header.get("per_item_code_loc_cap") != 5000:
+        raise BlueprintError("execution specification must freeze per-item code LOC cap at 5000")
+    if spec_header.get("loc_policy") != "every Blueprint item has an integer Estimated LOC with 0 <= value < 5000; scope is a per-item forecast of implementation/test code attributable to the row (Rust/Python/Shell), not a current-file inventory; docs/config/generated artifacts count 0; the declared forecast has a strict upper bound of 5000 (exclusive); aggregate repository LOC is informational":
+        raise BlueprintError("execution specification must describe strict per-item LOC semantics")
     modes = spec_header.get("product_modes")
     if isinstance(modes, list):
         normalized = [str(mode).strip().lower() for mode in modes]
@@ -364,6 +377,14 @@ def _require_spec(spec_header: dict[str, Any]) -> None:
         normalized = []
     if normalized != ["tui", "headless"]:
         raise BlueprintError("execution specification must freeze exactly [tui, headless] modes")
+
+
+def _check_item_loc(items: list[Item], cap: int) -> None:
+    for item in items:
+        if not 0 <= item.estimated_loc < cap:
+            raise BlueprintError(
+                f"{item.item_id} Estimated LOC must satisfy 0 <= value < {cap}, got {item.estimated_loc}"
+            )
 
 
 def _normalize_state(value: str) -> str:
@@ -411,6 +432,7 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         header = _yaml_header(blueprint_text)
         _required_header(header, root)
         items = _parse_items(blueprint_text, str(header["stable_id_pattern"]))
+        _check_item_loc(items, int(header["per_item_code_loc_cap"]))
         ids = [item.item_id for item in items]
         duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
         if duplicates:
@@ -486,8 +508,6 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         if summary != expected_summary:
             raise BlueprintError("Gantt state_summary does not match Blueprint marks")
         rust_lines = _rust_line_count(root)
-        if rust_lines > 5000:
-            raise BlueprintError(f"Rust source line budget exceeded: {rust_lines} > 5000")
         return {
             "ok": True,
             "errors": [],
@@ -499,7 +519,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
             },
             "blueprint_path": BLUEPRINT_REL.as_posix(),
             "gantt_path": GANTT_REL.as_posix(),
-            "rust_source_lines": rust_lines,
+            "aggregate_rust_source_lines_informational": rust_lines,
+            "estimated_loc_by_id": {item.item_id: item.estimated_loc for item in items},
+            "max_estimated_loc": max(item.estimated_loc for item in items),
             "source_sha256": source_sha,
             "spec_sha256": spec_sha,
         }

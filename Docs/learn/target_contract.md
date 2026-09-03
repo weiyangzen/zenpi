@@ -28,7 +28,8 @@ only and cannot satisfy completion.
 Every target artifact names its source path and source hash. A failed transform
 is rolled back by removing only the target artifact and reopening its manifest
 row; source files are never modified. Master acceptance requires a manifest
-path/hash audit plus the Rust tests, mode scan, and line-budget gate.
+path/hash audit plus the Rust tests, mode scan, and per-item LOC forecast gate. The
+aggregate Rust source inventory is telemetry only.
 
 Route and instrument feedback examples are recorded in
 [`evidence_records.md`](evidence_records.md); they are evidence, not another

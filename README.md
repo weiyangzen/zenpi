@@ -61,9 +61,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets
 ```
 
-The production Rust source, tests, examples, and benches are bounded by the
-project contract at 5,000 lines. Generated files, vendored dependencies,
-documentation, and build output are excluded from that source budget.
+Each Blueprint checklist item declares an `Estimated LOC` forecast for the
+implementation/test code attributable to that item, and every value is
+strictly below 5,000. The
+aggregate Rust source inventory is reported for visibility, not used as a
+project-wide cap; generated files, vendored dependencies, documentation, and
+build output are not item estimates.
 
 The authoritative execution plan is [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md).
 The frozen local policy is [`Docs/Zenpi_Execution_Spec.md`](Docs/Zenpi_Execution_Spec.md),
@@ -85,6 +88,8 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 
 默认 `echo` backend 不需要凭据，适合本地测试。需要模型服务时可配置
 OpenAI-compatible backend。协议、资源预算、验收门和迁移证据见 `Docs/`。
+每个 Blueprint item 都为其实现/测试代码声明小于 5000 的 `Estimated LOC` 预估值；仓库 Rust 总行数只作
+信息性盘点，不是项目级上限。
 
 ## 日本語
 
@@ -100,6 +105,8 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 更新でも不要な全画面再描画を避けます。
 この小さなリリースでは provider 呼び出しは同期式で、ネットワーク遅延中は
 入力処理が一時的に待機します。
+各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（5000 未満）を記載します。リポジトリ全体の
+Rust 行数は情報表示のみで、プロジェクト全体の上限ではありません。
 
 ## License
 

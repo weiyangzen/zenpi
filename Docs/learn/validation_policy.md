@@ -8,7 +8,7 @@
    notes; do not copy source implementation.
 4. Run `cargo fmt --all -- --check`, strict Clippy, Rust tests, the headless
    smoke test, the mode-boundary scan, the Blueprint validator, and the Rust
-   line-budget checker.
+   Blueprint per-item LOC validator and the informational Rust source inventory.
 5. A failed validator leaves the row provisional and records the failure; it
    cannot promote a worker result to the authoritative execution Blueprint.
 6. Rollback removes only target artifacts and generated projections. Source

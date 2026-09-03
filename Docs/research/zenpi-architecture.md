@@ -63,9 +63,10 @@ The synchronous core avoids an async runtime for the standalone case. A single
 HTTP adapter may be compiled for an OpenAI-compatible endpoint; it is behind
 the backend trait and never changes mode semantics. Ratatui plus crossterm is
 the sole UI stack. No scheduler, persistent pool, plugin host, remote queue,
-dashboard, or competing protocol is linked into the binary. The physical Rust
-source budget is 5,000 lines across production and tests; generated/build
-artifacts are excluded.
+dashboard, or competing protocol is linked into the binary. Each execution
+Blueprint item carries a strict `Estimated LOC < 5000` forecast for the
+implementation/test code attributable to that item; aggregate source lines are
+inventory telemetry only.
 
 ## Verification seams
 
