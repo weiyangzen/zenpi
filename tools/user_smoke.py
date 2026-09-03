@@ -240,7 +240,13 @@ def read_pty_until_exit(pid: int, fd: int, deadline: float) -> tuple[int, bytes]
             try:
                 output.extend(os.read(fd, 65536))
             except OSError:
-                break
+                # Linux PTYs report EIO after the child closes the slave. The
+                # child may already be a zombie, so poll waitpid once more
+                # before treating this as a timeout.
+                waited, wait_status = os.waitpid(pid, os.WNOHANG)
+                if waited == pid:
+                    status = wait_status
+                    break
     if status is None:
         os.kill(pid, signal.SIGTERM)
         _, status = os.waitpid(pid, 0)
@@ -306,6 +312,14 @@ def assert_tui(binary: Path, root: Path) -> None:
         # its journal record so a slow CI host cannot race Ctrl-C with Enter.
         wait_for_tui_turn(session)
         os.write(fd, b"\x03")
+        # Some Linux PTY setups deliver Ctrl-C as a signal rather than as a
+        # crossterm key event. Ctrl-D is the TUI's empty-input quit binding and
+        # makes the cleanup assertion deterministic on both PTY variants.
+        time.sleep(0.25)
+        try:
+            os.write(fd, b"\x04")
+        except OSError:
+            pass
         exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
         exited = True
         output.extend(trailing)
