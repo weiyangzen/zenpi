@@ -256,6 +256,24 @@ def read_pty_until_exit(pid: int, fd: int, deadline: float) -> tuple[int, bytes]
     return os.waitstatus_to_exitcode(status), bytes(output)
 
 
+def wait_for_tui_turn(session: Path, timeout: float = 10) -> None:
+    """Wait for the synchronous echo turn to be durable before quitting."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            records = json_lines(session.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            records = []
+        if any(
+            record.get("kind") == "turn"
+            and record.get("turn", {}).get("role") == "assistant"
+            for record in records
+        ):
+            return
+        time.sleep(0.05)
+    raise AssertionError("TUI did not persist the submitted turn before exit")
+
+
 def strip_ansi(data: bytes) -> bytes:
     """Remove terminal control sequences before inspecting PTY text."""
     return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", data).replace(b"\r", b"")
@@ -284,7 +302,9 @@ def assert_tui(binary: Path, root: Path) -> None:
             raise AssertionError(f"TUI did not reach prompt: {bytes(output)!r}")
         os.write(fd, b"hello from installed tui")
         os.write(fd, b"\r")
-        time.sleep(0.4)
+        # Enter synchronously completes the deterministic echo turn. Wait for
+        # its journal record so a slow CI host cannot race Ctrl-C with Enter.
+        wait_for_tui_turn(session)
         os.write(fd, b"\x03")
         exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
         exited = True
