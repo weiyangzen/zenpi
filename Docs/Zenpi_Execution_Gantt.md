@@ -7,11 +7,11 @@
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-03T16:26:46Z
+generated_at: 2026-09-03T16:36:43Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: acda43a1c0d80eb3638169108c5c091aa275672cd1362e890caaf14482db223a
+source_sha256: 2bf3310dacc57353d0c69fc0fed923e527f9d5b80e2bd7ebdae68249779c5c19
 spec_path: Docs/Zenpi_Execution_Spec.md
-spec_sha256: 32582aedec339317ccecfb8dfebcc4fcf0353df6dec2cf8512a89e081d97d43c
+spec_sha256: 0afa53417f054cdb1d03130c528c99466ad4a6fbf04d414722fd68d2a195edf4
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:

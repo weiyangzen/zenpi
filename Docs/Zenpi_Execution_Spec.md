@@ -231,6 +231,8 @@ tui: cargo test --test tui_resize -- --nocapture
 item_loc: every Blueprint row has integer Estimated LOC in [0, 5000); aggregate source inventory is informational
 mode_scan: binary help + source scan; exactly tui/headless, forbidden aliases rejected
 handoff: schema/digest/path-limit and round-trip tests
+release: cargo build --release --locked; tools/headless_smoke.sh --release
+installed_user: python3 tools/user_smoke.py (isolated cargo install plus public-path smoke)
 publish: draft2repo dry-run, remote receipt and local-source-retained checks
 ```
 
