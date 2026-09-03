@@ -25,6 +25,9 @@ use thiserror::Error;
 pub const ZENPI_DIR: &str = ".zenpi";
 pub const CONFIG_FILE: &str = "config.toml";
 pub const AUTH_FILE: &str = "auth.json";
+pub const SESSIONS_DIR: &str = "sessions";
+pub const SKILLS_DIR: &str = "skills";
+pub const EXTENSIONS_DIR: &str = "extensions";
 pub const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
 /// Paths for the zenpi configuration and auth files.  Tests can construct
@@ -34,6 +37,9 @@ pub struct ConfigPaths {
     pub root: PathBuf,
     pub config: PathBuf,
     pub auth: PathBuf,
+    pub sessions: PathBuf,
+    pub skills: PathBuf,
+    pub extensions: PathBuf,
 }
 
 impl ConfigPaths {
@@ -42,6 +48,9 @@ impl ConfigPaths {
         Self {
             config: root.join(CONFIG_FILE),
             auth: root.join(AUTH_FILE),
+            sessions: root.join(SESSIONS_DIR),
+            skills: root.join(SKILLS_DIR),
+            extensions: root.join(EXTENSIONS_DIR),
             root,
         }
     }
@@ -52,6 +61,9 @@ impl ConfigPaths {
             return Ok(Self {
                 config: root.join(CONFIG_FILE),
                 auth: root.join(AUTH_FILE),
+                sessions: root.join(SESSIONS_DIR),
+                skills: root.join(SKILLS_DIR),
+                extensions: root.join(EXTENSIONS_DIR),
                 root,
             });
         }
@@ -79,6 +91,22 @@ impl ConfigPaths {
             return Err(ConfigError::NotDirectory(self.root.clone()));
         }
         restrict_permissions(&self.root, 0o700)?;
+        for directory in [&self.sessions, &self.skills, &self.extensions] {
+            reject_symlink(directory)?;
+            if !directory.exists() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirBuilderExt;
+                    fs::DirBuilder::new().mode(0o700).create(directory)?;
+                }
+                #[cfg(not(unix))]
+                fs::create_dir(directory)?;
+            }
+            if !fs::metadata(directory)?.is_dir() {
+                return Err(ConfigError::NotDirectory(directory.to_path_buf()));
+            }
+            restrict_permissions(directory, 0o700)?;
+        }
         Ok(())
     }
 }
@@ -104,6 +132,10 @@ pub struct ConfigFile {
     pub model_reasoning_effort: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_verbosity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_retries: Option<u32>,
 }
 
 impl ConfigFile {
@@ -120,6 +152,19 @@ impl ConfigFile {
             64,
         )?;
         validate_optional("model_verbosity", self.model_verbosity.as_deref(), 64)?;
+        if self
+            .timeout_seconds
+            .is_some_and(|seconds| !(1..=3600).contains(&seconds))
+        {
+            return Err(ConfigError::Invalid(
+                "timeout_seconds must be between 1 and 3600".into(),
+            ));
+        }
+        if self.max_retries.is_some_and(|retries| retries > 10) {
+            return Err(ConfigError::Invalid(
+                "max_retries must be at most 10".into(),
+            ));
+        }
         if self
             .backend
             .as_deref()
@@ -193,6 +238,8 @@ pub struct ConfigOverrides {
     pub api_key: Option<String>,
     pub model_reasoning_effort: Option<String>,
     pub model_verbosity: Option<String>,
+    pub timeout_seconds: Option<u64>,
+    pub max_retries: Option<u32>,
 }
 
 /// Where the selected credential came from.  This enum is safe to display.
@@ -218,6 +265,8 @@ pub struct EffectiveConfig {
     pub credential_source: CredentialSource,
     pub model_reasoning_effort: Option<String>,
     pub model_verbosity: Option<String>,
+    pub timeout_seconds: Option<u64>,
+    pub max_retries: Option<u32>,
 }
 
 impl std::fmt::Debug for EffectiveConfig {
@@ -233,6 +282,8 @@ impl std::fmt::Debug for EffectiveConfig {
             .field("credential_source", &self.credential_source)
             .field("model_reasoning_effort", &self.model_reasoning_effort)
             .field("model_verbosity", &self.model_verbosity)
+            .field("timeout_seconds", &self.timeout_seconds)
+            .field("max_retries", &self.max_retries)
             .finish()
     }
 }
@@ -291,6 +342,22 @@ pub fn resolve(
         environment.get("ZENPI_MODEL_VERBOSITY").map(String::as_str),
         config.model_verbosity.as_deref(),
     );
+    let timeout_seconds = overrides
+        .timeout_seconds
+        .or_else(|| {
+            environment
+                .get("ZENPI_TIMEOUT_SECONDS")
+                .and_then(|value| value.parse().ok())
+        })
+        .or(config.timeout_seconds);
+    let max_retries = overrides
+        .max_retries
+        .or_else(|| {
+            environment
+                .get("ZENPI_MAX_RETRIES")
+                .and_then(|value| value.parse().ok())
+        })
+        .or(config.max_retries);
     let (api_key, credential_source) = if let Some(key) = overrides.api_key.clone() {
         (Some(key), CredentialSource::CommandLine)
     } else if let Some(key) = environment
@@ -329,6 +396,8 @@ pub fn resolve(
         credential_source,
         model_reasoning_effort,
         model_verbosity,
+        timeout_seconds,
+        max_retries,
     })
 }
 
@@ -342,7 +411,7 @@ pub fn resolve_default(overrides: &ConfigOverrides) -> Result<EffectiveConfig, C
     // configured for Codex. This fallback is read-only; `config import-codex`
     // remains the explicit persistence command.
     if (config.base_url.is_none() || config.model.is_none() || auth.openai_api_key().is_none())
-        && let Ok(import) = import_codex_from_home(home_dir()?)
+        && let Ok(import) = import_codex_from_root(codex_root()?)
     {
         if config.provider.is_none() {
             config.provider = import.config.provider;
@@ -400,7 +469,11 @@ impl std::fmt::Debug for CodexImport {
 /// Read the provider/model/endpoint from `~/.codex/config.toml` and the
 /// `OPENAI_API_KEY` credential from `~/.codex/auth.json` without printing it.
 pub fn import_codex_from_home(home: impl AsRef<Path>) -> Result<CodexImport, ConfigError> {
-    let codex_root = home.as_ref().join(".codex");
+    import_codex_from_root(home.as_ref().join(".codex"))
+}
+
+fn import_codex_from_root(codex_root: impl AsRef<Path>) -> Result<CodexImport, ConfigError> {
+    let codex_root = codex_root.as_ref();
     let source_config = codex_root.join(CONFIG_FILE);
     let source_auth = codex_root.join(AUTH_FILE);
     reject_symlink(&source_config)?;
@@ -448,6 +521,15 @@ pub fn import_codex_from_home(home: impl AsRef<Path>) -> Result<CodexImport, Con
         .get("model_verbosity")
         .and_then(toml::Value::as_str)
         .map(str::to_owned);
+    let timeout_seconds = root
+        .get("request_timeout_seconds")
+        .or_else(|| root.get("timeout_seconds"))
+        .and_then(toml::Value::as_integer)
+        .and_then(|value| u64::try_from(value).ok());
+    let max_retries = root
+        .get("max_retries")
+        .and_then(toml::Value::as_integer)
+        .and_then(|value| u32::try_from(value).ok());
     let provider = provider_name.or_else(|| {
         provider_table
             .and_then(|table| table.get("name"))
@@ -463,6 +545,8 @@ pub fn import_codex_from_home(home: impl AsRef<Path>) -> Result<CodexImport, Con
         auth_env: Some(OPENAI_API_KEY.into()),
         model_reasoning_effort,
         model_verbosity,
+        timeout_seconds,
+        max_retries,
     };
     config.validate()?;
     let api_key = match fs::read_to_string(&source_auth) {
@@ -499,7 +583,7 @@ pub fn pair_from_codex(paths: &ConfigPaths) -> Result<PairReport, ConfigError> {
 /// import-codex` is useful on a fresh machine and safe to repeat.
 pub fn import_codex() -> Result<ConfigSummary, ConfigError> {
     let paths = ConfigPaths::discover()?;
-    let pair = pair_from_codex_with_source(&paths, home_dir()?)?;
+    let pair = pair_from_codex_with_root(&paths, codex_root()?)?;
     let status = status(&paths)?;
     Ok(ConfigSummary {
         operation: "import-codex".into(),
@@ -512,7 +596,14 @@ fn pair_from_codex_with_source(
     paths: &ConfigPaths,
     codex_home: impl AsRef<Path>,
 ) -> Result<PairReport, ConfigError> {
-    let import = import_codex_from_home(codex_home)?;
+    pair_from_codex_with_root(paths, codex_home.as_ref().join(".codex"))
+}
+
+fn pair_from_codex_with_root(
+    paths: &ConfigPaths,
+    codex_root: impl AsRef<Path>,
+) -> Result<PairReport, ConfigError> {
+    let import = import_codex_from_root(codex_root)?;
     paths.ensure_root()?;
     let mut config = load_config(paths)?;
     // Import only fields actually present in Codex.  A partial Codex profile
@@ -541,6 +632,12 @@ fn pair_from_codex_with_source(
     if import.config.model_verbosity.is_some() {
         config.model_verbosity = import.config.model_verbosity;
     }
+    if import.config.timeout_seconds.is_some() {
+        config.timeout_seconds = import.config.timeout_seconds;
+    }
+    if import.config.max_retries.is_some() {
+        config.max_retries = import.config.max_retries;
+    }
     config.validate()?;
     let mut auth = load_auth(paths)?;
     let key_imported = if let Some(key) = import.api_key {
@@ -552,7 +649,7 @@ fn pair_from_codex_with_source(
     };
     let config_changed = write_config_if_changed(paths, &config)?;
     let auth_changed = write_auth_if_changed(paths, &auth)?;
-    let backend = config.backend.clone().unwrap_or_else(|| "echo".into());
+    let backend = config.backend.clone().unwrap_or_else(|| "openai".into());
     Ok(PairReport {
         changed: config_changed || auth_changed,
         config_changed,
@@ -831,6 +928,13 @@ fn home_dir() -> Result<PathBuf, ConfigError> {
     env::var_os(variable)
         .map(PathBuf::from)
         .ok_or(ConfigError::HomeUnavailable)
+}
+
+fn codex_root() -> Result<PathBuf, ConfigError> {
+    if let Some(root) = env::var_os("CODEX_HOME") {
+        return Ok(PathBuf::from(root));
+    }
+    Ok(home_dir()?.join(".codex"))
 }
 
 fn reject_symlink(path: &Path) -> Result<(), ConfigError> {

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 use tempfile::tempdir;
 use zenpi::config::{
@@ -73,7 +73,76 @@ fn pairing_imports_codex_and_is_idempotent_without_leaking_key() {
             fs::metadata(&paths.config).unwrap().permissions().mode() & 0o777,
             0o600
         );
+        for directory in [&paths.sessions, &paths.skills, &paths.extensions] {
+            assert_eq!(
+                fs::metadata(directory).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
     }
+}
+
+#[test]
+fn cli_import_honors_codex_home_as_the_profile_root() {
+    let temp = tempdir().unwrap();
+    let codex_home = temp.path().join("alternate-codex");
+    let zenpi_home = temp.path().join("zenpi-home");
+    fs::create_dir_all(&codex_home).unwrap();
+    fs::write(
+        codex_home.join("config.toml"),
+        r#"model_provider = "OpenAI"
+model = "codex-home-model"
+
+[model_providers.OpenAI]
+base_url = "http://127.0.0.1:9911"
+wire_api = "responses"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        codex_home.join("auth.json"),
+        "{\"OPENAI_API_KEY\":\"codex-home-secret\"}\n",
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_zenpi"))
+        .args(["config", "import-codex"])
+        .env("CODEX_HOME", &codex_home)
+        .env("ZENPI_HOME", &zenpi_home)
+        .env_remove("ZENPI_MODEL")
+        .env_remove("OPENAI_MODEL")
+        .env_remove("ZENPI_BASE_URL")
+        .env_remove("OPENAI_BASE_URL")
+        .env_remove("ZENPI_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("model=codex-home-model"));
+    assert!(stdout.contains("base_url=http://127.0.0.1:9911"));
+    assert!(!stdout.contains("codex-home-secret"));
+
+    let paths = ConfigPaths {
+        config: zenpi_home.join("config.toml"),
+        auth: zenpi_home.join("auth.json"),
+        sessions: zenpi_home.join("sessions"),
+        skills: zenpi_home.join("skills"),
+        extensions: zenpi_home.join("extensions"),
+        root: zenpi_home,
+    };
+    assert_eq!(
+        load_config(&paths).unwrap().model.as_deref(),
+        Some("codex-home-model")
+    );
+    assert_eq!(
+        load_auth(&paths).unwrap().openai_api_key(),
+        Some("codex-home-secret")
+    );
 }
 
 #[test]

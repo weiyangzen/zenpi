@@ -992,13 +992,14 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
                 .as_deref()
                 .unwrap_or("responses")
                 .parse::<OpenAiWireApi>()?;
-            let backend = OpenAiCompatibleBackend::from_values_with_settings(
+            let backend = OpenAiCompatibleBackend::from_values_with_settings_and_timeout(
                 base_url,
                 Some(api_key),
                 model,
                 wire_api,
                 effective.model_reasoning_effort,
                 effective.model_verbosity,
+                std::time::Duration::from_secs(effective.timeout_seconds.unwrap_or(120)),
             )?;
             Ok(Box::new(backend))
         }

@@ -240,6 +240,26 @@ impl OpenAiCompatibleBackend {
         reasoning_effort: Option<String>,
         verbosity: Option<String>,
     ) -> Result<Self, BackendError> {
+        Self::new_with_settings_and_timeout(
+            endpoint,
+            api_key,
+            model,
+            wire_api,
+            reasoning_effort,
+            verbosity,
+            Duration::from_secs(120),
+        )
+    }
+
+    pub fn new_with_settings_and_timeout(
+        endpoint: impl Into<String>,
+        api_key: Option<String>,
+        model: impl Into<String>,
+        wire_api: OpenAiWireApi,
+        reasoning_effort: Option<String>,
+        verbosity: Option<String>,
+        timeout: Duration,
+    ) -> Result<Self, BackendError> {
         let endpoint = normalize_endpoint(endpoint.into(), wire_api)?;
         let model = model.into();
         if model.trim().is_empty() || model.len() > 256 || model.chars().any(char::is_control) {
@@ -267,8 +287,13 @@ impl OpenAiCompatibleBackend {
                 )));
             }
         }
+        if timeout.is_zero() || timeout > Duration::from_secs(3600) {
+            return Err(BackendError::Configuration(
+                "timeout must be between 1 second and 1 hour".into(),
+            ));
+        }
         let config = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(120)))
+            .timeout_global(Some(timeout))
             .build();
         Ok(Self {
             client: ureq::Agent::new_with_config(config),
@@ -321,19 +346,40 @@ impl OpenAiCompatibleBackend {
         reasoning_effort: Option<String>,
         verbosity: Option<String>,
     ) -> Result<Self, BackendError> {
+        Self::from_values_with_settings_and_timeout(
+            endpoint,
+            api_key,
+            model,
+            wire_api,
+            reasoning_effort,
+            verbosity,
+            Duration::from_secs(120),
+        )
+    }
+
+    pub fn from_values_with_settings_and_timeout(
+        endpoint: String,
+        api_key: Option<String>,
+        model: String,
+        wire_api: OpenAiWireApi,
+        reasoning_effort: Option<String>,
+        verbosity: Option<String>,
+        timeout: Duration,
+    ) -> Result<Self, BackendError> {
         let normalized_endpoint = normalize_endpoint(endpoint, wire_api)?;
         if is_openai_endpoint(&normalized_endpoint) && api_key.is_none() {
             return Err(BackendError::Configuration(
                 "ZENPI_API_KEY or OPENAI_API_KEY is required for api.openai.com".into(),
             ));
         }
-        Self::new_with_settings(
+        Self::new_with_settings_and_timeout(
             normalized_endpoint,
             api_key,
             model,
             wire_api,
             reasoning_effort,
             verbosity,
+            timeout,
         )
     }
 
@@ -693,44 +739,38 @@ fn extract_responses_content(payload: &Value) -> Result<String, BackendError> {
 }
 
 fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendError> {
-    let text = body
-        .with_config()
-        .limit(MAX_RESPONSE_BYTES as u64)
-        .read_to_string()
-        .map_err(map_ureq_error)?;
+    use std::io::{BufRead, BufReader};
+
+    let configured = body.with_config().limit(MAX_RESPONSE_BYTES as u64).reader();
+    let mut reader = BufReader::new(configured);
     // Some OpenAI-compatible proxies ignore `stream:true` and return a
     // regular Responses JSON object. Accept that shape as a compatibility
     // fallback while keeping the normal path event-aware.
-    if text.trim_start().starts_with('{') {
-        let payload: Value = serde_json::from_str(text.trim()).map_err(|error| {
-            BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
-        })?;
-        let content = extract_responses_content(&payload)?;
-        if content.trim().is_empty() {
-            return Err(BackendError::EmptyResponse);
-        }
-        return Ok(Completion {
-            content,
-            usage: payload.get("usage").and_then(parse_usage),
-            model: payload
-                .get("model")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-            tool_calls: extract_responses_tool_calls(&payload)?,
-        });
-    }
     let mut content = String::new();
     let mut usage = None;
     let mut model = None;
     let mut saw_completed = false;
     let mut tool_calls = Vec::new();
-    for line in text.lines() {
+    let mut line_buffer = String::new();
+    while reader
+        .read_line(&mut line_buffer)
+        .map_err(|error| BackendError::Transport(error.to_string()))?
+        > 0
+    {
+        let line = std::mem::take(&mut line_buffer);
+        if line.trim_start().starts_with('{') && !line.contains("data:") {
+            let payload: Value = serde_json::from_str(line.trim()).map_err(|error| {
+                BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
+            })?;
+            return completion_from_responses_json(&payload);
+        }
         let Some(data) = line.strip_prefix("data:") else {
             continue;
         };
         // Some compatible gateways pad SSE frames with NUL bytes between
         // events. They are transport padding, not part of the JSON payload.
-        let data = data.trim_matches('\0').trim();
+        let data = data
+            .trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
         if data.is_empty() || data == "[DONE]" {
             continue;
         }
@@ -810,6 +850,22 @@ fn read_responses_stream(body: &mut ureq::Body) -> Result<Completion, BackendErr
         usage,
         model,
         tool_calls,
+    })
+}
+
+fn completion_from_responses_json(payload: &Value) -> Result<Completion, BackendError> {
+    let content = extract_responses_content(payload)?;
+    if content.trim().is_empty() {
+        return Err(BackendError::EmptyResponse);
+    }
+    Ok(Completion {
+        content,
+        usage: payload.get("usage").and_then(parse_usage),
+        model: payload
+            .get("model")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        tool_calls: extract_responses_tool_calls(payload)?,
     })
 }
 
