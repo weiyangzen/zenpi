@@ -197,15 +197,24 @@ impl OpenAiCompatibleBackend {
         let api_key = env::var("ZENPI_API_KEY")
             .or_else(|_| env::var("OPENAI_API_KEY"))
             .ok();
-        if endpoint.starts_with("https://api.openai.com/") && api_key.is_none() {
+        let model = env::var("ZENPI_MODEL")
+            .or_else(|_| env::var("OPENAI_MODEL"))
+            .unwrap_or_else(|_| "gpt-4o-mini".into());
+        Self::from_values(endpoint, api_key, model)
+    }
+
+    fn from_values(
+        endpoint: String,
+        api_key: Option<String>,
+        model: String,
+    ) -> Result<Self, BackendError> {
+        let normalized_endpoint = normalize_endpoint(endpoint)?;
+        if is_openai_endpoint(&normalized_endpoint) && api_key.is_none() {
             return Err(BackendError::Configuration(
                 "ZENPI_API_KEY or OPENAI_API_KEY is required for api.openai.com".into(),
             ));
         }
-        let model = env::var("ZENPI_MODEL")
-            .or_else(|_| env::var("OPENAI_MODEL"))
-            .unwrap_or_else(|_| "gpt-4o-mini".into());
-        Self::new(endpoint, api_key, model)
+        Self::new(normalized_endpoint, api_key, model)
     }
 
     pub fn endpoint(&self) -> &str {
@@ -227,9 +236,10 @@ fn normalize_endpoint(mut endpoint: String) -> Result<String, BackendError> {
         .chars()
         .any(|character| character.is_whitespace() || character.is_control())
         || !(endpoint.starts_with("http://") || endpoint.starts_with("https://"))
+        || endpoint.contains(['?', '#'])
     {
         return Err(BackendError::Configuration(
-            "endpoint must be an http or https URL without newlines".into(),
+            "endpoint must be an http or https URL without whitespace, query, or fragment".into(),
         ));
     }
     while endpoint.ends_with('/') {
@@ -239,6 +249,13 @@ fn normalize_endpoint(mut endpoint: String) -> Result<String, BackendError> {
         endpoint.push_str("/chat/completions");
     }
     Ok(endpoint)
+}
+
+fn is_openai_endpoint(endpoint: &str) -> bool {
+    endpoint
+        .strip_prefix("https://")
+        .and_then(|rest| rest.split(['/', '?', '#']).next())
+        == Some("api.openai.com")
 }
 
 impl Backend for OpenAiCompatibleBackend {
@@ -354,4 +371,28 @@ fn parse_usage(value: &Value) -> Option<Usage> {
         output_tokens: output,
         total_tokens: total,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OpenAiCompatibleBackend;
+
+    #[test]
+    fn openai_host_requires_credentials_after_endpoint_normalization() {
+        let error = OpenAiCompatibleBackend::from_values(
+            "https://api.openai.com".into(),
+            None,
+            "gpt-4o-mini".into(),
+        )
+        .expect_err("the normalized OpenAI host must require an API key");
+        assert!(error.to_string().contains("API_KEY"));
+
+        let query_error = OpenAiCompatibleBackend::from_values(
+            "https://api.openai.com?tenant=default".into(),
+            None,
+            "gpt-4o-mini".into(),
+        )
+        .expect_err("query-bearing endpoints must be rejected before any request");
+        assert!(query_error.to_string().contains("endpoint"));
+    }
 }

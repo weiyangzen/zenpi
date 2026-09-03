@@ -48,3 +48,9 @@ jobs:
 
       - name: Exercise headless JSONL protocol
         run: tools/headless_smoke.sh
+
+      - name: Exercise the installed release user paths
+        run: python3 tools/user_smoke.py
+
+      - name: Exercise the release headless protocol
+        run: tools/headless_smoke.sh --release

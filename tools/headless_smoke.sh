@@ -7,10 +7,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 ALLOW_SKIP=0
 BIN="${ZENPI_BIN:-}"
+RELEASE_CHECK=0
 
 usage() {
   cat <<'EOF'
-Usage: tools/headless_smoke.sh [--allow-skip] [--bin PATH]
+Usage: tools/headless_smoke.sh [--allow-skip] [--release] [--bin PATH]
 
 Run a deterministic echo-backend JSONL smoke test. The test fails when the
 Rust toolchain or binary is unavailable unless --allow-skip (or
@@ -28,6 +29,10 @@ while (($# > 0)); do
       (($# >= 2)) || { echo "headless smoke: --bin needs a path" >&2; exit 2; }
       BIN="$2"
       shift 2
+      ;;
+    --release)
+      RELEASE_CHECK=1
+      shift
       ;;
     -h|--help)
       usage
@@ -60,11 +65,19 @@ if [[ -z "$BIN" ]]; then
     ((ALLOW_SKIP)) && skip "cargo is not installed"
     fail "cargo is not installed"
   fi
-  cargo build --quiet --manifest-path "$ROOT_DIR/Cargo.toml" --bin zenpi || {
+  BUILD_ARGS=(build --quiet --manifest-path "$ROOT_DIR/Cargo.toml" --bin zenpi)
+  if ((RELEASE_CHECK)); then
+    BUILD_ARGS=(build --quiet --locked --release --manifest-path "$ROOT_DIR/Cargo.toml" --bin zenpi)
+  fi
+  cargo "${BUILD_ARGS[@]}" || {
     ((ALLOW_SKIP)) && skip "cargo build failed"
     fail "cargo build failed"
   }
-  BIN="$ROOT_DIR/target/debug/zenpi"
+  if ((RELEASE_CHECK)); then
+    BIN="$ROOT_DIR/target/release/zenpi"
+  else
+    BIN="$ROOT_DIR/target/debug/zenpi"
+  fi
 fi
 
 [[ -x "$BIN" ]] || {

@@ -24,15 +24,29 @@ are synchronous in this small release.
 ### Quick start
 
 ```bash
-cargo run -- --mode tui
+# Install the `zenpi` binary (or use `cargo run --` while developing).
+cargo install --path . --locked
+zenpi --help
+
+# Interactive terminal mode, using the credential-free echo backend.
+zenpi --mode tui
+
+# Scriptable JSONL mode.
 printf '%s\n' '{"type":"prompt","id":"1","text":"Say hello"}' \
-  | cargo run --quiet -- --mode headless --backend echo
+  | zenpi --mode headless --backend echo --session ./session.jsonl
 ```
 
 The default backend is deterministic `echo`, which makes local tests and
 protocol integration safe without credentials. Select `--backend openai` for
 an OpenAI-compatible endpoint and configure `ZENPI_API_KEY`, optional
 `ZENPI_BASE_URL`, and `ZENPI_MODEL`.
+
+This is a usable synchronous MVP: the `echo` path works offline, while the
+OpenAI-compatible path sends a non-streaming chat-completions request. The
+provider call intentionally blocks the current turn; streaming and background
+worker orchestration are not implemented in this release. This repository is
+currently distributed as source rather than a crates.io package or prebuilt
+GitHub Release, so installation requires Rust 1.88 or newer and a local clone.
 
 ### Headless protocol
 
@@ -41,9 +55,11 @@ contain U+2028 or U+2029; only LF frames a record. Diagnostics go to stderr so
 stdout remains machine-readable.
 
 Supported commands are `prompt`, `steer`, `status`, `handoff`, `resume`, and
-`shutdown`. Every accepted prompt and resulting assistant message is appended
-to the session JSONL file before its completion event is emitted. A malformed
-line receives a typed error and does not mutate the session.
+`shutdown`. In this synchronous release, `steer` can only be evaluated between
+completed provider requests; stdin is not consumed while a provider call is in
+flight. Every accepted prompt and resulting assistant message is appended to
+the session JSONL file before its completion event is emitted. A malformed line
+receives a typed error and does not mutate the session.
 
 Example:
 
@@ -88,6 +104,9 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 
 默认 `echo` backend 不需要凭据，适合本地测试。需要模型服务时可配置
 OpenAI-compatible backend。协议、资源预算、验收门和迁移证据见 `Docs/`。
+可用方式是先执行 `cargo install --path . --locked`，然后运行 `zenpi --mode tui`，
+或使用 `zenpi --mode headless --backend echo` 接收 JSONL。OpenAI-compatible
+调用是同步的非流式请求；本版本不包含后台 worker 编排。
 每个 Blueprint item 都为其实现/测试代码声明小于 5000 的 `Estimated LOC` 预估值；仓库 Rust 总行数只作
 信息性盘点，不是项目级上限。
 
@@ -105,6 +124,10 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 更新でも不要な全画面再描画を避けます。
 この小さなリリースでは provider 呼び出しは同期式で、ネットワーク遅延中は
 入力処理が一時的に待機します。
+`cargo install --path . --locked` で `zenpi` をインストールし、
+`zenpi --mode tui` または `zenpi --mode headless --backend echo` として実行できます。
+OpenAI-compatible 呼び出しは同期・非ストリーミングで、バックグラウンド worker の
+オーケストレーションはこのリリースに含まれません。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（5000 未満）を記載します。リポジトリ全体の
 Rust 行数は情報表示のみで、プロジェクト全体の上限ではありません。
 

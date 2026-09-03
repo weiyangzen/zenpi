@@ -11,6 +11,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
@@ -112,6 +115,7 @@ impl SessionStore {
         if path.exists() && path.is_dir() {
             return Err(SessionError::Directory(path));
         }
+        restrict_session_permissions(&path)?;
         if let Some(parent) = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
@@ -419,10 +423,11 @@ impl SessionStore {
             )));
         }
         encoded.push(b'\n');
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)?;
+        let mut options = OpenOptions::new();
+        options.create(true).append(true);
+        #[cfg(unix)]
+        options.mode(0o600);
+        let mut file = options.open(&self.path)?;
         if self.needs_separator {
             file.write_all(b"\n")?;
             self.needs_separator = false;
@@ -433,6 +438,24 @@ impl SessionStore {
         self.next_seq = self.next_seq.saturating_add(1);
         Ok(())
     }
+}
+
+#[cfg(unix)]
+fn restrict_session_permissions(path: &Path) -> io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let mut permissions = fs::metadata(path)?.permissions();
+    if permissions.mode() & 0o777 != 0o600 {
+        permissions.set_mode(0o600);
+        fs::set_permissions(path, permissions)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn restrict_session_permissions(_path: &Path) -> io::Result<()> {
+    Ok(())
 }
 
 fn now_ms() -> u64 {

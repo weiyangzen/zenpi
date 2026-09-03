@@ -30,6 +30,6 @@ passes all three tests. `TuiState::render` invalidates its cached transcript on 
 dimension change, clamps zero/one-cell areas, and lets Ratatui perform the
 buffer diff. `TerminalGuard` owns raw mode, alternate screen, cursor, and
 bracketed-paste cleanup; its `Drop` path is used on errors and normal exits.
-A PTY smoke run of `cargo run -- --mode tui --backend echo` accepted Ctrl-C,
-returned exit status 0, and emitted the alternate-screen/raw-mode restoration
-sequences.
+A PTY smoke run of the installed release binary (`zenpi --mode tui --backend
+echo`) accepted a prompt and Ctrl-C, returned exit status 0, and emitted the
+alternate-screen/raw-mode restoration sequences.

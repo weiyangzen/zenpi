@@ -19,6 +19,8 @@ python3 tools/generate_gantt.py
 python3 tools/check_rust_loc.py
 python3 tools/check_modes.py
 tools/headless_smoke.sh
+tools/headless_smoke.sh --release
+python3 tools/user_smoke.py
 ```
 
 The repository checks are intentionally dependency-free. `validate_blueprint.py`
@@ -31,6 +33,9 @@ monitoring index, and each row's strict `Estimated LOC < 5000` field.
 and valid LF-JSONL frames, and confirms durable session and handoff records. It
 accepts `--bin PATH` when a prebuilt binary is available; use `--allow-skip`
 only in environments without a Rust toolchain.
+`user_smoke.py` builds and installs the release into an isolated root, then
+exercises help, echo, resume, the OpenAI-compatible adapter, invalid input, and
+the PTY TUI through the installed binary.
 
 Keep every checklist item's estimated implementation/test code attributable to
 that item below 5,000 LOC. The aggregate source inventory is informational.

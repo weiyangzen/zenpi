@@ -56,3 +56,44 @@ fn backend_failure_keeps_the_user_turn_and_returns_idle() {
     assert_eq!(agent.history().len(), 1);
     assert_eq!(agent.phase(), zenpi::core::AgentPhase::Idle);
 }
+
+#[test]
+fn backend_retryability_is_typed() {
+    assert!(BackendError::Transport("offline".into()).is_retryable());
+    assert!(BackendError::HttpStatus { status: 429 }.is_retryable());
+    assert!(BackendError::HttpStatus { status: 503 }.is_retryable());
+    assert!(!BackendError::HttpStatus { status: 400 }.is_retryable());
+    assert!(!BackendError::Configuration("bad key".into()).is_retryable());
+    assert!(!BackendError::EmptyResponse.is_retryable());
+}
+
+#[test]
+fn steer_requires_an_active_turn_and_expected_id_matches() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("steer.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    assert_eq!(
+        agent
+            .steer_turn(TurnInputRequest::new("before start"))
+            .unwrap(),
+        TurnSubmission::NotSubmitted {
+            reason: zenpi::core::NotSubmittedReason::NoActiveTurn
+        }
+    );
+    let started = agent
+        .start_turn_if_idle(TurnInputRequest::new("start"))
+        .unwrap();
+    let turn_id = started.turn_id().unwrap().to_owned();
+    assert_eq!(
+        agent
+            .steer_turn(TurnInputRequest::new("wrong").expecting("other"))
+            .unwrap(),
+        TurnSubmission::NotSubmitted {
+            reason: zenpi::core::NotSubmittedReason::ExpectedTurnMismatch
+        }
+    );
+    let steered = agent
+        .steer_turn(TurnInputRequest::new("right").expecting(turn_id))
+        .unwrap();
+    assert!(matches!(steered, TurnSubmission::Steered { .. }));
+}

@@ -114,8 +114,10 @@ and a typed payload. User input and the resulting assistant message are
 durably appended before a completion response/event is emitted. Writes are
 bounded and use append, flush, and `sync_data` under the sole store owner;
 malformed or out-of-order records are skipped with a recovery warning and never
-overwrite the valid prefix. The default location is configurable, but tests use
-a temporary directory supplied by the caller.
+overwrite the valid prefix. On Unix, session files are created or tightened to
+mode `0600` because prompts and completions may contain private material. The
+default location is configurable, but tests use a temporary directory supplied
+by the caller.
 
 ### 3.3 Headless JSONL
 
@@ -127,7 +129,9 @@ Input is framed strictly by LF (U+2028/U+2029 are payload characters). A
 malformed non-empty frame gets a stable error code, never mutates session state,
 and the loop remains usable; blank LF frames are ignored. Stdout is
 protocol-only; diagnostics and tracing go to stderr. EOF performs an orderly
-shutdown and flush.
+shutdown and flush. The provider boundary is synchronous, so headless reads the
+next command only after the current provider request completes; `steer` is a
+between-turn state-machine command in this release, not live in-flight input.
 
 ### 3.4 Handoff
 
@@ -150,8 +154,10 @@ regions have stable bounds. Updates are coalesced on approximately a 16 ms
 tick; Ratatui's buffer diff emits no unchanged cells/rows. A resize invalidates
 the buffer and performs one full redraw using clamped dimensions and Unicode
 display width. The provider callback is synchronous in this release, so network
-latency can delay input; raw mode, cursor visibility, alternate-screen state,
-and EOF/interrupt cleanup are restored on every exit path.
+latency can delay input and Ctrl-C cannot cancel an in-flight provider request.
+Raw mode, cursor visibility, alternate-screen state, and orderly EOF/interrupt
+cleanup are restored by the terminal guard. External unhandled termination such
+as `SIGKILL` is outside the cleanup guarantee.
 
 ## 4. Rust deslop rules
 
@@ -239,6 +245,25 @@ failure paths, malformed/truncated records, out-of-order envelope records,
 resize during rapid local updates, terminal cleanup, and resource ownership,
 not only happy-path output. The append owner is deliberately single-threaded;
 cross-process locking is outside this release.
+
+The release artifact must be usable outside Cargo's development target. The
+Master therefore validates both `target/release/zenpi` and an isolated
+`cargo install --path . --locked` binary through the same public headless and
+TUI smoke paths; a green compile without those runtime checks is insufficient.
+
+### 6.1 End-user smoke acceptance
+
+Completion is not established by a compile or unit test alone. Before marking
+the release usable, the Master must exercise the built artifact through the
+public user path: `cargo build --release --locked`, `cargo install --path .
+--locked` into an isolated root, `zenpi --help`, an offline `echo` prompt over
+headless JSONL with a durable session, a resume/status cycle, a PTY TUI prompt
+with terminal restoration, and a local OpenAI-compatible HTTP fixture that
+verifies the request path, model, and bearer header without contacting a real
+provider. Invalid backend configuration and invalid session paths must fail
+before creating a session. The resulting evidence belongs to ZP-101, ZP-105,
+ZP-107, ZP-201, and ZP-202; it is separate from the structural Blueprint
+validator.
 
 Completion requires every required Blueprint row `[x]`, zero `[ ]`/`[_]`, no
 pending handoff/integration/repair, all applicable profiles green, a current

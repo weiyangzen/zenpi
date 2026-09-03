@@ -1,4 +1,6 @@
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use tempfile::tempdir;
 use zenpi::{
     core::{Turn, TurnRole},
@@ -51,4 +53,14 @@ fn out_of_order_envelope_is_warned() {
             .recovery_warnings()
             .is_empty()
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn session_journal_is_private_to_the_current_user() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("private.jsonl");
+    let _store = SessionStore::open(&path).unwrap();
+    let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
 }

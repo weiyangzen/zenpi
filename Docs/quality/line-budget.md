@@ -21,10 +21,10 @@ gate the aggregate by default. An operator may supply `--max-lines` for an
 ad-hoc diagnostic, but that optional check is not this Blueprint's acceptance
 gate.
 
-Final post-correction result on 2026-09-03: the informational Rust inventory
-reports `4923` physical lines across 16 files, while the maximum declared per-item
-estimate is `1400`; the acceptance rule is therefore evaluated per row, not by
-the aggregate number.
+The final validation run recorded `5164` physical lines across 17 files (4604
+under `src/`, 560 under `tests/`). That count may exceed 5,000 because the
+acceptance rule is evaluated independently per row; the maximum declared
+per-item estimate is `1400`.
 
 Dependencies remain intentionally narrow: Ratatui plus crossterm for one TUI
 stack, Serde/serde_json for typed JSONL, thiserror for errors, unicode-width

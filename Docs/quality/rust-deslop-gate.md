@@ -23,7 +23,10 @@ into the core, while compatibility conversion is limited to the session/b3
 boundary. Invalid protocol, path, digest, budget, and terminal states fail
 closed before mutation.
 
-Recorded gate result on 2026-09-03: format, Clippy, and `cargo test --all-targets`
-passed; the six integration targets reported 17 passing tests. The headless
+Recorded gate result on 2026-09-04: format, Clippy, and `cargo test --all-targets`
+passed; the seven integration targets reported 22 passing tests. The headless
 smoke reported 12 typed output responses and 4 durable session records, and
-`python3 tools/check_modes.py` reported exactly `tui/headless`.
+`python3 tools/check_modes.py` reported exactly `tui/headless`. The installed
+release user smoke also passed the release build, isolated install, echo,
+cross-process resume, local OpenAI-compatible fixture, invalid-input checks,
+and PTY terminal restoration.

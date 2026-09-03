@@ -49,3 +49,25 @@ fn unsupported_version_and_missing_id_are_rejected() {
             .is_err()
     );
 }
+
+#[test]
+fn sequential_steer_and_eof_are_safe_terminal_paths() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("steer-eof.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let input = b"{\"type\":\"prompt\",\"id\":\"p\",\"text\":\"hello\",\"mode\":\"start_if_idle\"}\n{\"type\":\"steer\",\"id\":\"s\",\"text\":\"follow-up\"}\n";
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input), &mut output).unwrap();
+    let records = json_lines(&output);
+    assert!(
+        records
+            .iter()
+            .any(|value| value["id"] == "p" && value["success"] == true)
+    );
+    assert!(
+        records
+            .iter()
+            .any(|value| value["id"] == "s" && value["success"] == true)
+    );
+    assert_eq!(agent.phase(), zenpi::core::AgentPhase::Closed);
+}
