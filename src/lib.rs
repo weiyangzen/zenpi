@@ -22,6 +22,7 @@ pub mod security;
 pub mod session;
 pub mod skills;
 pub mod slash;
+pub mod slash_actions;
 pub mod tools;
 pub mod tui;
 pub mod view_model;

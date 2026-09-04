@@ -7,7 +7,7 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Display;
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -163,6 +163,13 @@ pub struct TuiState {
     /// intentionally remains available for embedders; the production async
     /// loop opts into [`Self::render_bentobox`] below.
     workspace_layout: LayoutModel,
+    /// Inactive tab models are retained independently so switching tabs does
+    /// not leak one tab's ratios/focus into another. The active model remains
+    /// in `workspace_layout` for compatibility with existing render helpers.
+    workspace_layouts: BTreeMap<TabId, LayoutModel>,
+    /// Set only when user-owned layout state changes. Hosts use this bit to
+    /// persist layout changes without writing a file on every rendered frame.
+    layout_dirty: bool,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -195,6 +202,8 @@ impl TuiState {
             streaming_job_id: None,
             streaming_message_started: false,
             workspace_layout: LayoutModel::new(TabId::Project),
+            workspace_layouts: BTreeMap::new(),
+            layout_dirty: false,
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -245,6 +254,52 @@ impl TuiState {
         &self.workspace_layout
     }
 
+    /// Return a bounded snapshot of every tab's user-owned state. The active
+    /// tab is first, followed by inactive tabs in stable `TabId` order.
+    /// Capabilities are retained in memory for the host but omitted by the
+    /// config persistence layer.
+    pub fn workspace_layout_states(&self) -> Vec<LayoutModel> {
+        let mut states = Vec::with_capacity(TabId::ALL.len());
+        states.push(self.workspace_layout.clone());
+        states.extend(self.workspace_layouts.values().cloned());
+        states
+    }
+
+    /// Restore saved tab models before entering the production event loop.
+    /// Unknown tabs are impossible through the typed API; duplicate entries
+    /// deterministically use the last one. Host capabilities are applied later
+    /// because they are not portable user preferences.
+    pub fn restore_workspace_layouts<I>(&mut self, layouts: I)
+    where
+        I: IntoIterator<Item = LayoutModel>,
+    {
+        let capabilities = self.workspace_layout.capabilities;
+        self.workspace_layouts.clear();
+        self.workspace_layout = LayoutModel::new(TabId::Project);
+        self.workspace_layout.set_capabilities(capabilities);
+        for mut layout in layouts {
+            layout.set_capabilities(capabilities);
+            if layout.tab == TabId::Project {
+                self.workspace_layout = layout;
+            } else {
+                self.workspace_layouts.insert(layout.tab, layout);
+            }
+        }
+        self.layout_dirty = false;
+        self.dirty = true;
+    }
+
+    /// Whether a user-owned layout mutation should be persisted by a host.
+    pub fn layout_dirty(&self) -> bool {
+        self.layout_dirty
+    }
+
+    /// Clear the persistence bit after a successful save. Rendering dirtiness
+    /// is intentionally independent and is not affected by this operation.
+    pub fn clear_layout_dirty(&mut self) {
+        self.layout_dirty = false;
+    }
+
     /// Return the currently focused BentoBox pane.
     pub fn focused_workspace_pane(&self) -> Option<PaneId> {
         self.workspace_layout.focused_pane()
@@ -258,6 +313,7 @@ impl TuiState {
         let (width, height) = self.workspace_viewport();
         let focused = self.workspace_layout.focus_next(width, height);
         if focused.is_some() {
+            self.layout_dirty = true;
             self.dirty = true;
         }
         focused
@@ -268,6 +324,7 @@ impl TuiState {
         let (width, height) = self.workspace_viewport();
         let focused = self.workspace_layout.focus_previous(width, height);
         if focused.is_some() {
+            self.layout_dirty = true;
             self.dirty = true;
         }
         focused
@@ -280,6 +337,7 @@ impl TuiState {
             .workspace_layout
             .focus_direction(direction, width, height);
         if focused.is_some() {
+            self.layout_dirty = true;
             self.dirty = true;
         }
         focused
@@ -292,6 +350,7 @@ impl TuiState {
             .workspace_layout
             .adjust_focused_split(direction, width, height);
         if changed {
+            self.layout_dirty = true;
             self.dirty = true;
         }
         changed
@@ -300,6 +359,7 @@ impl TuiState {
     /// Reset ratios, collapsed panes, and focus to the active tab preset.
     pub fn reset_workspace_layout(&mut self) {
         self.workspace_layout.reset_layout();
+        self.layout_dirty = true;
         self.dirty = true;
     }
 
@@ -313,13 +373,22 @@ impl TuiState {
         }
     }
 
-    /// Select a workspace tab and invalidate the next frame.  Conversation
-    /// state is deliberately shared across tabs until durable per-tab stores
-    /// land in the v2 domain layer.
+    /// Select a workspace tab and invalidate the next frame. Each tab keeps
+    /// its own ratios, collapsed panes, and focus in memory; switching does
+    /// not mark the preference document dirty by itself.
     pub fn set_workspace_tab(&mut self, tab: TabId) {
         if self.workspace_layout.tab != tab {
-            self.workspace_layout.tab = tab;
-            self.workspace_layout.focused = None;
+            let capabilities = self.workspace_layout.capabilities;
+            let current = std::mem::replace(
+                &mut self.workspace_layout,
+                LayoutModel::new(tab).with_capabilities(capabilities),
+            );
+            self.workspace_layouts.insert(current.tab, current);
+            self.workspace_layout = self
+                .workspace_layouts
+                .remove(&tab)
+                .unwrap_or_else(|| LayoutModel::new(tab).with_capabilities(capabilities));
+            self.workspace_layout.set_capabilities(capabilities);
             self.dirty = true;
         }
     }
@@ -328,6 +397,9 @@ impl TuiState {
     /// Browser and PTY panes remain disabled by default in the binary.
     pub fn set_workspace_capabilities(&mut self, capabilities: crate::layout::PaneCapabilities) {
         self.workspace_layout.set_capabilities(capabilities);
+        for layout in self.workspace_layouts.values_mut() {
+            layout.set_capabilities(capabilities);
+        }
         self.dirty = true;
     }
 
@@ -1788,25 +1860,41 @@ pub fn dispatch_slash_command(
             );
         }
         SlashCommand::Diff { path } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "diff command is parsed but file review is not configured: {}",
-                    path.as_deref()
-                        .map(bounded_display)
-                        .unwrap_or_else(|| "current workspace".into())
+            match crate::slash_actions::diff_value_for_agent(agent.as_deref(), path.as_deref()) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "diff:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
                 ),
-            );
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("diff failed: {error}"))
+                }
+            }
         }
-        SlashCommand::Attach { path } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "attach command is parsed but attachment staging is not configured: {}",
-                    bounded_display(&path)
+        SlashCommand::Attach { path } => match agent.as_deref_mut() {
+            Some(agent) => match crate::slash_actions::attach_value(agent, &path) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "attachment staged:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
                 ),
-            );
-        }
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("attachment failed: {error}"))
+                }
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "attachment staging is unavailable while the agent is busy",
+            ),
+        },
         SlashCommand::Approve { id, decision } => {
             state.push_message(
                 MessageRole::Error,

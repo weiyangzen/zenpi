@@ -3490,20 +3490,34 @@ fn execute_headless_slash(
             "accepted": false,
             "message": "compact command is parsed but context compaction is not configured",
         }))),
-        SlashCommand::Diff { path } => Ok(SlashExecution::Response(json!({
-            "command": "diff",
-            "route": "local",
-            "accepted": false,
-            "path": path,
-            "message": "diff command is parsed but file review is not configured",
-        }))),
-        SlashCommand::Attach { path } => Ok(SlashExecution::Response(json!({
-            "command": "attach",
-            "route": "local",
-            "accepted": false,
-            "path": path,
-            "message": "attach command is parsed but attachment staging is not configured",
-        }))),
+        SlashCommand::Diff { path } => {
+            crate::slash_actions::diff_value_for_agent(agent.as_deref(), path.as_deref())
+                .map(|mut data| {
+                    if let Some(object) = data.as_object_mut() {
+                        object.insert("route".into(), json!("local"));
+                        object.insert("accepted".into(), json!(true));
+                    }
+                    SlashExecution::Response(data)
+                })
+                .map_err(|error| SlashDispatchError {
+                    code: "diff_error",
+                    message: error.to_string(),
+                })
+        }
+        SlashCommand::Attach { path } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "attachment staging is unavailable while the agent is busy".into(),
+                });
+            };
+            crate::slash_actions::attach_value(agent, &path)
+                .map(SlashExecution::Response)
+                .map_err(|error| SlashDispatchError {
+                    code: "attachment_error",
+                    message: error.to_string(),
+                })
+        }
         SlashCommand::Approve { id, decision } => Ok(SlashExecution::Response(json!({
             "command": "approve",
             "route": "local",

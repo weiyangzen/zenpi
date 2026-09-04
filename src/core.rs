@@ -7,7 +7,7 @@
 
 use std::{
     env,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -287,6 +287,10 @@ pub struct Agent {
     context_budget: crate::context::ContextBudget,
     skills: crate::skills::SkillSet,
     active_attachments: Vec<crate::backend::RequestAttachment>,
+    /// Workspace references staged by `/attach`.  They remain outside the
+    /// durable journal until the next turn is admitted, then are materialized
+    /// and recorded as bounded metadata alongside that user turn.
+    pending_attachments: Vec<crate::backend::InputAttachment>,
     governance: Option<crate::governance::BudgetLedger>,
 }
 
@@ -328,6 +332,7 @@ impl Agent {
             context_budget: crate::context::ContextBudget::default(),
             skills: crate::skills::SkillSet::default(),
             active_attachments: Vec::new(),
+            pending_attachments: Vec::new(),
             governance: None,
         };
         for operation in recovered {
@@ -455,6 +460,56 @@ impl Agent {
         }
     }
 
+    /// Return the host-fixed workspace used to materialize path attachments.
+    /// Hosts can use this to resolve slash-command paths against the same
+    /// boundary as provider requests instead of assuming the process cwd.
+    pub fn attachment_workspace_root(&self) -> Option<&Path> {
+        self.tools
+            .as_ref()
+            .map(|runtime| runtime.context.workspace_root())
+    }
+
+    /// Stage one validated attachment for the next admitted turn.  The
+    /// workspace bytes are read once now to prove that the path is valid and
+    /// bounded, then read and hashed again at turn admission so the provider
+    /// sees the current file rather than a stale snapshot.  Bytes are never
+    /// retained in the journal by this operation.
+    pub fn stage_attachment(
+        &mut self,
+        attachment: crate::backend::InputAttachment,
+    ) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        attachment.validate()?;
+        if self.pending_attachments.len() >= crate::backend::MAX_ATTACHMENTS_PER_TURN {
+            return Err(AgentError::InvalidTurn(format!(
+                "pending attachments exceed {}",
+                crate::backend::MAX_ATTACHMENTS_PER_TURN
+            )));
+        }
+        // A path attachment must be checked against the host-fixed tool
+        // workspace now. URL/provider-file references do not need local I/O.
+        if attachment.path.is_some() {
+            let _ = self
+                .materialize_attachments("pending-attachment", std::slice::from_ref(&attachment))?;
+        }
+        self.pending_attachments.push(attachment);
+        Ok(())
+    }
+
+    /// Return references waiting to be consumed by the next turn.  The slice
+    /// contains no file bytes and is safe for bounded status projections.
+    pub fn pending_attachments(&self) -> &[crate::backend::InputAttachment] {
+        &self.pending_attachments
+    }
+
+    /// Drop staged references explicitly, for example when a host switches to
+    /// another session or the user cancels an attachment workflow.
+    pub fn clear_pending_attachments(&mut self) {
+        self.pending_attachments.clear();
+    }
+
     /// Configure the approval policy and return the coordinator used by a
     /// host to surface/respond to pending side-effect requests.
     pub fn set_approval_policy(&mut self, policy: ApprovalPolicy) -> Option<ApprovalCoordinator> {
@@ -506,13 +561,15 @@ impl Agent {
                 "prompt exceeds {MAX_TEXT_BYTES} bytes"
             )));
         }
-        if request.attachments.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
+        let mut attachments = self.pending_attachments.clone();
+        attachments.extend(request.attachments);
+        if attachments.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
             return Err(AgentError::InvalidTurn(format!(
                 "prompt exceeds {} attachments",
                 crate::backend::MAX_ATTACHMENTS_PER_TURN
             )));
         }
-        for attachment in &request.attachments {
+        for attachment in &attachments {
             attachment.validate()?;
         }
         let current = self.active_turn_id.as_deref();
@@ -530,11 +587,11 @@ impl Agent {
             return Ok(submission);
         }
 
-        match request.mode {
+        let result = match request.mode {
             TurnMode::StartOrSteer if current.is_none() => {
-                self.start_new(request.message, request.attachments, TurnMode::StartOrSteer)
+                self.start_new(request.message, attachments, TurnMode::StartOrSteer)
             }
-            TurnMode::StartOrSteer => self.steer_existing(request.message, request.attachments),
+            TurnMode::StartOrSteer => self.steer_existing(request.message, attachments),
             TurnMode::StartIfIdle if current.is_some() => {
                 let submission = TurnSubmission::NotSubmitted {
                     reason: NotSubmittedReason::NotIdle,
@@ -545,7 +602,7 @@ impl Agent {
                 Ok(submission)
             }
             TurnMode::StartIfIdle => {
-                self.start_new(request.message, request.attachments, TurnMode::StartIfIdle)
+                self.start_new(request.message, attachments, TurnMode::StartIfIdle)
             }
             TurnMode::Steer if current.is_none() => {
                 let submission = TurnSubmission::NotSubmitted {
@@ -565,8 +622,12 @@ impl Agent {
                 });
                 Ok(submission)
             }
-            TurnMode::Steer => self.steer_existing(request.message, request.attachments),
+            TurnMode::Steer => self.steer_existing(request.message, attachments),
+        };
+        if result.as_ref().is_ok_and(TurnSubmission::accepted) {
+            self.pending_attachments.clear();
         }
+        result
     }
 
     pub fn start_or_steer_turn(
@@ -626,6 +687,17 @@ impl Agent {
         message: String,
         attachments: Vec<crate::backend::InputAttachment>,
     ) -> Result<TurnSubmission, AgentError> {
+        if self
+            .active_attachments
+            .len()
+            .saturating_add(attachments.len())
+            > crate::backend::MAX_ATTACHMENTS_PER_TURN
+        {
+            return Err(AgentError::InvalidTurn(format!(
+                "active turn exceeds {} attachments",
+                crate::backend::MAX_ATTACHMENTS_PER_TURN
+            )));
+        }
         let turn_id = self
             .active_turn_id
             .clone()
@@ -920,6 +992,7 @@ impl Agent {
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
         self.active_attachments.clear();
+        self.pending_attachments.clear();
         self.last_error = None;
         self.session.finish_operation(
             &provider_operation.operation_id,
@@ -1431,6 +1504,7 @@ impl Agent {
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
         self.active_attachments.clear();
+        self.pending_attachments.clear();
         self.last_error = None;
         // Events belong to the session that produced them. Do not let
         // recovery or lifecycle notifications from the previous journal leak
@@ -1454,6 +1528,7 @@ impl Agent {
         self.phase = AgentPhase::Closed;
         self.active_turn_id = None;
         self.active_attachments.clear();
+        self.pending_attachments.clear();
         Ok(())
     }
 
@@ -1466,6 +1541,7 @@ impl Agent {
             self.phase = AgentPhase::Closed;
             self.active_turn_id = None;
             self.active_attachments.clear();
+            self.pending_attachments.clear();
         }
     }
 }
