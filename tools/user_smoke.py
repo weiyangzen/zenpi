@@ -24,6 +24,28 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 
+_ZENPI_ENV_KEYS = {
+    "CODEX_HOME",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "ZENPI_API_KEY",
+    "ZENPI_BACKEND",
+    "ZENPI_BASE_URL",
+    "ZENPI_HOME",
+    "ZENPI_MODEL",
+    "ZENPI_PROFILE",
+    "ZENPI_SESSION",
+    "ZENPI_WIRE_API",
+}
+
+
+def isolated_env(home: Path, **overrides: str) -> dict[str, str]:
+    """Retain toolchain variables while excluding host agent credentials/config."""
+    env = {key: value for key, value in os.environ.items() if key not in _ZENPI_ENV_KEYS}
+    env.update({"HOME": str(home), "ZENPI_HOME": str(home / ".zenpi"), **overrides})
+    home.mkdir(parents=True, exist_ok=True)
+    return env
+
 
 def run(
     command: list[str],
@@ -171,11 +193,7 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
     tracked.write_text("before\nafter\n", encoding="utf-8")
 
     session = root / "slash-owner-session.jsonl"
-    env = {
-        **os.environ,
-        "ZENPI_HOME": str(root / "slash-owner-home"),
-        "HOME": str(root / "slash-user-home"),
-    }
+    env = isolated_env(root / "slash-user-home")
     first_payload = "\n".join(
         json.dumps(value, separators=(",", ":"))
         for value in (
@@ -407,9 +425,7 @@ def assert_invalid_inputs(binary: Path, root: Path) -> None:
     missing_key_session = root / "missing-key.jsonl"
     isolated_home = root / "empty-home"
     isolated_home.mkdir()
-    env = {key: value for key, value in os.environ.items() if key not in {"ZENPI_API_KEY", "OPENAI_API_KEY"}}
-    env["HOME"] = str(isolated_home)
-    env["ZENPI_HOME"] = str(isolated_home / ".zenpi")
+    env = isolated_env(isolated_home)
     # Deliberately omit the path: the binary must normalize the host before
     # applying its credential guard.
     env["ZENPI_BASE_URL"] = "https://api.openai.com"
@@ -469,15 +485,12 @@ def assert_openai_fixture(binary: Path, root: Path) -> None:
     server_thread = threading.Thread(target=server.handle_request, daemon=True)
     server_thread.start()
     session = root / "provider-session.jsonl"
-    env = {
-        **os.environ,
-        "ZENPI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1",
-        "ZENPI_API_KEY": "user-smoke-key",
-        "ZENPI_WIRE_API": "responses",
-        "ZENPI_HOME": str(root / "provider-zenpi"),
-        "HOME": str(root / "provider-home"),
-    }
-    Path(env["HOME"]).mkdir()
+    env = isolated_env(
+        root / "provider-home",
+        ZENPI_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
+        ZENPI_API_KEY="user-smoke-key",
+        ZENPI_WIRE_API="responses",
+    )
     payload = (
         '{"type":"prompt","id":"p","text":"provider prompt"}\n'
         '{"type":"shutdown","id":"q"}\n'
@@ -571,7 +584,7 @@ def assert_tui(binary: Path, root: Path) -> None:
     command = [str(binary), "--mode", "tui", "--backend", "echo", "--session", str(session)]
     pid, fd = pty.fork()
     if pid == 0:
-        os.execv(command[0], command)
+        os.execve(command[0], command, isolated_env(root / "tui-home"))
     exited = False
     try:
         # A real terminal supplies a usable window size before the first draw.
@@ -673,13 +686,13 @@ def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
     server_thread.start()
     session = root / "tui-stream-session.jsonl"
     command = [str(binary), "--mode", "tui", "--session", str(session)]
-    env = {
-        **os.environ,
-        "ZENPI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1",
-        "ZENPI_WIRE_API": "responses",
-        "ZENPI_MODEL": "mock-model",
-        "ZENPI_HOME": str(root / "tui-stream-home"),
-    }
+    env = isolated_env(
+        root / "tui-stream-home",
+        ZENPI_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
+        ZENPI_API_KEY="user-smoke-key",
+        ZENPI_WIRE_API="responses",
+        ZENPI_MODEL="mock-model",
+    )
     pid, fd = pty.fork()
     if pid == 0:
         os.execve(command[0], command, env)
