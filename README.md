@@ -60,6 +60,14 @@ fallback can use `~/.codex` on the first run; the explicit import persists it.
 Provider quota/rate/usage-limit failures are returned as errors; zenpi never
 turns them into a mock answer.
 
+In headless mode, wait for an emitted `approval_request` event before sending
+an `approve` request. Workspace write/edit approvals include a bounded unified
+diff. zenpi revalidates that preview immediately before execution and returns
+a `stale_preview` tool result instead of writing if the source changed while
+approval was pending. Plain stdin EOF drains an accepted model turn; when EOF
+leaves nobody able to answer a side-effect approval, that approval is denied
+rather than hanging or silently executing.
+
 The Responses API is the primary wire protocol (`/responses` and
 `/v1/responses`) and is consumed as SSE, including text deltas, completion
 usage, and Codex gateways that insert NUL padding. Chat Completions remains an
@@ -201,6 +209,10 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 构建；正常 release 无法启用它。缺少 provider 时 zenpi 会在创建 session
 前失败，不会伪造回复。
 provider 的额度、限流或 usage-limit 错误会原样作为失败返回，不会退回 mock。
+headless 客户端必须等收到 `approval_request` 后再发送 `approve`。文件写入和编辑
+审批会携带有界 unified diff；真正执行前再次校验文件状态，审批等待期间若文件已
+变化，则返回 `stale_preview`，不会写入。stdin 正常 EOF 会等待已接收的模型请求
+完成；若 EOF 后已无人能回答副作用审批，则拒绝该审批而不是挂住或暗中执行。
 
 当前仓库包含 v1 的 provider/session/runtime 基线，以及正在审核的 v2 候选实现。
 “编译通过”不等于已经达到 Claude Code/Codex 级别的完整可用体验。真实

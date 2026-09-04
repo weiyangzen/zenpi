@@ -1414,6 +1414,8 @@ impl Agent {
                         Some(ApprovalDecision::Deny)
                     }
                 });
+                let waited_for_approval = approval.is_none();
+                let mut approved_preview = None;
                 if approval == Some(ApprovalDecision::Deny) {
                     let result = crate::tools::ToolResult::Error {
                         call_id: call.id.clone(),
@@ -1451,6 +1453,47 @@ impl Agent {
                     continue;
                 }
                 if approval.is_none() {
+                    let preview = match runtime.registry.approval_preview(&runtime.context, &call) {
+                        Ok(preview) => preview,
+                        Err(error) => {
+                            let result = crate::tools::ToolResult::Error {
+                                call_id: call.id.clone(),
+                                tool: call.name.clone(),
+                                error: crate::tools::ToolFailure {
+                                    code: error.code(),
+                                    message: format!("tool preview failed: {error}"),
+                                },
+                            };
+                            let serialized = serde_json::to_string(&result).map_err(|error| {
+                                AgentError::InvalidTurn(format!(
+                                    "tool result serialization failed: {error}"
+                                ))
+                            })?;
+                            let mut tool_turn = Turn::with_parent(
+                                next_id("tool"),
+                                turn_id.to_owned(),
+                                TurnRole::Tool,
+                                serialized,
+                            );
+                            tool_turn.metadata = Some(serde_json::json!({
+                                "tool_call_id": call.id,
+                                "tool_name": call.name,
+                                "preview_failed": true,
+                            }));
+                            self.session.append_turn(tool_turn)?;
+                            self.events.push(AgentEvent::ToolResult {
+                                turn_id: turn_id.to_owned(),
+                                call_id: call.id,
+                                success: false,
+                            });
+                            self.session.finish_operation(
+                                &tool_operation_id,
+                                crate::session::OperationOutcome::Failed,
+                            )?;
+                            continue;
+                        }
+                    };
+                    let preview_for_execution = preview.clone();
                     let approval_request = ApprovalRequest {
                         request_id: format!("approval-{}", call.id),
                         turn_id: turn_id.to_owned(),
@@ -1461,6 +1504,7 @@ impl Agent {
                             .map(|item| item.side_effect)
                             .unwrap_or(crate::tools::ToolSideEffect::ReadOnly),
                         arguments: call.arguments.clone(),
+                        preview,
                     };
                     let coordinator = runtime.approval.clone();
                     let response = coordinator.request_response(
@@ -1479,6 +1523,36 @@ impl Agent {
                                     "call_id": accepted.request.call_id,
                                     "tool": accepted.request.tool,
                                     "side_effect": accepted.request.side_effect,
+                                    "preview": accepted.request.preview.as_ref().map(|preview| {
+                                        let (path, changed, truncated, before_bytes, after_bytes, source_sha256) =
+                                            match preview {
+                                                crate::tools::ToolPreview::Diff {
+                                                    path,
+                                                    changed,
+                                                    truncated,
+                                                    before_bytes,
+                                                    after_bytes,
+                                                    source_sha256,
+                                                    ..
+                                                } => (
+                                                    path,
+                                                    changed,
+                                                    truncated,
+                                                    before_bytes,
+                                                    after_bytes,
+                                                    source_sha256,
+                                                ),
+                                            };
+                                        serde_json::json!({
+                                            "kind": "diff",
+                                            "path": path,
+                                            "changed": changed,
+                                            "truncated": truncated,
+                                            "before_bytes": before_bytes,
+                                            "after_bytes": after_bytes,
+                                            "source_sha256": source_sha256,
+                                        })
+                                    }),
                                     "decision": accepted.response.decision,
                                     "remember": accepted.response.remember,
                                 }))
@@ -1494,6 +1568,7 @@ impl Agent {
                     }
                     match response {
                         Ok(response) => {
+                            approved_preview = preview_for_execution;
                             // The host writes `approval_resolved` before waking
                             // this worker.  Record consumption as a second
                             // durable boundary before entering any side effect.
@@ -1616,6 +1691,13 @@ impl Agent {
                             call.clone(),
                         ),
                     }
+                } else if waited_for_approval {
+                    runtime.registry.execute_approved(
+                        &runtime.context,
+                        runtime.policy,
+                        call.clone(),
+                        approved_preview.as_ref(),
+                    )
                 } else {
                     runtime
                         .registry
@@ -2375,7 +2457,13 @@ pub fn run() -> Result<(), ZenpiError> {
                 } else {
                     print_config_status(&report);
                 }
-                Ok(())
+                if report.is_ready() {
+                    Ok(())
+                } else {
+                    Err(ZenpiError::arguments(
+                        "provider configuration is not ready; run `zenpi config import-codex` or set ZENPI_BASE_URL, ZENPI_API_KEY, and ZENPI_MODEL",
+                    ))
+                }
             }
             CliCommand::ConfigList => {
                 let paths = crate::config::ConfigPaths::discover()?;
@@ -2646,12 +2734,7 @@ fn print_session_summary(summary: &crate::session::SessionSummary) {
 
 fn print_config_status(report: &crate::config::ConfigStatus) {
     println!("profile={}", display_option(report.profile.as_deref()));
-    println!(
-        "ready={}",
-        (!report.requires_openai_auth || report.api_key_present)
-            && report.base_url.is_some()
-            && report.model.is_some()
-    );
+    println!("ready={}", report.is_ready());
     println!("backend={}", report.backend);
     println!("provider={}", display_option(report.provider.as_deref()));
     println!("base_url={}", display_option(report.base_url.as_deref()));

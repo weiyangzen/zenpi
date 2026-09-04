@@ -3641,14 +3641,19 @@ pub fn run_async_with_profile(
             }
             if let Some(coordinator) = approval.as_ref() {
                 for request in coordinator.drain_pending() {
+                    let preview = request
+                        .preview
+                        .as_ref()
+                        .map(|preview| format!("\n\nProposed change:\n{}", preview.display_text()))
+                        .unwrap_or_default();
                     state.push_message(
                         // Keep the approval prompt visible while tool logs are
                         // folded; hiding it would leave the user with no way to
                         // know what the pending y/n response refers to.
                         MessageRole::System,
                         format!(
-                            "Approval required: {} {}\nType y to allow once, n to deny.",
-                            request.tool, request.arguments
+                            "Approval required: {} {}{preview}\nType y to allow once, n to deny.",
+                            request.tool, request.arguments,
                         ),
                     );
                     // The coordinator itself is bounded by one request per tool

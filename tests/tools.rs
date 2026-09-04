@@ -298,6 +298,40 @@ fn write_and_edit_tools_are_atomic_and_policy_guarded() {
             .unwrap()
             .contains("--- new.txt\n+++ new.txt\n")
     );
+    let typed_preview = registry
+        .approval_preview(
+            &context,
+            &call("write_file", json!({"path":"new.txt","content":"one"})),
+        )
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        typed_preview,
+        tools::ToolPreview::Diff {
+            ref path,
+            ref patch,
+            changed: true,
+            truncated: false,
+            before_bytes: 0,
+            after_bytes: 3,
+            ..
+        } if path == "new.txt" && patch.contains("+one\n")
+    ));
+    let stale_call = call(
+        "write_file",
+        json!({"path":"stale.txt","content":"approved"}),
+    );
+    let stale_preview = registry
+        .approval_preview(&context, &stale_call)
+        .unwrap()
+        .unwrap();
+    fs::write(directory.path().join("stale.txt"), "changed while waiting").unwrap();
+    let stale = registry.execute_approved(&context, policy, stale_call, Some(&stale_preview));
+    assert_eq!(error_code(stale), ToolErrorCode::StalePreview);
+    assert_eq!(
+        fs::read_to_string(directory.path().join("stale.txt")).unwrap(),
+        "changed while waiting"
+    );
     let created = successful_output(registry.execute(
         &context,
         policy,
@@ -325,6 +359,24 @@ fn write_and_edit_tools_are_atomic_and_policy_guarded() {
         fs::read_to_string(directory.path().join("new.txt")).unwrap(),
         "two"
     );
+    let edit_preview = registry
+        .approval_preview(
+            &context,
+            &call(
+                "edit_file",
+                json!({"path":"new.txt","old":"two","new":"three"}),
+            ),
+        )
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        edit_preview,
+        tools::ToolPreview::Diff {
+            ref patch,
+            changed: true,
+            ..
+        } if patch.contains("-two\n") && patch.contains("+three\n")
+    ));
 }
 
 #[test]

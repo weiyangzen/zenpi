@@ -601,6 +601,263 @@ def assert_openai_fixture(binary: Path, root: Path) -> None:
         raise AssertionError(f"provider response was not surfaced: {responses!r}")
 
 
+def assert_headless_eof_drains_slow_provider(binary: Path, root: Path) -> None:
+    """Prove the documented one-shot pipe waits for an admitted model turn."""
+    class SlowEofHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers.get("content-length", "0"))
+            self.rfile.read(length)
+            time.sleep(0.45)
+            response = (
+                'data: {"type":"response.output_text.delta","delta":"eof drained"}\n\n'
+                'data: {"type":"response.completed","response":{"id":"slow-eof"}}\n\n'
+                "data: [DONE]\n"
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("content-type", "text/event-stream")
+            self.send_header("content-length", str(len(response)))
+            self.send_header("connection", "close")
+            self.end_headers()
+            self.wfile.write(response)
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), SlowEofHandler)
+    server_thread = threading.Thread(target=server.handle_request, daemon=True)
+    server_thread.start()
+    session = root / "headless-eof-session.jsonl"
+    env = isolated_env(
+        root / "headless-eof-home",
+        ZENPI_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
+        ZENPI_API_KEY="eof-smoke-key",
+        ZENPI_WIRE_API="responses",
+        ZENPI_MODEL="mock-model",
+    )
+    # Deliberately omit a shutdown frame. EOF is the public one-shot pipeline
+    # boundary shown in README and must drain rather than cancel this request.
+    result = run(
+        [str(binary), "--mode", "headless", "--session", str(session)],
+        input_text='{"schema_version":2,"type":"prompt","id":"eof","text":"wait for me"}\n',
+        env=env,
+    )
+    server_thread.join(timeout=5)
+    server.server_close()
+    assert_success(result, "installed slow-provider EOF drain")
+    records = json_lines(result.stdout)
+    response = next(
+        (
+            record
+            for record in records
+            if record.get("type") == "response" and record.get("id") == "eof"
+        ),
+        None,
+    )
+    if response is None or response.get("success") is not True:
+        raise AssertionError(f"EOF cancelled or lost the admitted prompt: {records!r}")
+    if response.get("data", {}).get("assistant", {}).get("content") != "eof drained":
+        raise AssertionError(f"EOF drain returned the wrong assistant result: {response!r}")
+    if any(
+        record.get("code") == "backend_cancelled"
+        or record.get("event", {}).get("type") == "cancel_requested"
+        for record in records
+    ):
+        raise AssertionError(f"EOF emitted a cancellation marker: {records!r}")
+
+
+def assert_production_rejects_echo(binary: Path, root: Path) -> None:
+    session = root / "production-echo-must-not-exist.jsonl"
+    result = run(
+        [str(binary), "--mode", "headless", "--backend", "echo", "--session", str(session)],
+        input_text='{"type":"shutdown","id":"stop"}\n',
+        env=isolated_env(root / "production-echo-home"),
+    )
+    if result.returncode == 0 or session.exists() or "test fixture" not in result.stderr:
+        raise AssertionError(
+            "production install accepted echo or opened a session before rejecting it: "
+            f"rc={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+
+
+def assert_headless_tool_approval(binary: Path, root: Path) -> None:
+    """Run provider -> approval -> real write -> provider continuation end to end."""
+    workspace = root / "production-tool-workspace"
+    workspace.mkdir()
+    requests: list[dict[str, Any]] = []
+
+    class ToolHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers.get("content-length", "0"))
+            body = json.loads(self.rfile.read(length))
+            requests.append(body)
+            if len(requests) == 1:
+                response = (
+                    'data: {"type":"response.created","response":{"id":"tool-1","model":"mock-model"}}\n\n'
+                    'data: {"type":"response.output_item.done","item":{"type":"function_call","call_id":"write-1","name":"write_file","arguments":"{\\"path\\":\\"approved.txt\\",\\"content\\":\\"written by installed zenpi\\"}"}}\n\n'
+                    'data: {"type":"response.completed","response":{"id":"tool-1","model":"mock-model"}}\n\n'
+                    "data: [DONE]\n"
+                ).encode("utf-8")
+            else:
+                response = (
+                    'data: {"type":"response.output_text.delta","delta":"write completed"}\n\n'
+                    'data: {"type":"response.completed","response":{"id":"tool-2","model":"mock-model"}}\n\n'
+                    "data: [DONE]\n"
+                ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("content-type", "text/event-stream")
+            self.send_header("content-length", str(len(response)))
+            self.send_header("connection", "close")
+            self.end_headers()
+            self.wfile.write(response)
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), ToolHandler)
+    server.timeout = 10
+
+    def serve_two_requests() -> None:
+        server.handle_request()
+        server.handle_request()
+
+    server_thread = threading.Thread(target=serve_two_requests, daemon=True)
+    server_thread.start()
+    env = isolated_env(
+        root / "production-tool-home",
+        ZENPI_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
+        ZENPI_API_KEY="tool-smoke-key",
+        ZENPI_WIRE_API="responses",
+        ZENPI_MODEL="mock-model",
+    )
+    session = root / "production-tool-session.jsonl"
+    process = subprocess.Popen(
+        [str(binary), "--mode", "headless", "--session", str(session)],
+        cwd=workspace,
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+        bufsize=0,
+    )
+    records: list[dict[str, Any]] = []
+    approval_id: str | None = None
+    prompt_done = False
+    approve_done = False
+    try:
+        assert process.stdin is not None
+        assert process.stdout is not None
+        process.stdin.write(
+            b'{"schema_version":2,"type":"prompt","id":"tool-prompt","text":"write the file"}\n'
+        )
+        process.stdin.flush()
+        stdout_fd = process.stdout.fileno()
+        pending = bytearray()
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and not prompt_done:
+            ready, _, _ = select.select([stdout_fd], [], [], 0.1)
+            if not ready:
+                continue
+            chunk = os.read(stdout_fd, 65536)
+            if not chunk:
+                break
+            pending.extend(chunk)
+            while b"\n" in pending:
+                raw, _, remainder = pending.partition(b"\n")
+                pending = bytearray(remainder)
+                if not raw:
+                    continue
+                record = json.loads(raw)
+                records.append(record)
+                approval = record.get("event", {}).get("approval")
+                if (
+                    isinstance(approval, dict)
+                    and record.get("event", {}).get("type") == "approval_request"
+                ):
+                    if approval.get("tool") != "write_file":
+                        raise AssertionError(f"unexpected approval tool: {approval!r}")
+                    if approval.get("arguments", {}).get("path") != "approved.txt":
+                        raise AssertionError(f"approval omitted write arguments: {approval!r}")
+                    preview = approval.get("preview", {})
+                    if not (
+                        preview.get("kind") == "diff"
+                        and preview.get("path") == "approved.txt"
+                        and preview.get("changed") is True
+                        and "+written by installed zenpi" in preview.get("patch", "")
+                    ):
+                        raise AssertionError(
+                            f"approval did not expose the bounded pre-write diff: {approval!r}"
+                        )
+                    approval_id = approval.get("request_id")
+                    process.stdin.write(
+                        (
+                            json.dumps(
+                                {
+                                    "schema_version": 2,
+                                    "type": "approve",
+                                    "id": "tool-approve",
+                                    "approval_id": approval_id,
+                                    "decision": "allow",
+                                },
+                                separators=(",", ":"),
+                            )
+                            + "\n"
+                        ).encode("utf-8")
+                    )
+                    process.stdin.flush()
+                if record.get("type") == "response" and record.get("id") == "tool-approve":
+                    approve_done = record.get("success") is True
+                if record.get("type") == "response" and record.get("id") == "tool-prompt":
+                    prompt_done = record.get("success") is True
+        if not (approval_id and approve_done and prompt_done):
+            raise AssertionError(f"installed tool/approval chain did not complete: {records!r}")
+        process.stdin.write(b'{"schema_version":2,"type":"shutdown","id":"tool-stop"}\n')
+        process.stdin.flush()
+        process.stdin.close()
+        process.wait(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=2)
+        server_thread.join(timeout=3)
+        server.server_close()
+    stderr = process.stderr.read().decode("utf-8", "replace") if process.stderr is not None else ""
+    if process.returncode != 0:
+        raise AssertionError(f"installed tool process failed: {stderr!r}; records={records!r}")
+    if server_thread.is_alive() or len(requests) != 2:
+        raise AssertionError(f"provider did not receive both tool-loop requests: {requests!r}")
+    if (workspace / "approved.txt").read_text(encoding="utf-8") != "written by installed zenpi":
+        raise AssertionError("approved write_file did not create the expected workspace file")
+    second_input = requests[1].get("input", [])
+    if not any(item.get("type") == "function_call_output" for item in second_input):
+        raise AssertionError(f"tool result was not returned to the provider: {second_input!r}")
+    journal = json_lines(session.read_text(encoding="utf-8"))
+    if not any(
+        record.get("kind") == "turn"
+        and record.get("turn", {}).get("role") == "tool"
+        and "approved.txt" in record.get("turn", {}).get("content", "")
+        for record in journal
+    ):
+        raise AssertionError(f"tool result was not durable: {journal!r}")
+    approval_receipt = next(
+        (
+            record.get("event", {})
+            for record in journal
+            if record.get("kind") == "event"
+            and record.get("event", {}).get("type") == "approval_resolved"
+        ),
+        None,
+    )
+    if approval_receipt is None or approval_receipt.get("preview", {}).get("path") != "approved.txt":
+        raise AssertionError(f"approval metadata receipt was not durable: {journal!r}")
+    if "patch" in approval_receipt.get("preview", {}):
+        raise AssertionError(f"durable approval receipt retained the diff body: {approval_receipt!r}")
+
+
 def read_pty_until_exit(pid: int, fd: int, deadline: float) -> tuple[int, bytes]:
     output = bytearray()
     status: int | None = None
@@ -970,6 +1227,33 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="zenpi-user-smoke-") as directory:
         root = Path(directory)
         release = ROOT / "target" / "release" / "zenpi"
+        production_build = run(["cargo", "build", "--release", "--locked"])
+        assert_success(production_build, "production release build")
+        production_root = root / "production-install"
+        production_root.mkdir()
+        production_install = run(
+            [
+                "cargo",
+                "install",
+                "--path",
+                ".",
+                "--locked",
+                "--root",
+                str(production_root),
+                "--force",
+            ]
+        )
+        assert_success(production_install, "isolated production cargo install")
+        production_binary = production_root / "bin" / "zenpi"
+        if not production_binary.is_file() or not os.access(production_binary, os.X_OK):
+            raise AssertionError(f"installed production binary missing: {production_binary}")
+        production_help = run([str(production_binary), "--help"])
+        assert_success(production_help, "installed production help")
+        assert_production_rejects_echo(production_binary, root)
+        assert_openai_fixture(production_binary, root)
+        assert_headless_eof_drains_slow_provider(production_binary, root)
+        assert_headless_tool_approval(production_binary, root)
+
         features = os.environ.get("ZENPI_SMOKE_FEATURES", "dev-fixtures")
         feature_args = ["--features", features] if features else []
         build = run(["cargo", "build", "--release", "--locked", *feature_args])
@@ -1007,13 +1291,12 @@ def main() -> int:
         assert_resume_reopens_process(binary, session, root)
         assert_headless_slash_owners(binary, root)
         assert_invalid_inputs(binary, root)
-        assert_openai_fixture(binary, root)
         assert_tui(binary, root)
         assert_tui_multiline_paste(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: release, install, echo fixture, durable slash/runtime intents, "
-        "resume, Responses fixture, TUI resize/multiline paste, streaming interrupt, "
+        "user smoke passed: production install/provider/tool approval/EOF drain, echo fixture, "
+        "durable slash/runtime intents, resume, TUI resize/multiline paste, streaming interrupt, "
         "and terminal restoration"
     )
     return 0

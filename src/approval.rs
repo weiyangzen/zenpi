@@ -38,6 +38,8 @@ pub struct ApprovalRequest {
     pub tool: String,
     pub side_effect: ToolSideEffect,
     pub arguments: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<crate::tools::ToolPreview>,
 }
 
 impl ApprovalRequest {
@@ -57,6 +59,11 @@ impl ApprovalRequest {
         }
         if !self.arguments.is_object() {
             return Err(ApprovalError::Invalid("arguments must be an object".into()));
+        }
+        if let Some(preview) = &self.preview {
+            preview
+                .validate()
+                .map_err(|error| ApprovalError::Invalid(error.to_string()))?;
         }
         Ok(())
     }
@@ -346,8 +353,7 @@ impl ApprovalCoordinator {
         let (lock, wake) = &*self.inner;
         if let Ok(mut state) = lock.lock() {
             for request_id in state.pending.keys().cloned().collect::<Vec<_>>() {
-                state.pending.remove(&request_id);
-                if let Some(request) = state.visible.get(&request_id).cloned() {
+                if let Some(request) = state.pending.remove(&request_id) {
                     state.accepted.push(AcceptedApproval {
                         request,
                         response: ApprovalResponse {
@@ -493,6 +499,7 @@ mod tests {
                     tool: "write_file".into(),
                     side_effect: ToolSideEffect::WorkspaceWrite,
                     arguments: serde_json::json!({"path":"x"}),
+                    preview: None,
                 },
                 &mut policy,
                 &|| false,
@@ -532,6 +539,7 @@ mod tests {
                     tool: "write_file".into(),
                     side_effect: ToolSideEffect::WorkspaceWrite,
                     arguments: serde_json::json!({"path":"x"}),
+                    preview: None,
                 },
                 &mut policy,
                 &|| false,
@@ -564,5 +572,40 @@ mod tests {
         let response = join.join().unwrap().unwrap();
         assert_eq!(response.decision, ApprovalDecision::Allow);
         assert!(response.remember);
+    }
+
+    #[test]
+    fn cancel_all_retains_an_unrevealed_denial_for_durable_ack() {
+        let coordinator = ApprovalCoordinator::new();
+        let worker = coordinator.clone();
+        let join = thread::spawn(move || {
+            let mut policy = ApprovalPolicy::default();
+            worker.request_response(
+                ApprovalRequest {
+                    request_id: "approval-unrevealed".into(),
+                    turn_id: "turn-unrevealed".into(),
+                    call_id: "call-unrevealed".into(),
+                    tool: "write_file".into(),
+                    side_effect: ToolSideEffect::WorkspaceWrite,
+                    arguments: serde_json::json!({"path":"x"}),
+                    preview: None,
+                },
+                &mut policy,
+                &|| false,
+            )
+        });
+        while !coordinator.is_pending("approval-unrevealed") {
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        // Do not call drain_pending/reveal first. EOF and other host-close
+        // paths can race with publication of a newly pending request.
+        coordinator.cancel_all();
+        let accepted = coordinator.accepted("approval-unrevealed").unwrap();
+        assert_eq!(accepted.response.decision, ApprovalDecision::Deny);
+        coordinator.mark_persisted("approval-unrevealed").unwrap();
+        let response = join.join().unwrap().unwrap();
+        assert_eq!(response.decision, ApprovalDecision::Deny);
+        assert!(!response.remember);
     }
 }

@@ -48,6 +48,10 @@ const MAX_ASYNC_AGENT_EVENTS: usize = 4096;
 /// lifecycle markers.
 const MAX_ASYNC_PROVIDER_BYTES: usize = 1024 * 1024;
 const MAX_ASYNC_AGENT_BYTES: usize = 1024 * 1024;
+/// An explicit shutdown is a cancellation request and gets only a short grace
+/// period before the runner is stopped. Plain stdin EOF is different: it is
+/// the normal completion signal for one-shot pipelines, so admitted work must
+/// drain instead of being relabelled as cancelled.
 const SHUTDOWN_GRACE: Duration = Duration::from_millis(250);
 /// Explicit paths accepted by host-side inspection commands are workspace
 /// relative. Keep the same byte bound as the protocol path field even when a
@@ -2539,6 +2543,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     let mut event_sequence = 0_u64;
     let mut replay = ReplayState::default();
     let mut stopping = false;
+    let mut explicit_shutdown = false;
     let mut stopping_since: Option<Instant> = None;
     let mut shutdown_sent = false;
     let mut pending_shutdown: Option<(Option<String>, String, u16)> = None;
@@ -2552,6 +2557,17 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &mut event_sequence,
                 &mut replay,
             )?;
+            // EOF is the normal one-shot drain boundary, but there is no
+            // client left to answer a side-effect approval. Fail closed and
+            // wake the worker instead of hanging the pipeline forever. The
+            // core turns the denial into a durable tool result and may still
+            // let the provider return a useful final explanation.
+            if stopping
+                && !explicit_shutdown
+                && let Some(approval) = approval.as_ref()
+            {
+                approval.cancel_all();
+            }
             while let Ok(event) = runner.try_next_event() {
                 if handle_runtime_event(
                     event,
@@ -2574,7 +2590,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             // cancel/reissue promotion; once the grace period expires,
             // `promote_pending_steers` reports an explicit runtime_closed
             // error instead of silently dropping it.
-            let steer_grace_elapsed = stopping
+            let steer_grace_elapsed = explicit_shutdown
                 && stopping_since.is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
             promote_pending_steers(
                 &runner,
@@ -2591,8 +2607,8 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 // after `jobs` became empty would strand an active provider
                 // forever: jobs can become empty only after the worker has
                 // observed shutdown and emitted their terminal events.
-                let grace_elapsed =
-                    stopping_since.is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
+                let grace_elapsed = explicit_shutdown
+                    && stopping_since.is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
                 if !shutdown_sent
                     && ((jobs.is_empty() && pending_steers.is_empty()) || grace_elapsed)
                 {
@@ -2646,9 +2662,10 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         &mut stopping,
                     )?;
                     if stopping {
+                        explicit_shutdown = pending_shutdown.is_some();
                         stopping_since.get_or_insert_with(Instant::now);
                     }
-                    let steer_grace_elapsed = stopping
+                    let steer_grace_elapsed = explicit_shutdown
                         && stopping_since
                             .is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
                     promote_pending_steers(

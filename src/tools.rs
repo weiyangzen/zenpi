@@ -18,6 +18,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub const MAX_TOOL_CALL_BYTES: usize = 64 * 1024;
@@ -178,6 +179,75 @@ pub enum ToolErrorCode {
     CommandFailed,
     CommandTimeout,
     Cancelled,
+    StalePreview,
+}
+
+/// A bounded, renderer-neutral preview attached to an approval request before
+/// a workspace mutation can run. The raw model arguments remain available for
+/// audit, while this value gives a human the actual proposed file change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ToolPreview {
+    Diff {
+        path: String,
+        patch: String,
+        changed: bool,
+        truncated: bool,
+        before_bytes: usize,
+        after_bytes: usize,
+        source_sha256: String,
+    },
+}
+
+impl ToolPreview {
+    pub fn validate(&self) -> Result<(), ToolError> {
+        match self {
+            Self::Diff {
+                path,
+                patch,
+                before_bytes: _,
+                after_bytes,
+                source_sha256,
+                ..
+            } => {
+                validate_relative_path(path)?;
+                if path.len() > 4_096 {
+                    return Err(ToolError::LimitExceeded(
+                        "preview path exceeds 4096 bytes".into(),
+                    ));
+                }
+                if patch.len() > MAX_DIFF_BYTES {
+                    return Err(ToolError::LimitExceeded(format!(
+                        "preview diff exceeds {MAX_DIFF_BYTES} bytes"
+                    )));
+                }
+                // Write previews may replace an existing oversized file from a
+                // bounded prefix; `truncated` makes that fact explicit. The
+                // proposed post-write content is always strictly bounded.
+                if *after_bytes > MAX_WRITE_BYTES {
+                    return Err(ToolError::LimitExceeded(format!(
+                        "preview output size exceeds {MAX_WRITE_BYTES} bytes"
+                    )));
+                }
+                if source_sha256.len() != 64
+                    || !source_sha256
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                {
+                    return Err(ToolError::InvalidArguments(
+                        "preview source digest is invalid".into(),
+                    ));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    pub fn display_text(&self) -> &str {
+        match self {
+            Self::Diff { patch, .. } => patch,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -246,6 +316,8 @@ pub enum ToolError {
     CommandTimeout(u64),
     #[error("tool execution was cancelled")]
     Cancelled,
+    #[error("workspace changed after the tool preview was approved")]
+    StalePreview,
 }
 
 impl ToolError {
@@ -267,6 +339,7 @@ impl ToolError {
             Self::CommandFailed(_) => ToolErrorCode::CommandFailed,
             Self::CommandTimeout(_) => ToolErrorCode::CommandTimeout,
             Self::Cancelled => ToolErrorCode::Cancelled,
+            Self::StalePreview => ToolErrorCode::StalePreview,
         }
     }
 }
@@ -474,6 +547,73 @@ impl ToolRegistry {
 
     pub fn definition(&self, name: &str) -> Option<&ToolDefinition> {
         self.tools.get(name).map(|tool| &tool.definition)
+    }
+
+    /// Build the human-facing preview for a built-in mutating call without
+    /// executing it. Extension tools do not receive an invented preview: they
+    /// must add an explicit preview contract before a host can display one.
+    pub fn approval_preview(
+        &self,
+        context: &ToolContext,
+        call: &ToolCall,
+    ) -> Result<Option<ToolPreview>, ToolError> {
+        validate_call(call)?;
+        let registered = self
+            .tools
+            .get(&call.name)
+            .ok_or_else(|| ToolError::UnknownTool(call.name.clone()))?;
+        if registered.definition.side_effect != ToolSideEffect::WorkspaceWrite {
+            return Ok(None);
+        }
+        let arguments = call.arguments.as_object().ok_or_else(|| {
+            ToolError::InvalidArguments("tool arguments must be a JSON object".into())
+        })?;
+        let preview = match call.name.as_str() {
+            "write_file" => Some(WriteFileTool::approval_preview(context, arguments)?),
+            "edit_file" => Some(EditFileTool::approval_preview(context, arguments)?),
+            _ => None,
+        };
+        if let Some(preview) = &preview {
+            preview.validate()?;
+        }
+        Ok(preview)
+    }
+
+    /// Execute only if a mutating call still has the exact source snapshot the
+    /// user approved. Revalidation closes the wait-between-preview-and-write
+    /// race without giving read-only or command tools a fabricated diff.
+    pub fn execute_approved(
+        &self,
+        context: &ToolContext,
+        policy: SideEffectPolicy,
+        call: ToolCall,
+        approved_preview: Option<&ToolPreview>,
+    ) -> ToolResult {
+        match (approved_preview, self.approval_preview(context, &call)) {
+            (Some(expected), Ok(Some(actual))) if expected == &actual => {
+                self.execute_compact(context, policy, call)
+            }
+            (Some(_), Ok(Some(_))) | (Some(_), Ok(None)) | (None, Ok(Some(_))) => {
+                ToolResult::Error {
+                    call_id: call.id,
+                    tool: call.name,
+                    error: ToolFailure {
+                        code: ToolErrorCode::StalePreview,
+                        message: "workspace changed after approval; review the new diff and retry"
+                            .into(),
+                    },
+                }
+            }
+            (_, Err(error)) => ToolResult::Error {
+                call_id: call.id,
+                tool: call.name,
+                error: ToolFailure {
+                    code: error.code(),
+                    message: format!("approved preview revalidation failed: {error}"),
+                },
+            },
+            (None, Ok(None)) => self.execute_compact(context, policy, call),
+        }
     }
 
     pub fn execute(
@@ -883,26 +1023,54 @@ impl Tool for SearchTextTool {
 pub struct WriteFileTool;
 
 impl WriteFileTool {
+    fn approval_preview(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<ToolPreview, ToolError> {
+        reject_unknown(arguments, &["path", "content"])?;
+        let requested = required_string(arguments, "path", 4_096)?;
+        let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
+        if content.as_bytes().contains(&0) {
+            return Err(ToolError::InvalidArguments("content contains NUL".into()));
+        }
+        let path = context.resolve_for_write(requested)?;
+        let (before, source_truncated) = read_diff_source(&path)?;
+        let relative = relative_path_for_output(context, &path, requested)?;
+        let (patch, truncated) = render_unified_diff(&relative, &before, content, source_truncated);
+        let before_bytes = file_byte_len(&path).unwrap_or(before.len());
+        let source_sha256 = source_digest(&path)?;
+        Ok(ToolPreview::Diff {
+            path: relative,
+            before_bytes,
+            after_bytes: content.len(),
+            source_sha256,
+            changed: before != content || source_truncated,
+            patch,
+            truncated,
+        })
+    }
+
     pub fn preview(
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
-        reject_unknown(arguments, &["path", "content"])?;
-        let requested = required_string(arguments, "path", 4_096)?;
-        let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
-        let path = context.resolve_for_write(requested)?;
-        let (before, source_truncated) = read_diff_source(&path);
-        let relative = relative_path_for_output(context, &path, requested)?;
-        let (diff, diff_truncated) =
-            render_unified_diff(&relative, &before, content, source_truncated);
-        let before_bytes = file_byte_len(&path).unwrap_or(before.len());
+        let preview = Self::approval_preview(context, arguments)?;
+        let ToolPreview::Diff {
+            path,
+            patch,
+            changed,
+            truncated,
+            before_bytes,
+            after_bytes,
+            source_sha256: _,
+        } = preview;
         Ok(json!({
-            "path": relative,
+            "path": path,
             "before_bytes": before_bytes,
-            "after_bytes": content.len(),
-            "changed": before != content || source_truncated,
-            "diff": diff,
-            "diff_truncated": diff_truncated,
+            "after_bytes": after_bytes,
+            "changed": changed,
+            "diff": patch,
+            "diff_truncated": truncated,
         }))
     }
 }
@@ -940,7 +1108,7 @@ impl Tool for WriteFileTool {
         }
         let path = context.resolve_for_write(requested)?;
         let created = !path.exists();
-        let (before, source_truncated) = read_diff_source(&path);
+        let (before, source_truncated) = read_diff_source(&path)?;
         let relative = relative_path_for_output(context, &path, requested)?;
         let (diff, diff_truncated) =
             render_unified_diff(&relative, &before, content, source_truncated);
@@ -957,6 +1125,47 @@ impl Tool for WriteFileTool {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct EditFileTool;
+
+impl EditFileTool {
+    fn approval_preview(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<ToolPreview, ToolError> {
+        reject_unknown(arguments, &["path", "old", "new"])?;
+        let requested = required_string(arguments, "path", 4_096)?;
+        let old = required_string(arguments, "old", MAX_WRITE_BYTES)?;
+        let new = string_argument(arguments, "new", MAX_WRITE_BYTES, true)?;
+        if old.is_empty() {
+            return Err(ToolError::InvalidArguments("old must be non-empty".into()));
+        }
+        let path = context.resolve_existing(requested)?.canonical;
+        let original = read_bounded_text(&path, MAX_WRITE_BYTES)?;
+        let occurrences = original.matches(old).count();
+        if occurrences != 1 {
+            return Err(ToolError::InvalidArguments(format!(
+                "old text must occur exactly once (found {occurrences})"
+            )));
+        }
+        let edited = original.replacen(old, new, 1);
+        if edited.len() > MAX_WRITE_BYTES {
+            return Err(ToolError::LimitExceeded(format!(
+                "edited content exceeds {MAX_WRITE_BYTES} bytes"
+            )));
+        }
+        let relative = relative_path_for_output(context, &path, requested)?;
+        let (patch, truncated) = render_unified_diff(&relative, &original, &edited, false);
+        let source_sha256 = source_digest(&path)?;
+        Ok(ToolPreview::Diff {
+            path: relative,
+            patch,
+            changed: original != edited,
+            truncated,
+            before_bytes: original.len(),
+            after_bytes: edited.len(),
+            source_sha256,
+        })
+    }
+}
 
 impl Tool for EditFileTool {
     fn definition(&self) -> ToolDefinition {
@@ -1138,23 +1347,50 @@ fn relative_path_for_output(
 /// replace an existing file larger than `MAX_WRITE_BYTES`; reading that file
 /// in full merely to render a preview would make the tool's memory use
 /// unbounded. The boolean reports that the source was clipped.
-fn read_diff_source(path: &Path) -> (String, bool) {
-    if !path.is_file() {
-        return (String::new(), false);
+fn read_diff_source(path: &Path) -> Result<(String, bool), ToolError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if !metadata.is_file() => {
+            return Err(ToolError::NotAFile(display_path(path)));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok((String::new(), false));
+        }
+        Err(error) => return Err(ToolError::Io(error)),
     }
-    let Ok(file) = File::open(path) else {
-        return (String::new(), false);
-    };
+    let file = File::open(path)?;
     let mut bytes = Vec::with_capacity(MAX_WRITE_BYTES.min(64 * 1024));
-    let Ok(_) = file
-        .take(MAX_WRITE_BYTES.saturating_add(1) as u64)
-        .read_to_end(&mut bytes)
-    else {
-        return (String::new(), false);
-    };
+    file.take(MAX_WRITE_BYTES.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)?;
     let truncated = bytes.len() > MAX_WRITE_BYTES;
     bytes.truncate(MAX_WRITE_BYTES);
-    (String::from_utf8_lossy(&bytes).into_owned(), truncated)
+    Ok((String::from_utf8_lossy(&bytes).into_owned(), truncated))
+}
+
+fn source_digest(path: &Path) -> Result<String, ToolError> {
+    match fs::symlink_metadata(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let mut digest = Sha256::new();
+            digest.update(b"zenpi-source-absent-v1\0");
+            return Ok(format!("{:x}", digest.finalize()));
+        }
+        Err(error) => return Err(ToolError::Io(error)),
+        Ok(metadata) if !metadata.is_file() => {
+            return Err(ToolError::NotAFile(display_path(path)));
+        }
+        Ok(_) => {}
+    }
+    let mut file = File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 8192];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 /// Read a UTF-8 file while enforcing a hard byte bound.  Unlike

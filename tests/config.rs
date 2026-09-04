@@ -219,6 +219,32 @@ fn status_is_redacted_and_reports_auth_source() {
 }
 
 #[test]
+fn config_doctor_fails_when_provider_is_not_ready_without_creating_state() {
+    let home = tempdir().unwrap();
+    let zenpi_home = home.path().join("zenpi");
+    let output = Command::new(env!("CARGO_BIN_EXE_zenpi"))
+        .args(["config", "doctor", "--json"])
+        .env("HOME", home.path())
+        .env("ZENPI_HOME", &zenpi_home)
+        .env_remove("CODEX_HOME")
+        .env_remove("OPENAI_API_KEY")
+        .env_remove("OPENAI_BASE_URL")
+        .env_remove("ZENPI_API_KEY")
+        .env_remove("ZENPI_BASE_URL")
+        .env_remove("ZENPI_MODEL")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["api_key_present"], false);
+    assert_eq!(report["base_url"], serde_json::Value::Null);
+    assert_eq!(report["model"], serde_json::Value::Null);
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not ready"));
+    assert!(!zenpi_home.exists());
+}
+
+#[test]
 fn codex_import_ignores_unrelated_nested_credentials() {
     let home = tempdir().unwrap();
     let codex = home.path().join(".codex");

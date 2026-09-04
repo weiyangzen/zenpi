@@ -1088,6 +1088,17 @@ pub struct ConfigStatus {
     pub supports_websockets: bool,
 }
 
+impl ConfigStatus {
+    /// Whether this configuration has the minimum fields needed to start the
+    /// selected provider. This is deliberately local-only: it does not claim
+    /// that the endpoint is reachable or that the credential has quota.
+    pub fn is_ready(&self) -> bool {
+        (!self.requires_openai_auth || self.api_key_present)
+            && self.base_url.is_some()
+            && self.model.is_some()
+    }
+}
+
 /// A secret-free entry in the model picker exposed by the interactive hosts.
 /// Profiles are listed rather than credentials, so `/models` remains useful
 /// even when a provider is not currently reachable.
@@ -1161,9 +1172,7 @@ pub fn model_catalog(profile: Option<&str>) -> Result<Vec<ModelCatalogEntry>, Co
 pub fn doctor_value(profile: Option<&str>) -> Result<Value, ConfigError> {
     let paths = ConfigPaths::discover()?;
     let status = status_for_profile(&paths, profile)?;
-    let ready = (!status.requires_openai_auth || status.api_key_present)
-        && status.base_url.is_some()
-        && status.model.is_some();
+    let ready = status.is_ready();
     let mut checks = BTreeMap::new();
     checks.insert("config_file".to_owned(), status.config_exists);
     checks.insert(

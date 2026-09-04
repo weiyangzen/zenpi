@@ -120,6 +120,20 @@ fn denied_pending_request_is_durable_and_has_no_side_effect() {
         tx.send((agent, result)).unwrap();
     });
     wait_for_pending(&coordinator);
+    let pending = coordinator.drain_pending();
+    let preview = pending
+        .first()
+        .and_then(|request| request.preview.as_ref())
+        .expect("write approval must include a preview before the decision");
+    assert!(matches!(
+        preview,
+        zenpi::tools::ToolPreview::Diff {
+            path,
+            patch,
+            changed: true,
+            ..
+        } if path == "note.txt" && patch.contains("+approved\n")
+    ));
 
     coordinator
         .respond(ApprovalResponse {
@@ -178,4 +192,8 @@ fn remembered_allow_is_durable_and_executes_once() {
         .unwrap();
     assert_eq!(resolved["decision"], "allow");
     assert_eq!(resolved["remember"], true);
+    assert_eq!(resolved["preview"]["kind"], "diff");
+    assert_eq!(resolved["preview"]["path"], "note.txt");
+    assert_eq!(resolved["preview"]["after_bytes"], 8);
+    assert!(resolved["preview"].get("patch").is_none());
 }

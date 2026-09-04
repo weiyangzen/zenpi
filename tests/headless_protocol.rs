@@ -15,7 +15,7 @@ use std::{
 };
 use tempfile::tempdir;
 use zenpi::{
-    approval::ApprovalDecision,
+    approval::{ApprovalDecision, ApprovalMode, ApprovalPolicy},
     b3::ResourceBudget,
     backend::{Backend, BackendError, Completion, CompletionRequest, ProviderEvent},
     core::{Agent, Turn, TurnRole},
@@ -24,6 +24,7 @@ use zenpi::{
     headless::run_headless,
     protocol::parse_line,
     session::{InterruptedOperation, OperationKind, SessionStore},
+    tools::{SideEffectPolicy, ToolCall, ToolContext, ToolRegistry},
 };
 
 fn json_lines(bytes: &[u8]) -> Vec<Value> {
@@ -65,6 +66,52 @@ struct BurstSteerBackend {
     calls: AtomicUsize,
     first_started: mpsc::SyncSender<()>,
     cancellation_seen: mpsc::SyncSender<()>,
+}
+
+struct SlowEofBackend;
+
+impl Backend for SlowEofBackend {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        thread::sleep(Duration::from_millis(400));
+        Ok(Completion::text("drained after eof"))
+    }
+
+    fn name(&self) -> &str {
+        "slow-eof-fixture"
+    }
+}
+
+struct EofApprovalBackend {
+    calls: AtomicUsize,
+}
+
+impl Backend for EofApprovalBackend {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            Ok(Completion {
+                content: String::new(),
+                usage: None,
+                model: None,
+                tool_calls: vec![ToolCall {
+                    id: "eof-write".into(),
+                    name: "write_file".into(),
+                    arguments: serde_json::json!({
+                        "path": "must-not-exist.txt",
+                        "content": "denied after EOF",
+                    }),
+                }],
+                response_id: None,
+                refusal: None,
+                annotations: Vec::new(),
+            })
+        } else {
+            Ok(Completion::text("write denied safely"))
+        }
+    }
+
+    fn name(&self) -> &str {
+        "eof-approval-fixture"
+    }
 }
 
 impl Backend for BurstSteerBackend {
@@ -182,6 +229,97 @@ fn status_snapshots_redact_session_paths_in_sync_and_async_hosts() {
             .to_string()
             .contains(dir.path().to_string_lossy().as_ref())
     );
+}
+
+#[test]
+fn async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("slow-eof.jsonl");
+    let agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(SlowEofBackend));
+    let output = SharedWriter::default();
+    let captured = output.clone();
+
+    zenpi::headless::run_async_streams(
+        agent,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"slow\",\"text\":\"finish me\"}\n",
+        ),
+        output,
+    )
+    .unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    let response = records
+        .iter()
+        .find(|record| record["type"] == "response" && record["id"] == "slow")
+        .unwrap();
+    assert_eq!(response["success"], true);
+    assert_eq!(
+        response["data"]["assistant"]["content"],
+        "drained after eof"
+    );
+    assert!(!records.iter().any(|record| {
+        record["event"]["type"] == "cancel_requested" || record["code"] == "backend_cancelled"
+    }));
+    let journal = json_lines(&fs::read(path).unwrap());
+    assert!(journal.iter().any(|record| {
+        record["kind"] == "turn"
+            && record["turn"]["role"] == "assistant"
+            && record["turn"]["content"] == "drained after eof"
+    }));
+}
+
+#[test]
+fn async_eof_denies_unanswerable_side_effect_approval_without_hanging() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("eof-approval.jsonl");
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(EofApprovalBackend {
+            calls: AtomicUsize::new(0),
+        }),
+    );
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(dir.path()).unwrap(),
+        SideEffectPolicy::all_builtins(),
+    );
+    agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::Always,
+        ..ApprovalPolicy::default()
+    });
+    let output = SharedWriter::default();
+    let captured = output.clone();
+
+    zenpi::headless::run_async_streams(
+        agent,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"approval\",\"text\":\"write it\"}\n",
+        ),
+        output,
+    )
+    .unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    let response = records
+        .iter()
+        .find(|record| record["type"] == "response" && record["id"] == "approval")
+        .unwrap();
+    assert_eq!(response["success"], true);
+    assert_eq!(
+        response["data"]["assistant"]["content"],
+        "write denied safely"
+    );
+    assert!(!dir.path().join("must-not-exist.txt").exists());
+    let journal = json_lines(&fs::read(path).unwrap());
+    assert!(journal.iter().any(|record| {
+        record["kind"] == "turn"
+            && record["turn"]["role"] == "tool"
+            && record["turn"]["content"].as_str().is_some_and(|content| {
+                content.contains("policy_denied")
+                    && content.contains("approval denied or cancelled")
+            })
+    }));
 }
 
 #[test]
