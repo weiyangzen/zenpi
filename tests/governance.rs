@@ -84,6 +84,61 @@ fn accounting_persists_and_restores_from_a_session() {
 }
 
 #[test]
+fn resuming_a_session_reloads_governance_from_the_replacement_journal() {
+    let dir = tempdir().unwrap();
+    let original_path = dir.path().join("original-budget.jsonl");
+    let replacement_path = dir.path().join("replacement-budget.jsonl");
+    let mut agent = Agent::new(
+        SessionStore::open(&original_path).unwrap(),
+        Box::new(UsageBackend),
+    );
+    let mut session_limits = limits();
+    session_limits.max_input_tokens = 10_000;
+    session_limits.max_output_tokens = 10_000;
+    agent.set_resource_limits(session_limits).unwrap();
+
+    let mut replacement_session = SessionStore::open(&replacement_path).unwrap();
+    let mut replacement_ledger =
+        BudgetLedger::new(session_limits, ResourceUsage::default()).unwrap();
+    replacement_ledger
+        .charge(ResourceKind::NetworkRequests, 1)
+        .unwrap();
+    replacement_ledger
+        .persist(&mut replacement_session)
+        .unwrap();
+    drop(replacement_session);
+
+    agent
+        .process(TurnInputRequest::new("first request"))
+        .unwrap();
+    agent
+        .process(TurnInputRequest::new("second request"))
+        .unwrap();
+    let original = SessionStore::open(&original_path).unwrap();
+    let original_usage = original
+        .events()
+        .iter()
+        .rev()
+        .find(|event| event["type"] == "resource_usage")
+        .expect("original session should contain resource accounting");
+    assert_eq!(original_usage["usage"]["network_requests"], 2);
+
+    agent.resume_session(&replacement_path).unwrap();
+    agent
+        .process(TurnInputRequest::new("replacement request"))
+        .expect("the replacement session must not inherit the exhausted network budget");
+
+    let replacement = SessionStore::open(&replacement_path).unwrap();
+    let replacement_usage = replacement
+        .events()
+        .iter()
+        .rev()
+        .find(|event| event["type"] == "resource_usage")
+        .expect("replacement session should contain independent accounting");
+    assert_eq!(replacement_usage["usage"]["network_requests"], 2);
+}
+
+#[test]
 fn agent_emits_typed_budget_error_before_network_when_limit_is_exhausted() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("agent-budget.jsonl");

@@ -744,7 +744,7 @@ fn parse_blueprint(args: &[String]) -> Result<BlueprintAction, SlashError> {
                 path: args[1].clone(),
             })
         }
-        "put" | "save" | "import" => Ok(BlueprintAction::Put {
+        "put" => Ok(BlueprintAction::Put {
             path: required_domain_path(args, "blueprint put")?,
         }),
         _ => Err(SlashError::UnknownBlueprintAction {
@@ -757,10 +757,7 @@ fn parse_goal(args: &[String]) -> Result<SlashCommand, SlashError> {
     let Some(action) = args.first() else {
         return Err(SlashError::MissingArgument { command: "goal" });
     };
-    if matches!(
-        action.to_ascii_lowercase().as_str(),
-        "put" | "new" | "import"
-    ) {
+    if action.eq_ignore_ascii_case("put") {
         return Ok(SlashCommand::GoalPut {
             path: required_domain_path(args, "goal put")?,
         });
@@ -774,10 +771,7 @@ fn parse_learn(args: &[String]) -> Result<SlashCommand, SlashError> {
     let Some(action) = args.first() else {
         return Ok(SlashCommand::Learn { target: None });
     };
-    if matches!(
-        action.to_ascii_lowercase().as_str(),
-        "put" | "start" | "import"
-    ) {
+    if action.eq_ignore_ascii_case("put") {
         return Ok(SlashCommand::LearnPut {
             path: required_domain_path(args, "learn put")?,
         });

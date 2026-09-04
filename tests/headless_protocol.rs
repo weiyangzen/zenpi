@@ -1,21 +1,26 @@
 use serde_json::Value;
 use std::io::Cursor;
 use std::{
+    fs,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    path::PathBuf,
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
         mpsc,
     },
     thread,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tempfile::tempdir;
 use zenpi::{
     approval::ApprovalDecision,
+    b3::ResourceBudget,
     backend::{Backend, BackendError, Completion, CompletionRequest, ProviderEvent},
     core::{Agent, Turn, TurnRole},
+    domain_store::DomainStore,
+    domains::{Blueprint, BlueprintItem, Goal, Learn},
     headless::run_headless,
     protocol::parse_line,
     session::{InterruptedOperation, OperationKind, SessionStore},
@@ -27,6 +32,30 @@ fn json_lines(bytes: &[u8]) -> Vec<Value> {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()
+}
+
+/// Create a domain input under the process workspace so the host's
+/// workspace-relative path policy is exercised rather than bypassed with an
+/// absolute temporary path.
+fn workspace_domain_fixture(stem: &str, value: &str) -> (PathBuf, String) {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let workspace = std::env::current_dir().unwrap();
+    let directory = workspace.join("target").join(format!(
+        "zenpi-domain-command-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&directory).unwrap();
+    let path = directory.join(format!("{stem}.json"));
+    fs::write(&path, value).unwrap();
+    let relative = path
+        .strip_prefix(workspace)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    (directory, relative)
 }
 
 /// Keep the first provider call open until the host sends a cancellation. The
@@ -629,6 +658,11 @@ fn inspection_responses_redact_paths_and_reject_domain_escape() {
     let dir = tempdir().unwrap();
     let session_path = dir.path().join("inspection.jsonl");
     let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let domain_path = zenpi::domain_store::path_for_session(&session_path);
+    assert!(
+        !domain_path.exists(),
+        "read-only domain inspection must start without a snapshot"
+    );
     let input = concat!(
         "{\"type\":\"command\",\"id\":\"bp\",\"text\":\"/blueprint show\"}\n",
         "{\"type\":\"resources\",\"id\":\"res\",\"path\":\"src\"}\n",
@@ -653,6 +687,127 @@ fn inspection_responses_redact_paths_and_reject_domain_escape() {
         .unwrap();
     assert_eq!(escape["success"], false);
     assert_eq!(escape["code"], "domain_input_path_denied");
+    assert!(
+        !domain_path.exists(),
+        "show/validate commands must not create a missing domain snapshot"
+    );
+}
+
+#[test]
+fn headless_domain_put_commands_persist_and_round_trip() {
+    let blueprint = Blueprint::new(
+        "headless-plan",
+        "1",
+        vec![
+            BlueprintItem::new("build", 100),
+            BlueprintItem::new("verify", 200).with_dependencies(["build"]),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new("headless-goal", &blueprint, ResourceBudget::default(), None).unwrap();
+    let learn = Learn::new(
+        "headless-learn",
+        "src/core.rs",
+        "Docs/learn/core.md",
+        vec!["tests/headless_protocol.rs".into()],
+    )
+    .unwrap();
+    let (blueprint_dir, blueprint_path) =
+        workspace_domain_fixture("blueprint", &blueprint.encode_json().unwrap());
+    let (goal_dir, goal_path) =
+        workspace_domain_fixture("goal", &serde_json::to_string(&goal).unwrap());
+    let (learn_dir, learn_path) =
+        workspace_domain_fixture("learn", &serde_json::to_string(&learn).unwrap());
+
+    let session_path = blueprint_dir.join("session.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let input = [
+        serde_json::json!({
+            "type": "command",
+            "id": "bp-put",
+            "text": format!("/blueprint put {blueprint_path}"),
+        }),
+        serde_json::json!({
+            "type": "command",
+            "id": "goal-put",
+            "text": format!("/goal put {goal_path}"),
+        }),
+        serde_json::json!({
+            "type": "command",
+            "id": "learn-put",
+            "text": format!("/learn put {learn_path}"),
+        }),
+        serde_json::json!({"type": "command", "id": "bp-show", "text": "/blueprint show"}),
+        serde_json::json!({"type": "command", "id": "goal-show", "text": "/goal show"}),
+        serde_json::json!({"type": "command", "id": "learn-show", "text": "/learn show"}),
+        serde_json::json!({"type": "shutdown", "id": "shutdown"}),
+    ]
+    .into_iter()
+    .map(|value| serde_json::to_string(&value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n")
+        + "\n";
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.into_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+
+    for id in [
+        "bp-put",
+        "goal-put",
+        "learn-put",
+        "bp-show",
+        "goal-show",
+        "learn-show",
+    ] {
+        let response = records
+            .iter()
+            .find(|record| record["id"] == id)
+            .unwrap_or_else(|| panic!("missing response for {id}"));
+        assert_eq!(response["success"], true, "command {id} failed: {response}");
+        assert_eq!(
+            response["data"]["accepted"], true,
+            "command {id}: {response}"
+        );
+    }
+    assert_eq!(
+        records.iter().find(|r| r["id"] == "bp-put").unwrap()["data"]["change"],
+        "inserted"
+    );
+    assert_eq!(
+        records.iter().find(|r| r["id"] == "goal-put").unwrap()["data"]["change"],
+        "inserted"
+    );
+    assert_eq!(
+        records.iter().find(|r| r["id"] == "learn-put").unwrap()["data"]["change"],
+        "inserted"
+    );
+
+    let blueprint_view = records.iter().find(|r| r["id"] == "bp-show").unwrap();
+    assert_eq!(
+        blueprint_view["data"]["blueprints"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let goal_view = records.iter().find(|r| r["id"] == "goal-show").unwrap();
+    assert_eq!(goal_view["data"]["goals"].as_array().unwrap().len(), 1);
+    let learn_view = records.iter().find(|r| r["id"] == "learn-show").unwrap();
+    assert_eq!(learn_view["data"]["learns"].as_array().unwrap().len(), 1);
+
+    let store_path = zenpi::domain_store::path_for_session(&session_path);
+    let store = DomainStore::open(store_path).unwrap();
+    assert_eq!(store.blueprints().len(), 1);
+    assert_eq!(store.goals().len(), 1);
+    assert_eq!(store.learns().len(), 1);
+    assert_eq!(
+        agent.history().len(),
+        0,
+        "domain control commands must not become provider turns"
+    );
+    let _ = fs::remove_dir_all(blueprint_dir);
+    let _ = fs::remove_dir_all(goal_dir);
+    let _ = fs::remove_dir_all(learn_dir);
 }
 
 #[cfg(unix)]
@@ -824,6 +979,122 @@ impl Write for SharedWriter {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn async_runtime_lifecycle_events_are_correlated_ordered_and_replayable() {
+    let (first_started_tx, first_started_rx) = mpsc::sync_channel(1);
+    let (cancellation_seen_tx, cancellation_seen_rx) = mpsc::sync_channel(1);
+    let backend = BurstSteerBackend {
+        calls: AtomicUsize::new(0),
+        first_started: first_started_tx,
+        cancellation_seen: cancellation_seen_tx,
+    };
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("runtime-lifecycle.jsonl");
+    let agent = Agent::new(
+        SessionStore::open(&session_path).unwrap(),
+        Box::new(backend),
+    );
+    let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host = thread::spawn(move || {
+        zenpi::headless::run_async_streams(agent, reader, output).unwrap();
+    });
+
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"prompt","id":"life-p","text":"first"})
+    )
+    .unwrap();
+    first_started_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("provider request did not start");
+    wait_for_output(&captured, "request_started");
+
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"cancel","id":"life-c","target_id":"life-p"})
+    )
+    .unwrap();
+    cancellation_seen_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("provider did not observe cancellation");
+    wait_for_output(&captured, "backend_cancelled");
+
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"resume","id":"life-r","from_sequence":0})
+    )
+    .unwrap();
+    wait_for_output(&captured, "\"id\":\"life-r\"");
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"shutdown","id":"life-q"})
+    )
+    .unwrap();
+    drop(writer);
+    host.join().unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    let resume_response_index = records
+        .iter()
+        .position(|record| record["id"] == "life-r")
+        .expect("missing resume response");
+    let resume_response = &records[resume_response_index];
+    let replayed_count = resume_response["data"]["replayed"].as_u64().unwrap() as usize;
+    let original_end = resume_response_index
+        .checked_sub(replayed_count)
+        .expect("resume replay count exceeds prior output");
+    let original_events = records[..original_end]
+        .iter()
+        .filter(|record| record["type"] == "event")
+        .collect::<Vec<_>>();
+    let lifecycle = original_events
+        .iter()
+        .filter(|record| record["request_id"] == "life-p")
+        .filter_map(|record| record["event"]["type"].as_str())
+        .collect::<Vec<_>>();
+    let accepted = lifecycle
+        .iter()
+        .position(|kind| *kind == "request_accepted")
+        .expect("missing runtime acceptance event");
+    let started = lifecycle
+        .iter()
+        .position(|kind| *kind == "request_started")
+        .expect("missing runtime start event");
+    let cancelled = lifecycle
+        .iter()
+        .position(|kind| *kind == "cancel_requested")
+        .expect("missing runtime cancellation event");
+    assert!(accepted < started && started < cancelled);
+    assert_eq!(
+        original_events
+            .iter()
+            .map(|record| record["sequence"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        (0..original_events.len() as u64).collect::<Vec<_>>()
+    );
+
+    assert_eq!(resume_response["success"], true);
+    assert_eq!(resume_response["data"]["replay_gap"], false);
+    assert_eq!(replayed_count, original_events.len());
+    for kind in ["request_accepted", "request_started", "cancel_requested"] {
+        assert_eq!(
+            records
+                .iter()
+                .filter(|record| record["event"]["type"] == kind)
+                .count(),
+            2,
+            "{kind} was not replayed exactly once"
+        );
     }
 }
 

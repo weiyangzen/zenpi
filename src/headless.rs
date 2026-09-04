@@ -1604,6 +1604,31 @@ fn drain_provider_events_for_job<W: Write>(
     Ok(())
 }
 
+/// Project one scheduler transition onto the public JSONL event stream.
+///
+/// Provider and agent events describe work *inside* a turn, while the runtime
+/// owns admission, queueing, and cancellation.  Dropping the latter made an
+/// async client guess whether a request was queued, running, or had actually
+/// observed its cancel command.  Keep the payload deliberately small and
+/// replay it through the same bounded sequence ledger as every other event.
+fn write_runtime_lifecycle_event<W: Write>(
+    output: &mut W,
+    sequence: &mut u64,
+    replay: &mut ReplayState,
+    work: &AsyncWork,
+    event: serde_json::Value,
+) -> Result<(), HeadlessError> {
+    let turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
+    let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, event);
+    let current = *sequence;
+    *sequence = sequence.saturating_add(1);
+    let line = encode_line(&envelope)?;
+    replay.remember_event(current, line.clone());
+    output.write_all(line.as_bytes())?;
+    output.flush()?;
+    Ok(())
+}
+
 enum ReaderMessage {
     Line(String),
     TooLong,
@@ -1955,6 +1980,72 @@ fn handle_runtime_event<W: Write>(
 ) -> Result<bool, HeadlessError> {
     use crate::runtime::{JobOutcome, RuntimeEvent};
     match event {
+        RuntimeEvent::Accepted { id, queued } => {
+            let Some(work) = jobs.get(&id) else {
+                return Ok(false);
+            };
+            write_runtime_lifecycle_event(
+                output,
+                event_sequence,
+                replay,
+                work,
+                json!({
+                    "type": "request_accepted",
+                    "runtime_job_id": id.get(),
+                    "queued": queued,
+                }),
+            )?;
+            Ok(false)
+        }
+        RuntimeEvent::Started { id } => {
+            let Some(work) = jobs.get(&id) else {
+                return Ok(false);
+            };
+            write_runtime_lifecycle_event(
+                output,
+                event_sequence,
+                replay,
+                work,
+                json!({
+                    "type": "request_started",
+                    "runtime_job_id": id.get(),
+                }),
+            )?;
+            Ok(false)
+        }
+        RuntimeEvent::Queued { id, depth } => {
+            let Some(work) = jobs.get(&id) else {
+                return Ok(false);
+            };
+            write_runtime_lifecycle_event(
+                output,
+                event_sequence,
+                replay,
+                work,
+                json!({
+                    "type": "request_queued",
+                    "runtime_job_id": id.get(),
+                    "depth": depth,
+                }),
+            )?;
+            Ok(false)
+        }
+        RuntimeEvent::CancelRequested { id } => {
+            let Some(work) = jobs.get(&id) else {
+                return Ok(false);
+            };
+            write_runtime_lifecycle_event(
+                output,
+                event_sequence,
+                replay,
+                work,
+                json!({
+                    "type": "cancel_requested",
+                    "runtime_job_id": id.get(),
+                }),
+            )?;
+            Ok(false)
+        }
         RuntimeEvent::Completed { id, outcome } => {
             let Some(meta) = jobs.get(&id) else {
                 return Ok(false);
@@ -2108,7 +2199,6 @@ fn handle_runtime_event<W: Write>(
             }
             Ok(stopping && shutdown_sent && jobs.is_empty())
         }
-        _ => Ok(false),
     }
 }
 

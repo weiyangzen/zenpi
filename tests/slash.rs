@@ -123,6 +123,26 @@ fn common_workflow_commands_have_typed_arguments_and_metadata() {
         })
     );
     assert_eq!(
+        parse("/blueprint put target/blueprint.json").unwrap(),
+        Some(SlashCommand::Blueprint {
+            action: BlueprintAction::Put {
+                path: "target/blueprint.json".into(),
+            },
+        })
+    );
+    assert_eq!(
+        parse("/goal put target/goal.json").unwrap(),
+        Some(SlashCommand::GoalPut {
+            path: "target/goal.json".into(),
+        })
+    );
+    assert_eq!(
+        parse("/learn put target/learn.json").unwrap(),
+        Some(SlashCommand::LearnPut {
+            path: "target/learn.json".into(),
+        })
+    );
+    assert_eq!(
         parse("/session fork").unwrap(),
         Some(SlashCommand::Session {
             action: SessionAction::Fork { path: None },
@@ -206,6 +226,18 @@ fn common_workflow_commands_fail_closed_on_invalid_arguments() {
     assert!(matches!(
         parse("/approve req-1 once extra").unwrap_err(),
         SlashError::UnexpectedArgument { .. }
+    ));
+    assert!(matches!(
+        parse("/blueprint put").unwrap_err(),
+        SlashError::MissingArgument { .. }
+    ));
+    assert!(matches!(
+        parse("/goal put target/goal.json extra").unwrap_err(),
+        SlashError::UnexpectedArgument { .. }
+    ));
+    assert!(matches!(
+        parse("/learn put").unwrap_err(),
+        SlashError::MissingArgument { .. }
     ));
 }
 
