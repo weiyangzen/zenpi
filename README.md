@@ -68,6 +68,13 @@ approval was pending. Plain stdin EOF drains an accepted model turn; when EOF
 leaves nobody able to answer a side-effect approval, that approval is denied
 rather than hanging or silently executing.
 
+Session startup reads have a hard 256 MiB journal-byte cap: an oversized
+existing journal is rejected before parsing or permission changes, while a
+valid journal at or below the cap is still loaded eagerly. For Responses SSE
+only, the owned provider polls a stalled response-body read at a bounded
+100 ms interval; Chat/non-streaming requests and DNS/connect/send/header
+phases remain bounded by ordinary timeouts and have no external abort handle.
+
 The Responses API is the primary wire protocol (`/responses` and
 `/v1/responses`) and is consumed as SSE, including text deltas, completion
 usage, and Codex gateways that insert NUL padding. Chat Completions remains an
@@ -89,6 +96,9 @@ behind a completion claim. The frozen v1 receipt remains in
 versioned audit and re-plan is
 [`Docs/Zenpi_Execution_Blueprint_v2.md`](Docs/Zenpi_Execution_Blueprint_v2.md).
 Installation currently requires Rust 1.88 or newer and a local clone.
+The installed smoke uses local OpenAI-compatible loopback fixtures for provider
+assertions; it proves production-binary wiring, not live OpenAI/Codex service
+availability.
 
 Session and extension lifecycle commands are available outside either runtime
 mode:
@@ -134,7 +144,9 @@ re-emits its requested event suffix and is not
 treated as a response-only cache hit.
 Path-bearing JSONL `resume` requests, like `/session open PATH`, only switch to
 an existing regular journal; a missing or symbolic-link target is rejected
-without creating or modifying a file.
+without creating or modifying a file. Existing journal startup reads are
+limited to 256 MiB before parsing or permission changes; valid journals within
+that bound are loaded eagerly.
 When a `steer` arrives before `shutdown` but is still waiting for turn
 admission, the owned host gives that deferred request a bounded promotion
 window; if the window expires it returns an explicit `runtime_closed` error
@@ -196,7 +208,9 @@ handoff 记录。headless 可以通过一条管道启动、持久化可恢复会
 agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲区差分，减少
 窗口调整及快速流式更新时的重复绘制。
 生产 owned/async 路径把 provider 工作放在后台，TUI/headless 在流式响应期间
-可继续处理输入和协作式取消；legacy 同步入口和阻塞 socket 读取仍有限制。
+可继续处理输入和协作式取消。Responses SSE 的 body read 会以有界 100ms
+间隔轮询取消并关闭停滞 body；Chat/非流式请求以及 DNS/connect/send/header
+阶段仍只有普通 timeout，没有外部 abort handle。
 
 生产默认 backend 是配置的 OpenAI-compatible provider，不再静默使用
 `echo`。首次使用先执行 `zenpi config import-codex --profile codex`，它从
@@ -213,11 +227,13 @@ headless 客户端必须等收到 `approval_request` 后再发送 `approve`。�
 审批会携带有界 unified diff；真正执行前再次校验文件状态，审批等待期间若文件已
 变化，则返回 `stale_preview`，不会写入。stdin 正常 EOF 会等待已接收的模型请求
 完成；若 EOF 后已无人能回答副作用审批，则拒绝该审批而不是挂住或暗中执行。
+会话启动读取有 256 MiB 的 journal 字节硬上限：超限的已有 journal 会在解析或
+修改权限前拒绝；不超过上限的有效 journal 仍会整体载入内存。
 
 当前仓库包含 v1 的 provider/session/runtime 基线，以及正在审核的 v2 候选实现。
-“编译通过”不等于已经达到 Claude Code/Codex 级别的完整可用体验。真实
-provider、Codex 配对、Responses SSE、附件、工具、审批、session、skills/
-extensions 等已有可执行测试；多行编辑、Markdown/diff 渲染、工具状态折叠、
+“编译通过”不等于已经达到 Claude Code/Codex 级别的完整可用体验。生产
+provider 路径（本地 OpenAI-compatible loopback fixture）、Codex 配置导入、Responses SSE、
+附件、工具、审批、session、skills/extensions 等已有可执行测试；多行编辑、Markdown/diff 渲染、工具状态折叠、
 slash/domain 模型和响应式布局也有边界实现，但 BentoBox 多 tab、blueprint/
 goal/learn 的持久化调度、浏览器/PTY pane，以及 socket 级取消仍须按 v2
 验收矩阵补齐。它们不会因为 v1 的 `CF-*` 勾选而被伪称完成。
@@ -235,10 +251,12 @@ v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下�
 不伪造成功。`/learn evidence ID REPOSITORY-RELATIVE-REF` 只保存有界 hash receipt，
 `/learn resume ID` 只检查持久 checkpoint，不启动 worker。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
-会在不创建、不修改文件的情况下返回错误。
+会在不创建、不修改文件的情况下返回错误；已有 journal 超过 256 MiB 也会在
+解析或修改权限前拒绝，不超过上限的有效 journal 会整体载入内存。
 如果 `steer` 已在 `shutdown` 前被接收但仍等待 turn admission，owned 路径会在有界窗口内先完成取消/重发；超时则明确返回 `runtime_closed`，不会静默丢弃请求。
 每个 Blueprint item 都为其实现/测试代码声明严格小于 5000 的 `Estimated LOC` 预估值；这里是每个 item 的
 预估，不是 5000 个 Blueprint item，也不是仓库 Rust 总行数上限。仓库 Rust 总行数只作信息性盘点。
+安装态 smoke 的 provider/tool 断言使用本地 OpenAI-compatible loopback fixture，证明的是生产二进制 wiring，不是线上 OpenAI/Codex 服务可用性。
 在会话中还可用 `/help`、`/model`、`/models` 和 `/doctor` 查看命令、模型配置
 与脱敏诊断；这些命令不会把 secret 写入输出。
 
@@ -264,10 +282,14 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 `echo` は `dev-fixtures` feature のテスト build だけで有効です。通常の release
 では使用できず、provider がない場合は session 作成前に失敗します。
 provider の quota/rate/usage-limit エラーも mock 応答に置き換えません。
+Responses SSE の body 読み取りだけは有界 100ms 間隔で取消を確認して停滞した
+body を閉じます。Chat/非ストリーミング要求と DNS/connect/send/header 段階は
+通常の timeout のみで、外部 abort handle はありません。
 
 このリポジトリには v1 の provider/session/runtime 基盤と、レビュー中の v2
 候補実装があります。ただし、コンパイル成功は Claude Code/Codex 相当の
-完全な利用体験を意味しません。実 provider、Codex pairing、Responses SSE、
+完全な利用体験を意味しません。本番 provider 経路（ローカルの
+OpenAI-compatible loopback fixture）、Codex 設定インポート、Responses SSE、
 添付、tool、approval、session、skills/extensions には実行可能なテストがあり、
 複数行入力、Markdown/diff 表示、tool 状態の折りたたみ、slash/domain モデル、
 responsive layout にも境界実装があります。一方、BentoBox の複数 tab、
@@ -288,11 +310,15 @@ binary data を journal に保存しません。
 REPOSITORY-RELATIVE-REF` は有界 hash receipt だけを保存し、`/learn resume ID` は
 検証済み checkpoint を表示するだけで worker を起動しません。
 パス付き JSONL `resume` も既存の通常 journal だけを開き、欠落またはシンボリック
-リンクの対象はファイルを作成・変更せずエラーにします。
+リンクの対象はファイルを作成・変更せずエラーにします。既存 journal の起動読み込み
+には 256 MiB のバイト上限があり、超過時は解析または権限変更の前に拒否します。
+上限内の有効 journal は全体をメモリに読み込みます。
 `shutdown` 前に受理された `steer` が turn admission 待ちの場合、owned 経路は
 限定時間内に cancel/reissue を試み、期限後は `runtime_closed` を明示して破棄を隠しません。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（各 item が 5000 未満）を記載します。
 これは 5000 個の item という意味でも、リポジトリ全体の Rust 行数上限でもありません。
+インストール smoke の provider/tool 検証はローカルの OpenAI-compatible loopback fixture を使うため、
+オンラインの OpenAI/Codex サービス可用性を意味しません。
 
 ## License
 
