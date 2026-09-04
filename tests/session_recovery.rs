@@ -42,6 +42,49 @@ fn validated_records_retain_durable_sequences_for_replay_owners() {
 }
 
 #[test]
+fn invalid_high_sequence_does_not_poison_following_appends() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("high-sequence.jsonl");
+    let store = SessionStore::open(&path).unwrap();
+    let session_id = store.session_id().to_owned();
+    let mut raw = fs::read_to_string(&path).unwrap();
+    raw.push_str(&format!(
+        "{{\"kind\":\"turn\",\"turn\":{{\"id\":\"bad\",\"role\":\"user\",\"content\":\"\"}},\"schema_version\":1,\"session_id\":\"{session_id}\",\"seq\":18446744073709551615}}\n"
+    ));
+    fs::write(&path, raw).unwrap();
+
+    let mut recovered = SessionStore::open(&path).unwrap();
+    assert_eq!(recovered.next_sequence(), 1);
+    recovered
+        .append_turn(Turn::new("u", TurnRole::User, "after invalid"))
+        .unwrap();
+    let reopened = SessionStore::open(&path).unwrap();
+    assert_eq!(reopened.turns().len(), 1);
+    assert_eq!(reopened.turns()[0].content, "after invalid");
+    assert!(!reopened.recovery_warnings().is_empty());
+}
+
+#[test]
+fn records_before_a_header_are_ignored_instead_of_binding_foreign_state() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("header-order.jsonl");
+    fs::write(
+        &path,
+        b"{\"kind\":\"event\",\"event\":{\"type\":\"foreign\"},\"schema_version\":1,\"session_id\":\"foreign\",\"seq\":0}\n",
+    )
+    .unwrap();
+    let store = SessionStore::open(&path).unwrap();
+    assert_eq!(store.events().len(), 0);
+    assert_ne!(store.session_id(), "foreign");
+    assert!(
+        store
+            .recovery_warnings()
+            .iter()
+            .any(|warning| warning.reason.contains("before session header"))
+    );
+}
+
+#[test]
 fn unfinished_operations_are_detected_and_never_retried_implicitly() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("interrupted.jsonl");

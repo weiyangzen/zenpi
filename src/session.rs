@@ -285,14 +285,21 @@ impl SessionStore {
                     continue;
                 }
             };
-            let record_sequence = sequence.unwrap_or(next_seq);
-            if let Some(sequence) = sequence {
-                last_seq = Some(sequence);
-                next_seq = sequence.saturating_add(1);
-            } else {
-                next_seq = next_seq.saturating_add(1);
-                last_seq = next_seq.checked_sub(1);
+            if header.is_none() && !matches!(&record, DecodedRecord::Session { .. }) {
+                warnings.push(RecoveryWarning {
+                    line: line_number,
+                    reason: "ignored record before session header".into(),
+                });
+                continue;
             }
+            let record_sequence = sequence.unwrap_or(next_seq);
+            let Some(following_sequence) = record_sequence.checked_add(1) else {
+                warnings.push(RecoveryWarning {
+                    line: line_number,
+                    reason: "ignored record with exhausted sequence".into(),
+                });
+                continue;
+            };
             let accepted = match record {
                 DecodedRecord::Session {
                     version,
@@ -387,6 +394,8 @@ impl SessionStore {
                 }
             };
             if accepted {
+                last_seq = Some(record_sequence);
+                next_seq = following_sequence;
                 let kind = raw_value
                     .get("kind")
                     .and_then(Value::as_str)
@@ -692,8 +701,11 @@ impl SessionStore {
                 "session record must be an object".into(),
             ));
         }
-        let mut record = value.clone();
         let sequence = self.next_seq;
+        let following_sequence = sequence.checked_add(1).ok_or_else(|| {
+            SessionError::InvalidRecord("session sequence space is exhausted".into())
+        })?;
+        let mut record = value.clone();
         if let Value::Object(fields) = &mut record {
             let now = now_ms();
             fields.insert("schema_version".into(), json!(SESSION_VERSION));
@@ -725,7 +737,7 @@ impl SessionStore {
         file.write_all(&encoded)?;
         file.flush()?;
         file.sync_data()?;
-        self.next_seq = self.next_seq.saturating_add(1);
+        self.next_seq = following_sequence;
         let kind = record
             .get("kind")
             .and_then(Value::as_str)
