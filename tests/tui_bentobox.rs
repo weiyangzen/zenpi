@@ -219,6 +219,7 @@ fn gantt_projection_truncates_maximal_valid_blueprint() {
     let snapshot = collect_gantt_snapshot(&session_path).unwrap();
     assert!(snapshot.truncated());
     assert!(snapshot.content().len() <= MAX_GANTT_PANE_BYTES);
+    assert!(snapshot.content().lines().count() <= zenpi::tui::MAX_GANTT_PANE_ROWS);
     assert!(snapshot.content().contains("Gantt projection truncated"));
 }
 

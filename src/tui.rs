@@ -119,6 +119,56 @@ pub struct GanttPaneSnapshot {
     truncated: bool,
 }
 
+#[derive(Debug, Clone)]
+struct GanttRefreshRequest {
+    session_path: std::path::PathBuf,
+    generation: u64,
+}
+
+#[derive(Debug)]
+struct GanttRefreshResult {
+    snapshot: GanttPaneSnapshot,
+    generation: u64,
+}
+
+#[derive(Debug, Clone, Default)]
+struct GanttRefreshTracker {
+    session_path: std::path::PathBuf,
+    generation: u64,
+}
+
+impl GanttRefreshTracker {
+    fn new(session_path: std::path::PathBuf) -> Self {
+        Self {
+            session_path,
+            generation: 0,
+        }
+    }
+
+    fn request(&self) -> GanttRefreshRequest {
+        GanttRefreshRequest {
+            session_path: self.session_path.clone(),
+            generation: self.generation,
+        }
+    }
+
+    /// Return true only when the active journal changed. Failed session-open
+    /// commands pass the same path and therefore leave the current projection
+    /// untouched.
+    fn switch_session(&mut self, session_path: std::path::PathBuf) -> bool {
+        if self.session_path == session_path {
+            return false;
+        }
+        self.session_path = session_path;
+        self.generation = self.generation.saturating_add(1);
+        true
+    }
+
+    const fn accepts(&self, result: &GanttRefreshResult) -> bool {
+        result.generation == self.generation
+    }
+}
+
 impl GanttPaneSnapshot {
     pub fn content(&self) -> &str {
         &self.content
@@ -199,7 +249,7 @@ fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSna
                 })
                 .count();
             let header = format!(
-                "\n{}@{}  items {}  est {} LOC  goals {}\n",
+                "{}@{}  items {}  est {} LOC  goals {}\n",
                 inline_token(&blueprint.id, crate::domains::MAX_ID_BYTES),
                 inline_token(&blueprint.version, crate::domains::MAX_VERSION_BYTES),
                 blueprint.items.len(),
@@ -248,7 +298,8 @@ fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSna
 }
 
 fn append_gantt_line(content: &mut String, line: &str, rows: &mut usize) -> bool {
-    if *rows >= MAX_GANTT_PANE_ROWS
+    // Reserve the final logical row for a visible truncation marker.
+    if *rows >= MAX_GANTT_PANE_ROWS.saturating_sub(1)
         || content.len().saturating_add(line.len()) > MAX_GANTT_PANE_BYTES
     {
         return false;
@@ -259,10 +310,14 @@ fn append_gantt_line(content: &mut String, line: &str, rows: &mut usize) -> bool
 }
 
 fn append_gantt_marker(content: &mut String) {
-    const MARKER: &str = "\n... Gantt projection truncated";
-    let keep = MAX_GANTT_PANE_BYTES.saturating_sub(MARKER.len());
+    const MARKER: &str = "... Gantt projection truncated";
+    let separator_bytes = usize::from(!content.ends_with('\n'));
+    let keep = MAX_GANTT_PANE_BYTES.saturating_sub(separator_bytes + MARKER.len());
     if content.len() > keep {
         content.truncate(truncate_bytes(content, keep).len());
+    }
+    if !content.ends_with('\n') {
+        content.push('\n');
     }
     content.push_str(MARKER);
 }
@@ -539,6 +594,15 @@ impl TuiState {
     /// Mark a Gantt refresh as admitted by the production host.
     pub fn gantt_refresh_started(&mut self) {
         self.gantt_status = GanttPaneStatus::Refreshing;
+        self.dirty = true;
+    }
+
+    /// Drop a projection owned by a session which is no longer active. A
+    /// session switch must not leave the prior session's domain data visible
+    /// while its replacement snapshot is loading.
+    pub fn clear_gantt_snapshot(&mut self) {
+        self.gantt_snapshot = None;
+        self.gantt_status = GanttPaneStatus::Idle;
         self.dirty = true;
     }
 
@@ -1623,14 +1687,44 @@ impl TuiState {
                 GanttPaneStatus::Ready => "Blueprint/Goal snapshot unavailable".into(),
             };
         };
-        match &self.gantt_status {
+        let content = match &self.gantt_status {
             GanttPaneStatus::Refreshing => format!("{}\nrefreshing...", snapshot.content),
             GanttPaneStatus::Failed(error) => {
                 format!("{}\nrefresh failed: {error}", snapshot.content)
             }
             GanttPaneStatus::Idle | GanttPaneStatus::Ready => snapshot.content.clone(),
+        };
+        bound_gantt_pane_content(content)
+    }
+}
+
+fn bound_gantt_pane_content(content: String) -> String {
+    const MARKER: &str = "... Gantt pane content truncated";
+    let too_many_rows = content.lines().count() > MAX_GANTT_PANE_ROWS;
+    if !too_many_rows && content.len() <= MAX_GANTT_PANE_BYTES {
+        return content;
+    }
+
+    let mut bounded = String::new();
+    for line in content.lines().take(MAX_GANTT_PANE_ROWS.saturating_sub(1)) {
+        let suffix_len = usize::from(!bounded.is_empty()) + 1 + MARKER.len();
+        let available = MAX_GANTT_PANE_BYTES.saturating_sub(bounded.len() + suffix_len);
+        if available == 0 {
+            break;
+        }
+        if !bounded.is_empty() {
+            bounded.push('\n');
+        }
+        bounded.push_str(truncate_bytes(line, available));
+        if line.len() > available {
+            break;
         }
     }
+    if !bounded.is_empty() {
+        bounded.push('\n');
+    }
+    bounded.push_str(MARKER);
+    bounded
 }
 
 /// Ratatui-facing rectangle for one pane in a computed BentoBox snapshot.
@@ -2412,28 +2506,56 @@ pub fn dispatch_slash_command(
             ),
         },
         SlashCommand::Compete { args } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "compete is not executable in this host; b3ehive runtime adapter is pending: {}",
-                    bounded_display(&args.join(" "))
-                ),
-            );
+            dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Compete, &args);
         }
         SlashCommand::Loop { args } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "loop is not executable in this host; b3ehive runtime adapter is pending: {}",
-                    bounded_display(&args.join(" "))
-                ),
-            );
+            dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Loop, &args);
         }
     }
     if !state.is_busy() {
         state.set_status("Ready");
     }
     SlashDispatchAction::Continue
+}
+
+fn dispatch_runtime_intent(
+    state: &mut TuiState,
+    agent: Option<&mut crate::core::Agent>,
+    kind: crate::b3::RuntimeIntentKind,
+    args: &[String],
+) {
+    let Some(agent) = agent else {
+        state.push_message(
+            MessageRole::Error,
+            format!(
+                "{} intent cannot be persisted while the agent is busy",
+                kind.as_str()
+            ),
+        );
+        return;
+    };
+    match crate::runtime_intent::runtime_intent_value(agent, kind, args) {
+        Ok(data) => state.push_message(
+            MessageRole::System,
+            format!(
+                "{} runtime intent: delivery=journal_only, stored={}, zenpi_started=false, external_state=untracked, intent_id={}",
+                kind.as_str(),
+                data.get("persisted")
+                    .or_else(|| data.get("records_durable"))
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                data.pointer("/intent/intent_id")
+                    .or_else(|| data.get("latest_intent_id"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(|value| inline_token(value, 160))
+                    .unwrap_or_else(|| "<status>".into()),
+            ),
+        ),
+        Err(error) => state.push_message(
+            MessageRole::Error,
+            format!("{} runtime intent failed: {error}", kind.as_str()),
+        ),
+    }
 }
 
 fn format_agent_status(agent: &crate::core::Agent) -> String {
@@ -2882,17 +3004,21 @@ pub fn run_async_with_profile(
         .session()
         .path()
         .to_path_buf();
+    let mut gantt_tracker = GanttRefreshTracker::new(gantt_session_path);
     let gantt_runner = BackgroundRunner::spawn(
-        |session_path: std::path::PathBuf, token| -> Result<GanttPaneSnapshot, String> {
+        |request: GanttRefreshRequest, token| -> Result<GanttRefreshResult, String> {
             if token.is_cancelled() {
                 return Err("Gantt refresh cancelled".into());
             }
-            let snapshot = collect_gantt_snapshot(session_path)?;
+            let snapshot = collect_gantt_snapshot(request.session_path)?;
             if token.is_cancelled() {
                 return Err("Gantt refresh cancelled".into());
             }
             token.mark_completed();
-            Ok(snapshot)
+            Ok(GanttRefreshResult {
+                snapshot,
+                generation: request.generation,
+            })
         },
         RuntimeConfig {
             command_capacity: 1,
@@ -2927,10 +3053,19 @@ pub fn run_async_with_profile(
         Ok(_) => state.resource_refresh_started(),
         Err(error) => state.resource_refresh_failed(error.to_string()),
     }
-    match gantt_runner.try_submit(gantt_session_path.clone()) {
-        Ok(_) => state.gantt_refresh_started(),
-        Err(error) => state.gantt_refresh_failed(error.to_string()),
-    }
+    let mut active_gantt_generation = Some(gantt_tracker.generation);
+    let mut active_gantt_job = match gantt_runner.try_submit(gantt_tracker.request()) {
+        Ok(id) => {
+            state.gantt_refresh_started();
+            Some(id)
+        }
+        Err(error) => {
+            active_gantt_generation = None;
+            state.gantt_refresh_failed(error.to_string());
+            None
+        }
+    };
+    let mut gantt_refresh_pending = false;
     let config = TuiConfig::default();
     // The runtime worker is spawned before terminal setup so it can own the
     // agent independently of the terminal.  Terminal setup can still fail
@@ -2971,6 +3106,21 @@ pub fn run_async_with_profile(
             // use a non-blocking drain so lifecycle events become visible as soon
             // as that mutex is released without freezing keyboard/render polling.
             drain_agent_tool_events(&shared, &mut state);
+            if active_gantt_job.is_none() && gantt_refresh_pending {
+                match gantt_runner.try_submit(gantt_tracker.request()) {
+                    Ok(id) => {
+                        active_gantt_job = Some(id);
+                        active_gantt_generation = Some(gantt_tracker.generation);
+                        gantt_refresh_pending = false;
+                        state.gantt_refresh_started();
+                    }
+                    Err(crate::runtime::SubmitError::QueueFull) => {}
+                    Err(crate::runtime::SubmitError::Closed) => {
+                        gantt_refresh_pending = false;
+                        state.gantt_refresh_failed("Gantt worker closed");
+                    }
+                }
+            }
             while let Ok(event) = resource_runner.try_next_event() {
                 match event {
                     RuntimeEvent::Completed { outcome, .. } => {
@@ -3001,24 +3151,56 @@ pub fn run_async_with_profile(
             }
             while let Ok(event) = gantt_runner.try_next_event() {
                 match event {
-                    RuntimeEvent::Completed { outcome, .. } => {
+                    RuntimeEvent::Completed { id, outcome } => {
+                        if Some(id) != active_gantt_job {
+                            continue;
+                        }
+                        active_gantt_job = None;
+                        let completed_generation = active_gantt_generation.take();
                         match outcome {
-                            JobOutcome::Succeeded(snapshot) => state.set_gantt_snapshot(snapshot),
-                            JobOutcome::Failed(error) => state.gantt_refresh_failed(error),
+                            JobOutcome::Succeeded(result)
+                                if completed_generation == Some(result.generation)
+                                    && gantt_tracker.accepts(&result) =>
+                            {
+                                state.set_gantt_snapshot(result.snapshot)
+                            }
+                            JobOutcome::Succeeded(_) => {}
+                            JobOutcome::Failed(error)
+                                if completed_generation == Some(gantt_tracker.generation) =>
+                            {
+                                state.gantt_refresh_failed(error)
+                            }
+                            JobOutcome::Failed(_) => {}
                             JobOutcome::Cancelled => {
-                                state.gantt_refresh_failed("Gantt refresh cancelled")
+                                if completed_generation == Some(gantt_tracker.generation) {
+                                    state.gantt_refresh_failed("Gantt refresh cancelled");
+                                }
                             }
                             JobOutcome::Panicked => {
-                                state.gantt_refresh_failed("Gantt worker panicked")
+                                if completed_generation == Some(gantt_tracker.generation) {
+                                    state.gantt_refresh_failed("Gantt worker panicked");
+                                }
                             }
                         }
                         scheduler.request();
                     }
-                    RuntimeEvent::Rejected { reason, .. } => {
-                        state.gantt_refresh_failed(reason.to_string());
-                        scheduler.request();
+                    RuntimeEvent::Rejected { id, reason } => {
+                        if Some(id) == active_gantt_job {
+                            active_gantt_job = None;
+                            active_gantt_generation = None;
+                            if reason == crate::runtime::SubmitError::QueueFull {
+                                gantt_refresh_pending = true;
+                                state.gantt_refresh_started();
+                            } else {
+                                state.gantt_refresh_failed(reason.to_string());
+                            }
+                            scheduler.request();
+                        }
                     }
                     RuntimeEvent::Closed => {
+                        active_gantt_job = None;
+                        active_gantt_generation = None;
+                        gantt_refresh_pending = false;
                         state.gantt_refresh_failed("Gantt worker closed");
                         scheduler.request();
                     }
@@ -3299,11 +3481,23 @@ pub fn run_async_with_profile(
                                     SlashDispatchAction::Quit => break 'outer,
                                     SlashDispatchAction::Continue => {}
                                 }
-                                if refresh_gantt {
-                                    match gantt_runner.try_submit(gantt_session_path.clone()) {
-                                        Ok(_) => state.gantt_refresh_started(),
-                                        Err(error) => state.gantt_refresh_failed(error.to_string()),
+                                // `/session open` may replace the active
+                                // journal. Reconcile after dispatch so a
+                                // rejected switch retains its prior pane, but
+                                // a successful switch clears that pane before
+                                // the replacement store is loaded.
+                                if let Ok(agent) = shared.try_lock() {
+                                    let active_path = agent.session().path().to_path_buf();
+                                    drop(agent);
+                                    if gantt_tracker.switch_session(active_path) {
+                                        state.clear_gantt_snapshot();
+                                        gantt_refresh_pending = true;
+                                        state.gantt_refresh_started();
                                     }
+                                }
+                                if refresh_gantt {
+                                    gantt_refresh_pending = true;
+                                    state.gantt_refresh_started();
                                 }
                             }
                             Ok(InputRoute::Prompt(text)) => {
@@ -3997,6 +4191,66 @@ fn cursor_position(text: &str, cursor: usize, width: usize) -> (u16, u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn gantt_refresh_tracker_rejects_a_result_from_the_previous_session() {
+        let mut tracker = GanttRefreshTracker::new("session-a.jsonl".into());
+        let stale = GanttRefreshResult {
+            snapshot: GanttPaneSnapshot {
+                content: "plan-a".into(),
+                blueprint_count: 1,
+                goal_count: 0,
+                truncated: false,
+            },
+            generation: tracker.generation,
+        };
+        assert!(tracker.accepts(&stale));
+        assert!(!tracker.switch_session("session-a.jsonl".into()));
+        assert!(tracker.switch_session("session-b.jsonl".into()));
+        assert!(!tracker.accepts(&stale));
+        assert_eq!(
+            tracker.request().session_path,
+            PathBuf::from("session-b.jsonl")
+        );
+    }
+
+    #[test]
+    fn clearing_gantt_snapshot_hides_the_previous_session_immediately() {
+        let mut state = TuiState::default();
+        state.set_gantt_snapshot(GanttPaneSnapshot {
+            content: "plan-a".into(),
+            blueprint_count: 1,
+            goal_count: 0,
+            truncated: false,
+        });
+        state.clear_gantt_snapshot();
+        state.gantt_refresh_started();
+        assert!(state.gantt_snapshot().is_none());
+        assert_eq!(
+            state.gantt_pane_content(),
+            "Loading Blueprint/Goal snapshot..."
+        );
+    }
+
+    #[test]
+    fn gantt_status_suffix_cannot_exceed_pane_row_or_byte_limits() {
+        let mut state = TuiState::default();
+        state.set_gantt_snapshot(GanttPaneSnapshot {
+            content: (0..MAX_GANTT_PANE_ROWS)
+                .map(|index| format!("row-{index}-{}", "x".repeat(400)))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            blueprint_count: 1,
+            goal_count: 1,
+            truncated: true,
+        });
+        state.gantt_refresh_started();
+        let content = state.gantt_pane_content();
+        assert!(content.len() <= MAX_GANTT_PANE_BYTES);
+        assert!(content.lines().count() <= MAX_GANTT_PANE_ROWS);
+        assert!(content.contains("Gantt pane content truncated"));
+    }
 
     #[test]
     fn provider_stream_overflow_is_visible_in_transcript() {
