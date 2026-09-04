@@ -1,12 +1,12 @@
-use std::{fs, io::Cursor, path::Path};
+use std::{fs, io::Cursor, path::Path, thread, time::Duration};
 
 use serde_json::Value;
 use tempfile::tempdir;
 use zenpi::{
     core::{Agent, Turn, TurnRole},
-    headless::{run_headless, session_maintenance_view},
+    headless::{run_headless, session_gc_view_at, session_maintenance_view},
     session::SessionStore,
-    slash::{SessionAction, SlashCommand, SlashError, parse},
+    slash::{SessionAction, SessionGcPolicy, SlashCommand, SlashError, parse},
     tui::{MessageRole, SlashDispatchAction, TuiState, dispatch_slash_command},
 };
 
@@ -263,4 +263,46 @@ fn headless_and_tui_dispatch_execute_typed_session_maintenance_locally() {
         message.role == MessageRole::System && message.text.starts_with("session fork:")
     }));
     assert_eq!(fs::read(&source_path).unwrap(), source_bytes);
+}
+
+#[test]
+fn gc_owner_is_real_bounded_and_never_removes_active_or_foreign_files() {
+    let directory = tempdir().unwrap();
+    let sessions = directory.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    let active_path = directory.path().join("active.jsonl");
+    let active = Agent::with_echo(SessionStore::open(&active_path).unwrap());
+    let old_path = sessions.join("old.jsonl");
+    SessionStore::open(&old_path).unwrap();
+    thread::sleep(Duration::from_millis(10));
+    let newest_path = sessions.join("newest.jsonl");
+    SessionStore::open(&newest_path).unwrap();
+    let foreign_path = sessions.join("foreign.jsonl");
+    fs::write(&foreign_path, b"{\"kind\":\"not-a-session\"}\n").unwrap();
+
+    let policy = SessionGcPolicy {
+        retain_newest: 1,
+        older_than_seconds: 0,
+        confirm: true,
+    };
+    let value = session_gc_view_at(&active, &policy, &sessions).unwrap();
+    assert_eq!(value["accepted"], true);
+    assert_eq!(value["action"], "gc");
+    assert_eq!(value["confirmed"], true);
+    assert_eq!(value["removed_count"], 1);
+    assert!(value["skipped_unowned"].as_u64().unwrap() >= 1);
+    assert!(!old_path.exists());
+    assert!(newest_path.exists());
+    assert!(foreign_path.exists());
+
+    // A direct owner invocation with the active journal inside the managed
+    // directory fails before deleting any other candidate.
+    let active_in_dir = sessions.join("active.jsonl");
+    let active_agent = Agent::with_echo(SessionStore::open(&active_in_dir).unwrap());
+    let other = sessions.join("other.jsonl");
+    SessionStore::open(&other).unwrap();
+    let error = session_gc_view_at(&active_agent, &policy, &sessions).unwrap_err();
+    assert!(error.contains("active session"));
+    assert!(active_in_dir.exists());
+    assert!(other.exists());
 }

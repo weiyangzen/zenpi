@@ -67,6 +67,9 @@ const MAX_DOMAIN_VIEW_BYTES: usize = 512 * 1024;
 const MAX_SLASH_RESUME_RECORDS: usize = 128;
 const MAX_SLASH_RESUME_BYTES: usize = 128 * 1024;
 const MAX_SLASH_RESUME_EVENT_BYTES: usize = 8 * 1024;
+/// A GC response is an audit receipt, not a directory listing. Keep the
+/// serialized owner result comfortably below the replay-cache line budget.
+const MAX_SESSION_GC_RECEIPT_BYTES: usize = 64 * 1024;
 /// Learn evidence is a reference plus a small integrity receipt, not a file
 /// transfer. Hashing is bounded so a command cannot turn the owner into an
 /// unbounded workspace reader.
@@ -1246,6 +1249,77 @@ pub fn session_maintenance_view(
     }))
 }
 
+/// Execute the explicitly confirmed session-retention owner for both TUI and
+/// headless hosts. The active journal is excluded by identity, and the
+/// session module performs the final ownership/symlink checks before removal.
+pub fn session_gc_view(
+    agent: &Agent,
+    policy: &crate::slash::SessionGcPolicy,
+) -> Result<serde_json::Value, String> {
+    let paths = crate::config::ConfigPaths::discover().map_err(|error| error.to_string())?;
+    session_gc_view_at(agent, policy, &paths.sessions)
+}
+
+/// Testable/embedded variant of [`session_gc_view`] with an explicit session
+/// directory. Production hosts use the configured path above; embedders can
+/// keep their own isolated home without mutating process-global environment.
+pub fn session_gc_view_at(
+    agent: &Agent,
+    policy: &crate::slash::SessionGcPolicy,
+    directory: &Path,
+) -> Result<serde_json::Value, String> {
+    if !policy.confirm {
+        return Err("session gc requires explicit --yes confirmation".into());
+    }
+    if policy.retain_newest == 0 && policy.older_than_seconds == 0 {
+        return Err("session gc requires a non-zero retention policy".into());
+    }
+    if policy.retain_newest > crate::slash::MAX_SESSION_GC_RETAIN_NEWEST
+        || policy.older_than_seconds > crate::slash::MAX_SESSION_GC_AGE_SECONDS
+    {
+        return Err("session gc retention policy exceeds the bounded limit".into());
+    }
+    if agent.phase() != crate::core::AgentPhase::Idle {
+        return Err("session gc is available only while the agent is idle".into());
+    }
+    let report = crate::session::garbage_collect_sessions_with_active(
+        directory,
+        crate::session::GarbageCollectionPolicy {
+            retain_newest: policy.retain_newest,
+            older_than_ms: policy.older_than_seconds.saturating_mul(1_000),
+        },
+        Some(agent.session().path()),
+        unix_time_ms(),
+    )
+    .map_err(|error| error.to_string())?;
+    let removed = report
+        .removed
+        .iter()
+        .map(|path| bound_slash_text(&redact_session_path(&path.display().to_string()), 256))
+        .collect::<Vec<_>>();
+    let value = json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": "gc",
+        "durable": true,
+        "confirmed": true,
+        "retention": {
+            "retain_newest": policy.retain_newest,
+            "older_than_seconds": policy.older_than_seconds,
+        },
+        "inspected": report.inspected,
+        "skipped_unowned": report.skipped_unowned,
+        "removed_count": report.removed.len(),
+        "removed": removed,
+    });
+    let encoded = serde_json::to_vec(&value).map_err(|error| error.to_string())?;
+    if encoded.len() > MAX_SESSION_GC_RECEIPT_BYTES {
+        return Err("session gc receipt exceeds the bounded response limit".into());
+    }
+    Ok(value)
+}
+
 fn validate_clean_session_source(source: &SessionStore, operation: &str) -> Result<(), String> {
     let valid_header = source
         .records()
@@ -1516,17 +1590,6 @@ fn serialized_agent_snapshot(agent: &Agent) -> Result<serde_json::Value, serde_j
     let mut snapshot = agent.snapshot();
     snapshot.session.path = redact_session_path(&snapshot.session.path);
     serde_json::to_value(snapshot)
-}
-
-fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
-    match action {
-        crate::slash::SessionAction::List => "list",
-        crate::slash::SessionAction::Open { .. } => "open",
-        crate::slash::SessionAction::Fork { .. } => "fork",
-        crate::slash::SessionAction::Export { .. } => "export",
-        crate::slash::SessionAction::Import { .. } => "import",
-        crate::slash::SessionAction::Gc => "gc",
-    }
 }
 
 fn redact_session_path(raw: &str) -> String {
@@ -4435,13 +4498,20 @@ fn execute_headless_slash(
                     code: "session_maintenance_failed",
                     message,
                 }),
-            action => Ok(SlashExecution::Response(json!({
-                "command": "session",
-                "route": "local",
-                "accepted": false,
-                "action": session_action_name(&action),
-                "message": "session action is parsed but not executable in this host",
-            }))),
+            crate::slash::SessionAction::Gc { policy } => {
+                let Some(agent) = agent else {
+                    return Err(SlashDispatchError {
+                        code: "agent_busy",
+                        message: "session gc is unavailable while the agent is busy".into(),
+                    });
+                };
+                session_gc_view(agent, &policy)
+                    .map(SlashExecution::Response)
+                    .map_err(|message| SlashDispatchError {
+                        code: "session_gc_failed",
+                        message,
+                    })
+            }
         },
         SlashCommand::Resume { sequence } => {
             let Some(agent) = agent else {

@@ -2459,13 +2459,25 @@ pub fn dispatch_slash_command(
                     ),
                 }
             }
-            action => state.push_message(
-                MessageRole::Error,
-                format!(
-                    "session {} is not executable in this host",
-                    session_action_label(&action)
+            crate::slash::SessionAction::Gc { policy } => match agent.as_deref() {
+                Some(agent) => match crate::headless::session_gc_view(agent, &policy) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "session gc:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state
+                        .push_message(MessageRole::Error, format!("session gc failed: {error}")),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "session gc is unavailable while the agent is busy",
                 ),
-            ),
+            },
         },
         SlashCommand::Resume { sequence } => {
             let Some(agent) = agent.as_deref_mut() else {
@@ -3035,7 +3047,7 @@ fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
         crate::slash::SessionAction::Fork { .. } => "fork",
         crate::slash::SessionAction::Export { .. } => "export",
         crate::slash::SessionAction::Import { .. } => "import",
-        crate::slash::SessionAction::Gc => "gc",
+        crate::slash::SessionAction::Gc { .. } => "gc",
     }
 }
 

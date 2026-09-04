@@ -551,6 +551,67 @@ fn session_gc_skips_domain_store_and_non_owned_links() {
 }
 
 #[test]
+fn session_gc_only_removes_clean_owned_journals_and_reports_skips() {
+    use zenpi::session::{
+        GarbageCollectionPolicy, MAX_GC_REMOVALS, garbage_collect_sessions_with_active,
+    };
+
+    let dir = tempdir().unwrap();
+    let active_dir = tempdir().unwrap();
+    let active_path = active_dir.path().join("active.jsonl");
+    let _active = SessionStore::open(&active_path).unwrap();
+    let owned_path = dir.path().join("owned.jsonl");
+    SessionStore::open(&owned_path).unwrap();
+    let foreign_path = dir.path().join("foreign.jsonl");
+    fs::write(&foreign_path, b"{\"not\":\"a zenpi session\"}\n").unwrap();
+    let domain_path = dir.path().join(zenpi::domain_store::DOMAIN_STORE_FILE_NAME);
+    zenpi::domain_store::DomainStore::open(&domain_path).unwrap();
+
+    let report = garbage_collect_sessions_with_active(
+        dir.path(),
+        GarbageCollectionPolicy {
+            retain_newest: 0,
+            older_than_ms: 1,
+        },
+        Some(&active_path),
+        u64::MAX,
+    )
+    .unwrap();
+    assert_eq!(report.removed, vec![owned_path.clone()]);
+    assert_eq!(report.removed.len(), 1);
+    assert!(report.inspected >= 1);
+    assert!(report.skipped_unowned >= 1);
+    assert!(!owned_path.exists());
+    assert!(foreign_path.exists());
+    assert!(domain_path.exists());
+    assert!(MAX_GC_REMOVALS > 0);
+}
+
+#[test]
+fn session_gc_refuses_the_active_journal_before_any_removal() {
+    use zenpi::session::{GarbageCollectionPolicy, garbage_collect_sessions_with_active};
+
+    let dir = tempdir().unwrap();
+    let active_path = dir.path().join("active.jsonl");
+    SessionStore::open(&active_path).unwrap();
+    let other_path = dir.path().join("other.jsonl");
+    SessionStore::open(&other_path).unwrap();
+    let error = garbage_collect_sessions_with_active(
+        dir.path(),
+        GarbageCollectionPolicy {
+            retain_newest: 0,
+            older_than_ms: 1,
+        },
+        Some(&active_path),
+        u64::MAX,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("active session"));
+    assert!(active_path.exists());
+    assert!(other_path.exists());
+}
+
+#[test]
 fn session_listing_skips_sibling_domain_store_without_mutating_it() {
     let dir = tempdir().unwrap();
     let sessions = dir.path().join("sessions");

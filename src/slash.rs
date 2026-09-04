@@ -14,6 +14,12 @@ use crate::layout::{PaneId, TabId};
 /// Maximum UTF-8 bytes accepted for one slash command.
 pub const MAX_SLASH_INPUT_BYTES: usize = 16 * 1024;
 
+/// Keep retention parsing bounded before a host touches the filesystem.
+/// Session directories are intentionally capped below this value as well;
+/// larger policies are almost certainly an accidental destructive request.
+pub const MAX_SESSION_GC_RETAIN_NEWEST: usize = 4096;
+pub const MAX_SESSION_GC_AGE_SECONDS: u64 = u64::MAX / 1_000;
+
 /// Wire/log schema version for the typed command representation.  This is
 /// independent from the execution-blueprint version so hosts can evolve the
 /// command grammar without rewriting old blueprint records.
@@ -158,7 +164,20 @@ pub enum SessionAction {
     Fork { source: String, destination: String },
     Export { source: String, destination: String },
     Import { source: String, destination: String },
-    Gc,
+    Gc { policy: SessionGcPolicy },
+}
+
+/// Explicit retention and confirmation policy for `/session gc`.
+///
+/// A slash command must carry both retention dimensions and an explicit
+/// confirmation token.  Keeping this as typed data prevents a host from
+/// accidentally treating a bare `/session gc` as permission to delete files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SessionGcPolicy {
+    pub retain_newest: usize,
+    pub older_than_seconds: u64,
+    pub confirm: bool,
 }
 
 /// Operations supported by `/layout`.
@@ -399,7 +418,7 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "session",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/session [list|open PATH|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|gc]",
+        usage: "/session [list|open PATH|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|gc --retain-newest N --older-than-seconds N --yes]",
         summary: "navigate durable sessions",
     },
     SlashCommandSpec {
@@ -526,6 +545,12 @@ pub enum SlashError {
     MissingSessionPath { action: &'static str },
     #[error("/session {action} received an unexpected argument")]
     UnexpectedSessionArgument { action: &'static str },
+    #[error("/session gc {flag} must be a non-negative integer")]
+    InvalidSessionGcValue { flag: &'static str },
+    #[error("/session gc requires --retain-newest N --older-than-seconds N --yes")]
+    MissingSessionGcPolicy,
+    #[error("/session gc requires --yes confirmation")]
+    MissingSessionGcConfirmation,
     #[error("/approve decision must be once, always, or deny")]
     InvalidApproveDecision,
     #[error("/blueprint has unknown action `/{action}`")]
@@ -1111,16 +1136,99 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
                 destination,
             })
         }
-        "gc" => {
-            if args.len() > 1 {
-                return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
-            }
-            Ok(SessionAction::Gc)
-        }
+        "gc" => parse_session_gc(args),
         _ => Err(SlashError::UnknownSessionAction {
             action: action.clone(),
         }),
     }
+}
+
+fn parse_session_gc(args: &[String]) -> Result<SessionAction, SlashError> {
+    let mut retain_newest = None;
+    let mut older_than_seconds = None;
+    let mut confirm = false;
+    let mut index = 1;
+    while index < args.len() {
+        let argument = &args[index];
+        if argument == "--yes" {
+            if confirm {
+                return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
+            }
+            confirm = true;
+            index += 1;
+            continue;
+        }
+        if argument == "--retain-newest" || argument.starts_with("--retain-newest=") {
+            if retain_newest.is_some() {
+                return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
+            }
+            let value = argument
+                .strip_prefix("--retain-newest=")
+                .map(str::to_owned)
+                .or_else(|| args.get(index + 1).cloned())
+                .ok_or(SlashError::InvalidSessionGcValue {
+                    flag: "--retain-newest",
+                })?;
+            if argument == "--retain-newest" {
+                index += 1;
+            }
+            let parsed = value
+                .parse::<usize>()
+                .ok()
+                .filter(|value| *value <= MAX_SESSION_GC_RETAIN_NEWEST)
+                .ok_or(SlashError::InvalidSessionGcValue {
+                    flag: "--retain-newest",
+                })?;
+            retain_newest = Some(parsed);
+            index += 1;
+            continue;
+        }
+        if argument == "--older-than-seconds" || argument.starts_with("--older-than-seconds=") {
+            if older_than_seconds.is_some() {
+                return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
+            }
+            let value = argument
+                .strip_prefix("--older-than-seconds=")
+                .map(str::to_owned)
+                .or_else(|| args.get(index + 1).cloned())
+                .ok_or(SlashError::InvalidSessionGcValue {
+                    flag: "--older-than-seconds",
+                })?;
+            if argument == "--older-than-seconds" {
+                index += 1;
+            }
+            let parsed = value
+                .parse::<u64>()
+                .ok()
+                .filter(|value| *value <= MAX_SESSION_GC_AGE_SECONDS)
+                .ok_or(SlashError::InvalidSessionGcValue {
+                    flag: "--older-than-seconds",
+                })?;
+            older_than_seconds = Some(parsed);
+            index += 1;
+            continue;
+        }
+        return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
+    }
+    let Some(retain_newest) = retain_newest else {
+        return Err(SlashError::MissingSessionGcPolicy);
+    };
+    let Some(older_than_seconds) = older_than_seconds else {
+        return Err(SlashError::MissingSessionGcPolicy);
+    };
+    if !confirm {
+        return Err(SlashError::MissingSessionGcConfirmation);
+    }
+    if retain_newest == 0 && older_than_seconds == 0 {
+        return Err(SlashError::MissingSessionGcPolicy);
+    }
+    Ok(SessionAction::Gc {
+        policy: SessionGcPolicy {
+            retain_newest,
+            older_than_seconds,
+            confirm,
+        },
+    })
 }
 
 fn required_session_path(args: &[String], action: &'static str) -> Result<String, SlashError> {
@@ -1326,5 +1434,39 @@ mod tests {
             parse("/pane nope").unwrap_err(),
             SlashError::UnknownPane(_)
         ));
+    }
+
+    #[test]
+    fn session_gc_requires_explicit_bounded_policy_and_confirmation() {
+        let command = parse("/session gc --older-than-seconds=3600 --retain-newest 3 --yes")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            command,
+            SlashCommand::Session {
+                action: SessionAction::Gc {
+                    policy: SessionGcPolicy {
+                        retain_newest: 3,
+                        older_than_seconds: 3600,
+                        confirm: true,
+                    },
+                },
+            }
+        );
+        assert!(matches!(
+            parse("/session gc").unwrap_err(),
+            SlashError::MissingSessionGcPolicy
+        ));
+        assert!(matches!(
+            parse("/session gc --retain-newest 1 --older-than-seconds 1").unwrap_err(),
+            SlashError::MissingSessionGcConfirmation
+        ));
+        assert!(matches!(
+            parse("/session gc --retain-newest 999999 --older-than-seconds 1 --yes").unwrap_err(),
+            SlashError::InvalidSessionGcValue {
+                flag: "--retain-newest"
+            }
+        ));
+        assert!(parse("/session gc --retain-newest 0 --older-than-seconds 0 --yes").is_err());
     }
 }

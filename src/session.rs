@@ -929,6 +929,21 @@ pub struct GarbageCollectionPolicy {
     pub older_than_ms: u64,
 }
 
+/// Upper bound for one GC directory scan. Refusing a larger directory is
+/// safer than retaining an unbounded candidate list or partially deleting it.
+pub const MAX_GC_CANDIDATES: usize = 4_096;
+/// Keep owner receipts small enough for both the TUI transcript and JSONL
+/// replay cache. The collector refuses to delete more than this many files in
+/// one invocation so every deletion can be reported exactly.
+pub const MAX_GC_REMOVALS: usize = 128;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GarbageCollectionReport {
+    pub removed: Vec<PathBuf>,
+    pub inspected: usize,
+    pub skipped_unowned: usize,
+}
+
 pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>, SessionError> {
     let directory = directory.as_ref();
     let metadata = match fs::symlink_metadata(directory) {
@@ -1061,6 +1076,25 @@ pub fn garbage_collect_sessions(
     policy: GarbageCollectionPolicy,
     now_ms: u64,
 ) -> Result<Vec<PathBuf>, SessionError> {
+    let active = SessionStore::default_path();
+    garbage_collect_sessions_with_active(directory, policy, Some(&active), now_ms)
+        .map(|report| report.removed)
+}
+
+/// Garbage collect only clean, zenpi-owned session journals.
+///
+/// `active_session` is checked by path and (where available) file identity;
+/// an active journal is never removed. The scan is fail-closed for symlinks,
+/// unexpected file types, candidate-count overflow, and a removal set larger
+/// than the bounded receipt can describe. Domain snapshots are skipped rather
+/// than treated as sessions. No source is opened writable and no parent path
+/// is followed through a final symlink.
+pub fn garbage_collect_sessions_with_active(
+    directory: impl AsRef<Path>,
+    policy: GarbageCollectionPolicy,
+    active_session: Option<&Path>,
+    now_ms: u64,
+) -> Result<GarbageCollectionReport, SessionError> {
     if policy.retain_newest == 0 && policy.older_than_ms == 0 {
         return Err(SessionError::InvalidRecord(
             "garbage collection requires an explicit retention policy".into(),
@@ -1069,7 +1103,13 @@ pub fn garbage_collect_sessions(
     let directory = directory.as_ref();
     let directory_metadata = match fs::symlink_metadata(directory) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(GarbageCollectionReport {
+                removed: Vec::new(),
+                inspected: 0,
+                skipped_unowned: 0,
+            });
+        }
         Err(error) => return Err(error.into()),
     };
     if directory_metadata.file_type().is_symlink() {
@@ -1079,8 +1119,16 @@ pub fn garbage_collect_sessions(
         return Err(SessionError::Directory(directory.to_owned()));
     }
     let mut candidates = Vec::new();
+    let mut skipped_unowned = 0_usize;
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();
+        // Inspect every directory entry before filtering by suffix. A
+        // symlink with a non-JSONL name is still an alias in the managed
+        // directory and must fail closed rather than being silently ignored.
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.file_type().is_symlink() {
+            return Err(SessionError::Symlink(path));
+        }
         // Domain snapshots use JSONL too, but are not sessions. Never let a
         // retention command remove the store that owns Blueprint/Goal/Learn
         // records.
@@ -1092,13 +1140,22 @@ pub fn garbage_collect_sessions(
         }
         // Fail closed for aliases and unexpected node types. In particular,
         // do not follow a symlink while selecting an item for deletion.
-        let metadata = fs::symlink_metadata(&path)?;
-        if metadata.file_type().is_symlink() {
-            return Err(SessionError::Symlink(path));
-        }
         if !metadata.is_file() {
             return Err(SessionError::InvalidRecord(
                 "garbage collection candidate is not a regular file".into(),
+            ));
+        }
+        // A `.jsonl` suffix is not ownership proof. Only a clean journal with
+        // a valid session header may be selected; malformed or unrelated
+        // files remain untouched and are counted in the bounded receipt.
+        let owned = clean_owned_session(&path)?;
+        if !owned {
+            skipped_unowned = skipped_unowned.saturating_add(1);
+            continue;
+        }
+        if active_session.is_some_and(|active| same_file_or_path(&path, active)) {
+            return Err(SessionError::InvalidRecord(
+                "garbage collection cannot remove the active session".into(),
             ));
         }
         let modified = metadata
@@ -1110,15 +1167,77 @@ pub fn garbage_collect_sessions(
                 )
             })?;
         candidates.push((path, modified.as_millis().min(u128::from(u64::MAX)) as u64));
+        if candidates.len() > MAX_GC_CANDIDATES {
+            return Err(SessionError::InvalidRecord(format!(
+                "garbage collection candidate limit exceeded ({MAX_GC_CANDIDATES})"
+            )));
+        }
     }
     candidates.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
-    let mut removed = Vec::new();
-    for (index, (path, modified)) in candidates.into_iter().enumerate() {
-        if index < policy.retain_newest || now_ms.saturating_sub(modified) < policy.older_than_ms {
+    let mut selected = Vec::new();
+    for (index, (path, modified)) in candidates.iter().enumerate() {
+        if index < policy.retain_newest || now_ms.saturating_sub(*modified) < policy.older_than_ms {
             continue;
         }
-        fs::remove_file(&path)?;
-        removed.push(path);
+        selected.push(path.clone());
     }
-    Ok(removed)
+    if selected.len() > MAX_GC_REMOVALS {
+        return Err(SessionError::InvalidRecord(format!(
+            "garbage collection removal limit exceeded ({MAX_GC_REMOVALS})"
+        )));
+    }
+    // Recheck every selected path immediately before mutation. This closes
+    // the common replacement race where a valid journal is swapped for a
+    // symlink or unrelated JSONL file after the initial directory scan.
+    for path in &selected {
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink() {
+            return Err(SessionError::Symlink(path.clone()));
+        }
+        if !metadata.is_file() || !clean_owned_session(path)? {
+            return Err(SessionError::InvalidRecord(
+                "garbage collection candidate changed before removal".into(),
+            ));
+        }
+        if active_session.is_some_and(|active| same_file_or_path(path, active)) {
+            return Err(SessionError::InvalidRecord(
+                "garbage collection cannot remove the active session".into(),
+            ));
+        }
+    }
+    for path in selected.iter() {
+        fs::remove_file(path)?;
+    }
+    Ok(GarbageCollectionReport {
+        removed: selected,
+        inspected: candidates.len(),
+        skipped_unowned,
+    })
+}
+
+fn same_file_or_path(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Ok(left), Ok(right)) = (fs::metadata(left), fs::metadata(right))
+            && left.dev() == right.dev()
+            && left.ino() == right.ino()
+        {
+            return true;
+        }
+    }
+    left.canonicalize().ok() == right.canonicalize().ok()
+}
+
+fn clean_owned_session(path: &Path) -> Result<bool, SessionError> {
+    match SessionStore::open_existing(path) {
+        Ok(store) => Ok(store.records().first().is_some_and(|record| {
+            record.kind == "session" && record.sequence == 0 && store.recovery_warnings().is_empty()
+        })),
+        Err(SessionError::Symlink(path)) => Err(SessionError::Symlink(path)),
+        Err(_) => Ok(false),
+    }
 }
