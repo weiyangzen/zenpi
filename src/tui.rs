@@ -31,7 +31,9 @@ use ratatui::{Frame, Terminal};
 use thiserror::Error;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::layout::{Breakpoint, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility};
+use crate::layout::{
+    Breakpoint, FocusDirection, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility,
+};
 use crate::slash::{self, BlueprintAction, InputRoute, SlashCommand};
 
 /// Bound retained transcript memory even when a provider streams forever.
@@ -240,6 +242,74 @@ impl TuiState {
     /// ratios/capabilities without coupling themselves to Ratatui rectangles.
     pub fn workspace_layout(&self) -> &LayoutModel {
         &self.workspace_layout
+    }
+
+    /// Return the currently focused BentoBox pane.
+    pub fn focused_workspace_pane(&self) -> Option<PaneId> {
+        self.workspace_layout.focused_pane()
+    }
+
+    /// Move focus to the next pane in the active workspace.  Before the first
+    /// frame is drawn there is no measured viewport, so use the wide preset as
+    /// a conservative default; a subsequent resize/render applies the real
+    /// breakpoint without losing the selected pane.
+    pub fn focus_next_workspace_pane(&mut self) -> Option<PaneId> {
+        let (width, height) = self.workspace_viewport();
+        let focused = self.workspace_layout.focus_next(width, height);
+        if focused.is_some() {
+            self.dirty = true;
+        }
+        focused
+    }
+
+    /// Move focus to the previous pane in the active workspace.
+    pub fn focus_previous_workspace_pane(&mut self) -> Option<PaneId> {
+        let (width, height) = self.workspace_viewport();
+        let focused = self.workspace_layout.focus_previous(width, height);
+        if focused.is_some() {
+            self.dirty = true;
+        }
+        focused
+    }
+
+    /// Move focus geometrically in the active workspace.
+    pub fn focus_workspace_direction(&mut self, direction: FocusDirection) -> Option<PaneId> {
+        let (width, height) = self.workspace_viewport();
+        let focused = self
+            .workspace_layout
+            .focus_direction(direction, width, height);
+        if focused.is_some() {
+            self.dirty = true;
+        }
+        focused
+    }
+
+    /// Nudge the focused column split by one bounded keyboard step.
+    pub fn adjust_workspace_split(&mut self, direction: FocusDirection) -> bool {
+        let (width, height) = self.workspace_viewport();
+        let changed = self
+            .workspace_layout
+            .adjust_focused_split(direction, width, height);
+        if changed {
+            self.dirty = true;
+        }
+        changed
+    }
+
+    /// Reset ratios, collapsed panes, and focus to the active tab preset.
+    pub fn reset_workspace_layout(&mut self) {
+        self.workspace_layout.reset_layout();
+        self.dirty = true;
+    }
+
+    fn workspace_viewport(&self) -> (u16, u16) {
+        if self.last_area.width == 0 && self.last_area.height == 0 {
+            // A wide fallback keeps all required panes keyboard reachable
+            // before the first draw.  It is never used after a real frame.
+            (160, 40)
+        } else {
+            (self.last_area.width, self.last_area.height)
+        }
     }
 
     /// Select a workspace tab and invalidate the next frame.  Conversation
@@ -605,6 +675,31 @@ impl TuiState {
                     self.toggle_tool_logs();
                     return TuiAction::Redraw;
                 }
+                // Workspace controls are kept on modified keys so ordinary
+                // arrow navigation remains dedicated to multiline prompt
+                // editing. Ctrl-Arrow moves pane focus; Ctrl-Shift-Arrow
+                // adjusts the selected split by one bounded step.
+                KeyCode::Left | KeyCode::Right | KeyCode::Up | KeyCode::Down
+                    if self.input.is_empty() =>
+                {
+                    let direction = match key.code {
+                        KeyCode::Left => FocusDirection::Left,
+                        KeyCode::Right => FocusDirection::Right,
+                        KeyCode::Up => FocusDirection::Up,
+                        KeyCode::Down => FocusDirection::Down,
+                        _ => unreachable!(),
+                    };
+                    if modifiers.contains(KeyModifiers::SHIFT) && direction.is_horizontal() {
+                        self.adjust_workspace_split(direction);
+                    } else {
+                        self.focus_workspace_direction(direction);
+                    }
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('0') if self.input.is_empty() => {
+                    self.reset_workspace_layout();
+                    return TuiAction::Redraw;
+                }
                 // Workspace tabs are intentionally keyboard-only for now so
                 // the existing prompt workflow remains unchanged.  The tab
                 // bar mirrors these stable numbers in the BentoBox view.
@@ -626,6 +721,16 @@ impl TuiState {
             }
         }
         match key.code {
+            // With an empty prompt, Tab cycles BentoBox focus; while typing
+            // it remains available to the terminal's normal input handling.
+            KeyCode::Tab if self.input.is_empty() => {
+                if modifiers.contains(KeyModifiers::SHIFT) {
+                    self.focus_previous_workspace_pane();
+                } else {
+                    self.focus_next_workspace_pane();
+                }
+                return TuiAction::Redraw;
+            }
             KeyCode::Char(character) if !modifiers.contains(KeyModifiers::ALT) => {
                 self.insert_text(&character.to_string())
             }
@@ -1020,6 +1125,12 @@ impl TuiState {
         let area = frame.area();
         if area.width == 0 || area.height == 0 {
             return;
+        }
+        if area != self.last_area {
+            self.last_area = area;
+            self.cached_transcript = None;
+            self.scroll = 0;
+            self.input_scroll = 0;
         }
         let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
         let prompt_lines = wrap_plain(&self.input, prompt_width).len();
@@ -1906,18 +2017,46 @@ pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiErro
 
 struct TuiRequest {
     text: String,
-    provider_events: Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
+    provider_events: Arc<Mutex<TuiProviderEventBuffer>>,
 }
 
 impl TuiRequest {
-    fn new(text: String) -> (Self, Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>) {
-        let provider_events = Arc::new(Mutex::new(VecDeque::new()));
+    fn new(text: String) -> (Self, Arc<Mutex<TuiProviderEventBuffer>>) {
+        let provider_events = Arc::new(Mutex::new(TuiProviderEventBuffer::default()));
         (
             Self {
                 text,
                 provider_events: Arc::clone(&provider_events),
             },
             provider_events,
+        )
+    }
+}
+
+/// Provider deltas are produced on the worker thread while the terminal loop
+/// may be busy rendering or waiting for input. Keep that mailbox bounded, but
+/// retain a loss counter so backpressure never turns into a silent transcript
+/// gap. The counter is drained together with the queue under one lock, which
+/// gives the host a consistent snapshot for each warning it renders.
+#[derive(Debug, Default)]
+struct TuiProviderEventBuffer {
+    events: VecDeque<crate::backend::ProviderEvent>,
+    dropped: u64,
+}
+
+impl TuiProviderEventBuffer {
+    fn push(&mut self, event: crate::backend::ProviderEvent, limit: usize) {
+        if self.events.len() < limit.max(1) {
+            self.events.push_back(event);
+        } else {
+            self.dropped = self.dropped.saturating_add(1);
+        }
+    }
+
+    fn take(&mut self) -> (VecDeque<crate::backend::ProviderEvent>, u64) {
+        (
+            std::mem::take(&mut self.events),
+            std::mem::take(&mut self.dropped),
         )
     }
 }
@@ -1951,10 +2090,8 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                 crate::core::TurnInputRequest::new(request.text),
                 || token.is_cancelled(),
                 &mut |event| {
-                    if let Ok(mut pending) = request.provider_events.lock()
-                        && pending.len() < MAX_PROVIDER_EVENTS
-                    {
-                        pending.push_back(event);
+                    if let Ok(mut pending) = request.provider_events.lock() {
+                        pending.push(event, MAX_PROVIDER_EVENTS);
                     }
                     Ok(())
                 },
@@ -2007,10 +2144,8 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     let mut resize_pending = false;
     let mut last_tick = Instant::now();
     let mut active_job = None;
-    let mut stream_buffers: HashMap<
-        crate::runtime::JobId,
-        Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
-    > = HashMap::new();
+    let mut stream_buffers: HashMap<crate::runtime::JobId, Arc<Mutex<TuiProviderEventBuffer>>> =
+        HashMap::new();
     let mut pending_approvals = VecDeque::new();
     let loop_result = (|| -> Result<(), crate::error::ZenpiError> {
         'outer: loop {
@@ -2557,13 +2692,14 @@ fn apply_agent_tool_event(state: &mut TuiState, event: crate::core::AgentEvent) 
 fn drain_tui_provider_events(
     state: &mut TuiState,
     job_id: u64,
-    events: &Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
+    events: &Arc<Mutex<TuiProviderEventBuffer>>,
 ) -> bool {
     let Ok(mut events) = events.lock() else {
         return false;
     };
+    let (events, dropped) = events.take();
     let mut changed = false;
-    for event in events.drain(..) {
+    for event in events {
         changed = true;
         match event {
             crate::backend::ProviderEvent::TextDelta { delta } => {
@@ -2587,6 +2723,20 @@ fn drain_tui_provider_events(
             }
             _ => {}
         }
+    }
+    if dropped > 0 {
+        // A bounded mailbox may have to discard deltas when a terminal is
+        // slower than the provider. Never hide that loss from the operator;
+        // the final ProcessResult remains authoritative for the answer, while
+        // this transcript entry explains why live rendering may be incomplete.
+        state.push_message(
+            MessageRole::Error,
+            format!(
+                "Provider stream truncated: {dropped} event(s) dropped; final response remains authoritative"
+            ),
+        );
+        state.set_status("Provider stream truncated");
+        changed = true;
     }
     changed
 }
@@ -2857,4 +3007,58 @@ fn cursor_position(text: &str, cursor: usize, width: usize) -> (u16, u16) {
         u16::try_from(x).unwrap_or(u16::MAX),
         u16::try_from(y).unwrap_or(u16::MAX),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_stream_overflow_is_visible_in_transcript() {
+        let events = Arc::new(Mutex::new(TuiProviderEventBuffer::default()));
+        {
+            let mut pending = events.lock().expect("provider event buffer lock");
+            pending.push(
+                crate::backend::ProviderEvent::TextDelta {
+                    delta: "kept".into(),
+                },
+                1,
+            );
+            pending.push(
+                crate::backend::ProviderEvent::TextDelta {
+                    delta: "dropped".into(),
+                },
+                1,
+            );
+        }
+
+        let mut state = TuiState::default();
+        state.begin_stream_for_job(7);
+        assert!(drain_tui_provider_events(&mut state, 7, &events));
+
+        let messages = state
+            .messages()
+            .map(|message| (message.role, message.text.clone()))
+            .collect::<Vec<_>>();
+        assert!(messages.contains(&(MessageRole::Assistant, "kept".into())));
+        assert!(messages.iter().any(|(role, text)| {
+            *role == MessageRole::Error && text.contains("Provider stream truncated: 1")
+        }));
+        assert_eq!(state.status(), "Provider stream truncated");
+
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 8))
+            .expect("test terminal");
+        terminal
+            .draw(|frame| state.render(frame, "zenpi"))
+            .expect("render overflow warning");
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(rendered.contains("Provider stream truncated: 1"));
+        assert!(!drain_tui_provider_events(&mut state, 7, &events));
+    }
 }

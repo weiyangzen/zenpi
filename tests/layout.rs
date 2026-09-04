@@ -1,5 +1,6 @@
 use zenpi::layout::{
-    Breakpoint, LayoutModel, LayoutPreset, PaneCapabilities, PaneId, TabId, Visibility,
+    Breakpoint, Column, ColumnRatios, FocusDirection, LayoutModel, LayoutPreset, PaneCapabilities,
+    PaneId, TabId, Visibility,
 };
 
 #[test]
@@ -149,4 +150,128 @@ fn fully_collapsed_state_is_safe_at_a_normal_viewport() {
     let snapshot = model.compute(120, 30);
     assert!(snapshot.visible_panes().next().is_none());
     assert!(snapshot.visible_rects_non_overlapping());
+}
+
+#[test]
+fn pane_focus_cycles_in_preset_order_and_skips_collapsed_or_unavailable_panes() {
+    let mut model = LayoutModel::new(TabId::Project).with_capabilities(PaneCapabilities {
+        browser: true,
+        terminal: true,
+    });
+    let viewport = (200, 40);
+    assert_eq!(
+        model.focusable_panes(viewport.0, viewport.1),
+        vec![
+            PaneId::ProjectConversation,
+            PaneId::Resources,
+            PaneId::GoalConversation,
+            PaneId::Gantt,
+            PaneId::Browser,
+            PaneId::Terminal,
+        ]
+    );
+    assert_eq!(
+        model.focus_next(viewport.0, viewport.1),
+        Some(PaneId::ProjectConversation)
+    );
+    assert_eq!(
+        model.focus_next(viewport.0, viewport.1),
+        Some(PaneId::Resources)
+    );
+    assert_eq!(
+        model.focus_previous(viewport.0, viewport.1),
+        Some(PaneId::ProjectConversation)
+    );
+
+    model.set_collapsed(PaneId::Resources, true);
+    assert_eq!(
+        model.focus_next(viewport.0, viewport.1),
+        Some(PaneId::GoalConversation)
+    );
+    model.set_capabilities(PaneCapabilities::default());
+    assert!(
+        !model
+            .focusable_panes(viewport.0, viewport.1)
+            .contains(&PaneId::Browser)
+    );
+    assert!(
+        !model
+            .focusable_panes(viewport.0, viewport.1)
+            .contains(&PaneId::Terminal)
+    );
+}
+
+#[test]
+fn directional_focus_prefers_same_row_or_column_before_falling_back() {
+    let mut model = LayoutModel::new(TabId::Project).with_capabilities(PaneCapabilities {
+        browser: true,
+        terminal: true,
+    });
+    model.set_focused(Some(PaneId::ProjectConversation));
+    assert_eq!(
+        model.focus_direction(FocusDirection::Down, 200, 40),
+        Some(PaneId::Resources)
+    );
+    assert_eq!(
+        model.focus_direction(FocusDirection::Right, 200, 40),
+        Some(PaneId::Gantt)
+    );
+    assert_eq!(
+        model.focus_direction(FocusDirection::Left, 200, 40),
+        Some(PaneId::Resources)
+    );
+    assert_eq!(
+        model.focus_direction(FocusDirection::Up, 200, 40),
+        Some(PaneId::ProjectConversation)
+    );
+
+    // At a narrow width only the focused rectangle is rendered, but keyboard
+    // navigation still cycles through the bounded single-pane stack.
+    model.set_focused(Some(PaneId::ProjectConversation));
+    assert_eq!(
+        model.focus_direction(FocusDirection::Down, 60, 20),
+        Some(PaneId::Resources)
+    );
+}
+
+fn ratio_sum(ratios: ColumnRatios) -> u16 {
+    ratios.left + ratios.center + ratios.right
+}
+
+#[test]
+fn interactive_ratio_adjustment_preserves_bounded_total_and_reset_restores_preset() {
+    let mut model = LayoutModel::new(TabId::Project);
+    model.set_ratios(ColumnRatios::new(0, 98, 1));
+    let bounded = model.ratios.bounded();
+    assert_eq!(ratio_sum(bounded), ColumnRatios::TOTAL);
+    assert!(
+        [bounded.left, bounded.center, bounded.right]
+            .into_iter()
+            .all(|value| (ColumnRatios::MIN..=ColumnRatios::MAX).contains(&value))
+    );
+
+    model.set_ratios(ColumnRatios::new(30, 45, 25));
+    model.set_focused(Some(PaneId::ProjectConversation));
+    assert!(model.adjust_ratio(Column::Left, 100));
+    assert_eq!(ratio_sum(model.ratios), ColumnRatios::TOTAL);
+    assert_eq!(model.ratios.left, ColumnRatios::MAX);
+    assert!(!model.adjust_ratio(Column::Left, 100));
+
+    model.set_collapsed(PaneId::Resources, true);
+    model.reset_layout();
+    assert_eq!(model.ratios, LayoutPreset::project().ratios);
+    assert!(model.collapsed.is_empty());
+    assert_eq!(model.focused_pane(), None);
+}
+
+#[test]
+fn focused_split_adjustment_uses_horizontal_arrows_only() {
+    let mut model = LayoutModel::new(TabId::Project);
+    model.set_focused(Some(PaneId::ProjectConversation));
+    let before = model.ratios;
+    assert!(!model.adjust_focused_split(FocusDirection::Down, 200, 40));
+    assert_eq!(model.ratios, before);
+    assert!(model.adjust_focused_split(FocusDirection::Right, 200, 40));
+    assert_eq!(model.ratios.left, 35);
+    assert_eq!(ratio_sum(model.ratios), ColumnRatios::TOTAL);
 }

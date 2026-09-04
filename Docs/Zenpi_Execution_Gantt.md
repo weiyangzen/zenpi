@@ -8,7 +8,7 @@
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-04T11:52:14Z
+generated_at: 2026-09-04T17:04:50Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
 source_sha256: 44e8d80a67d9d4675862a125959bd95d5b418e0b345038c917f431b1cb049c71
 spec_path: Docs/Zenpi_Execution_Spec.md

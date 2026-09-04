@@ -80,6 +80,58 @@ fn ctrl_number_switches_workspace_tab_without_submitting_prompt() {
 }
 
 #[test]
+fn workspace_keyboard_controls_focus_and_split_without_touching_prompt() {
+    let mut state = TuiState::default();
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::Redraw
+    );
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::CONTROL)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
+
+    // Ctrl-Shift-Right changes a bounded split only; no prompt text is
+    // consumed while the workspace is being adjusted.
+    let before = state.workspace_layout().ratios;
+    assert_eq!(
+        state.handle_key(KeyEvent::new(
+            KeyCode::Right,
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        )),
+        TuiAction::Redraw
+    );
+    assert_ne!(state.workspace_layout().ratios, before);
+    assert!(state.input().is_empty());
+
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Char('0'), KeyModifiers::CONTROL)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.focused_workspace_pane(), None);
+    assert_eq!(
+        state.workspace_layout().ratios,
+        LayoutModel::new(TabId::Project).ratios
+    );
+
+    // With prompt text present, arrows retain their editing semantics.
+    state.set_input("draft");
+    state.handle_key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "draft");
+    assert_eq!(state.focused_workspace_pane(), None);
+}
+
+#[test]
 fn production_workspace_is_resize_safe_at_tiny_viewports() {
     let mut terminal = Terminal::new(TestBackend::new(4, 3)).unwrap();
     let mut state = TuiState::default();

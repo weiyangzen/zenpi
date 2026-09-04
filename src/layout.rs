@@ -240,6 +240,29 @@ impl Column {
     }
 }
 
+/// Direction used by keyboard navigation and split adjustment.
+///
+/// This lives in the terminal-independent layout module so a future headless
+/// or GUI host can apply the same focus policy without importing crossterm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FocusDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl FocusDirection {
+    pub const fn is_horizontal(self) -> bool {
+        matches!(self, Self::Left | Self::Right)
+    }
+
+    pub const fn is_forward(self) -> bool {
+        matches!(self, Self::Right | Self::Down)
+    }
+}
+
 /// Relative width weights for the left/center/right columns.  The values are
 /// weights rather than percentages; callers may use any positive values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -266,6 +289,126 @@ impl ColumnRatios {
             center,
             right,
         }
+    }
+
+    /// The target sum used by interactive split editing.  Presets are
+    /// expressed as percentages (30/45/25), while layout computation still
+    /// accepts arbitrary positive weights for compatibility with callers that
+    /// build their own presets.
+    pub const TOTAL: u16 = 100;
+    /// Keep every column useful while a user repeatedly nudges a split.
+    pub const MIN: u16 = 5;
+    /// Keep one column from swallowing the entire workspace.
+    pub const MAX: u16 = 90;
+    /// One keyboard step in percentage points.
+    pub const STEP: i16 = 5;
+
+    pub const fn get(self, column: Column) -> u16 {
+        match column {
+            Column::Left => self.left,
+            Column::Center => self.center,
+            Column::Right => self.right,
+        }
+    }
+
+    pub fn set(&mut self, column: Column, value: u16) {
+        match column {
+            Column::Left => self.left = value,
+            Column::Center => self.center = value,
+            Column::Right => self.right = value,
+        }
+    }
+
+    /// Return a deterministic percentage representation suitable for editing.
+    ///
+    /// `set_ratios` intentionally remains a low-level escape hatch and accepts
+    /// arbitrary weights.  Interactive controls call this method first so a
+    /// malformed/legacy value cannot produce a zero or overflowing split.
+    pub fn bounded(self) -> Self {
+        let weights = vec![self.left.max(1), self.center.max(1), self.right.max(1)];
+        let mut values = weighted_partition(u32::from(Self::TOTAL), weights)
+            .into_iter()
+            .map(|value| value.clamp(Self::MIN, Self::MAX))
+            .collect::<Vec<_>>();
+
+        // Clamping can change the sum.  Repair it with deterministic one-cell
+        // transfers while respecting both floors; 3 * MIN <= TOTAL <= 2 * MAX
+        // makes a solution possible for the constants above.
+        let mut sum = values.iter().map(|value| u32::from(*value)).sum::<u32>();
+        while sum < u32::from(Self::TOTAL) {
+            if let Some(index) = values.iter().position(|value| *value < Self::MAX) {
+                values[index] = values[index].saturating_add(1);
+                sum += 1;
+            } else {
+                break;
+            }
+        }
+        while sum > u32::from(Self::TOTAL) {
+            if let Some(index) = values.iter().position(|value| *value > Self::MIN) {
+                values[index] = values[index].saturating_sub(1);
+                sum = sum.saturating_sub(1);
+            } else {
+                break;
+            }
+        }
+        Self::new(values[0], values[1], values[2])
+    }
+
+    /// Nudge one column while preserving the 100-point total and bounded
+    /// floors/ceilings.  Positive deltas grow the selected column; negative
+    /// deltas shrink it.  The nearest neighbouring column supplies/receives
+    /// the transferred weight before the remaining column is used.
+    pub fn adjust_column(self, column: Column, delta: i16) -> Self {
+        if delta == 0 {
+            return self;
+        }
+        let mut values = self.bounded();
+        let old = values.get(column);
+        let desired = (i32::from(old) + i32::from(delta))
+            .clamp(i32::from(Self::MIN), i32::from(Self::MAX)) as u16;
+        let requested = i32::from(desired) - i32::from(old);
+        if requested == 0 {
+            return values;
+        }
+
+        let donors = match column {
+            Column::Left => [Column::Center, Column::Right],
+            Column::Center => [Column::Left, Column::Right],
+            Column::Right => [Column::Center, Column::Left],
+        };
+        if requested > 0 {
+            let mut remaining = requested as u16;
+            for donor in donors {
+                let available = values.get(donor).saturating_sub(Self::MIN);
+                let transfer = available.min(remaining);
+                if transfer > 0 {
+                    values.set(donor, values.get(donor).saturating_sub(transfer));
+                    remaining -= transfer;
+                }
+                if remaining == 0 {
+                    break;
+                }
+            }
+            let transferred = requested as u16 - remaining;
+            values.set(column, old.saturating_add(transferred));
+        } else {
+            let requested_abs = requested.unsigned_abs().min(u32::from(u16::MAX)) as u16;
+            let mut remaining = requested_abs;
+            for donor in donors {
+                let available = Self::MAX.saturating_sub(values.get(donor));
+                let transfer = available.min(remaining);
+                if transfer > 0 {
+                    values.set(donor, values.get(donor).saturating_add(transfer));
+                    remaining -= transfer;
+                }
+                if remaining == 0 {
+                    break;
+                }
+            }
+            let transferred = requested_abs - remaining;
+            values.set(column, old.saturating_sub(transferred));
+        }
+        values
     }
 }
 
@@ -482,6 +625,205 @@ impl LayoutModel {
 
     pub fn set_focused(&mut self, pane: Option<PaneId>) {
         self.focused = pane;
+    }
+
+    /// Return the currently selected pane, if one has been selected.
+    pub const fn focused_pane(&self) -> Option<PaneId> {
+        self.focused
+    }
+
+    /// Return panes that can receive focus at a given viewport.
+    ///
+    /// At a narrow width the geometry intentionally exposes only one pane, but
+    /// all available, non-collapsed panes remain candidates so a user can use
+    /// the keyboard to move through the single-pane stack.  At wider widths,
+    /// breakpoint-collapsed and unavailable panes are omitted.
+    pub fn focusable_panes(&self, width: u16, height: u16) -> Vec<PaneId> {
+        let viewport = Viewport::new(width, height);
+        let snapshot = self.compute_viewport(viewport);
+        let narrow = matches!(snapshot.breakpoint, Breakpoint::Narrow);
+        self.preset()
+            .panes
+            .iter()
+            .filter_map(|spec| {
+                if !self.is_available(*spec) || self.collapsed.contains(&spec.id) {
+                    return None;
+                }
+                if narrow {
+                    Some(spec.id)
+                } else {
+                    snapshot
+                        .pane(spec.id)
+                        .filter(|pane| pane.visibility == Visibility::Visible)
+                        .map(|_| spec.id)
+                }
+            })
+            .collect()
+    }
+
+    /// Cycle focus in preset order, wrapping at either end.
+    pub fn focus_next(&mut self, width: u16, height: u16) -> Option<PaneId> {
+        self.focus_cycle(width, height, true)
+    }
+
+    /// Cycle focus backwards in preset order, wrapping at either end.
+    pub fn focus_previous(&mut self, width: u16, height: u16) -> Option<PaneId> {
+        self.focus_cycle(width, height, false)
+    }
+
+    /// Move focus toward the nearest pane in a direction.  If there is no pane
+    /// in that direction (or the viewport is narrow and has only one visible
+    /// rectangle), fall back to a deterministic forward/backward cycle rather
+    /// than trapping keyboard focus.
+    pub fn focus_direction(
+        &mut self,
+        direction: FocusDirection,
+        width: u16,
+        height: u16,
+    ) -> Option<PaneId> {
+        let candidates = self.focusable_panes(width, height);
+        if candidates.is_empty() {
+            return None;
+        }
+        let snapshot = self.compute(width, height);
+        let current = self.focused.filter(|pane| candidates.contains(pane));
+        let Some(current) = current else {
+            self.focused = candidates.first().copied();
+            return self.focused;
+        };
+        let current_rect = snapshot.pane(current).map(|pane| pane.rect);
+        let mut nearest: Option<((u8, u32, u32), PaneId)> = None;
+        if let Some(current_rect) = current_rect.filter(|rect| !rect.is_empty()) {
+            let current_x = i32::from(current_rect.x) + i32::from(current_rect.width) / 2;
+            let current_y = i32::from(current_rect.y) + i32::from(current_rect.height) / 2;
+            for candidate in &candidates {
+                if *candidate == current {
+                    continue;
+                }
+                let Some(rect) = snapshot.pane(*candidate).map(|pane| pane.rect) else {
+                    continue;
+                };
+                if rect.is_empty() {
+                    continue;
+                }
+                let candidate_x = i32::from(rect.x) + i32::from(rect.width) / 2;
+                let candidate_y = i32::from(rect.y) + i32::from(rect.height) / 2;
+                let (primary, secondary) = match direction {
+                    FocusDirection::Left if candidate_x < current_x => (
+                        current_x - candidate_x,
+                        (candidate_y - current_y).unsigned_abs(),
+                    ),
+                    FocusDirection::Right if candidate_x > current_x => (
+                        candidate_x - current_x,
+                        (candidate_y - current_y).unsigned_abs(),
+                    ),
+                    FocusDirection::Up if candidate_y < current_y => (
+                        current_y - candidate_y,
+                        (candidate_x - current_x).unsigned_abs(),
+                    ),
+                    FocusDirection::Down if candidate_y > current_y => (
+                        candidate_y - current_y,
+                        (candidate_x - current_x).unsigned_abs(),
+                    ),
+                    _ => continue,
+                };
+                // Prefer a pane that overlaps the current pane on the
+                // perpendicular axis (for example, Down should stay in the
+                // same column).  Primary distance then dominates, while the
+                // secondary distance keeps ties deterministic.
+                let axis_overlap = if direction.is_horizontal() {
+                    current_rect.y < rect.bottom() && rect.y < current_rect.bottom()
+                } else {
+                    current_rect.x < rect.right() && rect.x < current_rect.right()
+                };
+                let score = (
+                    u8::from(!axis_overlap),
+                    u32::try_from(primary).unwrap_or(u32::MAX),
+                    secondary,
+                );
+                if nearest.is_none_or(|(best, _)| score < best) {
+                    nearest = Some((score, *candidate));
+                }
+            }
+        }
+        if let Some((_, pane)) = nearest {
+            self.focused = Some(pane);
+            return self.focused;
+        }
+        self.focus_cycle(width, height, direction.is_forward())
+    }
+
+    fn focus_cycle(&mut self, width: u16, height: u16, forward: bool) -> Option<PaneId> {
+        let candidates = self.focusable_panes(width, height);
+        if candidates.is_empty() {
+            return None;
+        }
+        let next = match self
+            .focused
+            .and_then(|pane| candidates.iter().position(|id| *id == pane))
+        {
+            Some(index) if forward => (index + 1) % candidates.len(),
+            Some(index) => (index + candidates.len() - 1) % candidates.len(),
+            None if forward => 0,
+            None => candidates.len() - 1,
+        };
+        self.focused = candidates.get(next).copied();
+        self.focused
+    }
+
+    /// Adjust one column by a signed percentage-point delta while preserving
+    /// a bounded, 100-point ratio total.
+    pub fn adjust_ratio(&mut self, column: Column, delta: i16) -> bool {
+        let adjusted = self.ratios.adjust_column(column, delta);
+        if adjusted == self.ratios {
+            false
+        } else {
+            self.ratios = adjusted;
+            true
+        }
+    }
+
+    /// Adjust the split associated with the focused pane.  Horizontal arrows
+    /// nudge its column; vertical arrows are navigation-only and therefore do
+    /// not mutate ratios.
+    pub fn adjust_focused_split(
+        &mut self,
+        direction: FocusDirection,
+        width: u16,
+        height: u16,
+    ) -> bool {
+        if !direction.is_horizontal() {
+            return false;
+        }
+        let pane = self
+            .focused
+            .filter(|pane| self.focusable_panes(width, height).contains(pane));
+        let pane = pane.or_else(|| self.focusable_panes(width, height).first().copied());
+        let Some(pane) = pane else {
+            return false;
+        };
+        let Some(spec) = self.preset().panes.into_iter().find(|spec| spec.id == pane) else {
+            return false;
+        };
+        self.focused = Some(pane);
+        let delta = if direction == FocusDirection::Right {
+            ColumnRatios::STEP
+        } else {
+            -ColumnRatios::STEP
+        };
+        self.adjust_ratio(spec.column, delta)
+    }
+
+    /// Restore the active tab's preset ratios and clear user pane state.
+    pub fn reset_layout(&mut self) {
+        self.ratios = self.preset().ratios;
+        self.collapsed.clear();
+        self.focused = None;
+    }
+
+    /// Short alias useful to hosts implementing a reset key or command.
+    pub fn reset(&mut self) {
+        self.reset_layout();
     }
 
     pub fn set_collapsed(&mut self, pane: PaneId, collapsed: bool) {
