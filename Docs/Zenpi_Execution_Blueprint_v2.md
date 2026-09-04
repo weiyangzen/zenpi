@@ -280,12 +280,13 @@ started a scheduler.
 
 ## 5. BentoBox workspace contract
 
-The upper tab bar is a named workspace selector. The target is for each tab to
-own a preset, focus history, collapsed-pane state, and bounded split ratios;
-the current model keeps one active focus/ratio state and switching tabs does
-not yet persist it. The layout model is data (`TabId`, `PaneId`, `Split`,
-`Visibility`, `min_width`, `min_height`), so it can be tested without a
-terminal and later consumed by a GUI.
+The upper tab bar is a named workspace selector. Each tab now owns an
+independent preset, focus, collapsed-pane state, and bounded split ratios in
+memory. The production TUI restores and atomically saves those values under
+the active profile in bounded `layout.json`; a malformed snapshot fails closed
+to built-in presets and is reported visibly. The layout model is data
+(`TabId`, `PaneId`, `Split`, `Visibility`, `min_width`, `min_height`), so it can
+be tested without a terminal and later consumed by a GUI.
 
 ### 5.1 Pane vocabulary
 
@@ -304,8 +305,9 @@ Ratios are the target starting values, not pixel promises. The pure
 `src/layout.rs` model records them and safely computes geometry, and the
 production async TUI consumes it through `BentoBoxLayoutAdapter`. The current
 adapter renders the tab bar, conversation pane, and bounded Gantt/resources
-placeholders; keyboard focus and bounded ratio editing are now wired, while
-persistence and real browser/terminal content remain planned. Resource snapshots are available through the local
+placeholders; keyboard focus, bounded ratio editing, per-tab state, automatic
+profile persistence, and keyboard reset are now wired. Real browser/terminal
+content remains deferred. Resource snapshots are available through the local
 command path, but are not yet polled into a pane. Once those pieces are
 integrated, the smallest pane
 will never be allowed below its declared minimum.
@@ -323,8 +325,9 @@ upper-left, resource awareness at left-middle, goal conversation at lower-left,
 the Markdown Gantt board in the center, browser at upper-right, and terminal at
 lower-right. The production async TUI now has the tab/adapter and keyboard
 focus/split controls; the legacy synchronous `run_with_state` path remains
-vertical. V2-206 completes persistence, real pane content, and narrow-terminal stack behavior
-instead of forcing unreadable six-way splits.
+vertical. V2-206 completes real pane content and narrow-terminal stack behavior
+instead of forcing unreadable six-way splits. V2-207 retains the PTY and
+migration acceptance work for the already-wired persistence path.
 
 ### 5.3 Scaling and focus rules
 
@@ -338,9 +341,9 @@ instead of forcing unreadable six-way splits.
   zero.
 * `Ctrl-1..Ctrl-5` selects the upper tab; `Tab`/`Shift-Tab` and `Ctrl-Arrow`
   move focus; `Ctrl-Shift-Left/Right` adjusts the focused split by a bounded
-  step; `Ctrl-0` resets the active layout. `/layout save` persistence remains
-  planned and becomes a test contract after the TUI integration row is
-  accepted.
+  step; `Ctrl-0` resets the active layout. Automatic profile/tab save and
+  restore are wired through bounded `layout.json`; the `/layout` slash
+  parser/owner is still open.
 
 ## 6. Rendering contract
 
