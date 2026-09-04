@@ -560,6 +560,20 @@ struct AsyncEventBuffer {
     agent_dropped: DroppedEvents,
 }
 
+const EVENT_MAILBOX_POISONED: &str = "headless event mailbox mutex poisoned";
+
+fn event_mailbox_headless_error() -> HeadlessError {
+    HeadlessError::Io(io::Error::other(EVENT_MAILBOX_POISONED))
+}
+
+fn event_mailbox_agent_error() -> AgentError {
+    AgentError::InvalidTurn(EVENT_MAILBOX_POISONED.into())
+}
+
+fn event_mailbox_backend_error() -> crate::backend::BackendError {
+    crate::backend::BackendError::Transport(EVENT_MAILBOX_POISONED.into())
+}
+
 fn serialized_event_len<T: serde::Serialize>(event: &T) -> usize {
     #[derive(Default)]
     struct ByteCounter(usize);
@@ -582,42 +596,29 @@ fn serialized_event_len<T: serde::Serialize>(event: &T) -> usize {
     serde_json::to_writer(&mut counter, event).map_or(usize::MAX, |()| counter.0)
 }
 
+fn is_admission_event(event: &AgentEvent) -> bool {
+    matches!(
+        event,
+        AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
+    )
+}
+
 fn buffered_admission_prefix_len(events: &[BufferedEvent<AgentEvent>]) -> Option<usize> {
-    let first_admission = events.iter().position(|event| {
-        matches!(
-            event.event,
-            AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
-        )
-    })?;
-    let admission_count = events[first_admission..]
+    // A request normally publishes one marker, but a recovery/reissue path
+    // may append more than one lifecycle event before the host polls. Drain
+    // through the *last* marker so every admission remains ahead of provider
+    // output even when ordinary agent events are interleaved.
+    events
         .iter()
-        .take_while(|event| {
-            matches!(
-                event.event,
-                AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
-            )
-        })
-        .count();
-    Some(first_admission.saturating_add(admission_count))
+        .rposition(|event| is_admission_event(&event.event))
+        .map(|last_admission| last_admission.saturating_add(1))
 }
 
 fn admission_prefix_len(events: &[AgentEvent]) -> Option<usize> {
-    let first_admission = events.iter().position(|event| {
-        matches!(
-            event,
-            AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
-        )
-    })?;
-    let admission_count = events[first_admission..]
+    events
         .iter()
-        .take_while(|event| {
-            matches!(
-                event,
-                AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
-            )
-        })
-        .count();
-    Some(first_admission.saturating_add(admission_count))
+        .rposition(is_admission_event)
+        .map(|last_admission| last_admission.saturating_add(1))
 }
 
 impl AsyncEventBuffer {
@@ -639,6 +640,51 @@ impl AsyncEventBuffer {
 
     fn push_agent(&mut self, event: AgentEvent) {
         let serialized_bytes = serialized_event_len(&event);
+        if is_admission_event(&event) {
+            // Admission is a correctness boundary, not best-effort progress.
+            // If a flood has consumed the mailbox, evict ordinary lifecycle
+            // events until this small, bounded marker fits. Never evict an
+            // earlier TurnAccepted/TurnRejected marker.
+            if serialized_bytes > MAX_ASYNC_AGENT_BYTES {
+                self.agent_dropped.record(serialized_bytes);
+                return;
+            }
+            loop {
+                let fits_count = self.agent.len() < MAX_ASYNC_AGENT_EVENTS;
+                let fits_bytes = self
+                    .agent_bytes
+                    .checked_add(serialized_bytes)
+                    .is_some_and(|bytes| bytes <= MAX_ASYNC_AGENT_BYTES);
+                if fits_count && fits_bytes {
+                    self.agent_bytes = self
+                        .agent_bytes
+                        .checked_add(serialized_bytes)
+                        .unwrap_or(self.agent_bytes);
+                    self.agent.push(BufferedEvent {
+                        event,
+                        serialized_bytes,
+                    });
+                    return;
+                }
+
+                let Some(eviction_index) = self
+                    .agent
+                    .iter()
+                    .position(|buffered| !is_admission_event(&buffered.event))
+                else {
+                    // Valid core admission markers are tiny and bounded. This
+                    // branch is only reachable after a pathological sequence
+                    // of markers; report the loss rather than violating the
+                    // byte/count bound.
+                    self.agent_dropped.record(serialized_bytes);
+                    return;
+                };
+                let evicted = self.agent.remove(eviction_index);
+                self.agent_bytes = self.agent_bytes.saturating_sub(evicted.serialized_bytes);
+                self.agent_dropped.record(evicted.serialized_bytes);
+            }
+        }
+
         let next_bytes = self.agent_bytes.checked_add(serialized_bytes);
         if self.agent.len() < MAX_ASYNC_AGENT_EVENTS
             && next_bytes.is_some_and(|bytes| bytes <= MAX_ASYNC_AGENT_BYTES)
@@ -678,8 +724,9 @@ impl AsyncEventBuffer {
     /// events even when the host polls the request before it completes. Agent
     /// construction may also preload recovery errors, so include any prefix
     /// before the first admission marker rather than requiring the marker to
-    /// be the first queued event. Any later AgentEvents remain buffered until
-    /// the provider trace is drained.
+    /// be the first queued event. Drain through the last marker to cover
+    /// interleaved recovery/reissue events; any later AgentEvents remain
+    /// buffered until the provider trace is drained.
     fn take_admission(&mut self) -> Vec<AgentEvent> {
         let Some(admission_end) = buffered_admission_prefix_len(&self.agent) else {
             return Vec::new();
@@ -2170,7 +2217,11 @@ fn drain_provider_events<W: Write>(
         // `ProviderEvent` deliberately contains no turn ID.  The async
         // request owns the correlation captured from `TurnSubmission`, so
         // read it from `AsyncWork` rather than probing the event JSON.
-        let work_turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
+        let work_turn_id = work
+            .turn_id
+            .lock()
+            .map_err(|_| event_mailbox_headless_error())?
+            .clone();
         // Snapshot the mailbox before doing JSON encoding or writing to the
         // client. A slow stdout consumer must not hold the request lock and
         // stall the provider worker (or a future lifecycle callback).
@@ -2182,7 +2233,7 @@ fn drain_provider_events<W: Write>(
                 // that relationship.
                 (events.take_admission(), events.take_provider())
             }
-            Err(_) => continue,
+            Err(_) => return Err(event_mailbox_headless_error()),
         };
         write_buffered_events(
             output,
@@ -2228,16 +2279,20 @@ fn drain_approval_events<W: Write>(
         // ApprovalRequest carries the durable turn ID. Match it to the
         // corresponding AsyncWork rather than relying on HashMap iteration;
         // queued requests may coexist with the active tool turn.
-        let request_id = jobs
+        let mut request_id = None;
+        for work in jobs
             .values()
             .filter(|work| work.command == "prompt" || work.command == "steer")
-            .find(|work| {
-                work.turn_id
-                    .lock()
-                    .ok()
-                    .is_some_and(|turn_id| turn_id.as_deref() == Some(request.turn_id.as_str()))
-            })
-            .and_then(|work| work.id.clone());
+        {
+            let work_turn_id = work
+                .turn_id
+                .lock()
+                .map_err(|_| event_mailbox_headless_error())?;
+            if work_turn_id.as_deref() == Some(request.turn_id.as_str()) {
+                request_id = work.id.clone();
+                break;
+            }
+        }
         let turn_id = Some(request.turn_id.clone());
         let value = serde_json::json!({
             "type": "approval_request",
@@ -2262,12 +2317,16 @@ fn drain_provider_events_for_job<W: Write>(
 ) -> Result<(), HeadlessError> {
     // Raw provider events have no turn_id field; correlation is carried by
     // the request metadata captured when the submission was accepted.
-    let work_turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
+    let work_turn_id = work
+        .turn_id
+        .lock()
+        .map_err(|_| event_mailbox_headless_error())?
+        .clone();
     // Detach all buffered data before serializing or writing. Holding this
     // mutex across client I/O would let a slow consumer pause the worker.
     let (admission_events, (provider_events, dropped)) = match work.events.lock() {
         Ok(mut events) => (events.take_admission(), events.take_provider()),
-        Err(_) => return Ok(()),
+        Err(_) => return Err(event_mailbox_headless_error()),
     };
     write_buffered_events(
         output,
@@ -2311,7 +2370,11 @@ fn write_runtime_lifecycle_event<W: Write>(
     work: &AsyncWork,
     event: serde_json::Value,
 ) -> Result<(), HeadlessError> {
-    let turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
+    let turn_id = work
+        .turn_id
+        .lock()
+        .map_err(|_| event_mailbox_headless_error())?
+        .clone();
     let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, event);
     let current = *sequence;
     *sequence = sequence.saturating_add(1);
@@ -2387,9 +2450,8 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             let events = Arc::clone(&request.events);
             let started_turn_id = Arc::clone(&request.started_turn_id);
             let mut sink = |event: ProviderEvent| {
-                if let Ok(mut pending) = events.lock() {
-                    pending.push_provider(event);
-                }
+                let mut pending = events.lock().map_err(|_| event_mailbox_backend_error())?;
+                pending.push_provider(event);
                 Ok(())
             };
             // Keep the agent lock until its events are copied into this
@@ -2400,10 +2462,14 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 match request.turn {
                     AsyncTurn::Standard(request) => {
                         let submission = agent.submit(request)?;
-                        if let Ok(mut active) = started_turn_id.lock() {
-                            *active = submission.turn_id().map(str::to_owned);
-                        }
-                        if let Ok(mut pending) = events.lock() {
+                        let mut active = started_turn_id
+                            .lock()
+                            .map_err(|_| event_mailbox_agent_error())?;
+                        *active = submission.turn_id().map(str::to_owned);
+                        drop(active);
+                        {
+                            let mut pending =
+                                events.lock().map_err(|_| event_mailbox_agent_error())?;
                             for event in agent.take_events() {
                                 pending.push_agent(event);
                             }
@@ -2426,10 +2492,14 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         superseded_turn_id,
                     } => {
                         let submission = agent.start_steer_reissue(message, &superseded_turn_id)?;
-                        if let Ok(mut active) = started_turn_id.lock() {
-                            *active = submission.turn_id().map(str::to_owned);
-                        }
-                        if let Ok(mut pending) = events.lock() {
+                        let mut active = started_turn_id
+                            .lock()
+                            .map_err(|_| event_mailbox_agent_error())?;
+                        *active = submission.turn_id().map(str::to_owned);
+                        drop(active);
+                        {
+                            let mut pending =
+                                events.lock().map_err(|_| event_mailbox_agent_error())?;
                             for event in agent.take_events() {
                                 pending.push_agent(event);
                             }
@@ -2445,7 +2515,8 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                     }
                 }
             })();
-            if let Ok(mut pending) = events.lock() {
+            {
+                let mut pending = events.lock().map_err(|_| event_mailbox_agent_error())?;
                 for event in agent.take_events() {
                     pending.push_agent(event);
                 }
@@ -2746,7 +2817,11 @@ fn handle_runtime_event<W: Write>(
             // Preserve the turn ID for a steer that was received before the
             // worker could publish it.  The completed job is removed below,
             // so this is the last reliable place to capture the correlation.
-            let completed_turn_id = meta.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
+            let completed_turn_id = meta
+                .turn_id
+                .lock()
+                .map_err(|_| event_mailbox_headless_error())?
+                .clone();
             for pending in pending_steers.iter_mut() {
                 if pending.target_job == id && pending.superseded_turn_id.is_none() {
                     pending.superseded_turn_id = completed_turn_id.clone();
@@ -2768,8 +2843,8 @@ fn handle_runtime_event<W: Write>(
             let (agent_events, agent_dropped) = meta
                 .events
                 .lock()
-                .map(|mut events| events.take_agent())
-                .unwrap_or_default();
+                .map_err(|_| event_mailbox_headless_error())
+                .map(|mut events| events.take_agent())?;
             let mut agent_events = agent_events;
             let admission_end = admission_prefix_len(&agent_events).unwrap_or(0);
             let admission_events = agent_events.drain(..admission_end).collect::<Vec<_>>();
@@ -3290,16 +3365,20 @@ where
                 )?;
                 return Ok(());
             }
-            let active = jobs
+            let active = if let Some((job_id, work)) = jobs
                 .iter()
                 .filter(|(_, work)| work.command == "prompt" || work.command == "steer")
                 .min_by_key(|(job_id, _)| job_id.get())
-                .map(|(job_id, work)| {
-                    (
-                        *job_id,
-                        work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone()),
-                    )
-                });
+            {
+                let active_turn_id = work
+                    .turn_id
+                    .lock()
+                    .map_err(|_| event_mailbox_headless_error())?
+                    .clone();
+                Some((*job_id, active_turn_id))
+            } else {
+                None
+            };
             if let Some((job_id, active_turn_id)) = active {
                 if expected_turn_id.as_deref().is_some_and(|expected| {
                     active_turn_id
@@ -3670,7 +3749,14 @@ where
 
         let active_turn_id = jobs
             .get(&pending.target_job)
-            .and_then(|work| work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone()));
+            .map(|work| {
+                work.turn_id
+                    .lock()
+                    .map(|turn_id| turn_id.clone())
+                    .map_err(|_| event_mailbox_headless_error())
+            })
+            .transpose()?
+            .flatten();
         if let Some(turn_id) = active_turn_id {
             if pending
                 .expected_turn_id
@@ -4198,6 +4284,20 @@ fn execute_headless_slash(
                 message: error.to_string(),
             }),
         },
+        SlashCommand::Layout { action } => Ok(SlashExecution::Response(json!({
+            "command": "layout",
+            "route": "local",
+            "accepted": false,
+            "action": action,
+            "message": "layout mutations require the interactive TUI owner",
+        }))),
+        SlashCommand::Pane { action } => Ok(SlashExecution::Response(json!({
+            "command": "pane",
+            "route": "local",
+            "accepted": false,
+            "action": action,
+            "message": "pane focus and visibility require the interactive TUI owner",
+        }))),
         SlashCommand::Clear => Ok(SlashExecution::Response(json!({
             "command": "clear",
             "cleared": true,
@@ -5115,6 +5215,91 @@ mod async_event_buffer_tests {
         assert_eq!(dropped.count, 1);
         assert_eq!(dropped.bytes, oversized_bytes as u64);
         assert_eq!(buffer.agent_dropped, DroppedEvents::default());
+        assert_eq!(buffer.agent_bytes, 0);
+    }
+
+    #[test]
+    fn admission_marker_survives_full_count_mailbox() {
+        let filler = AgentEvent::Error {
+            message: "filler".into(),
+        };
+        let accepted = AgentEvent::TurnAccepted {
+            turn_id: "turn-priority-count".into(),
+            mode: crate::protocol::TurnMode::StartIfIdle,
+        };
+        let mut buffer = AsyncEventBuffer::default();
+        for _ in 0..MAX_ASYNC_AGENT_EVENTS {
+            buffer.push_agent(filler.clone());
+        }
+        assert_eq!(buffer.agent.len(), MAX_ASYNC_AGENT_EVENTS);
+
+        buffer.push_agent(accepted.clone());
+
+        assert_eq!(buffer.agent.len(), MAX_ASYNC_AGENT_EVENTS);
+        assert!(buffer.agent.iter().any(|event| event.event == accepted));
+        assert_eq!(buffer.agent_dropped.count, 1);
+        let admission = buffer.take_admission();
+        assert!(admission.iter().any(|event| event == &accepted));
+    }
+
+    #[test]
+    fn admission_marker_survives_full_byte_mailbox() {
+        let accepted = AgentEvent::TurnAccepted {
+            turn_id: "turn-priority-bytes".into(),
+            mode: crate::protocol::TurnMode::StartIfIdle,
+        };
+        let accepted_bytes = serialized_event_len(&accepted);
+        // Leave the filler just below the aggregate limit, but not enough
+        // room for the marker. The priority path must evict that ordinary
+        // event and retain the admission boundary.
+        let filler = AgentEvent::Error {
+            message: "x".repeat(
+                MAX_ASYNC_AGENT_BYTES
+                    .saturating_sub(accepted_bytes)
+                    .saturating_add(1),
+            ),
+        };
+        let filler_bytes = serialized_event_len(&filler);
+        assert!(filler_bytes <= MAX_ASYNC_AGENT_BYTES);
+        assert!(filler_bytes.saturating_add(accepted_bytes) > MAX_ASYNC_AGENT_BYTES);
+
+        let mut buffer = AsyncEventBuffer::default();
+        buffer.push_agent(filler);
+        assert_eq!(buffer.agent.len(), 1);
+        buffer.push_agent(accepted.clone());
+
+        assert_eq!(buffer.agent.len(), 1);
+        assert!(buffer.agent.iter().any(|event| event.event == accepted));
+        assert_eq!(buffer.agent_dropped.count, 1);
+        assert_eq!(buffer.agent_dropped.bytes, filler_bytes as u64);
+        assert!(
+            buffer
+                .take_admission()
+                .iter()
+                .any(|event| event == &accepted)
+        );
+    }
+
+    #[test]
+    fn interleaved_admission_markers_are_drained_before_provider_events() {
+        let first = AgentEvent::TurnAccepted {
+            turn_id: "turn-first".into(),
+            mode: crate::protocol::TurnMode::StartIfIdle,
+        };
+        let second = AgentEvent::TurnRejected {
+            reason: crate::core::NotSubmittedReason::NotIdle,
+        };
+        let middle = AgentEvent::Error {
+            message: "middle".into(),
+        };
+        let mut buffer = AsyncEventBuffer::default();
+        buffer.push_agent(first.clone());
+        buffer.push_agent(middle.clone());
+        buffer.push_agent(second.clone());
+
+        let drained = buffer.take_admission();
+        assert_eq!(drained, vec![first, middle, second]);
+        assert!(buffer.agent.is_empty());
         assert_eq!(buffer.agent_bytes, 0);
     }
 }
