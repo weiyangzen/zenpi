@@ -1240,6 +1240,7 @@ fn serialized_session_summary(summary: &SessionSummary) -> serde_json::Value {
         "turn_count": summary.turn_count,
         "handoff_count": summary.handoff_count,
         "handoff_record_count": summary.handoff_record_count,
+        "runtime_intent_count": summary.runtime_intent_count,
         "event_count": summary.event_count,
         "recovery_warnings": summary.recovery_warnings,
         "next_seq": summary.next_seq,
@@ -3973,20 +3974,42 @@ fn execute_headless_slash(
         SlashCommand::LearnPut { path } => Ok(SlashExecution::Response(persist_learn_from_path(
             agent, &path,
         )?)),
-        SlashCommand::Compete { args } => Ok(SlashExecution::Response(json!({
-            "command": "compete",
-            "route": "runtime",
-            "accepted": false,
-            "args": args,
-            "message": "b3ehive runtime adapter is not configured",
-        }))),
-        SlashCommand::Loop { args } => Ok(SlashExecution::Response(json!({
-            "command": "loop",
-            "route": "runtime",
-            "accepted": false,
-            "args": args,
-            "message": "b3ehive runtime adapter is not configured",
-        }))),
+        SlashCommand::Compete { args } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "compete intent cannot be persisted while the agent is busy".into(),
+                });
+            };
+            crate::runtime_intent::runtime_intent_value(
+                agent,
+                crate::b3::RuntimeIntentKind::Compete,
+                &args,
+            )
+            .map(SlashExecution::Response)
+            .map_err(|error| SlashDispatchError {
+                code: "runtime_intent_error",
+                message: error.to_string(),
+            })
+        }
+        SlashCommand::Loop { args } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "loop intent cannot be persisted while the agent is busy".into(),
+                });
+            };
+            crate::runtime_intent::runtime_intent_value(
+                agent,
+                crate::b3::RuntimeIntentKind::Loop,
+                &args,
+            )
+            .map(SlashExecution::Response)
+            .map_err(|error| SlashDispatchError {
+                code: "runtime_intent_error",
+                message: error.to_string(),
+            })
+        }
     }
 }
 

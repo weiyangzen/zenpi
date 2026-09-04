@@ -546,7 +546,7 @@ fn headless_slash_commands_are_control_plane_only() {
         "{\"type\":\"command\",\"id\":\"h\",\"text\":\"/history 3\"}\n",
         "{\"type\":\"command\",\"id\":\"c\",\"text\":\"/clear\"}\n",
         "{\"type\":\"command\",\"id\":\"r\",\"text\":\"/compete run-a\"}\n",
-        "{\"type\":\"command\",\"id\":\"l\",\"text\":\"/loop --budget 1\"}\n",
+        "{\"type\":\"command\",\"id\":\"l\",\"text\":\"/loop repair item-a\"}\n",
         "{\"type\":\"command\",\"id\":\"e\",\"text\":\"/session export /private/secret.jsonl\"}\n",
         "{\"type\":\"command\",\"id\":\"bad\",\"text\":\"/does-not-exist\"}\n",
         "{\"type\":\"status\",\"id\":\"after\"}\n",
@@ -555,7 +555,7 @@ fn headless_slash_commands_are_control_plane_only() {
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for id in ["m", "s", "h", "c", "after", "q"] {
+    for id in ["m", "s", "h", "c", "r", "l", "after", "q"] {
         assert!(
             records.iter().any(|record| {
                 record["id"] == id && record["type"] == "response" && record["success"] == true
@@ -563,7 +563,7 @@ fn headless_slash_commands_are_control_plane_only() {
             "missing successful response for {id}"
         );
     }
-    for id in ["g", "r", "l", "e"] {
+    for id in ["g", "e"] {
         let response = records.iter().find(|record| record["id"] == id).unwrap();
         assert_eq!(
             response["success"], false,
@@ -590,6 +590,15 @@ fn headless_slash_commands_are_control_plane_only() {
             .contains("/private/secret.jsonl")
     );
     assert_eq!(agent.history().len(), 0, "slash input reached the model");
+    assert_eq!(agent.session().runtime_intents().len(), 2);
+    for id in ["r", "l"] {
+        let response = records.iter().find(|record| record["id"] == id).unwrap();
+        assert_eq!(response["data"]["durable"], true);
+        assert_eq!(response["data"]["persisted"], true);
+        assert_eq!(response["data"]["delivery"], "journal_only");
+        assert_eq!(response["data"]["zenpi_started"], false);
+        assert_eq!(response["data"]["execution_state"], "untracked");
+    }
     let status = records.iter().find(|record| record["id"] == "s").unwrap();
     assert_eq!(status["data"]["model"], "fixture");
 }

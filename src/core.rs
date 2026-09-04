@@ -1788,6 +1788,20 @@ impl Agent {
         Ok(())
     }
 
+    /// Persist one inert `/compete` or `/loop` request for an external runtime
+    /// owner. This deliberately does not start a scheduler or nested worker.
+    pub fn append_runtime_intent(
+        &mut self,
+        intent: crate::b3::RuntimeIntent,
+    ) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        intent.validate()?;
+        self.session.append_runtime_intent(intent)?;
+        Ok(())
+    }
+
     /// Replace the session only while idle.  The old store is moved out only
     /// after the new path has recovered successfully.
     pub fn resume_session(&mut self, path: impl Into<PathBuf>) -> Result<(), AgentError> {

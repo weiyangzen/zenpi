@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{
-    b3::{Handoff, HandoffRecord, unix_ms_to_rfc3339},
+    b3::{Handoff, HandoffRecord, RuntimeIntent, unix_ms_to_rfc3339},
     core::Turn,
 };
 
@@ -101,6 +101,9 @@ enum DecodedRecord {
     HandoffRecord {
         handoff: HandoffRecord,
     },
+    RuntimeIntent {
+        intent: Box<RuntimeIntent>,
+    },
     Event {
         event: Value,
     },
@@ -114,6 +117,7 @@ pub struct SessionStore {
     turns: Vec<Turn>,
     handoffs: Vec<Handoff>,
     handoff_records: Vec<HandoffRecord>,
+    runtime_intents: Vec<RuntimeIntent>,
     events: usize,
     event_values: Vec<Value>,
     records: Vec<SessionRecord>,
@@ -130,6 +134,7 @@ pub struct SessionSummary {
     pub turn_count: usize,
     pub handoff_count: usize,
     pub handoff_record_count: usize,
+    pub runtime_intent_count: usize,
     pub event_count: usize,
     pub recovery_warnings: usize,
     pub next_seq: u64,
@@ -214,6 +219,7 @@ impl SessionStore {
         let mut turns = Vec::new();
         let mut handoffs = Vec::new();
         let mut handoff_records = Vec::new();
+        let mut runtime_intents = Vec::new();
         let mut events = 0;
         let mut event_values = Vec::new();
         let mut records = Vec::new();
@@ -357,6 +363,23 @@ impl SessionStore {
                         true
                     }
                 }
+                DecodedRecord::RuntimeIntent { intent } => {
+                    let intent = *intent;
+                    if intent.validate().is_err()
+                        || header
+                            .as_ref()
+                            .is_some_and(|item| item.session_id != intent.session_id)
+                    {
+                        warnings.push(RecoveryWarning {
+                            line: line_number,
+                            reason: "ignored invalid runtime intent".into(),
+                        });
+                        false
+                    } else {
+                        runtime_intents.push(intent);
+                        true
+                    }
+                }
                 DecodedRecord::Event { event } => {
                     event_values.push(event);
                     events += 1;
@@ -392,6 +415,7 @@ impl SessionStore {
             turns,
             handoffs,
             handoff_records,
+            runtime_intents,
             events,
             event_values,
             records,
@@ -458,6 +482,7 @@ impl SessionStore {
             turn_count: self.turns.len(),
             handoff_count: self.handoffs.len() + self.handoff_records.len(),
             handoff_record_count: self.handoff_records.len(),
+            runtime_intent_count: self.runtime_intents.len(),
             event_count: self.events,
             recovery_warnings: self.warnings.len(),
             next_seq: self.next_seq,
@@ -494,6 +519,27 @@ impl SessionStore {
 
     pub fn handoff_records(&self) -> &[HandoffRecord] {
         &self.handoff_records
+    }
+
+    /// Return inert requests waiting for an external b3ehive runtime owner.
+    pub fn runtime_intents(&self) -> &[RuntimeIntent] {
+        &self.runtime_intents
+    }
+
+    /// Validate and durably append one external-runtime request. No scheduler,
+    /// worker, process, or network call is started by this operation.
+    pub fn append_runtime_intent(&mut self, intent: RuntimeIntent) -> Result<(), SessionError> {
+        intent
+            .validate()
+            .map_err(|error| SessionError::InvalidRecord(error.to_string()))?;
+        if intent.session_id != self.header.session_id {
+            return Err(SessionError::InvalidRecord(
+                "runtime intent session does not match journal".into(),
+            ));
+        }
+        self.append_json(&json!({ "kind": "runtime_intent", "intent": &intent }))?;
+        self.runtime_intents.push(intent);
+        Ok(())
     }
 
     /// Persist a normalized event.  Events are intentionally opaque to the
@@ -631,6 +677,9 @@ impl SessionStore {
         for record in &self.handoff_records {
             fork.append_handoff_record(record.clone())?;
         }
+        // Runtime intents are pending work for one external owner. Forking a
+        // session must not duplicate them under a new identity and risk a
+        // second execution; a caller can submit a fresh intent explicitly.
         for event in &self.event_values {
             fork.append_event(event.clone())?;
         }

@@ -156,3 +156,75 @@ fn checked_budget_addition_does_not_wrap() {
         Err(B3Error::BudgetExceeded { field: "envelope" })
     );
 }
+
+#[test]
+fn runtime_intent_is_bounded_and_inert() {
+    let limit = ResourceBudget {
+        tokens: 100,
+        wall_clock_ms: 200,
+        attempts: 1,
+        disk_bytes: 300,
+    };
+    let route = RouteDecision {
+        route_id: "route-1".into(),
+        parent_ref: "goal-1".into(),
+        route_class: "external_compete".into(),
+        runner: "external_b3ehive".into(),
+        validator_strength: "host_selected".into(),
+    };
+    let intent = RuntimeIntent::new(
+        "intent-1",
+        RuntimeIntentKind::Compete,
+        "goal-1",
+        vec!["audit".into(), "owners".into()],
+        route,
+        ResourceEnvelope::new("envelope-1", "compete", limit).unwrap(),
+        None,
+        "session-1",
+        1,
+    )
+    .unwrap();
+    assert!(intent.validate().is_ok());
+    assert!(serde_json::to_vec(&intent).unwrap().len() <= MAX_RUNTIME_INTENT_BYTES);
+
+    let mut secret = intent.clone();
+    secret.args = vec!["API_KEY=hidden".into()];
+    assert_eq!(
+        secret.validate(),
+        Err(B3Error::SecretPayload {
+            field: "runtime argument"
+        })
+    );
+    let mut ordinary = secret.clone();
+    ordinary.args = vec!["risk-analysis".into()];
+    assert!(ordinary.validate().is_ok());
+    let mut mismatched = intent;
+    mismatched.route.parent_ref = "other".into();
+    assert!(mismatched.validate().is_err());
+
+    let mut unbounded = RuntimeIntent::new(
+        "intent-2",
+        RuntimeIntentKind::Compete,
+        "goal-1",
+        vec!["audit".into()],
+        RouteDecision {
+            route_id: "route-2".into(),
+            parent_ref: "goal-1".into(),
+            route_class: "external_compete".into(),
+            runner: "external_b3ehive".into(),
+            validator_strength: "host_selected".into(),
+        },
+        ResourceEnvelope::new("envelope-2", "compete", limit).unwrap(),
+        None,
+        "session-1",
+        1,
+    )
+    .unwrap();
+    unbounded.envelope.limit.tokens = MAX_RUNTIME_TOKENS + 1;
+    assert_eq!(
+        unbounded.validate(),
+        Err(B3Error::BudgetExceeded {
+            field: "runtime intent"
+        })
+    );
+}

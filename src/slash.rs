@@ -371,15 +371,15 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "compete",
         aliases: NO_ALIASES,
         route: SlashRoute::Runtime,
-        usage: "/compete <args...>",
-        summary: "delegate proposal competition to b3ehive runtime",
+        usage: "/compete [submit] <task...> | /compete status",
+        summary: "persist a bounded request for an external competition owner",
     },
     SlashCommandSpec {
         name: "loop",
         aliases: NO_ALIASES,
         route: SlashRoute::Runtime,
-        usage: "/loop <args...>",
-        summary: "delegate the bounded loop to b3ehive runtime",
+        usage: "/loop [start] <task...> | /loop status",
+        summary: "persist a bounded request for an external loop owner",
     },
 ];
 

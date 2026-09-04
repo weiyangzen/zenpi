@@ -538,12 +538,19 @@ fn looks_like_secret(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
     lower.contains("begin private key")
         || lower.contains("api_key=")
+        || lower.contains("api-key=")
         || lower.contains("apikey=")
         || lower.contains("access_token=")
         || lower.contains("secret=")
-        || value.contains("sk-")
-        || value.contains("ghp_")
-        || value.contains("AKIA")
+        || lower
+            .split(|character: char| {
+                character.is_whitespace() || matches!(character, '"' | '\'' | '=' | ':' | ',')
+            })
+            .any(|token| {
+                (token.starts_with("sk-") && token.len() >= 12)
+                    || (token.starts_with("ghp_") && token.len() >= 12)
+                    || (token.starts_with("akia") && token.len() >= 16)
+            })
 }
 
 /// Result-manifest schema version.  It is separate from the handoff version
@@ -883,6 +890,18 @@ pub fn require_side_effect_gate(
 /// Small accounting records understood by a b3ehive host. They are data-only:
 /// zenpi never starts workers, schedules retries, or hides nested agents.
 pub const MAX_B3_LIST: usize = 64;
+/// Schema and record bounds for inert external-runtime requests. These values
+/// keep one slash command comfortably below the session and headless replay
+/// limits; they are data for an external owner, never scheduler instructions
+/// executed by zenpi itself.
+pub const RUNTIME_INTENT_SCHEMA_VERSION: u16 = 1;
+pub const MAX_RUNTIME_INTENT_BYTES: usize = 64 * 1024;
+pub const MAX_RUNTIME_ARGUMENTS: usize = 64;
+pub const MAX_RUNTIME_ARGUMENT_BYTES: usize = 4096;
+pub const MAX_RUNTIME_TOKENS: u64 = 10_000_000;
+pub const MAX_RUNTIME_WALL_CLOCK_MS: u64 = 24 * 60 * 60 * 1_000;
+pub const MAX_RUNTIME_ATTEMPTS: u32 = 64;
+pub const MAX_RUNTIME_DISK_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ResourceBudget {
@@ -1054,6 +1073,160 @@ impl ResourceLease {
             return Err(B3Error::BudgetExceeded { field: "lease" });
         }
         self.spent = next;
+        Ok(())
+    }
+}
+
+/// The external b3ehive owner selected by a runtime slash command.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeIntentKind {
+    Compete,
+    Loop,
+}
+
+impl RuntimeIntentKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Compete => "compete",
+            Self::Loop => "loop",
+        }
+    }
+}
+
+/// A durable request for an external b3ehive runtime.
+///
+/// The record is deliberately inert. It preserves the exact decoded slash
+/// arguments, a route decision, and bounded resource attribution. Persisting
+/// it means only that the intent is ready for a separate owner to consume; it
+/// does not mean a competition, loop, scheduler, worker, or network call ran.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeIntent {
+    pub schema_version: u16,
+    pub intent_id: String,
+    pub kind: RuntimeIntentKind,
+    pub parent_ref: String,
+    pub args: Vec<String>,
+    pub route: RouteDecision,
+    pub envelope: ResourceEnvelope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_lease: Option<ParentLeaseRef>,
+    pub session_id: String,
+    pub created_at_ms: u64,
+}
+
+impl RuntimeIntent {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        intent_id: impl Into<String>,
+        kind: RuntimeIntentKind,
+        parent_ref: impl Into<String>,
+        args: Vec<String>,
+        route: RouteDecision,
+        envelope: ResourceEnvelope,
+        parent_lease: Option<ParentLeaseRef>,
+        session_id: impl Into<String>,
+        created_at_ms: u64,
+    ) -> Result<Self, B3Error> {
+        let intent = Self {
+            schema_version: RUNTIME_INTENT_SCHEMA_VERSION,
+            intent_id: intent_id.into(),
+            kind,
+            parent_ref: parent_ref.into(),
+            args,
+            route,
+            envelope,
+            parent_lease,
+            session_id: session_id.into(),
+            created_at_ms,
+        };
+        intent.validate()?;
+        Ok(intent)
+    }
+
+    pub fn validate(&self) -> Result<(), B3Error> {
+        if self.schema_version != RUNTIME_INTENT_SCHEMA_VERSION {
+            return Err(B3Error::SchemaVersion {
+                found: self.schema_version,
+                expected: RUNTIME_INTENT_SCHEMA_VERSION,
+            });
+        }
+        id(&self.intent_id, "intent_id")?;
+        id(&self.parent_ref, "parent_ref")?;
+        id(&self.session_id, "session_id")?;
+        if self.args.is_empty() {
+            return Err(B3Error::Empty {
+                field: "runtime args",
+            });
+        }
+        if self.args.len() > MAX_RUNTIME_ARGUMENTS {
+            return Err(B3Error::TooMany {
+                field: "runtime args",
+                max: MAX_RUNTIME_ARGUMENTS,
+            });
+        }
+        for argument in &self.args {
+            bounded_single_line(argument, "runtime argument", MAX_RUNTIME_ARGUMENT_BYTES)?;
+            if looks_like_secret(argument) {
+                return Err(B3Error::SecretPayload {
+                    field: "runtime argument",
+                });
+            }
+        }
+        self.route.validate()?;
+        self.envelope.validate()?;
+        if self.route.parent_ref != self.parent_ref {
+            return Err(B3Error::InvalidId {
+                field: "route parent_ref",
+            });
+        }
+        if self.envelope.owner != self.kind.as_str() {
+            return Err(B3Error::InvalidId {
+                field: "envelope owner",
+            });
+        }
+        let expected_route = format!("external_{}", self.kind.as_str());
+        if self.route.route_class != expected_route
+            || self.route.runner != "external_b3ehive"
+            || self.route.validator_strength != "host_selected"
+            || self.envelope.status != EnvelopeStatus::Active
+            || self.envelope.spent != ResourceBudget::default()
+        {
+            return Err(B3Error::InvalidId {
+                field: "runtime route",
+            });
+        }
+        let budget = self.envelope.limit;
+        if budget.tokens == 0
+            || budget.tokens > MAX_RUNTIME_TOKENS
+            || budget.wall_clock_ms == 0
+            || budget.wall_clock_ms > MAX_RUNTIME_WALL_CLOCK_MS
+            || budget.attempts == 0
+            || budget.attempts > MAX_RUNTIME_ATTEMPTS
+            || budget.disk_bytes == 0
+            || budget.disk_bytes > MAX_RUNTIME_DISK_BYTES
+        {
+            return Err(B3Error::BudgetExceeded {
+                field: "runtime intent",
+            });
+        }
+        if let Some(parent) = &self.parent_lease {
+            parent.validate()?;
+            if parent.max_tokens == 0 || parent.max_tokens < budget.tokens {
+                return Err(B3Error::BudgetExceeded {
+                    field: "parent lease",
+                });
+            }
+        }
+        let encoded = serde_json::to_vec(self).map_err(|_| B3Error::RecordTooLong {
+            max: MAX_RUNTIME_INTENT_BYTES,
+        })?;
+        if encoded.len() > MAX_RUNTIME_INTENT_BYTES {
+            return Err(B3Error::RecordTooLong {
+                max: MAX_RUNTIME_INTENT_BYTES,
+            });
+        }
         Ok(())
     }
 }

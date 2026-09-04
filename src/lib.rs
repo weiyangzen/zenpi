@@ -18,6 +18,7 @@ pub mod protocol;
 pub mod render;
 pub mod resources;
 pub mod runtime;
+pub mod runtime_intent;
 pub mod security;
 pub mod session;
 pub mod skills;
