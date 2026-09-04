@@ -62,6 +62,33 @@ fn shifted_enter_and_ctrl_j_insert_multiline_text_without_submitting() {
 }
 
 #[test]
+fn ctrl_c_interrupts_a_busy_turn_without_quitting_the_tui() {
+    let mut state = TuiState::default();
+    state.set_busy(true);
+
+    assert_eq!(
+        state.handle_key(key(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+        TuiAction::Interrupt
+    );
+    assert!(
+        state.is_busy(),
+        "the owner clears busy after processing cancel"
+    );
+
+    // Ctrl-D remains the explicit empty-prompt quit binding, while an idle
+    // Ctrl-C keeps its historical quit behavior for terminal ergonomics.
+    assert_eq!(
+        state.handle_key(key(KeyCode::Char('d'), KeyModifiers::CONTROL)),
+        TuiAction::Quit
+    );
+    state.set_busy(false);
+    assert_eq!(
+        state.handle_key(key(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+        TuiAction::Quit
+    );
+}
+
+#[test]
 fn multiline_cursor_editing_stays_on_utf8_boundaries() {
     let mut state = TuiState::default();
     state.set_input("ab\n世界");

@@ -1057,6 +1057,13 @@ impl TuiState {
         let modifiers = key.modifiers;
         if modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
+                // Ctrl-C is an interrupt while a provider turn is active;
+                // quitting in that state would discard a usable session
+                // instead of returning the user to an idle prompt. Ctrl-D
+                // remains the explicit empty-prompt quit binding.
+                KeyCode::Char('c') if self.input.is_empty() && self.busy => {
+                    return TuiAction::Interrupt;
+                }
                 KeyCode::Char('c') | KeyCode::Char('d') if self.input.is_empty() => {
                     return TuiAction::Quit;
                 }
@@ -1508,7 +1515,7 @@ impl TuiState {
             return;
         }
         let text = truncate_to_width(
-            " Enter send  |  Shift+Enter newline  |  Ctrl-C quit  |  PgUp/PgDn scroll ",
+            " Enter send  |  Shift+Enter newline  |  Ctrl-C interrupt  |  Ctrl-D quit  |  PgUp/PgDn scroll ",
             usize::from(area.width),
         );
         frame.render_widget(
