@@ -133,10 +133,16 @@ window; if the window expires it returns an explicit `runtime_closed` error
 instead of silently dropping the request.
 
 The common local session routes are executable in both hosts: `/session list`
-lists configured journals (including the legacy `~/.zenpi/session.jsonl`), and
-`/session open PATH` switches an idle agent to an existing journal. Other
-session actions remain explicit host errors until their owner adapters are
-accepted.
+lists configured journals (including the legacy `~/.zenpi/session.jsonl`),
+`/session open PATH` switches an idle agent to an existing journal, and
+`/session fork SOURCE DESTINATION`, `/session export SOURCE DESTINATION`, and
+`/session import SOURCE DESTINATION` use explicit clean-source and
+non-overwriting-destination validation. `/session gc` and the in-workspace
+session browser remain explicit host errors until their owner adapters are
+accepted. Learn evidence/checkpoint commands are likewise local and read-only
+with respect to execution: `/learn evidence ID REPOSITORY-RELATIVE-REF`
+stores a bounded hash receipt, while `/learn resume ID` reports a validated
+checkpoint with `zenpi_started: false` until an external owner is present.
 
 Example:
 
@@ -209,9 +215,13 @@ v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下�
 会话可用 `zenpi session list|inspect|fork|export|import|gc` 管理；扩展可用
 `zenpi extension install|list|disable|enable|upgrade|remove` 管理。headless v2
 的 `prompt.attachments` 可引用工作区内的图片或文件，二进制内容不会写入日志。
-两种运行模式都可执行 `/session list` 和 `/session open PATH`；切换只针对已有
-会话文件，旧版 `~/.zenpi/session.jsonl` 也会被列出。其余 session slash 动作
-在 owner adapter 完成前会明确返回错误，不伪造成功。
+两种运行模式都可执行 `/session list`、`/session open PATH`，以及带明确源和目标的
+`/session fork SOURCE DESTINATION`、`/session export SOURCE DESTINATION`、
+`/session import SOURCE DESTINATION`；切换只针对已有会话文件，维护操作拒绝符号链接、
+脏 journal 和已存在目标，旧版 `~/.zenpi/session.jsonl` 也会被列出。`/session gc`、
+工作区内 session 浏览器以及真正的外部执行仍会在 owner adapter 完成前明确返回错误，
+不伪造成功。`/learn evidence ID REPOSITORY-RELATIVE-REF` 只保存有界 hash receipt，
+`/learn resume ID` 只检查持久 checkpoint，不启动 worker。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
 会在不创建、不修改文件的情况下返回错误。
 如果 `steer` 已在 `shutdown` 前被接收但仍等待 turn admission，owned 路径会在有界窗口内先完成取消/重发；超时则明确返回 `runtime_closed`，不会静默丢弃请求。
@@ -255,9 +265,14 @@ Session は `zenpi session list|inspect|fork|export|import|gc`、extension は
 `zenpi extension install|list|disable|enable|upgrade|remove` で管理できます。
 headless v2 の `prompt.attachments` は workspace 内の画像・ファイルを参照し、
 binary data を journal に保存しません。
-両ホストで `/session list` と `/session open PATH` を実行でき、既存 journal のみを
-開きます。旧版 `~/.zenpi/session.jsonl` も一覧に含まれます。その他の session
-slash 操作は owner adapter が受理されるまで明示的にエラーになります。
+両ホストで `/session list`、`/session open PATH`、および明示的な source/destination
+を取る `/session fork SOURCE DESTINATION`、`/session export SOURCE DESTINATION`、
+`/session import SOURCE DESTINATION` を実行できます。保守操作は既存の正常な journal
+だけを source に取り、symlink、壊れた journal、既存 destination を拒否します。旧版
+`~/.zenpi/session.jsonl` も一覧に含まれます。`/session gc`、workspace session browser、
+外部実行は owner adapter が受理されるまで明示的にエラーです。`/learn evidence ID
+REPOSITORY-RELATIVE-REF` は有界 hash receipt だけを保存し、`/learn resume ID` は
+検証済み checkpoint を表示するだけで worker を起動しません。
 パス付き JSONL `resume` も既存の通常 journal だけを開き、欠落またはシンボリック
 リンクの対象はファイルを作成・変更せずエラーにします。
 `shutdown` 前に受理された `steer` が turn admission 待ちの場合、owned 経路は
