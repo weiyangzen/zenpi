@@ -84,6 +84,7 @@ pub fn diff_value_at(
     path: Option<&str>,
 ) -> Result<Value, SlashActionError> {
     let workspace = canonical_workspace(workspace_root.as_ref())?;
+    let requested_path = path.unwrap_or(".").to_owned();
     let relative = match path {
         Some(raw) => Some(resolve_relative(&workspace, raw, true)?),
         None => None,
@@ -94,7 +95,7 @@ pub fn diff_value_at(
         && !target.exists()
         && status.trim().is_empty()
     {
-        return Err(SlashActionError::PathDenied(path_display(target)));
+        return Err(SlashActionError::PathDenied(requested_path));
     }
     let untracked = relative.as_deref().is_some_and(|target| {
         target.is_file()
