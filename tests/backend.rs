@@ -1,15 +1,20 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    mpsc,
+};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tempfile::tempdir;
 use zenpi::backend::{
-    AttachmentKind, BackendError, InputAttachment, OpenAiCompatibleBackend, OpenAiWireApi,
-    ProviderCapabilities,
+    AttachmentKind, Backend, BackendError, CompletionRequest, InputAttachment,
+    OpenAiCompatibleBackend, OpenAiWireApi, ProviderCapabilities, ProviderEvent,
 };
-use zenpi::core::{Agent, TurnInputRequest};
+use zenpi::core::{Agent, Turn, TurnInputRequest, TurnRole};
 use zenpi::session::SessionStore;
 
 fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String> {
@@ -392,6 +397,226 @@ fn cancellation_during_retry_backoff_stops_before_a_second_request() {
     ));
     assert!(started.elapsed() < Duration::from_secs(1));
     server.join().unwrap().unwrap();
+}
+
+#[test]
+fn responses_stream_resumes_after_poll_timeouts_without_a_second_request() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let server = thread::spawn(move || -> Result<(), String> {
+        let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        server_requests.fetch_add(1, Ordering::AcqRel);
+        let headers = read_headers(&mut stream)?;
+        if header_value(&headers, "accept-encoding")? != "identity" {
+            return Err("Responses request did not disable compression".into());
+        }
+        let payload = concat!(
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"cross chunk\"}\n\n",
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"slow-id\"}}\n\n"
+        );
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            payload.len()
+        )
+        .map_err(|error| error.to_string())?;
+        let split = payload
+            .find("cross chunk")
+            .ok_or_else(|| "missing split marker".to_owned())?
+            + 5;
+        stream
+            .write_all(&payload.as_bytes()[..split])
+            .map_err(|error| error.to_string())?;
+        stream.flush().map_err(|error| error.to_string())?;
+        // Cross more than one cancellation-poll interval while an SSE JSON
+        // line is incomplete. The client must retain the partial bytes.
+        thread::sleep(Duration::from_millis(260));
+        stream
+            .write_all(&payload.as_bytes()[split..])
+            .map_err(|error| error.to_string())?;
+        stream.flush().map_err(|error| error.to_string())?;
+
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| error.to_string())?;
+        thread::sleep(Duration::from_millis(150));
+        if listener.accept().is_ok() {
+            return Err("body poll timeout caused a duplicate request".into());
+        }
+        Ok(())
+    });
+    let backend = OpenAiCompatibleBackend::new_with_settings_and_timeout(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+        None,
+        None,
+        Duration::from_secs(3),
+    )
+    .unwrap()
+    .with_max_retries(1)
+    .unwrap();
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(dir.path().join("cross-chunk.jsonl")).unwrap(),
+        Box::new(backend),
+    );
+    let result = agent
+        .process(TurnInputRequest::new("slow cross-chunk stream"))
+        .unwrap();
+    assert_eq!(result.assistant.unwrap().content, "cross chunk");
+    server.join().unwrap().unwrap();
+    assert_eq!(requests.load(Ordering::Acquire), 1);
+}
+
+#[test]
+fn responses_json_fallback_emits_one_completion_sequence() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || -> Result<(), String> {
+        let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        let _ = read_headers(&mut stream)?;
+        let payload = r#"{"id":"json-id","model":"mock-model","output_text":"json fallback"}"#;
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+            payload.len()
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(())
+    });
+    let backend = OpenAiCompatibleBackend::new_with_wire_api(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+    )
+    .unwrap();
+    let turns = [Turn::new("user-1", TurnRole::User, "fallback")];
+    let request = CompletionRequest::new("turn-1", &turns, None, &[]);
+    let mut events = Vec::new();
+    let completion = backend
+        .complete_with_control(request, &|| false, &mut |event| {
+            events.push(event);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(completion.content, "json fallback");
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, ProviderEvent::Completed { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, ProviderEvent::TextDelta { .. }))
+            .count(),
+        1
+    );
+    server.join().unwrap().unwrap();
+}
+
+#[test]
+fn cancellation_interrupts_a_stalled_responses_body_within_poll_deadline() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let (body_started_tx, body_started_rx) = mpsc::sync_channel(1);
+    let server = thread::spawn(move || -> Result<(), String> {
+        let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        server_requests.fetch_add(1, Ordering::AcqRel);
+        let _ = read_headers(&mut stream)?;
+        let partial = concat!(
+            "event: response.created\n",
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"stall-id\"}}\n\n"
+        );
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 1048576\r\nConnection: close\r\n\r\n{partial}"
+        )
+        .map_err(|error| error.to_string())?;
+        stream.flush().map_err(|error| error.to_string())?;
+        body_started_tx
+            .send(())
+            .map_err(|error| error.to_string())?;
+
+        // Dropping an incomplete ureq body must close its socket; this also
+        // proves the cancelled request does not leave a detached reader.
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .map_err(|error| error.to_string())?;
+        let mut byte = [0_u8; 1];
+        match stream.read(&mut byte) {
+            Ok(0) => {}
+            Ok(_) => return Err("cancelled client unexpectedly wrote more request data".into()),
+            Err(error) => return Err(format!("cancelled client did not close socket: {error}")),
+        }
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| error.to_string())?;
+        thread::sleep(Duration::from_millis(150));
+        if listener.accept().is_ok() {
+            return Err("cancelled Responses request was retried".into());
+        }
+        Ok(())
+    });
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let canceller_flag = Arc::clone(&cancelled);
+    let (cancelled_at_tx, cancelled_at_rx) = mpsc::sync_channel(1);
+    let canceller = thread::spawn(move || {
+        body_started_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("fixture never started response body");
+        thread::sleep(Duration::from_millis(40));
+        let at = Instant::now();
+        canceller_flag.store(true, Ordering::Release);
+        cancelled_at_tx.send(at).unwrap();
+    });
+    let backend = OpenAiCompatibleBackend::new_with_settings_and_timeout(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+        None,
+        None,
+        Duration::from_secs(5),
+    )
+    .unwrap()
+    .with_max_retries(2)
+    .unwrap();
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(dir.path().join("cancel-stalled-body.jsonl")).unwrap(),
+        Box::new(backend),
+    );
+    let error = agent
+        .process_with_cancel(TurnInputRequest::new("cancel stalled stream"), || {
+            cancelled.load(Ordering::Acquire)
+        })
+        .unwrap_err();
+    let cancelled_at = cancelled_at_rx.recv().unwrap();
+    assert!(matches!(
+        error,
+        zenpi::core::AgentError::Backend(BackendError::Cancelled)
+    ));
+    assert!(
+        cancelled_at.elapsed() < Duration::from_millis(500),
+        "stalled body cancellation exceeded deadline: {:?}",
+        cancelled_at.elapsed()
+    );
+    canceller.join().unwrap();
+    server.join().unwrap().unwrap();
+    assert_eq!(requests.load(Ordering::Acquire), 1);
 }
 
 #[test]

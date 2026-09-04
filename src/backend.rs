@@ -25,6 +25,10 @@ pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ATTACHMENTS_PER_TURN: usize = 8;
 pub const MAX_ATTACHMENT_BYTES: usize = 10 * 1024 * 1024;
 pub const MAX_TOTAL_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024;
+/// Maximum time a blocking Responses body read may hide a cancellation
+/// request. `ureq` has no external abort handle, so the synchronous adapter
+/// uses short receive-body slices and resumes after ordinary slice expiry.
+const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -472,6 +476,7 @@ pub struct OpenAiCompatibleBackend {
     wire_api: OpenAiWireApi,
     reasoning_effort: Option<String>,
     verbosity: Option<String>,
+    request_timeout: Duration,
     max_retries: u32,
     circuit_failure_threshold: u32,
     circuit_cooldown: Duration,
@@ -488,6 +493,7 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("wire_api", &self.wire_api)
             .field("reasoning_effort", &self.reasoning_effort)
             .field("verbosity", &self.verbosity)
+            .field("request_timeout", &self.request_timeout)
             .field("max_retries", &self.max_retries)
             .field("circuit_failure_threshold", &self.circuit_failure_threshold)
             .field("circuit_cooldown", &self.circuit_cooldown)
@@ -576,11 +582,6 @@ impl OpenAiCompatibleBackend {
         }
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
-            // Keep the per-read deadline aligned with the caller's overall
-            // budget. A short fixed read timeout would reject legitimate
-            // providers that pause between SSE heartbeats; cancellation is
-            // still checked after every received frame.
-            .timeout_recv_body(Some(timeout))
             // Status responses must remain inspectable so Retry-After can be
             // honored. They are converted to the typed error below before a
             // response body reaches any parser.
@@ -594,6 +595,7 @@ impl OpenAiCompatibleBackend {
             wire_api,
             reasoning_effort,
             verbosity,
+            request_timeout: timeout,
             max_retries: 0,
             circuit_failure_threshold: 3,
             circuit_cooldown: Duration::from_secs(2),
@@ -908,6 +910,19 @@ impl OpenAiCompatibleBackend {
             .header("x-idempotency-key", idempotency_key(request.turn_id));
         if let Some(key) = &self.api_key {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
+        }
+        // Only the streaming Responses adapter can safely treat a short body
+        // timeout as a cancellation poll. Chat JSON remains one bounded read
+        // under the caller's ordinary total timeout.
+        if self.wire_api == OpenAiWireApi::Responses {
+            request_builder = request_builder
+                // A decompressor may not be resumable after an underlying
+                // timeout. SSE is already text and benefits little from
+                // compression, so keep cancellation polling on raw bytes.
+                .header("accept-encoding", "identity")
+                .config()
+                .timeout_recv_body(Some(CANCEL_POLL_INTERVAL.min(self.request_timeout)))
+                .build();
         }
         let mut response = request_builder.send_json(&body).map_err(map_ureq_error)?;
         let status = response.status().as_u16();
@@ -1470,10 +1485,10 @@ fn read_responses_stream(
     cancelled: &dyn Fn() -> bool,
     sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
 ) -> Result<Completion, BackendError> {
-    use std::io::{BufRead, BufReader};
+    use std::io::Read;
 
     let configured = body.with_config().limit(MAX_RESPONSE_BYTES as u64).reader();
-    let mut reader = BufReader::new(configured);
+    let mut reader = configured;
     // Some OpenAI-compatible proxies ignore `stream:true` and return a
     // regular Responses JSON object. Accept that shape as a compatibility
     // fallback while keeping the normal path event-aware.
@@ -1485,157 +1500,60 @@ fn read_responses_stream(
     let mut response_id: Option<String> = None;
     let mut refusal: Option<String> = None;
     let mut annotations = Vec::new();
-    let mut line_buffer = String::new();
-    while reader
-        .read_line(&mut line_buffer)
-        .map_err(|error| BackendError::Transport(error.to_string()))?
-        > 0
-    {
+    let mut pending = Vec::new();
+    let mut chunk = [0_u8; 16 * 1024];
+    loop {
         if cancelled() {
             return Err(BackendError::Cancelled);
         }
-        let line = std::mem::take(&mut line_buffer);
-        let clean_line = line
-            .trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
-        if clean_line.starts_with('{') && !clean_line.contains("data:") {
-            let payload: Value = serde_json::from_str(clean_line).map_err(|error| {
-                BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
-            })?;
-            let completion = completion_from_responses_json(&payload)?;
-            emit_completion_events(&completion, sink)?;
-            return Ok(completion);
-        }
-        let Some(data) = clean_line.strip_prefix("data:") else {
-            continue;
+        let read = match reader.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(error) if is_recv_body_poll_timeout(&error) => {
+                if cancelled() {
+                    return Err(BackendError::Cancelled);
+                }
+                // This timeout is intentionally a cancellation poll, not a
+                // provider failure. ureq retains the body handler and its
+                // global deadline, so a later chunk can continue the same SSE
+                // frame without opening a second request.
+                continue;
+            }
+            Err(error) => return Err(BackendError::Transport(error.to_string())),
         };
-        // Some compatible gateways pad SSE frames with NUL bytes between
-        // events. They are transport padding, not part of the JSON payload.
-        let data = data
-            .trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
-        if data.is_empty() || data == "[DONE]" {
-            continue;
+        pending.extend_from_slice(&chunk[..read]);
+        while let Some(newline) = pending.iter().position(|byte| *byte == b'\n') {
+            let line = pending.drain(..=newline).collect::<Vec<_>>();
+            process_responses_line(
+                &line,
+                &mut content,
+                &mut usage,
+                &mut model,
+                &mut saw_completed,
+                &mut tool_calls,
+                &mut response_id,
+                &mut refusal,
+                &mut annotations,
+                sink,
+            )?;
         }
-        let event: Value = serde_json::from_str(data).map_err(|error| {
-            BackendError::InvalidResponse(format!("invalid SSE event: {error}"))
-        })?;
-        match event.get("type").and_then(Value::as_str) {
-            Some("response.output_text.delta") => {
-                if let Some(delta) = event.get("delta").and_then(Value::as_str) {
-                    content.push_str(delta);
-                    sink(ProviderEvent::TextDelta {
-                        delta: delta.to_owned(),
-                    })?;
-                }
-            }
-            Some("response.output_text.done") => {
-                if let Some(value) = event.get("text").and_then(Value::as_str) {
-                    if content.is_empty() {
-                        content.push_str(value);
-                    }
-                    sink(ProviderEvent::TextDone {
-                        text: value.to_owned(),
-                    })?;
-                }
-            }
-            Some("response.created") => {
-                let response = event.get("response").unwrap_or(&event);
-                response_id = response
-                    .get("id")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned);
-                model = response
-                    .get("model")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned);
-                sink(ProviderEvent::ResponseCreated {
-                    response_id: response_id.clone(),
-                    model: model.clone(),
-                })?;
-            }
-            Some("response.output_item.done") => {
-                if let Some(item) = event.get("item")
-                    && item.get("type").and_then(Value::as_str) == Some("function_call")
-                    && let Some(call) = parse_response_function_call(item)
-                {
-                    push_unique_tool_call(&mut tool_calls, call);
-                    if let Some(call) = tool_calls.last().cloned() {
-                        sink(ProviderEvent::ToolCallDone { call })?;
-                    }
-                }
-            }
-            Some("response.function_call_arguments.delta") => {
-                sink(ProviderEvent::ToolCallDelta {
-                    call_id: event
-                        .get("call_id")
-                        .and_then(Value::as_str)
-                        .map(str::to_owned),
-                    name: event.get("name").and_then(Value::as_str).map(str::to_owned),
-                    arguments_delta: event
-                        .get("delta")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned(),
-                })?;
-            }
-            Some("response.function_call_arguments.done") => {
-                if let Some(call_id) = event.get("call_id").and_then(Value::as_str)
-                    && let Some(name) = event.get("name").and_then(Value::as_str)
-                {
-                    let arguments = event
-                        .get("arguments")
-                        .and_then(Value::as_str)
-                        .unwrap_or("{}");
-                    let call = parse_tool_call(call_id, name, arguments)?;
-                    push_unique_tool_call(&mut tool_calls, call.clone());
-                    sink(ProviderEvent::ToolCallDone { call })?;
-                }
-            }
-            Some("response.completed") => {
-                saw_completed = true;
-                let response = event.get("response").unwrap_or(&event);
-                usage = response.get("usage").and_then(parse_usage);
-                model = response
-                    .get("model")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned);
-                response_id = response
-                    .get("id")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-                    .or(response_id);
-                refusal = extract_responses_refusal(response);
-                annotations = extract_annotations(response);
-                if let Some(usage_value) = response.get("usage")
-                    && let Some(parsed) = parse_usage(usage_value)
-                {
-                    sink(ProviderEvent::Usage { usage: parsed })?;
-                }
-                sink(ProviderEvent::Completed {
-                    response_id: response_id.clone(),
-                    model: model.clone(),
-                })?;
-            }
-            Some("response.refusal.delta") | Some("response.refusal.done") => {
-                if let Some(value) = event
-                    .get("delta")
-                    .or_else(|| event.get("text"))
-                    .and_then(Value::as_str)
-                {
-                    refusal.get_or_insert_with(String::new).push_str(value);
-                    sink(ProviderEvent::Refusal {
-                        text: value.to_owned(),
-                    })?;
-                }
-            }
-            Some("response.failed") | Some("error") => {
-                let message = extract_responses_error(&event);
-                let _ = sink(ProviderEvent::Failed {
-                    message: message.clone(),
-                });
-                return Err(BackendError::InvalidResponse(message));
-            }
-            _ => {}
-        }
+    }
+    if !pending.is_empty() {
+        process_responses_line(
+            &pending,
+            &mut content,
+            &mut usage,
+            &mut model,
+            &mut saw_completed,
+            &mut tool_calls,
+            &mut response_id,
+            &mut refusal,
+            &mut annotations,
+            sink,
+        )?;
+    }
+    if cancelled() {
+        return Err(BackendError::Cancelled);
     }
     if !saw_completed {
         return Err(BackendError::InvalidResponse(
@@ -1665,6 +1583,180 @@ fn read_responses_stream(
         refusal,
         annotations,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_responses_line(
+    line: &[u8],
+    content: &mut String,
+    usage: &mut Option<Usage>,
+    model: &mut Option<String>,
+    saw_completed: &mut bool,
+    tool_calls: &mut Vec<ToolCall>,
+    response_id: &mut Option<String>,
+    refusal: &mut Option<String>,
+    annotations: &mut Vec<Value>,
+    sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+) -> Result<(), BackendError> {
+    let line = std::str::from_utf8(line).map_err(|error| {
+        BackendError::InvalidResponse(format!("Responses stream is not valid UTF-8: {error}"))
+    })?;
+    let clean_line =
+        line.trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
+    if clean_line.starts_with('{') && !clean_line.contains("data:") {
+        let payload: Value = serde_json::from_str(clean_line).map_err(|error| {
+            BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
+        })?;
+        let completion = completion_from_responses_json(&payload)?;
+        emit_completion_events(&completion, sink)?;
+        *content = completion.content;
+        *usage = completion.usage;
+        *model = completion.model;
+        *tool_calls = completion.tool_calls;
+        *response_id = completion.response_id;
+        *refusal = completion.refusal;
+        *annotations = completion.annotations;
+        *saw_completed = true;
+        return Ok(());
+    }
+    let Some(data) = clean_line.strip_prefix("data:") else {
+        return Ok(());
+    };
+    // Some compatible gateways pad SSE frames with NUL bytes between
+    // events. They are transport padding, not part of the JSON payload.
+    let data =
+        data.trim_matches(|character: char| character == '\0' || character.is_ascii_whitespace());
+    if data.is_empty() || data == "[DONE]" {
+        return Ok(());
+    }
+    let event: Value = serde_json::from_str(data)
+        .map_err(|error| BackendError::InvalidResponse(format!("invalid SSE event: {error}")))?;
+    match event.get("type").and_then(Value::as_str) {
+        Some("response.output_text.delta") => {
+            if let Some(delta) = event.get("delta").and_then(Value::as_str) {
+                content.push_str(delta);
+                sink(ProviderEvent::TextDelta {
+                    delta: delta.to_owned(),
+                })?;
+            }
+        }
+        Some("response.output_text.done") => {
+            if let Some(value) = event.get("text").and_then(Value::as_str) {
+                if content.is_empty() {
+                    content.push_str(value);
+                }
+                sink(ProviderEvent::TextDone {
+                    text: value.to_owned(),
+                })?;
+            }
+        }
+        Some("response.created") => {
+            let response = event.get("response").unwrap_or(&event);
+            *response_id = response
+                .get("id")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            *model = response
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            sink(ProviderEvent::ResponseCreated {
+                response_id: response_id.clone(),
+                model: model.clone(),
+            })?;
+        }
+        Some("response.output_item.done") => {
+            if let Some(item) = event.get("item")
+                && item.get("type").and_then(Value::as_str) == Some("function_call")
+                && let Some(call) = parse_response_function_call(item)
+            {
+                push_unique_tool_call(tool_calls, call);
+                if let Some(call) = tool_calls.last().cloned() {
+                    sink(ProviderEvent::ToolCallDone { call })?;
+                }
+            }
+        }
+        Some("response.function_call_arguments.delta") => {
+            sink(ProviderEvent::ToolCallDelta {
+                call_id: event
+                    .get("call_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                name: event.get("name").and_then(Value::as_str).map(str::to_owned),
+                arguments_delta: event
+                    .get("delta")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+            })?;
+        }
+        Some("response.function_call_arguments.done") => {
+            if let Some(call_id) = event.get("call_id").and_then(Value::as_str)
+                && let Some(name) = event.get("name").and_then(Value::as_str)
+            {
+                let arguments = event
+                    .get("arguments")
+                    .and_then(Value::as_str)
+                    .unwrap_or("{}");
+                let call = parse_tool_call(call_id, name, arguments)?;
+                push_unique_tool_call(tool_calls, call.clone());
+                sink(ProviderEvent::ToolCallDone { call })?;
+            }
+        }
+        Some("response.completed") => {
+            *saw_completed = true;
+            let response = event.get("response").unwrap_or(&event);
+            *usage = response.get("usage").and_then(parse_usage);
+            *model = response
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            *response_id = response
+                .get("id")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .or_else(|| response_id.clone());
+            *refusal = extract_responses_refusal(response);
+            *annotations = extract_annotations(response);
+            if let Some(usage_value) = response.get("usage")
+                && let Some(parsed) = parse_usage(usage_value)
+            {
+                sink(ProviderEvent::Usage { usage: parsed })?;
+            }
+            sink(ProviderEvent::Completed {
+                response_id: response_id.clone(),
+                model: model.clone(),
+            })?;
+        }
+        Some("response.refusal.delta") | Some("response.refusal.done") => {
+            if let Some(value) = event
+                .get("delta")
+                .or_else(|| event.get("text"))
+                .and_then(Value::as_str)
+            {
+                refusal.get_or_insert_with(String::new).push_str(value);
+                sink(ProviderEvent::Refusal {
+                    text: value.to_owned(),
+                })?;
+            }
+        }
+        Some("response.failed") | Some("error") => {
+            let message = extract_responses_error(&event);
+            let _ = sink(ProviderEvent::Failed {
+                message: message.clone(),
+            });
+            return Err(BackendError::InvalidResponse(message));
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn is_recv_body_poll_timeout(error: &std::io::Error) -> bool {
+    error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<ureq::Error>())
+        .is_some_and(|error| matches!(error, ureq::Error::Timeout(ureq::Timeout::RecvBody)))
 }
 
 fn completion_from_responses_json(payload: &Value) -> Result<Completion, BackendError> {
