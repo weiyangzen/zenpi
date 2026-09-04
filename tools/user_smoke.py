@@ -581,8 +581,12 @@ def read_pty_until_exit(pid: int, fd: int, deadline: float) -> tuple[int, bytes]
                     status = wait_status
                     break
     if status is None:
-        os.kill(pid, signal.SIGTERM)
-        _, status = os.waitpid(pid, 0)
+        status = terminate_pty_child(pid)
+        if status is None:
+            raise AssertionError(
+                "TUI did not exit before deadline and could not be reaped; "
+                f"output={bytes(output)!r}"
+            )
         raise AssertionError(f"TUI did not exit before deadline; output={bytes(output)!r}")
     for _ in range(3):
         ready, _, _ = select.select([fd], [], [], 0.1)
@@ -595,10 +599,92 @@ def read_pty_until_exit(pid: int, fd: int, deadline: float) -> tuple[int, bytes]
     return os.waitstatus_to_exitcode(status), bytes(output)
 
 
-def wait_for_tui_turn(session: Path, timeout: float = 10) -> None:
-    """Wait for the synchronous echo turn to be durable before quitting."""
+def terminate_pty_child(pid: int, grace: float = 0.5) -> int | None:
+    """Terminate and reap a PTY child without blocking the smoke runner.
+
+    A child can be blocked in a full-screen write when the test harness has
+    not drained the master side. Waiting unconditionally after SIGTERM would
+    then strand the whole smoke run, so use a short graceful window followed
+    by SIGKILL and non-blocking reap attempts.
+    """
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        pass
+    deadline = time.monotonic() + max(grace, 0.0)
+    while time.monotonic() < deadline:
+        try:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+        except (OSError, ChildProcessError):
+            return None
+        if waited == pid:
+            return status
+        time.sleep(0.02)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except (OSError, ProcessLookupError):
+        pass
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        try:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+        except (OSError, ChildProcessError):
+            return None
+        if waited == pid:
+            return status
+        time.sleep(0.02)
+    return None
+
+
+def drain_pty(fd: int, output: bytearray, timeout: float = 0.0) -> bool:
+    """Drain queued PTY output without blocking.
+
+    Production terminals continuously consume redraws. The smoke harness must
+    do the same while it waits on a journal file; otherwise a multiline
+    prompt can fill the PTY buffer and stop the child before it reads Enter.
+    """
+    drained = False
+    deadline = time.monotonic() + max(timeout, 0.0)
+    while True:
+        if timeout > 0 and time.monotonic() >= deadline:
+            break
+        remaining = deadline - time.monotonic()
+        wait = min(0.05, remaining) if timeout > 0 else 0.0
+        if wait < 0:
+            wait = 0.0
+        ready, _, _ = select.select([fd], [], [], wait)
+        if not ready:
+            break
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        output.extend(chunk)
+        drained = True
+    return drained
+
+
+def wait_for_tui_turn(
+    session: Path,
+    timeout: float = 10,
+    *,
+    fd: int | None = None,
+    output: bytearray | None = None,
+) -> None:
+    """Wait for the synchronous echo turn to be durable before quitting.
+
+    When a PTY is supplied, drain redraws during the journal wait just as a
+    real terminal would. Keeping this optional preserves the helper's use in
+    non-PTY checks while preventing output back-pressure in interactive tests.
+    """
+    if (fd is None) != (output is None):
+        raise ValueError("fd and output must be provided together")
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if fd is not None and output is not None:
+            drain_pty(fd, output, min(0.05, max(0.0, deadline - time.monotonic())))
         try:
             records = json_lines(session.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
@@ -609,7 +695,7 @@ def wait_for_tui_turn(session: Path, timeout: float = 10) -> None:
             for record in records
         ):
             return
-        time.sleep(0.05)
+        time.sleep(0.01)
     raise AssertionError("TUI did not persist the submitted turn before exit")
 
 
@@ -647,7 +733,7 @@ def assert_tui(binary: Path, root: Path) -> None:
         os.write(fd, b"\r")
         # Enter synchronously completes the deterministic echo turn. Wait for
         # its journal record so a slow CI host cannot race Ctrl-C with Enter.
-        wait_for_tui_turn(session)
+        wait_for_tui_turn(session, fd=fd, output=output)
         os.write(fd, b"\x03")
         # Some Linux PTY setups deliver Ctrl-C as a signal rather than as a
         # crossterm key event. Ctrl-D is the TUI's empty-input quit binding and
@@ -662,11 +748,7 @@ def assert_tui(binary: Path, root: Path) -> None:
         output.extend(trailing)
     except BaseException:
         if not exited:
-            try:
-                os.kill(pid, signal.SIGTERM)
-                os.waitpid(pid, 0)
-            except (OSError, ChildProcessError):
-                pass
+            terminate_pty_child(pid)
         raise
     finally:
         try:
@@ -732,7 +814,7 @@ def assert_tui_multiline_paste(binary: Path, root: Path) -> None:
         )
         time.sleep(0.1)
         os.write(fd, b"\r")
-        wait_for_tui_turn(session)
+        wait_for_tui_turn(session, fd=fd, output=output)
 
         # Ctrl-D is the deterministic empty-prompt quit binding across PTY
         # implementations; Ctrl-C is intentionally reserved for interrupt.
@@ -742,11 +824,7 @@ def assert_tui_multiline_paste(binary: Path, root: Path) -> None:
         output.extend(trailing)
     except BaseException:
         if not exited:
-            try:
-                os.kill(pid, signal.SIGTERM)
-                os.waitpid(pid, 0)
-            except (OSError, ChildProcessError):
-                pass
+            terminate_pty_child(pid)
         raise
     finally:
         try:
@@ -839,11 +917,7 @@ def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
         output.extend(trailing)
     finally:
         if not exited:
-            try:
-                os.kill(pid, signal.SIGTERM)
-                os.waitpid(pid, 0)
-            except (OSError, ChildProcessError):
-                pass
+            terminate_pty_child(pid)
         os.close(fd)
         server_thread.join(timeout=3)
         server.server_close()
