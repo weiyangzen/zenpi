@@ -88,9 +88,12 @@ scheduling decisions:
    hides a nested agent.
 4. The append-only session journal records user input, assistant output,
    selected operation/lifecycle markers, errors, and handoffs in sequence order.
-   Not every in-memory provider/AgentEvent is durable yet; durable event parity
-   remains a v2 acceptance row. A resume validates the sequence and ignores a
-   truncated final line rather than corrupting prior records.
+   Validated journal envelopes retain their durable sequence for bounded local
+   `/resume` paging; `/compact` records a deterministic checkpoint and later
+   provider turns verify/reconstruct it after restart. Not every in-memory
+   provider/AgentEvent is durable yet; durable event parity remains a v2
+   acceptance row. A resume validates the sequence and ignores a truncated
+   final line rather than corrupting prior records.
 5. A result manifest records changed repository-relative paths, validation
    commands/outcomes, and a checksum. Workers can self-test (`[_]`), while only
    the canonical Master can accept (`[x]`).
@@ -147,7 +150,10 @@ Request IDs use the same bounded non-control Unicode identifier grammar (at
 most 128 UTF-8 bytes) for requests and cancellation targets. A path-bearing
 `resume` opens an existing regular journal only; it never creates a missing
 target. A `resume` request selects either a session `path` or an in-process
-`from_sequence`, never both. Ordinary
+`from_sequence`, never both. Typed slash `/resume [sequence]` additionally
+pages a bounded durable journal projection and records a `session_resumed`
+marker; `/compact` records a deterministic context checkpoint without a
+provider call. Ordinary
 terminal responses are replayable by ID; a sequence replay re-emits its event
 suffix on each retry.
 Event sequence numbers are process-global within one host; switching session

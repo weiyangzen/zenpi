@@ -1043,6 +1043,17 @@ pub fn resume_session_view(
     }
     let first_available = session.records().first().map(|record| record.sequence);
     let last_available = session.records().last().map(|record| record.sequence);
+    let recovery_warnings = session
+        .recovery_warnings()
+        .iter()
+        .take(32)
+        .map(|warning| {
+            json!({
+                "line": warning.line,
+                "reason": bound_slash_text(&warning.reason, 512),
+            })
+        })
+        .collect::<Vec<_>>();
     let from_sequence = requested_sequence.unwrap_or_else(|| {
         last_available
             .or(first_available)
@@ -1139,6 +1150,7 @@ pub fn resume_session_view(
         "replay_cursor": replay_cursor,
         "next_sequence": next_sequence,
         "marker_sequence": marker_sequence,
+        "recovery_warnings": recovery_warnings,
         "recovered_operations": recovered_operations,
         "records": records,
     }))
