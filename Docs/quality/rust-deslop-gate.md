@@ -26,10 +26,11 @@ states fail closed before mutation.
 
 Recorded gate result on 2026-09-04: format, strict Clippy, and all-target/all-
 feature locked tests passed, including provider retry/multimodal fixtures,
-live steer, replay protection, extensions, governance, recovery, diagnostics,
-and security. The release headless smoke emitted 15 typed records with one
-durable prompt path, and `python3 tools/check_modes.py` reported exactly
-`tui/headless`. The installed release smoke passed isolated install,
-cross-process resume, a Responses fixture, resize, streaming interruption,
-and PTY terminal restoration. A separate production archive passed SHA-256,
-SBOM, credential/fixture scan, and packaged-binary execution.
+live steer, bounded duplicate-ID handling, extensions, governance, recovery,
+diagnostics, and security. The release headless smoke emitted 15 typed records
+with one durable prompt path, and `python3 tools/check_modes.py` reported
+exactly `tui/headless`. The installed release smoke passed isolated install,
+cross-process resume, a Responses fixture, resize, interrupt/cleanup handling,
+and PTY terminal restoration. Full socket-cancellation and end-user v2
+acceptance remain open in the v2 Blueprint. A separate production archive
+passed SHA-256, SBOM, credential/fixture scan, and packaged-binary execution.

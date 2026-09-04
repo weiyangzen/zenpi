@@ -28,11 +28,13 @@ in an archive. A failed smoke or checksum step prevents publication.
 - Archive inventory: binary, multilingual README, license, and CycloneDX SBOM
   only; the credential/fixture path scan returned no matches.
 - Installed release smoke: isolated Cargo install, Responses streaming fixture,
-  cross-process session resume, PTY resize, in-flight cancellation, and terminal
-  restoration passed.
-- Real imported profile: `config doctor --profile codex --json` reported a
-  Responses profile and credential presence without revealing the credential.
-  A real provider request returned `ZENPI_REAL_FRAMEWORK_OK` earlier in the same
-  acceptance run. A later repeat reached the configured gateway but received
-  its explicit usage-limit error; zenpi surfaced that provider error and did not
-  substitute echo. No credential value is recorded in this receipt.
+  cross-process session resume, PTY resize, interrupt/cleanup handling, and
+  terminal restoration passed. Socket-level cancellation of a blocking
+  provider read remains a documented v2 gap.
+- Real imported profile (host-local observation): `config doctor --profile
+  codex --json` reported a Responses profile and credential presence without
+  revealing the credential. A real provider request was attempted earlier in
+  the same acceptance run; a later repeat reached the configured gateway but
+  received its explicit usage-limit error. zenpi surfaced that provider error
+  and did not substitute echo. No credential value is recorded in this receipt;
+  this is not the v2 end-user acceptance gate.

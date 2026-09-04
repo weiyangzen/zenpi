@@ -2,9 +2,10 @@
 
 This is a reproducible renderer gate, not a claim about provider latency. The
 release uses Ratatui's single `TestBackend`/terminal buffer and a 16 ms dirty
-scheduler. Production provider work runs on the owned background runtime, so
-input, resize, approval, cancellation, and streaming rendering remain live
-while a remote request is active.
+scheduler. In the production owned/async path, provider work runs on the
+background runtime so input, resize, approval, cancellation, and streaming
+rendering remain cooperatively live while a remote request is active. Blocking
+Chat/`ureq` socket reads and queue-overflow behavior remain explicit v2 gaps.
 
 ## Checks
 
@@ -26,7 +27,7 @@ the terminal backend reports panics directly.
 ## Acceptance evidence
 
 On the final validation host, `cargo test --test tui_resize -- --nocapture`
-passes all three tests. `TuiState::render` invalidates its cached transcript on a
+passes the full resize suite. `TuiState::render` invalidates its cached transcript on a
 dimension change, clamps zero/one-cell areas, and lets Ratatui perform the
 buffer diff. `TerminalGuard` owns raw mode, alternate screen, cursor, and
 bracketed-paste cleanup; its `Drop` path is used on errors and normal exits.

@@ -1,8 +1,11 @@
 # zenpi Execution Blueprint
 
-> **Authoritative checklist.** This is the only mutable requirement and state
-> surface for the zenpi execution. Workers never write `[x]`. A worker or the
-> controller may move `[ ]` to `[_]` only after a checksum-valid self-tested
+> **Frozen v1 execution receipt.** This file records the historical v1
+> checklist and is retained for migration/audit; its checkmarks are not proof
+> of end-user product usability. The v2 review draft is the current product
+> status document until its Master acceptance gate passes. This remains the
+> only mutable v1 requirement and state surface. Workers never write `[x]`. A
+> worker or the controller may move `[ ]` to `[_]` only after a checksum-valid self-tested
 > handoff; only the canonical Master may move `[_]` to `[x]` after integration
 > and the applicable gates pass. The companion
 > `Docs/Zenpi_Execution_Gantt.md` is a read-only projection, never another
@@ -45,8 +48,9 @@ nested_agents: forbidden
   telemetry and is not an acceptance limit.
 - The original `ZP-*` rows below are historical foundation rows. The `CF-*`
   rows are the complete-framework contract requested on 2026-09-04 and are
-  authoritative work, not a 5,000-item count: each row independently forecasts
-  fewer than 5,000 lines of implementation/test code.
+  historical v1 work, not a 5,000-item count: each row independently forecasts
+  fewer than 5,000 lines of implementation/test code. They do not establish
+  end-user acceptance or supersede the v2 audit.
 - The Master harvests a checksum-valid `result.json` before pruning a claim,
   applies only the declared patch, reruns gates, reconciles README/spec/Gantt,
   and then changes `[_]` to `[x]`. A failed validation preserves the handoff
@@ -155,13 +159,15 @@ nested_agents: forbidden
 | R2 | ZP-301..ZP-304 | Master-only reconciliation and publication sequence |
 | F0-F7 | CF-001..CF-705 | Complete-framework DAG; rows remain open until their own acceptance tests pass |
 
-## Completion checklist
+## Historical v1 completion checklist
 
-Writing this file is not completion. The objective is complete only when all
+Writing this file is not current product acceptance. The historical v1
+workflow receipt was complete only when all
 required rows, including all `CF-*` complete-framework rows, are `[x]`, every
 row carries a strict `Estimated LOC < 5000`
 value with durable validation evidence, no `[ ]` or `[_]`/repair/integration
 remains, the Gantt projection is current, the binary exposes only `tui` and
 `headless`, and the `weiyangzen/zenpi` draft2repo receipt proves the remote
 while the local source remains present. Aggregate repository LOC may be
-reported for visibility but is not this Blueprint's acceptance cap.
+reported for visibility but is not this Blueprint's acceptance cap. Current
+end-user usability is governed by the v2 audit and its `V2-999` gate.

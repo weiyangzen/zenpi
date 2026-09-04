@@ -461,16 +461,37 @@ fn read_headers(stream: &mut TcpStream) -> Result<String, String> {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| error.to_string())?;
     let mut request = Vec::new();
-    let mut chunk = [0_u8; 4096];
-    loop {
+    let header_end = loop {
+        let mut chunk = [0_u8; 4096];
         let count = stream.read(&mut chunk).map_err(|error| error.to_string())?;
         if count == 0 {
             return Err("client closed before sending headers".into());
         }
         request.extend_from_slice(&chunk[..count]);
-        if request.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
+        if let Some(index) = request.windows(4).position(|window| window == b"\r\n\r\n") {
+            break index + 4;
         }
+    };
+    // Drain the request body before sending the fixture response.  Closing a
+    // loopback socket with unread request bytes can produce an OS-level RST;
+    // ureq then surfaces that as a transient `Invalid argument` transport
+    // error, which made the retry matrix flaky rather than testing retries.
+    let headers = String::from_utf8_lossy(&request[..header_end]);
+    let content_length = headers
+        .lines()
+        .find_map(|line| {
+            line.split_once(':')
+                .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+        })
+        .unwrap_or(0);
+    while request.len() < header_end.saturating_add(content_length) {
+        let mut chunk = [0_u8; 4096];
+        let count = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+        if count == 0 {
+            return Err("client closed before sending request body".into());
+        }
+        request.extend_from_slice(&chunk[..count]);
     }
     Ok(String::from_utf8_lossy(&request).into_owned())
 }

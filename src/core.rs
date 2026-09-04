@@ -1419,11 +1419,24 @@ impl Agent {
             return Err(AgentError::NotIdle);
         }
         let replacement = SessionStore::open(path.into())?;
+        let replacement_governance = self
+            .governance
+            .as_ref()
+            .map(|ledger| {
+                crate::governance::BudgetLedger::restore(&replacement, ledger.limits())
+                    .map_err(|error| AgentError::Governance(error.to_string()))
+            })
+            .transpose()?;
         self.session = replacement;
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
         self.active_attachments.clear();
         self.last_error = None;
+        // Events belong to the session that produced them. Do not let
+        // recovery or lifecycle notifications from the previous journal leak
+        // into the first request on the replacement session.
+        self.events.clear();
+        self.governance = replacement_governance;
         Ok(())
     }
 

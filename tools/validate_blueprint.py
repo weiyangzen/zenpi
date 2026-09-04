@@ -83,6 +83,30 @@ def _yaml_header(text: str) -> dict[str, Any]:
     return result
 
 
+def _is_explicit_review_draft(path: Path) -> bool:
+    """Return true for a Blueprint-shaped document explicitly marked non-authoritative.
+
+    Versioned review drafts live next to the frozen v1 document so they are
+    easy for operators to discover.  They must not make the single-authority
+    gate fail merely by existing, but a malformed or unmarked Blueprint still
+    remains an error candidate rather than being silently ignored.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        header = _yaml_header(text)
+    except (OSError, UnicodeError, BlueprintError):
+        return False
+    if header.get("authoritative") is not False:
+        return False
+    # A review draft is excluded from the v1 single-authority candidate list
+    # only when it is structurally a v2 document.  A file with a false flag
+    # but malformed rows must still surface as a candidate error instead of
+    # disappearing from validation.
+    return header.get("schema_version") == "execution-blueprint/v2" and bool(
+        re.search(r"\bV2-[0-9]{3}\b", text)
+    )
+
+
 def _field(row: str, name: str, next_names: Iterable[str]) -> str:
     names = "|".join(re.escape(item) for item in next_names)
     boundary = rf"(?=\s*\|\s*(?:{names}):|$)" if names else r"(?=$)"
@@ -419,7 +443,9 @@ def validate(root: Path = ROOT) -> dict[str, Any]:
         candidates = sorted(
             path.relative_to(root).as_posix()
             for path in docs_dir.rglob("*Blueprint*.md")
-            if path.is_file() and not path.is_symlink()
+            if path.is_file()
+            and not path.is_symlink()
+            and not _is_explicit_review_draft(path)
         )
         if candidates != [BLUEPRINT_REL.as_posix()]:
             errors.append(

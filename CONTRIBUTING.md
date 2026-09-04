@@ -15,6 +15,7 @@ cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets --all-features --locked
 python3 tools/validate_blueprint.py
+python3 tools/validate_blueprint_v2.py
 python3 tools/generate_gantt.py
 python3 tools/check_rust_loc.py
 python3 tools/check_modes.py

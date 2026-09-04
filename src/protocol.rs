@@ -97,6 +97,12 @@ pub struct StdioRequest {
 /// it into the core without cloning potentially large prompt text.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
+    /// A typed local slash command carried over the headless transport.  The
+    /// command text is parsed by the shared slash grammar and is never
+    /// submitted as a provider prompt.
+    Slash {
+        input: String,
+    },
     Prompt {
         text: String,
         mode: TurnMode,
@@ -144,6 +150,13 @@ impl StdioRequest {
         validate_optional_field(self.expected_turn_id.as_deref(), "expected_turn_id", 256)?;
         validate_optional_field(self.path.as_deref(), "path", 4096)?;
         match self.kind.as_str() {
+            "command" | "slash" => {
+                let input = bounded_text(self.text.or(self.message), "command")?;
+                if !input.trim_start().starts_with('/') {
+                    return Err(ProtocolError::InvalidField { field: "command" });
+                }
+                Ok(Command::Slash { input })
+            }
             "prompt" => Ok(Command::Prompt {
                 text: bounded_text(self.text.or(self.message), "prompt")?,
                 mode: self.mode.unwrap_or_default(),
@@ -194,10 +207,15 @@ impl StdioRequest {
                     artifacts: self.artifacts,
                 })
             }
-            "resume" => Ok(Command::Resume {
-                path: self.path,
-                from_sequence: self.from_sequence,
-            }),
+            "resume" => {
+                if self.path.is_some() && self.from_sequence.is_some() {
+                    return Err(ProtocolError::InvalidField { field: "resume" });
+                }
+                Ok(Command::Resume {
+                    path: self.path,
+                    from_sequence: self.from_sequence,
+                })
+            }
             "approve" | "approval" => {
                 let approval_id = self.approval_id.ok_or(ProtocolError::MissingField {
                     field: "approval_id",
@@ -237,10 +255,7 @@ fn validate_id(id: Option<&str>) -> Result<(), ProtocolError> {
             max: MAX_ID_BYTES,
         });
     }
-    if id.chars().any(char::is_control) {
-        return Err(ProtocolError::InvalidField { field: "id" });
-    }
-    Ok(())
+    validate_identifier(id, "id")
 }
 
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), ProtocolError> {
@@ -253,10 +268,7 @@ fn validate_identifier(value: &str, field: &'static str) -> Result<(), ProtocolE
             max: MAX_ID_BYTES,
         });
     }
-    if value
-        .chars()
-        .any(|character| !(character.is_ascii_alphanumeric() || "._:/-".contains(character)))
-    {
+    if value.chars().any(char::is_control) {
         return Err(ProtocolError::InvalidField { field });
     }
     Ok(())
@@ -506,6 +518,7 @@ pub fn encode_line<T: Serialize>(value: &T) -> Result<String, serde_json::Error>
 /// name without matching every enum variant.
 pub fn command_name(command: &Command) -> &'static str {
     match command {
+        Command::Slash { .. } => "command",
         Command::Prompt { .. } => "prompt",
         Command::Steer { .. } => "steer",
         Command::Cancel { .. } => "cancel",

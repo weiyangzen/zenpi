@@ -21,10 +21,12 @@ gate the aggregate by default. An operator may supply `--max-lines` for an
 ad-hoc diagnostic, but that optional check is not this Blueprint's acceptance
 gate.
 
-The final validation run recorded `5164` physical lines across 17 files (4604
-under `src/`, 560 under `tests/`). That count may exceed 5,000 because the
-acceptance rule is evaluated independently per row; the maximum declared
-per-item estimate is `1400`.
+The latest validation command reports the current physical inventory; this
+informational value changes as source and tests evolve and may exceed 5,000
+because the acceptance rule is evaluated independently per row. It is not a
+project-wide cap. The authoritative v1 validator's maximum declared per-item
+estimate is `3200`; the v2 review draft's maximum is `2800`. Both satisfy the
+strict per-item `<5000` rule.
 
 Dependencies remain intentionally narrow: Ratatui plus crossterm for one TUI
 stack, Serde/serde_json for typed JSONL, thiserror for errors, unicode-width

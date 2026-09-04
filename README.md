@@ -52,9 +52,10 @@ The production default is the configured OpenAI-compatible provider. zenpi
 never fabricates an answer when credentials are missing: it exits before
 creating a session and tells you to run `zenpi config import-codex` or set
 `ZENPI_BASE_URL`, `ZENPI_API_KEY`, and `ZENPI_MODEL`. The profile is stored in
-`~/.zenpi/config.toml`; the imported key is stored only in the owner-readable
-`~/.zenpi/auth.json`. `config doctor` reports the effective endpoint host, API
-family, model, and credential presence without printing the key. A read-only
+`~/.zenpi/config.toml`; on Unix the imported key is stored in the owner-only
+`~/.zenpi/auth.json` (platform-specific ACL enforcement remains separate).
+`config doctor` reports the effective endpoint host, API family, model, and
+credential presence without printing the key. A read-only
 fallback can use `~/.codex` on the first run; the explicit import persists it.
 Provider quota/rate/usage-limit failures are returned as errors; zenpi never
 turns them into a mock answer.
@@ -65,15 +66,21 @@ usage, and Codex gateways that insert NUL padding. Chat Completions remains an
 explicit compatibility adapter. `--backend echo` exists only in builds made
 with `--features dev-fixtures`; normal release binaries cannot use the mock.
 
-This checkout is under complete-framework delivery. Real provider requests,
-Codex pairing, Responses streaming, bounded multimodal attachments, tool
-continuation, cancellation/live steer, write/shell tools, approval, context
-compaction, session management, installable skills/extensions, recovery, and
-cross-platform release packaging are implemented. The authoritative status is
-the `CF-*` section in
+This checkout contains the v1 provider/session/runtime baseline and a set of
+bounded v2 candidates. A green compile is not a claim that a Claude
+Code/Codex-equivalent product is complete. The current baseline evidence is
+the release/install/user-smoke flow and the focused tests; those checks cover
+the baseline and selected slices, not every v2 interaction or close hook.
+multiline editing, Markdown rendering, file diff previews, tool lifecycle
+folding, slash-command/domain models, and responsive layout primitives still
+need the end-to-end acceptance work described by their v2 rows. BentoBox tabs,
+durable first-class domain dispatch, browser/PTY panes, and socket-level
+cancellation are explicitly partial, planned, or deferred rather than hidden
+behind a completion claim. The frozen v1 receipt remains in
 [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md); the
-gap document is archived planning input, not a second checklist. Installation
-currently requires Rust 1.88 or newer and a local clone.
+versioned audit and re-plan is
+[`Docs/Zenpi_Execution_Blueprint_v2.md`](Docs/Zenpi_Execution_Blueprint_v2.md).
+Installation currently requires Rust 1.88 or newer and a local clone.
 
 Session and extension lifecycle commands are available outside either runtime
 mode:
@@ -103,11 +110,20 @@ Input and output are one JSON object per LF-terminated line. A payload may
 contain U+2028 or U+2029; only LF frames a record. Diagnostics go to stderr so
 stdout remains machine-readable.
 
-Supported commands are `prompt`, `steer`, `cancel`, `approve`, `status`,
-`handoff`, `resume`, and `shutdown`. Accepted prompts emit typed v2 progress
-events and one v1-compatible terminal response. A v2 `resume` can request
-`from_sequence`; duplicate in-process request IDs receive the cached terminal
-result rather than repeating provider or tool work.
+Supported commands are `prompt`, typed slash `command`, `steer`, `cancel`, `approve`, `status`,
+`handoff`, `resume`, and `shutdown`. The `command` request carries a slash
+command such as `{"type":"command","id":"c1","text":"/status"}` and never
+enters the model turn. In the production owned/async headless
+path, accepted prompts emit typed v2 progress events and one v1-compatible
+terminal response. The borrowed synchronous embedding API is intentionally
+smaller and does not expose in-flight cancellation. These are the current
+transport guarantees, not proof that every v2 UX row is accepted. A v2 `resume` can request
+`from_sequence`; duplicate in-process request IDs for ordinary terminal
+operations receive the cached terminal result while that bounded cache entry
+is retained (evicted or session-reset IDs may be retried), rather than repeating
+provider or tool work. A replay request
+re-emits its requested event suffix and is not
+treated as a response-only cache hit.
 
 Example:
 
@@ -127,12 +143,16 @@ cargo test --all-targets
 
 Each Blueprint checklist item declares an `Estimated LOC` forecast for the
 implementation/test code attributable to that item, and every value is
-strictly below 5,000. The
+strictly below 5,000. This is a **per-item** forecast: it does not mean 5,000
+Blueprint items and it is not a 5,000-line cap on the repository. The
 aggregate Rust source inventory is reported for visibility, not used as a
 project-wide cap; generated files, vendored dependencies, documentation, and
 build output are not item estimates.
 
-The authoritative execution plan is [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md).
+The frozen v1 execution receipt is [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md).
+The current product review and next execution contract is the non-authoritative
+versioned draft [`Docs/Zenpi_Execution_Blueprint_v2.md`](Docs/Zenpi_Execution_Blueprint_v2.md)
+(`2.0.0`; the Cargo crate remains `0.1.0`).
 The frozen local policy is [`Docs/Zenpi_Execution_Spec.md`](Docs/Zenpi_Execution_Spec.md),
 and its read-only monitoring projection is
 [`Docs/Zenpi_Execution_Gantt.md`](Docs/Zenpi_Execution_Gantt.md).
@@ -148,7 +168,8 @@ stdin/stdout 传输严格 LF-JSONL 的 **headless**。不存在第三种 `print`
 handoff 记录。headless 可以通过一条管道启动、持久化可恢复会话，并在
 agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲区差分，减少
 窗口调整及快速流式更新时的重复绘制。
-provider 工作在后台执行，TUI/headless 在流式响应期间仍可处理输入和取消。
+生产 owned/async 路径把 provider 工作放在后台，TUI/headless 在流式响应期间
+可继续处理输入和协作式取消；legacy 同步入口和阻塞 socket 读取仍有限制。
 
 生产默认 backend 是配置的 OpenAI-compatible provider，不再静默使用
 `echo`。首次使用先执行 `zenpi config import-codex --profile codex`，它从
@@ -162,15 +183,21 @@ provider 工作在后台执行，TUI/headless 在流式响应期间仍可处理�
 前失败，不会伪造回复。
 provider 的额度、限流或 usage-limit 错误会原样作为失败返回，不会退回 mock。
 
-当前已支持真实 provider、Codex 配对、Responses SSE（含 NUL padding）、
-流式输出、多模态附件、工具 continuation、取消/live steer、读写/shell 工具、
-审批、上下文压缩、session 管理、skills/extensions、崩溃恢复与跨平台发布包。
-权威状态在 `Docs/Zenpi_Execution_Blueprint.md` 的 `CF-*` 部分。
+当前仓库包含 v1 的 provider/session/runtime 基线，以及正在审核的 v2 候选实现。
+“编译通过”不等于已经达到 Claude Code/Codex 级别的完整可用体验。真实
+provider、Codex 配对、Responses SSE、附件、工具、审批、session、skills/
+extensions 等已有可执行测试；多行编辑、Markdown/diff 渲染、工具状态折叠、
+slash/domain 模型和响应式布局也有边界实现，但 BentoBox 多 tab、blueprint/
+goal/learn 的持久化调度、浏览器/PTY pane，以及 socket 级取消仍须按 v2
+验收矩阵补齐。它们不会因为 v1 的 `CF-*` 勾选而被伪称完成。
+v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下一轮
+契约在 `Docs/Zenpi_Execution_Blueprint_v2.md`。
+该草案版本为 `2.0.0`；Cargo crate 的发布版本仍是 `0.1.0`，两者分别表示产品契约与包版本。
 会话可用 `zenpi session list|inspect|fork|export|import|gc` 管理；扩展可用
 `zenpi extension install|list|disable|enable|upgrade|remove` 管理。headless v2
 的 `prompt.attachments` 可引用工作区内的图片或文件，二进制内容不会写入日志。
-每个 Blueprint item 都为其实现/测试代码声明小于 5000 的 `Estimated LOC` 预估值；仓库 Rust 总行数只作
-信息性盘点，不是项目级上限。
+每个 Blueprint item 都为其实现/测试代码声明严格小于 5000 的 `Estimated LOC` 预估值；这里是每个 item 的
+预估，不是 5000 个 Blueprint item，也不是仓库 Rust 总行数上限。仓库 Rust 总行数只作信息性盘点。
 
 ## 日本語
 
@@ -195,16 +222,22 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 では使用できず、provider がない場合は session 作成前に失敗します。
 provider の quota/rate/usage-limit エラーも mock 応答に置き換えません。
 
-Responses SSE、Codex pairing、streaming、multimodal attachments、tool
-continuation、cancellation/live steer、write/shell tools、approval、context
-compaction、session management、skills/extensions、recovery、cross-platform
-release packaging は実装済みです。
+このリポジトリには v1 の provider/session/runtime 基盤と、レビュー中の v2
+候補実装があります。ただし、コンパイル成功は Claude Code/Codex 相当の
+完全な利用体験を意味しません。実 provider、Codex pairing、Responses SSE、
+添付、tool、approval、session、skills/extensions には実行可能なテストがあり、
+複数行入力、Markdown/diff 表示、tool 状態の折りたたみ、slash/domain モデル、
+responsive layout にも境界実装があります。一方、BentoBox の複数 tab、
+blueprint/goal/learn の永続 dispatch、browser/PTY pane、socket 単位の取消は
+v2 の受け入れ行として partial/planned/deferred です。v1 の `CF-*` の印だけで
+完成とは扱いません。凍結した v1 の記録は `Docs/Zenpi_Execution_Blueprint.md`、
+版付き（`2.0.0`）の監査と次の契約は `Docs/Zenpi_Execution_Blueprint_v2.md` にあります。Cargo crate の公開版は `0.1.0` のままです。
 Session は `zenpi session list|inspect|fork|export|import|gc`、extension は
 `zenpi extension install|list|disable|enable|upgrade|remove` で管理できます。
 headless v2 の `prompt.attachments` は workspace 内の画像・ファイルを参照し、
 binary data を journal に保存しません。
-各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（5000 未満）を記載します。リポジトリ全体の
-Rust 行数は情報表示のみで、プロジェクト全体の上限ではありません。
+各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（各 item が 5000 未満）を記載します。
+これは 5000 個の item という意味でも、リポジトリ全体の Rust 行数上限でもありません。
 
 ## License
 

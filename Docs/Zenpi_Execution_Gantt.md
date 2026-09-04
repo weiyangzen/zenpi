@@ -1,17 +1,18 @@
 # zenpi Execution Gantt
 
-> **Read-only projection.** The source of truth is
-> `Docs/Zenpi_Execution_Blueprint.md`; this file is regenerated atomically by
-> the canonical Master after state reconciliation. It contains no mutable
-> checklist marks and cannot be used to claim or accept work.
+> **Read-only historical projection.** This file mirrors the frozen v1
+> execution receipt in `Docs/Zenpi_Execution_Blueprint.md`; it is regenerated
+> atomically by the canonical Master and contains no mutable checklist marks.
+> It cannot be used to claim end-user product acceptance; current product
+> status is tracked in the non-authoritative v2 audit.
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-04T02:16:26Z
+generated_at: 2026-09-04T08:40:06Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: 09244063301119ce594548c741c4f2f0c540c3396c2964ddcd8014360ea16e9c
+source_sha256: 44e8d80a67d9d4675862a125959bd95d5b418e0b345038c917f431b1cb049c71
 spec_path: Docs/Zenpi_Execution_Spec.md
-spec_sha256: 772892a067481cd288089fda378f9f59bc632ee05a4b4d72ac37a09b71924f14
+spec_sha256: b715cdee9761f9ff4ac3270d4f286cf827b07997db24fe99368fdb064df00d7a
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:

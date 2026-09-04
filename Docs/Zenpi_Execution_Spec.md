@@ -3,7 +3,9 @@
 > Frozen repository-local policy for the `execution-cron-builder` workflow.
 > This file describes how work is claimed, isolated, validated, integrated,
 > and published. It is not a second product checklist; the authoritative
-> checklist is `Zenpi_Execution_Blueprint.md`.
+> checklist is `Zenpi_Execution_Blueprint.md`. Its v1 receipt is a workflow
+> record, not proof of end-user product usability; the versioned v2.0.0 draft
+> (`Docs/Zenpi_Execution_Blueprint_v2.md`) is the current UX audit and re-plan.
 
 ```yaml
 schema_version: execution-spec/v1
@@ -56,13 +58,14 @@ Research notes must preserve source revisions and distinguish observed facts
 from design decisions. Network access is not required for a local build; a
 missing remote or credential is a research blocker, never a reason to guess.
 
-The `CF-*` rows in the authoritative Blueprint supersede the original
-synchronous-MVP ceiling. They define the complete provider-backed framework:
-secure Codex-compatible profiles, Responses streaming, nonblocking control,
-approved write/shell tools, context/session recovery, skills/extensions, and
-packaged releases. A completed `ZP-*` foundation row does not implicitly close
-any `CF-*` row. The 5,000 LOC cap is evaluated independently for each item;
-there is neither a 5,000-item target nor an aggregate 5,000-line cap.
+The `CF-*` rows in the authoritative Blueprint record the intended v1
+provider-backed scope and its implementation receipt: secure Codex-compatible
+profiles, Responses streaming, nonblocking control, approved write/shell
+tools, context/session recovery, skills/extensions, and packaged releases.
+That receipt is not the v2 end-user acceptance matrix, and a completed `ZP-*`
+foundation row does not implicitly close any `CF-*` row. The 5,000 LOC cap is
+evaluated independently for each item; there is neither a 5,000-item target
+nor an aggregate 5,000-line cap.
 
 ## 2. Lean b3ehive subset
 
@@ -70,9 +73,9 @@ The following b3ehive concepts are first-class zenpi data, not an external
 service. They are inert, bounded records; they do not start workers or make
 scheduling decisions:
 
-1. A bounded, versioned `Handoff` record carries `from`, `to`, an immutable
-   handoff/claim reference, summary, artifact references, session context,
-   creation time, and (when exported) a content digest.
+1. The legacy bounded `Handoff` carries transfer data (`from`, `to`, summary,
+   artifacts, and creation time). The versioned/digested `HandoffRecord` adds
+   an immutable claim reference, session context, and canonical content digest.
 2. `ResourceBudget`/`ResourceEnvelope`/`ResourceLease` account for bounded
    tokens, attempts, wall time, and disk use without running a scheduler.
    `SideEffectGate` records an explicit allow/deny decision for publish,
@@ -84,9 +87,10 @@ scheduling decisions:
    describe work performed by an external host, but zenpi never spawns or
    hides a nested agent.
 4. The append-only session journal records user input, assistant output,
-   lifecycle events, errors, and handoffs in sequence order. A resume validates
-   the sequence and ignores a truncated final line rather than corrupting prior
-   records.
+   selected operation/lifecycle markers, errors, and handoffs in sequence order.
+   Not every in-memory provider/AgentEvent is durable yet; durable event parity
+   remains a v2 acceptance row. A resume validates the sequence and ignores a
+   truncated final line rather than corrupting prior records.
 5. A result manifest records changed repository-relative paths, validation
    commands/outcomes, and a checksum. Workers can self-test (`[_]`), while only
    the canonical Master can accept (`[x]`).
@@ -111,18 +115,23 @@ owns the backend trait and deterministic `echo` backend; an optional
 OpenAI-compatible backend is an adapter, not a second core. Backend errors are
 typed, preserve retryability, and never leak credentials. The runtime phase is
 explicit (`idle`, `running`, `closed`); a failed provider returns the agent to
-`idle` with a typed error, and a TUI interrupt cancels admission without a
-backend call. Invalid transitions are rejected without mutating the journal.
+`idle` with a typed error. A pre-admission TUI interrupt is backend-free; an
+active turn is cancelled only at a cooperative boundary and remains subject to
+the blocking socket limitation. Invalid transitions are rejected without
+mutating the journal.
 
 ### 3.2 Session journal
 
-`src/session.rs` owns all persistence. Each LF-delimited JSON object contains
+`src/session.rs` owns persistence. Each LF-delimited JSON object contains
 `schema_version`, `session_id`, monotonic `seq`, RFC3339 `timestamp`, `kind`,
 and a typed payload. User input and the resulting assistant message are
-durably appended before a completion response/event is emitted. Writes are
+durably appended before a turn completion response/event is emitted;
+control-plane responses are not operation-marked. Writes are
 bounded and use append, flush, and `sync_data` under the sole store owner;
 malformed or out-of-order records are skipped with a recovery warning and never
-overwrite the valid prefix. On Unix, session files are created or tightened to
+overwrite the valid prefix. The journal currently recovers its file into memory;
+streaming recovery and a hard startup byte budget remain a v2 quality gap. On
+Unix, session files are created or tightened to
 mode `0600` because prompts and completions may contain private material. The
 default location is configurable, but tests use a temporary directory supplied
 by the caller.
@@ -130,16 +139,27 @@ by the caller.
 ### 3.3 Headless JSONL
 
 `src/protocol.rs` owns parsing/encoding and `src/headless.rs` owns the stdio
-loop. Supported request types are `prompt`, `steer`, `status`, `handoff`,
-`resume`, and `shutdown`. Every request has an ID and receives one terminal
-response; unknown fields are tolerated only when they do not change semantics.
+loop. Supported request types include `prompt`, typed slash `command`, `steer`, `cancel`, `approve`,
+`status`, `handoff`, `resume`, and `shutdown`. Every request has an ID and
+receives one terminal response; unknown fields are tolerated only when they do
+not change semantics.
+Request IDs use the same bounded non-control Unicode identifier grammar (at
+most 128 UTF-8 bytes) for requests and cancellation targets. A `resume` request selects
+either a session `path` or an in-process `from_sequence`, never both. Ordinary
+terminal responses are replayable by ID; a sequence replay re-emits its event
+suffix on each retry.
+Event sequence numbers are process-global within one host; switching session
+paths clears the old replay namespace and preserves monotonic numbering, so a
+client may receive `replay_gap` rather than a reset to sequence zero.
 Input is framed strictly by LF (U+2028/U+2029 are payload characters). A
 malformed non-empty frame gets a stable error code, never mutates session state,
 and the loop remains usable; blank LF frames are ignored. Stdout is
 protocol-only; diagnostics and tracing go to stderr. EOF performs an orderly
-shutdown and flush. The provider boundary is synchronous, so headless reads the
-next command only after the current provider request completes; `steer` is a
-between-turn state-machine command in this release, not live in-flight input.
+shutdown and flush. The borrowed synchronous embedding API (`run_stdio`) reads
+the next command after the current provider request; the production owned loop
+(`run_stdio_owned`/`run_async_streams`) uses a background worker and accepts
+cooperative `cancel`/live-steer control. Both remain subject to the documented
+blocking `ureq` socket-read limitation.
 
 ### 3.4 Handoff
 
@@ -161,8 +181,11 @@ async framework): input, transcript, status, spinner/progress, help, and error
 regions have stable bounds. Updates are coalesced on approximately a 16 ms
 tick; Ratatui's buffer diff emits no unchanged cells/rows. A resize invalidates
 the buffer and performs one full redraw using clamped dimensions and Unicode
-display width. The provider callback is synchronous in this release, so network
-latency can delay input and Ctrl-C cannot cancel an in-flight provider request.
+display width. The legacy synchronous `run_with_state` callback can delay input
+and cannot cancel an in-flight provider request; the production `run_async`
+path delegates to a background worker and supports cooperative cancel/live
+steer, while a blocking `ureq` socket read still cannot be interrupted at the
+socket boundary.
 Raw mode, cursor visibility, alternate-screen state, and orderly EOF/interrupt
 cleanup are restored by the terminal guard. External unhandled termination such
 as `SIGKILL` is outside the cleanup guarantee.

@@ -282,6 +282,54 @@ fn shutdown_cancels_active_job_and_closes_after_terminal_result() {
 }
 
 #[test]
+fn late_cancellation_after_completion_marker_preserves_success() {
+    let completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_completed = Arc::clone(&completed);
+    let worker_release = Arc::clone(&release);
+    let runner = BackgroundRunner::spawn(
+        move |_request: (), token| {
+            // Model an adapter that has committed its successful result but
+            // has not yet returned through the runtime's done channel.
+            token.mark_completed();
+            worker_completed.store(true, std::sync::atomic::Ordering::Release);
+            while !worker_release.load(std::sync::atomic::Ordering::Acquire) {
+                thread::yield_now();
+            }
+            Ok::<_, String>(7_u8)
+        },
+        RuntimeConfig::default(),
+    );
+    let id = runner.try_submit(()).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::Started { id: actual } if *actual == id),
+    );
+    while !completed.load(std::sync::atomic::Ordering::Acquire) {
+        thread::yield_now();
+    }
+    runner.try_cancel(id).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::CancelRequested { id: actual } if *actual == id),
+    );
+    release.store(true, std::sync::atomic::Ordering::Release);
+    assert!(matches!(
+        wait_event(
+            &runner,
+            |event| matches!(event, RuntimeEvent::Completed { id: actual, .. } if *actual == id)
+        ),
+        RuntimeEvent::Completed {
+            outcome: JobOutcome::Succeeded(7),
+            ..
+        }
+    ));
+    runner.try_shutdown().unwrap();
+    assert!(matches!(runner.next_event().unwrap(), RuntimeEvent::Closed));
+    runner.join().unwrap();
+}
+
+#[test]
 fn panicking_job_still_reaches_a_terminal_event_and_runner_survives() {
     let runner = BackgroundRunner::spawn(
         |_request: u8, _token| -> Result<u8, String> { panic!("fixture panic") },
@@ -343,4 +391,59 @@ fn owned_shutdown_joins_the_active_job_before_returning() {
     );
     runner.shutdown_and_join().unwrap();
     assert!(finished.load(std::sync::atomic::Ordering::Acquire));
+}
+
+#[test]
+fn shutdown_and_join_is_safe_after_closed_event_was_consumed() {
+    let runner = BackgroundRunner::spawn(
+        |_request: (), _token| Ok::<_, String>(()),
+        RuntimeConfig::default(),
+    );
+    runner.try_shutdown().unwrap();
+    assert!(matches!(runner.next_event().unwrap(), RuntimeEvent::Closed));
+
+    // The host is allowed to consume `Closed` while polling its event loop
+    // and call the owned cleanup helper afterwards.  The lifecycle marker
+    // prevents the helper from waiting for an event that is already gone.
+    runner.shutdown_and_join().unwrap();
+}
+
+#[test]
+fn shutdown_and_join_drains_saturated_command_and_event_queues() {
+    let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_started = Arc::clone(&started);
+    let runner = BackgroundRunner::spawn(
+        move |_request: u8, token| {
+            worker_started.store(true, std::sync::atomic::Ordering::Release);
+            while !token.is_cancelled() {
+                thread::yield_now();
+            }
+            Ok::<_, String>(())
+        },
+        RuntimeConfig {
+            command_capacity: 1,
+            event_capacity: 1,
+            max_pending: 4,
+            ..RuntimeConfig::default()
+        },
+    );
+    runner.try_submit(1).unwrap();
+    for _ in 0..100 {
+        if started.load(std::sync::atomic::Ordering::Acquire) {
+            break;
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert!(started.load(std::sync::atomic::Ordering::Acquire));
+    // Leave the event queue full and the command queue occupied. Cleanup is
+    // run on another thread so this regression test can assert a bound.
+    let _ = runner.try_submit(2);
+    let (done_tx, done_rx) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        runner.shutdown_and_join().unwrap();
+        done_tx.send(()).unwrap();
+    });
+    done_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("saturated runtime did not shut down");
 }

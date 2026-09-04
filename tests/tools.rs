@@ -292,12 +292,19 @@ fn write_and_edit_tools_are_atomic_and_policy_guarded() {
     )
     .unwrap();
     assert_eq!(preview["changed"], true);
+    assert!(
+        preview["diff"]
+            .as_str()
+            .unwrap()
+            .contains("--- new.txt\n+++ new.txt\n")
+    );
     let created = successful_output(registry.execute(
         &context,
         policy,
         call("write_file", json!({"path":"new.txt","content":"one"})),
     ));
     assert_eq!(created["bytes"], 3);
+    assert!(created["diff"].as_str().unwrap().contains("+one\n"));
     assert_eq!(
         fs::read_to_string(directory.path().join("new.txt")).unwrap(),
         "one"
@@ -311,10 +318,95 @@ fn write_and_edit_tools_are_atomic_and_policy_guarded() {
         ),
     ));
     assert_eq!(edited["replacements"], 1);
+    let edit_diff = edited["diff"].as_str().unwrap();
+    assert!(edit_diff.contains("-one\n"));
+    assert!(edit_diff.contains("+two\n"));
     assert_eq!(
         fs::read_to_string(directory.path().join("new.txt")).unwrap(),
         "two"
     );
+}
+
+#[test]
+fn write_diff_is_empty_when_content_is_unchanged() {
+    let directory = tempdir().unwrap();
+    fs::write(directory.path().join("same.txt"), "same\n").unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let output = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("write_file", json!({"path":"same.txt","content":"same\n"})),
+    ));
+    assert_eq!(output["diff"], "");
+    assert_eq!(output["diff_truncated"], false);
+}
+
+#[test]
+fn write_diff_represents_final_newline_changes_as_a_hunk() {
+    let directory = tempdir().unwrap();
+    fs::write(directory.path().join("newline.txt"), "same").unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let output = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call(
+            "write_file",
+            json!({"path":"newline.txt","content":"same\n"}),
+        ),
+    ));
+    let diff = output["diff"].as_str().unwrap();
+    assert!(diff.contains("-same\n"));
+    assert!(diff.contains("+same\n"));
+    assert!(diff.contains("\\ No newline at end of file\n"));
+}
+
+#[test]
+fn write_diff_is_bounded_for_large_replacements() {
+    let directory = tempdir().unwrap();
+    fs::write(
+        directory.path().join("large.txt"),
+        "old-line\n".repeat(tools::MAX_WRITE_BYTES / 9),
+    )
+    .unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    // Keep the request itself below MAX_TOOL_CALL_BYTES while making the
+    // before+after diff larger than the response cap.
+    let content = "new-line\n".repeat(6_000);
+    let output = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("write_file", json!({"path":"large.txt","content":content})),
+    ));
+    let diff = output["diff"].as_str().unwrap();
+    assert!(diff.len() <= tools::MAX_DIFF_BYTES);
+    assert_eq!(output["diff_truncated"], true);
+    assert!(diff.contains("[diff truncated]"));
+}
+
+#[test]
+fn edit_rejects_a_source_larger_than_the_write_budget() {
+    let directory = tempdir().unwrap();
+    let original = format!("{}needle\n", "x".repeat(tools::MAX_WRITE_BYTES));
+    let path = directory.path().join("oversized.txt");
+    fs::write(&path, &original).unwrap();
+    assert!(original.len() > tools::MAX_WRITE_BYTES);
+
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let result = registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call(
+            "edit_file",
+            json!({"path":"oversized.txt","old":"needle","new":"changed"}),
+        ),
+    );
+
+    assert_eq!(error_code(result), ToolErrorCode::LimitExceeded);
+    assert_eq!(fs::read_to_string(path).unwrap(), original);
 }
 
 #[test]

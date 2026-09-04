@@ -1,0 +1,488 @@
+# zenpi Execution Blueprint v2
+
+> **Review draft, version 2.0.0 (2026-09-04).** This document is a
+> self-audit and re-plan for the terminal-agent product. It is intentionally
+> **not** the current authoritative checklist and it does not mutate or
+> supersede `Docs/Zenpi_Execution_Blueprint.md` until the Master accepts the
+> migration described in this file. The v1 checklist therefore remains the
+> source of truth for the already recorded execution receipt; this document is
+> the source of truth for the proposed next product contract.
+
+```yaml
+schema_version: execution-blueprint/v2
+blueprint_version: 2.0.0
+revision_date: 2026-09-04
+status: proposed-audit
+authoritative: false
+predecessor: Docs/Zenpi_Execution_Blueprint.md
+stable_id_pattern: '^V2-[0-9]{3}$'
+product_modes: [tui, headless]
+per_item_code_loc_cap: 5000
+loc_basis: per-item forecast of implementation and test code attributable to that row; documentation, configuration, and generated artifacts count as zero
+status_values: AUDITED|PARTIAL|PLANNED|DEFERRED|ACCEPTED
+required_for_v2_acceptance: all rows except DEFERRED rows
+layout_name: bentobox
+first_class_domains: [blueprint, goal, learn]
+runtime_domains: [compete, loop]
+gui_scope: future-separate-workspaces
+```
+
+The review draft is checked independently of the frozen v1 authority:
+
+```text
+python3 tools/validate_blueprint_v2.py
+Blueprint v2 valid: 38 rows, max LOC 2800 < 5000
+```
+
+`tools/validate_blueprint.py` continues to validate the single authoritative
+v1 Blueprint; the v2 checker verifies this draft's version, status vocabulary,
+dependency DAG, duplicate IDs, and strict per-item LOC cap.
+
+## 1. Why a v2 review is necessary
+
+The previous framework work made the provider, session, tool, and transport
+boundaries much stronger, but a green compile is not the same thing as a
+usable Claude Code/Codex-style terminal agent. In particular, the v1 contract
+was deliberately limited to a single transcript and a fixed vertical TUI. It
+does not define multiline editing, slash commands, a BentoBox workspace,
+first-class blueprint/goal/learn operations, or a rendering model for code and
+Markdown blocks. It also records several capabilities as complete before a
+user-facing end-to-end acceptance test exists.
+
+This v2 draft makes the distinction explicit:
+
+* `AUDITED` means the current tree and an executable observation support the
+  statement. It is not a promise that the final v2 gate has passed.
+* `PARTIAL` means a useful slice exists, but an important interaction,
+  failure mode, or proof is missing.
+* `PLANNED` means the contract is now specified but implementation is not
+  accepted.
+* `DEFERRED` means intentionally outside the lightweight v2.0 binary; it is
+  not silently counted as done.
+* `ACCEPTED` may be used only after the v2 acceptance matrix and all relevant
+  gates pass. A v2 row must never be marked accepted merely because a nearby v1
+  row is `[x]`.
+
+The `Estimated LOC` value on every row is an independent forecast. The number
+of rows is not a target, and there is no aggregate 5,000-line limit. Every
+forecast below is strictly less than 5,000.
+
+## 2. Current-state audit
+
+The following table is the evidence-ledger snapshot taken from the current
+checkout on 2026-09-04. Paths and symbols are intentionally named so the audit
+can be repeated after each integration pass.
+
+| # | Requested experience | Status | Evidence in the current tree | What is still missing |
+|---:|---|---|---|---|
+| 1 | Input and multiline editing | PARTIAL | `src/tui.rs` now has UTF-8-safe cursor movement, Shift-Enter/Ctrl-J newline insertion, line navigation, bounded prompt scrolling, and focused cases in `tests/tui_resize.rs`. | The production PTY gate must still prove exact multiline submission, cursor movement across lines, multiline history, paste limits, and bounded prompt scrolling. |
+| 2 | Streamed AI replies | PARTIAL | `src/backend.rs` emits typed `TextDelta`/`TextDone` events for Responses SSE; `src/tui.rs` and `src/headless.rs` consume provider events while a `BackgroundRunner` job runs. Queues are count-bounded; headless emits an explicit drop marker, while TUI drop visibility remains incomplete. `tests/backend.rs` covers fixture SSE. | A universal byte/truncation budget and fair control-input scheduling are still missing; Chat compatibility remains blocking, and a PTY/headless test does not yet prove that a slow stream stays interactive through every boundary. |
+| 3 | Tool-call status | PARTIAL | `src/core.rs` records `AgentEvent::ToolCall`/`ToolResult`; the TUI now maintains stable call-ID rows for running/succeeded/failed/cancelled states and tests them in `tests/tui_logs.rs`. | Headless and TUI do not yet consume one canonical lifecycle schema, and provider/core/tool status ordering still needs protocol-level acceptance. |
+| 4 | Command confirmation | PARTIAL | `src/approval.rs` provides an approval coordinator; production TUI accepts `y`/`n`, and the headless protocol has an `approve` request. Side-effect policy is checked before tool invocation. | Approval focus, multiple pending requests, timeout/cancel semantics, and a full PTY plus JSONL denial/no-side-effect matrix need to be made explicit. |
+| 5 | Error recovery | PARTIAL | `src/backend.rs` has retry/backoff and circuit state; `src/session.rs` recovers a valid JSONL prefix; operation markers and typed errors exist. | A user-visible retry/resume operation for an interrupted provider/tool step, durable replay across process restart, and recovery of a stuck active marker are not proven end to end. |
+| 6 | File modification diff | PARTIAL | `src/tools.rs` now returns bounded unified-diff previews and explicit truncation metadata for write/edit, with regression coverage in `tests/tools.rs`. | Render the preview before and result after approval in TUI/headless, define binary-file behavior, and add atomic-write failure acceptance. |
+| 7 | Log folding | PARTIAL | Transcript messages are retained in a bounded `VecDeque`; `src/tui.rs` now adds `ToolRunStatus`, fold state, Ctrl-O, and summary rendering, with focused coverage in `tests/tui_logs.rs`. | Persist the preference per tab and add PTY evidence that a pending approval/error can never be hidden. |
+| 8 | Session history | PARTIAL | `src/session.rs` owns append-only JSONL recovery; `Agent::history`, TUI up/down history, `session list/inspect/fork/import/export/gc`, and `tests/session_cli.rs` exist. The in-process replay path is bounded and session-switch isolated. | There is no session browser inside a workspace tab, event replay that survives process restart, or history-aware conversation/goal navigation; startup recovery still reads a journal into memory. |
+| 9 | Interrupt and cancellation | PARTIAL | `src/runtime.rs` has a cooperative `CancellationToken`; core/tool loops check it; TUI/headless expose cancel/live-steer paths (including typed slash `/cancel`), including cancellation of deferred headless steer intents; production hosts now join owned runners, and deterministic headless tests cover deferred steer admission and shutdown. | A blocking `ureq` read or non-streaming Chat request cannot be interrupted at socket granularity; byte-level event limits, control-input fairness, and complete shutdown/close-hook semantics remain to be accepted. |
+| 10 | Terminal resize adaptation | PARTIAL | `crossterm` resize handling and `tests/tui_resize.rs` cover the current view; `src/layout.rs` plus `tests/layout.rs` provide wide/standard/compact/narrow/zero-cell geometry, capability collapse, ratios, tabs, and presets. The production async TUI now uses a bounded BentoBox adapter and tab bar. | Pane focus/ratio editing, persistence, and a full PTY acceptance matrix are still missing; the legacy synchronous callback keeps the compact vertical renderer. |
+| a | Code/text/simple-Markdown and block rendering | PARTIAL | `src/render.rs` is wired into the TUI for Assistant/System messages (headings, lists, quotes, fences, inline styles); User/Tool/Error messages remain literal and sanitized. `tests/render_markdown.rs` and `tests/tui_markdown.rs` cover the bounded subset. The audit note [`Docs/research/zenpi-rendering.md`](research/zenpi-rendering.md) records the remaining boundary. | Carry the block model through headless events, add diff/tool blocks and streaming fence boundaries, and accept deterministic golden snapshots. |
+| b | Slash command area and common commands | PARTIAL | The hand-written CLI parser covers process commands such as `config`, `session`, and `extension`; `src/slash.rs` and `tests/slash.rs` define typed `/goal`, `/model`, `/blueprint`, `/learn`, `/compete`, and `/loop` parsing. Production and legacy TUI input, plus headless JSONL `type=command`, now route slash commands before approval/model submission and render typed acknowledgements/errors. | Add `/session`, `/resume`, `/compact`, `/approve`, and richer domain execution, and prove complete command-owner parity in both transports. |
+| b | b3ehive first-class domains | PARTIAL | `src/b3.rs` contains bounded handoff/budget/lease/evidence records; `src/domains.rs` adds typed, content-addressed Blueprint DAGs plus bounded Goal and Learn records, including the strict per-item `estimated_loc < 5000` invariant. | These records are not yet journal-backed stores or production commands. `compete` and `loop` still have no external runtime adapter. |
+| c | Tabs and BentoBox workspace | PARTIAL | `src/layout.rs` defines Project/Goal/Learn/Review/Session tabs, pane capabilities, presets, breakpoints, safe geometry, and collapse behavior; `src/tui.rs` now has a Ratatui adapter, tab bar, Ctrl-1..5 selection, and bounded pane placeholders in the production async path. | Interactive pane focus/ratio persistence, real resource data, and browser/PTY adapters remain absent; the optional panes stay disabled by default. |
+| d | Scaling and platform quality | PARTIAL | Ratatui/crossterm provide a small terminal surface; release settings use size-oriented optimization; the layout model and production async BentoBox adapter compute compact fallbacks safely. | No measured pane-layout budget, persisted scaling, or production BentoBox PTY proof. A Svelte-quality GUI for macOS/Linux/Windows is deliberately future work, not a v2.0 dependency. |
+
+### Reproducible evidence snapshot
+
+These observations are deliberately narrower than a completion claim:
+
+```text
+Audit summary (equivalent to `git status --short`, not a literal command dump)
+  v2 slices: runtime/headless safety, multiline TUI, diff, log folding,
+  Markdown renderer, slash grammar plus TUI dispatcher, domain records, and
+  BentoBox layout adapter
+
+cargo tree --depth 1
+  13 direct normal dependencies (count may vary with Cargo target/features);
+  no tokio, reqwest, clap, or rusqlite
+
+tools/release.sh (no-feature package)
+  observed package binary was approximately 4.6 MiB on
+  aarch64-apple-darwin; exact size is build/profile dependent
+
+Existing focused evidence
+  tests/backend.rs          Responses/Chat fixture parsing and provider events
+  tests/headless_protocol.rs JSONL framing, duplicate/in-flight, replay,
+                             shutdown paths (full v2 acceptance pending)
+  tests/runtime.rs          bounded runner, cancellation, panic, and shutdown cases
+  tests/tui_resize.rs       mock-terminal resize and small-cell rendering
+  tests/tools.rs            path/policy/tool-result contracts
+  tests/session_cli.rs      session lifecycle commands
+  tests/config.rs           profile/import/doctor and secret redaction
+  tests/domains.rs          Blueprint/Goal/Learn bounds, DAG, digest, transitions
+  tests/layout.rs           BentoBox preset geometry and collapse invariants
+  tests/render_markdown.rs  bounded Markdown parsing/rendering
+  tests/slash.rs            typed slash grammar, aliases, routing, bounds
+  tests/tui_logs.rs         stable tool lifecycle rows and folding
+  tests/tui_markdown.rs     live TUI renderer integration
+```
+
+The focused and full Rust gates pass for these slices, but that is deliberately
+not recorded as product acceptance. A compile, a unit test, or a generated
+Gantt file cannot prove the ten interactive experiences; `V2-305` still
+requires user-facing PTY and headless acceptance for each one.
+
+## 3. Lightweight technology decision record
+
+The goal is a capable terminal agent without shipping a desktop/browser stack
+or an idle server. The default binary should stay small; capability-heavy
+adapters must be optional and must not leak into headless startup.
+
+| Choice | v2.0 decision | Reason and gate |
+|---|---|---|
+| Rust | KEEP | Ownership, typed errors, one portable core, and straightforward process/terminal cleanup match the failure-sensitive product. |
+| Ratatui + crossterm | KEEP | Already provides a single terminal buffer, resize events, and compact rendering. The current BentoBox adapter uses pure layout data plus Ratatui; do not add a second TUI framework. |
+| serde + serde_json | KEEP | One typed representation can serve the JSONL protocol, session records, layout presets, and b3 handoffs. |
+| JSONL journal | KEEP for v2.0 | Append-only, inspectable, crash-prefix recovery, and no database dependency. Add an index only after a measured history query problem. |
+| `std::thread` + bounded channels | KEEP provisionally | The no-feature packaged binary was about 4.6 MiB on the observed aarch64-apple-darwin build, with 13 direct normal dependencies. It is enough to keep a blocking provider off the UI thread and is cheaper than introducing an executor solely for scheduling. It is not called an async executor. |
+| Tokio + reqwest | DEFER behind a measured gate | Adopt together, not piecemeal, only if cancellation tests require interrupting an in-flight socket, Chat streaming must be nonblocking, or concurrent tools become a product requirement. A v2.1 migration must replace the provider boundary coherently; a Tokio runtime around blocking `ureq` is explicitly rejected. |
+| `ureq` | KEEP while the gate is green | It keeps the current synchronous adapter small and works with the dedicated worker. The v2 cancellation gate must document the socket-read limitation rather than hide it. |
+| clap | DEFER | The current parser has no dependency/compile cost and can be wrapped by a typed slash registry. Reconsider when command grammar, completion, and generated help exceed the hand parser's testable surface; do not add clap only for branding. |
+| SQLite | DEFER / optional index | A single session owner does not need locking or migrations in v2.0. Introduce SQLite only with a benchmark showing JSONL history or multi-process indexing is the bottleneck, and keep the append-only journal as the recovery source. |
+| Browser pane | DEFER / external adapter | An embedded browser is a large security and binary-size commitment. v2 models a browser pane as an optional capability that can show a bounded external URL/snapshot; no browser process starts by default. |
+| Terminal pane | DEFER / external PTY adapter | A terminal pane may later own a PTY and child lifecycle, but v2.0 keeps `run_command` approval and reaping in the existing tool boundary. No hidden shell multiplexer or daemon is introduced. |
+| GUI (Svelte-quality) | DEFER / separate workspaces | No GUI is built now. A future macOS, Linux, and Windows client will consume the stable headless/core protocol from separate crates or workspace members, so GUI dependencies never enter the lightweight TUI/headless binary. |
+
+### Hard size and ownership rules
+
+1. `cargo tree --depth 1`, release binary size, cold-start time, and peak RSS are
+   recorded for every dependency decision. A feature is not "lightweight" by
+   intent alone.
+2. The default build has exactly two public transports: `tui` and `headless`.
+   Optional browser, PTY, GUI, Tokio, reqwest, or SQLite adapters are feature
+   or workspace boundaries, not hidden modes.
+3. Blocking work runs outside the render/input loop. Every queue has a byte or
+   item bound, and the target shutdown contract joins owned workers or reports
+   why a join is impossible. The current async stdin reader is still a
+   documented join gap in V2-109.
+4. Each blueprint row below forecasts fewer than 5,000 implementation/test
+   LOC independently. The forecast is not a promise that the whole repository
+   will contain fewer than 5,000 lines.
+
+## 4. Product and ownership model
+
+### 4.1 One core, two transports, one view model
+
+The target v2 ownership contract is: `src/core.rs` owns turn admission, tool
+policy, approval, recovery, and durable events; `src/headless.rs` owns only
+LF-JSONL framing and stdout/stderr discipline; and `src/tui.rs` owns terminal
+lifecycle and input while consuming the same typed event stream as headless.
+The current tree has not yet completed the shared view-model layer that would
+normalize provider text, Markdown blocks, tool states, diffs, approvals, and
+errors before either renderer sees them.
+
+The **target v2** event lifecycle is explicit (it is not yet emitted as one
+canonical stream by the current headless adapter; runtime admission events are
+still internal and lifecycle ordering remains a partial row):
+
+```text
+request.accepted
+turn.started
+assistant.delta*
+tool.started
+tool.output.delta*
+tool.succeeded | tool.failed | tool.cancelled
+approval.required | approval.accepted | approval.denied
+turn.recoverable_error | turn.cancelled | turn.completed
+```
+
+Current input/session/provider buffers have count/aggregate bounds; a universal
+per-event output-byte cap, mandatory request correlation, and fair output
+scheduling remain open. For turn operations, the terminal response follows its
+durable operation marker; control-plane responses are not operation-marked. A
+dropped stream never synthesizes a successful completion.
+
+### 4.2 First-class b3ehive domains
+
+The v2 product target treats these as local, durable user concepts. The current
+`src/domains.rs` provides bounded typed records and validation; journal-backed
+stores and production commands remain planned rows. Fields such as current item,
+mapping manifests, and result handoffs below describe the target schema, not
+fields currently persisted by the in-memory records:
+
+* **Blueprint**: a versioned DAG of bounded work items, dependencies, owned
+  paths, acceptance commands, and per-item LOC forecast. A blueprint has an
+  immutable content digest and can be inspected or validated without running
+  work.
+* **Goal**: a user-facing execution intent linked to one blueprint/version,
+  with status (`queued`, `running`, `blocked`, `cancelled`, `done`), budget,
+  lease reference, current item, and evidence links. A goal may be resumed or
+  cancelled without rewriting prior journal records.
+* **Learn**: a source-to-target transformation task with source manifest,
+  target contract, mapping/evidence records, and a bounded result handoff. It
+  is not an opaque prompt alias.
+
+`compete` and `loop` are runtime calls, not hidden local schedulers:
+
+1. `/compete` creates a typed route/handoff request with a parent goal and
+   resource envelope.
+2. `/loop` requests a bounded continuation/feedback pass and records its lease,
+   attempt, and evidence.
+3. An external b3ehive runtime may execute those requests. zenpi imports only a
+   validated result manifest and never spawns a nested agent, cron daemon, or
+   competition controller on its own.
+
+This distinction keeps blueprint/goal/learn useful when zenpi is standalone,
+while preserving the user's b3ehive composition model.
+
+### 4.3 Slash-command contract
+
+The target command area is a typed command registry, not shell evaluation. The
+current `src/slash.rs` supplies the parser/catalogue and both TUI input and
+headless JSONL `type=command` now dispatch local commands before provider
+submission; durable domain execution and complete command parity are not yet
+fully wired. The v2 gate requires commands to
+be parsed before a model turn, bounded by protocol limits, rendered as
+system/tool events, and exposed through an equivalent headless `command`
+request so TUI and headless behavior cannot drift.
+
+| Command | v2 meaning | Domain |
+|---|---|---|
+| `/help [command]` | list or inspect commands | core |
+| `/model [id]` / `/models` | inspect or select an allowed model/profile | core/config |
+| `/doctor` | run redacted configuration/runtime diagnostics | core/config |
+| `/settings [key] [value]` | inspect or change a bounded user setting | core/config |
+| `/init [path]` | initialize a project blueprint/goal context without a model call | first-class |
+| `/plan [instruction]` | propose a plan that can be saved as a Blueprint | first-class |
+| `/blueprint show\|validate\|run\|status` | inspect or execute a versioned DAG | first-class |
+| `/goal new\|show\|run\|pause\|resume\|cancel` | manage one durable goal | first-class |
+| `/learn start\|show\|resume\|evidence` | manage a source-to-target learn task | first-class |
+| `/compete submit\|status` | hand a bounded proposal request to the runtime | runtime call |
+| `/loop start\|status\|stop` | hand a bounded continuation request to the runtime | runtime call |
+| `/session list\|open\|fork\|export\|import\|gc` | navigate durable sessions | core |
+| `/resume [sequence]` | replay a bounded event suffix or recover a turn | core |
+| `/diff [path]` | inspect pending file changes and bounded hunks | review |
+| `/attach [path]` | add a bounded workspace attachment to the next turn | core/provider |
+| `/permissions show\|set` | inspect or change explicit side-effect policy | approval |
+| `/compact` | compact context with a durable marker | core |
+| `/approve [id] once\|always\|deny` | answer a pending side-effect request | approval |
+| `/cancel` | cancel the active turn/tool/goal operation | core |
+| `/layout [preset\|reset\|save]` | choose and persist a BentoBox preset | TUI |
+| `/pane [name]` | focus or collapse a pane | TUI |
+| `/clear`, `/quit` | clear view or close cleanly | TUI |
+
+Unknown commands, ambiguous arguments, and shell-looking payloads fail before
+mutating the journal. `/compete` and `/loop` never imply that zenpi itself has
+started a scheduler.
+
+## 5. BentoBox workspace contract
+
+The upper tab bar is a named workspace selector. The target is for each tab to
+own a preset, focus history, collapsed-pane state, and bounded split ratios;
+the current model keeps one active focus/ratio state and switching tabs does
+not yet persist it. The layout model is data (`TabId`, `PaneId`, `Split`,
+`Visibility`, `min_width`, `min_height`), so it can be tested without a
+terminal and later consumed by a GUI.
+
+### 5.1 Pane vocabulary
+
+| Pane | Purpose | Default capability |
+|---|---|---|
+| `project_conversation` | project-level conversation and current context | always on |
+| `resources` | workspace files, changed paths, and bounded CPU/memory/disk signals | always on |
+| `goal_conversation` | goal-specific prompts, approvals, and execution notes | always on when a goal is active |
+| `gantt` | Markdown-rendered blueprint DAG/progress board | always on for blueprint/goal tabs |
+| `browser` | optional bounded external web/snapshot view | off unless an adapter is enabled |
+| `terminal` | optional approved PTY/command view, with the quality bar of a modern Herd-like terminal workflow | off unless requested and approved |
+
+### 5.2 Presets for each upper tab
+
+Ratios are the target starting values, not pixel promises. The pure
+`src/layout.rs` model records them and safely computes geometry, and the
+production async TUI consumes it through `BentoBoxLayoutAdapter`. The current
+adapter renders the tab bar, conversation pane, and bounded Gantt/resources
+placeholders; focus/ratio editing, persistence, and real browser/terminal
+content remain planned. Once those pieces are integrated, the smallest pane
+will never be allowed below its declared minimum.
+
+| Tab | Left column (30%) | Center (45%) | Right column (25%) |
+|---|---|---|---|
+| `Project` | top `project_conversation` (45%), middle `resources` (30%), bottom `goal_conversation` (25%) | `gantt` with current project blueprint and activity | top `browser` (55%), bottom `terminal` (45%), both collapsible |
+| `Goal` | top `goal_conversation` (50%), middle `resources` (25%), bottom `project_conversation` (25%) | `gantt` (70%) and goal event log (30%) | `browser`/`terminal` stack, hidden when no capability |
+| `Learn` | source/target conversation (45%), source tree/resources (35%), learn queue (20%) | learn mapping, Markdown blocks, and evidence progress | browser for source references, terminal for validation |
+| `Review` | diff conversation (45%), checks/resources (35%), approval queue (20%) | file diff/Markdown review with foldable hunks | terminal for tests; browser optional |
+| `Session` | session list (45%), selected conversation (35%), replay/goal controls (20%) | event timeline and Gantt projection | terminal/browser optional |
+
+The target wide layout matches the requested shape: project conversation at
+upper-left, resource awareness at left-middle, goal conversation at lower-left,
+the Markdown Gantt board in the center, browser at upper-right, and terminal at
+lower-right. The production async TUI now has the tab/adapter skeleton; the
+legacy synchronous `run_with_state` path remains vertical. V2-206 completes
+focus, persistence, real pane content, and narrow-terminal stack behavior
+instead of forcing unreadable six-way splits.
+
+### 5.3 Scaling and focus rules
+
+* Wide (`>=160` columns): target behavior is to show the three columns and all enabled panes.
+* Standard (`100-159`): keep the three columns, collapse optional browser or
+  terminal panes when their minimum width would be violated.
+* Compact (`80-99`): show left + center; right panes become tabs in a single
+  auxiliary stack.
+* Narrow (`<80`) or transient zero/one-cell resize: show one focused pane and
+  preserve state; never panic, overlap text, or resize the command buffer to
+  zero.
+* `Ctrl-1..Ctrl-5` selects the upper tab; `Ctrl-Shift-Arrow` adjusts the
+  focused split; `/layout save` persists only bounded ratios and pane flags.
+  These are planned bindings and become a test contract only after the TUI
+  integration row is accepted.
+
+## 6. Rendering contract
+
+The view model splits each message into bounded blocks before rendering:
+
+```text
+PlainText | Paragraph | Heading(level) | List | Quote | Code(language?)
+Diff(path, hunks) | ToolStatus(state) | Approval(request) | Error(retryable)
+```
+
+Streaming may append to the current text/code block, but a completed block is
+immutable. Code and diff blocks use a monospace style and explicit truncation
+markers; simple Markdown is parsed without a browser or a full web layout
+engine. Unsupported Markdown is rendered as safe plain text. Folded tool/log
+groups target a one-line summary (`N calls, M succeeded, K failed`) and can be
+expanded without re-reading the provider.
+
+The target is for the same block model to be serialized in headless progress
+events. That parity is not implemented yet; current headless clients receive
+the existing event schema and can use its plain-text fields until V2-004/V2-301
+are accepted.
+
+The current headless replay cache is process-local and bounded by count and
+bytes. Session-path switches clear that namespace while preserving global
+sequence monotonicity; a restart therefore requires the still-planned durable
+replay work rather than implying journal-backed event replay.
+
+## 7. v2 work matrix
+
+This is the proposed execution sequence. `Paths` are intended ownership
+boundaries; a row may not silently broaden them. Every `Estimated LOC` is an
+independent forecast and is `<5000`.
+
+### A. Contracts and decisions
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-001 | AUDITED | Freeze this audit, version metadata, status vocabulary, and v1-to-v2 migration map | `Docs/Zenpi_Execution_Blueprint_v2.md` | - | Draft is explicitly non-authoritative and every gap has a row | 0 |
+| V2-002 | PLANNED | Record dependency, binary-size, startup, RSS, queue, and feature-flag budgets | `Cargo.toml`, `Docs/quality/line-budget.md`, `tools/` | V2-001 | Reproducible baseline and regression thresholds | 250 |
+| V2-003 | PLANNED | Define one lifecycle event schema for provider, tools, approvals, recovery, and terminal state | `src/protocol.rs`, `src/backend.rs`, `src/core.rs`, `tests/` | V2-001 | Sequence/correlation and terminal-state invariants | 900 |
+| V2-004 | PARTIAL | Add the bounded block model for text, Markdown, code, diff, tool status, approval, and error; current renderer covers a tested TUI subset | `src/render.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-003 | Golden block tests and headless parity for all declared block kinds | 1100 |
+| V2-005 | PARTIAL | Define typed slash-command grammar and TUI/headless parity; parser/catalogue plus TUI and JSONL `/command` dispatch slices are present, while complete command-owner parity remains planned | `src/slash.rs`, `src/protocol.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-003 | Unknown/ambiguous commands fail without mutation in both transports | 1200 |
+| V2-006 | PARTIAL | Extend b3 records with first-class Blueprint, Goal, Learn, and external runtime-call references; bounded data types now exist | `src/b3.rs`, `src/domains.rs`, `src/session.rs`, `tests/` | V2-003 | Durable digest, owner, budget, lease, and evidence round trips | 1400 |
+| V2-007 | PARTIAL | Define pure BentoBox layout data, tabs, pane capabilities, minimums, and breakpoints; geometry and a production TUI adapter now exist | `src/layout.rs`, `src/tui.rs`, `tests/` | V2-004 | Layout computes safely and all interactive pane behavior is accepted | 1200 |
+
+### B. Core terminal-agent experiences
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-101 | PARTIAL | Multiline editor with newline key, UTF-8 cursor, line navigation, paste, history, and bounded wrapping | `src/tui.rs`, `tests/tui_resize.rs` | V2-004 | Shift-Enter/Ctrl-J inserts; Enter submits; multiline history round trips | 1400 |
+| V2-102 | PARTIAL | Stream event backpressure and live rendering without unbounded provider mailbox growth | `src/runtime.rs`, `src/backend.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-003 | Slow consumer stays bounded; headless drop markers and deltas precede one terminal response; TUI drop visibility and full ordering remain open | 1800 |
+| V2-103 | PARTIAL | Tool lifecycle events and status rows for queued, running, success, failure, cancellation, and output truncation | `src/core.rs`, `src/backend.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-003 | Same call ID/status sequence in TUI and JSONL | 1800 |
+| V2-104 | PARTIAL | Inline approval focus, multiple pending requests, timeout, deny, and no-side-effect proof | `src/approval.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-005,V2-103 | PTY and headless matrix proves denied write/command never invokes a tool | 1200 |
+| V2-105 | PARTIAL | User-visible retry, resume, interrupted-operation markers, and durable recovery guidance | `src/core.rs`, `src/session.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-003,V2-102 | Kill/restart/replay test preserves valid prefix and offers retry without duplication | 2000 |
+| V2-106 | PARTIAL | Bounded unified diff before/after write/edit approval with hunk metadata and safe truncation | `src/tools.rs`, `src/tui.rs`, `src/headless.rs`, `tests/tools.rs` | V2-004,V2-104 | Atomic failure leaves file unchanged; diff is redacted/bounded and rendered | 1300 |
+| V2-107 | PARTIAL | Foldable tool/log groups with counts, error summaries, keyboard toggle, and preference | `src/tui.rs`, `src/render.rs`, `tests/` | V2-004,V2-103 | Fold/unfold is deterministic and never hides a pending approval/error | 900 |
+| V2-108 | PARTIAL | In-workspace session browser, history search, replay suffix, fork/open, and goal/session navigation | `src/session.rs`, `src/tui.rs`, `src/slash.rs`, `tests/` | V2-005,V2-006 | Restarted process can inspect/replay a bounded session without provider work | 1600 |
+| V2-109 | PARTIAL | Atomic cancel/steer admission, socket/read boundary policy, child reaping, joined shutdown, and close-hook coverage | `src/runtime.rs`, `src/backend.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-102,V2-105 | Slow provider/tool cancellation has no orphan, duplicate, stuck active marker, or lost reissue; owned-host close hooks and blocking socket cancellation still need acceptance | 2400 |
+| V2-110 | PARTIAL | Responsive BentoBox resize, focus, collapse, ratio adjustment, and terminal restoration | `src/layout.rs`, `src/tui.rs`, `tests/tui_resize.rs` | V2-007,V2-109 | Wide/standard/compact/narrow/zero-cell PTY and mock-terminal matrix | 1800 |
+| V2-111 | PARTIAL | Deterministic Markdown/code renderer with plain fallback; current TUI integration covers Assistant/System text and needs diff/streaming blocks | `src/render.rs`, `src/tui.rs`, `tests/` | V2-004,V2-110 | Golden snapshots contain no overlap, unsafe escapes, or broken wide glyphs | 2400 |
+
+### C. b3ehive domains, commands, and workspace panes
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-201 | PLANNED | Durable Blueprint store, digest, DAG validation, `/blueprint` commands, and Gantt projection | `src/b3.rs`, `src/session.rs`, `src/slash.rs`, `tests/` | V2-005,V2-006 | Duplicate/cycle/missing dependency and stale-digest negatives | 1800 |
+| V2-202 | PLANNED | Durable Goal entity linked to a Blueprint, budget/lease state, `/goal` commands, resume/cancel | `src/b3.rs`, `src/session.rs`, `src/core.rs`, `tests/` | V2-006,V2-201 | Goal status transitions and restart recovery are typed and idempotent | 1600 |
+| V2-203 | PLANNED | Learn entity with source/target manifest, mapping, evidence, `/learn` commands, and handoff | `src/b3.rs`, `src/session.rs`, `src/slash.rs`, `tests/` | V2-006,V2-202 | Source-to-target traceability and bounded artifact references | 1900 |
+| V2-204 | PLANNED | External runtime adapters for `/compete` and `/loop` using leases, route decisions, and result manifests | `src/b3.rs`, `src/runtime.rs`, `src/headless.rs`, `tests/` | V2-006,V2-202 | Adapter records intent/evidence only; no hidden scheduler or nested agent | 1600 |
+| V2-205 | PARTIAL | Complete the slash-command dispatcher, completion/help metadata, aliases, and command events for the common `/goal`, `/model`, `/plan`, `/blueprint`, `/learn`, `/session`, `/diff`, `/attach`, `/approve`, and `/cancel` surface; local TUI and headless `/command` routing are present, while durable domain execution and full command parity remain | `src/slash.rs`, `src/core.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-005,V2-201,V2-203 | Every listed command has a success/error/abort path and protocol parity | 1800 |
+| V2-206 | PARTIAL | Add the Project, Goal, Learn, Review, and Session tabs with the requested six-pane BentoBox presets; production async TUI tab/adapter skeleton is present | `src/layout.rs`, `src/tui.rs`, `tests/` | V2-007,V2-110,V2-201 | Preset snapshots match ratios, pane ownership, capability visibility, and interactive focus behavior | 2800 |
+| V2-207 | PLANNED | Persist per-profile/tab pane ratios, collapsed state, focus, and reset/migration | `src/layout.rs`, `src/config.rs`, `src/session.rs`, `tests/` | V2-206 | Corrupt/out-of-range layout fails closed and leaves a valid prior config | 1500 |
+| V2-208 | PLANNED | Resource pane for workspace files plus bounded CPU/memory/disk/process signals | `src/resources.rs`, `src/tui.rs`, `tests/` | V2-206,V2-207 | Polling is bounded, redacted, resize-safe, and never blocks provider work | 1800 |
+| V2-209 | DEFERRED | Optional browser capability pane via an external, bounded snapshot adapter | `src/adapters/browser.rs`, feature docs, `tests/` | V2-206 | Feature is absent from default build; no browser process or credential leak by default | 2200 |
+| V2-210 | DEFERRED | Optional PTY terminal pane with explicit child ownership and approval | `src/adapters/pty.rs`, feature docs, `tests/` | V2-104,V2-206 | Feature is absent from default build; child, resize, signal, and cleanup tests pass when enabled | 2200 |
+
+### D. Headless parity, quality, and release gates
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-301 | PARTIAL | Expose the currently declared events/commands over strict bounded JSONL while retaining stdout protocol-only | `src/protocol.rs`, `src/headless.rs`, `tests/headless_protocol.rs` | V2-003,V2-005,V2-103 | Split/overlong/malformed frames, replay gaps, duplicate IDs, EOF, and cancellation matrix; canonical admission/lifecycle event parity remains open | 2200 |
+| V2-302 | PLANNED | Benchmark queue memory, stream latency, startup/RSS, render frames, and layout computation | `tools/bench_runtime.py`, `Docs/quality/` | V2-002,V2-102,V2-110 | Report has repeatable limits and no unverified p95 claim | 700 |
+| V2-303 | PLANNED | Apply the Tokio/reqwest/clap/SQLite decision gates using measured evidence | `Docs/quality/technology-decision-v2.md`, `tools/` | V2-002,V2-302 | Any migration is all-at-once at its ownership boundary; rejected additions stay absent | 300 |
+| V2-304 | PARTIAL | Re-audit secrets, paths, approvals, diff content, external adapters, and redacted diagnostics | `src/security.rs`, `src/config.rs`, `src/approval.rs`, `src/b3.rs`, `tests/` | V2-103,V2-104,V2-106 | Negative tests prove no credential, absolute path, shell escape, or hidden side effect | 1300 |
+| V2-305 | PLANNED | Run the ten-experience acceptance matrix in both TUI PTY and headless fixture lanes | `tests/`, `tools/user_smoke.py`, `tools/headless_smoke.sh`, `Docs/quality/` | V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-301 | Every item has direct executable evidence; no compile-only acceptance | 1500 |
+| V2-306 | PARTIAL | Reconcile README/spec/Gantt, version notes, release archive, SBOM, and size receipt | `README.md`, `Docs/Zenpi_Execution_Spec.md`, `Docs/Zenpi_Execution_Gantt.md`, `Docs/quality/` | V2-303,V2-305 | Docs never call partial/deferred work complete; release reproduces the recorded size | 500 |
+
+### E. Explicitly future GUI boundary
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-401 | DEFERRED | Publish a stable core/headless/layout protocol that a future GUI can consume | `Docs/Zenpi_GUI_Future_Contract.md` | V2-003,V2-007 | Contract names macOS, Linux, and Windows without adding GUI dependencies now | 0 |
+| V2-402 | DEFERRED | Future macOS GUI workspace (Svelte-quality interaction target) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
+| V2-403 | DEFERRED | Future Linux/Windows GUI workspace (same shared protocol) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
+| V2-999 | PLANNED | Master acceptance, v1 archive/migration, Gantt regeneration, and final user receipt | `Docs/`, `tools/`, `.github/` | V2-001,V2-002,V2-003,V2-004,V2-005,V2-006,V2-007,V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-201,V2-202,V2-203,V2-204,V2-205,V2-206,V2-207,V2-208,V2-301,V2-302,V2-303,V2-304,V2-305,V2-306 | All required rows `ACCEPTED`, zero unresolved partials, clean gates, and size receipt; deferred adapter/GUI rows are not v2.0 blockers | 0 |
+
+## 8. Acceptance matrix for the ten core experiences
+
+The following tests are mandatory evidence, not illustrative examples:
+
+| Experience | Positive proof | Failure/edge proof |
+|---|---|---|
+| Multiline input | Type two lines with Shift-Enter, move the cursor across a UTF-8 boundary, submit one exact message | Paste at the byte limit, empty lines, history recall, narrow wrapping, and 1-cell prompt |
+| Streaming reply | Delayed fixture emits several deltas; TUI paints each before completion and headless emits ordered events | Slow consumer/backpressure, malformed SSE, dropped stream, refusal, and no synthesized success |
+| Tool status | One read, one write, and one command expose stable started/result states | Tool failure, cancellation, output truncation, duplicate call ID, and queue depth |
+| Confirmation | TUI and headless allow a permitted write/command after explicit approval | Deny, timeout, cancel, two pending approvals, and proof the handler was never called |
+| Recovery | Kill/restart after a durable operation marker and resume/retry once | Truncated tail, malformed record, stale active marker, retryable provider error, and duplicate request |
+| File diff | Preview and final result contain bounded unified hunks and changed paths | New file, deletion-like replacement, large truncation, NUL/secret redaction, atomic write failure |
+| Log folding | Toggle a tool group and retain a count/status summary | Pending approval/error cannot be hidden; fold state survives resize and tab switch |
+| Session history | Open/replay/fork a session from the Session tab and headless command | Corrupt prefix, old sequence, missing file, and no provider call during replay |
+| Cancel/interrupt | Ctrl-C or `/cancel` stops a delayed provider/tool and returns to idle | Half-line read, retry backoff, live-steer race, child reaping, shutdown, and panic cleanup |
+| Resize | Exercise wide, standard, compact, narrow, 1x1, and transient zero-cell layouts | No overlap, panic, lost input, stale cursor, or terminal raw-mode/alternate-screen leak |
+
+Additional acceptance is required for Markdown block rendering, every slash
+command, all five tab presets, resource polling bounds, b3 digest/lease rules,
+and the default-build dependency/size budget.
+
+## 9. Versioning and migration policy
+
+* `2.0.0` is a product-contract revision, not a claim that the rows are done.
+  Additive v2 fixes use `2.0.x`; additive compatible features use `2.1.y`;
+  protocol, event, or layout incompatibilities require `3.0.0`.
+* Until `V2-999` is accepted, the v1 file and v1 Gantt remain authoritative
+  only for the historical v1 receipt and its validator. A worker must not mark
+  a v1 row complete to imply a v2 row is complete.
+* On acceptance, the Master will archive the v1 document, migrate stable IDs
+  with an explicit table, update the Spec and README, regenerate the same-name
+  Gantt, and run all structural and executable gates. A hand-edited Gantt or a
+  compile-only receipt is not a migration.
+* GUI, browser, PTY, Tokio/reqwest, clap, and SQLite work may not be smuggled
+  into v2.0 by changing a dependency or adding an unlisted mode. Each requires
+  a row, an estimate, a gate, and (for a contract change) a new version.
+
+## 10. Open decisions for the Master review
+
+1. Keep the lightweight synchronous provider boundary for v2.0 while fixing
+   bounded queues, joined shutdown, and steer admission, or approve a complete
+   Tokio+reqwest migration if the socket-cancellation benchmark fails.
+2. Keep the hand-written parser plus typed slash registry until command
+   completion/help tests demonstrate a real need for clap.
+3. Keep JSONL as the source of truth; add SQLite only as an optional derived
+   index after a measured history workload.
+4. Keep browser and PTY panes disabled by default and model them as external
+   adapters, rather than making the lightweight binary a desktop shell.
+5. Accept `blueprint`, `goal`, and `learn` as first-class local domains now;
+   route `compete` and `loop` through b3ehive runtime handoffs with explicit
+   evidence instead of implementing a second scheduler inside zenpi.
+
+The recommended answer to "should we discuss and update the blueprint again?"
+is therefore **yes**: accept this v2 contract and audit first, then execute the
+rows in dependency order. Do not call the current v1 checkmarks proof that the
+ten experiences or the BentoBox/b3ehive product surface already exists.

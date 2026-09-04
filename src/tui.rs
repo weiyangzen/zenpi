@@ -31,10 +31,17 @@ use ratatui::{Frame, Terminal};
 use thiserror::Error;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
+use crate::layout::{Breakpoint, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility};
+use crate::slash::{self, BlueprintAction, InputRoute, SlashCommand};
+
 /// Bound retained transcript memory even when a provider streams forever.
 pub const DEFAULT_MAX_MESSAGES: usize = 2_048;
 pub const MAX_MESSAGE_BYTES: usize = 256 * 1024;
 pub const MAX_RENDER_LINES: usize = 8_192;
+/// Maximum number of visual rows reserved for the editable prompt.  Longer
+/// prompts remain editable; the input viewport scrolls to keep the cursor
+/// visible instead of growing without bound and starving the transcript.
+pub const MAX_INPUT_LINES: usize = 8;
 pub const DEFAULT_FRAME_INTERVAL: Duration = Duration::from_millis(16);
 pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MIN_LOOP_INTERVAL: Duration = Duration::from_millis(1);
@@ -95,6 +102,31 @@ pub enum TuiAction {
     Redraw,
 }
 
+/// Lifecycle state shown for a provider-requested tool call.
+///
+/// The TUI deliberately keeps this as a small value enum rather than carrying
+/// provider-specific payloads.  That makes status updates cheap and lets the
+/// same view work for headless-driven embedders that forward only normalized
+/// [`crate::core::AgentEvent`] values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolRunStatus {
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+impl ToolRunStatus {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Succeeded => "ok",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
 /// All mutable view state, with bounded queues and UTF-8-safe editing.
 #[derive(Debug, Clone)]
 pub struct TuiState {
@@ -106,6 +138,18 @@ pub struct TuiState {
     scroll: usize,
     history: VecDeque<String>,
     history_cursor: Option<usize>,
+    /// Visual row offset for the multiline prompt viewport.
+    input_scroll: usize,
+    /// Display-cell column retained while moving vertically through lines.
+    preferred_column: Option<usize>,
+    /// Whether verbose tool lifecycle entries are replaced by one summary
+    /// line in the transcript.  Tool entries remain in the bounded message
+    /// queue, so toggling this flag never loses history.
+    fold_tool_logs: bool,
+    /// The active lightweight workspace layout.  The legacy `render` method
+    /// intentionally remains available for embedders; the production async
+    /// loop opts into [`Self::render_bentobox`] below.
+    workspace_layout: LayoutModel,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -131,6 +175,10 @@ impl TuiState {
             scroll: 0,
             history: VecDeque::new(),
             history_cursor: None,
+            input_scroll: 0,
+            preferred_column: None,
+            fold_tool_logs: false,
+            workspace_layout: LayoutModel::new(TabId::Project),
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -166,6 +214,132 @@ impl TuiState {
 
     pub fn message_count(&self) -> usize {
         self.messages.len()
+    }
+
+    /// Return the currently selected BentoBox workspace tab.
+    pub fn workspace_tab(&self) -> TabId {
+        self.workspace_layout.tab
+    }
+
+    /// Borrow the layout model used by the production workspace renderer.
+    ///
+    /// Keeping this as a typed model lets hosts inspect or adjust bounded
+    /// ratios/capabilities without coupling themselves to Ratatui rectangles.
+    pub fn workspace_layout(&self) -> &LayoutModel {
+        &self.workspace_layout
+    }
+
+    /// Select a workspace tab and invalidate the next frame.  Conversation
+    /// state is deliberately shared across tabs until durable per-tab stores
+    /// land in the v2 domain layer.
+    pub fn set_workspace_tab(&mut self, tab: TabId) {
+        if self.workspace_layout.tab != tab {
+            self.workspace_layout.tab = tab;
+            self.workspace_layout.focused = None;
+            self.dirty = true;
+        }
+    }
+
+    /// Set optional pane capabilities for a host that has an external adapter.
+    /// Browser and PTY panes remain disabled by default in the binary.
+    pub fn set_workspace_capabilities(&mut self, capabilities: crate::layout::PaneCapabilities) {
+        self.workspace_layout.set_capabilities(capabilities);
+        self.dirty = true;
+    }
+
+    /// Return whether tool lifecycle entries are currently collapsed.
+    pub fn tool_logs_folded(&self) -> bool {
+        self.fold_tool_logs
+    }
+
+    /// Set the tool-log folding state and invalidate the transcript cache.
+    pub fn set_tool_logs_folded(&mut self, folded: bool) {
+        if self.fold_tool_logs != folded {
+            self.fold_tool_logs = folded;
+            self.cached_transcript = None;
+            self.scroll = 0;
+            self.dirty = true;
+        }
+    }
+
+    /// Toggle tool-log folding and return the new state.
+    pub fn toggle_tool_logs(&mut self) -> bool {
+        let folded = !self.fold_tool_logs;
+        self.set_tool_logs_folded(folded);
+        folded
+    }
+
+    /// Add or update a normalized tool lifecycle entry.
+    ///
+    /// A call ID is used as a stable key, allowing the later `ToolResult`
+    /// event to update the original line instead of appending duplicate
+    /// messages.  Input is sanitized and bounded because provider data is
+    /// displayed in a terminal context.
+    pub fn tool_call_started(&mut self, call_id: impl AsRef<str>, name: impl AsRef<str>) {
+        self.upsert_tool_log(call_id.as_ref(), name.as_ref(), ToolRunStatus::Running);
+    }
+
+    /// Mark a tool call as completed, failed, or cancelled.
+    pub fn tool_call_finished(&mut self, call_id: impl AsRef<str>, status: ToolRunStatus) {
+        let call_id = inline_token(call_id.as_ref(), 96);
+        let key = tool_log_key(&call_id);
+        let position = self.messages.iter().rposition(|message| {
+            message.role == MessageRole::Tool && tool_log_matches(&message.text, &key)
+        });
+        let name = position
+            .and_then(|index| self.messages.get(index))
+            .and_then(|message| tool_log_name(&message.text, &key))
+            .unwrap_or_else(|| "unknown".into());
+        self.upsert_tool_log(&call_id, &name, status);
+    }
+
+    /// Resolve any entries that were still running when a turn was stopped.
+    /// This prevents a cancelled or failed request from leaving a misleading
+    /// permanent "running" marker in the transcript.
+    pub fn finish_running_tools(&mut self, status: ToolRunStatus) {
+        let running = self
+            .messages
+            .iter()
+            .filter(|message| {
+                message.role == MessageRole::Tool && message.text.ends_with(" [running]")
+            })
+            .map(|message| message.text.clone())
+            .collect::<Vec<_>>();
+        for message in running {
+            if let Some((key, rest)) = message.split_once(' ') {
+                let name = rest
+                    .strip_suffix(" [running]")
+                    .unwrap_or("unknown")
+                    .to_owned();
+                if let Some(call_id) = key
+                    .strip_prefix("[tool:")
+                    .and_then(|value| value.strip_suffix(']'))
+                {
+                    self.upsert_tool_log(call_id, &name, status);
+                }
+            }
+        }
+    }
+
+    fn upsert_tool_log(&mut self, call_id: &str, name: &str, status: ToolRunStatus) {
+        let call_id = inline_token(call_id, 96);
+        let name = inline_token(name, 160);
+        let key = tool_log_key(&call_id);
+        let text = format!("{key} {name} [{}]", status.label());
+        if let Some(index) = self.messages.iter().rposition(|message| {
+            message.role == MessageRole::Tool && tool_log_matches(&message.text, &key)
+        }) {
+            if let Some(message) = self.messages.get_mut(index)
+                && message.text != text
+            {
+                message.text = bound_text(text);
+                self.cached_transcript = None;
+                self.scroll = 0;
+                self.dirty = true;
+            }
+            return;
+        }
+        self.push_message(MessageRole::Tool, text);
     }
 
     pub fn invalidate(&mut self) {
@@ -249,9 +423,11 @@ impl TuiState {
     }
 
     pub fn set_input(&mut self, input: impl Into<String>) {
-        self.input = bound_text(input.into());
+        self.input = bound_text(sanitize_input(input.into()));
         self.cursor = self.input.len();
         self.history_cursor = None;
+        self.input_scroll = 0;
+        self.preferred_column = None;
         self.dirty = true;
     }
 
@@ -292,6 +468,8 @@ impl TuiState {
                 KeyCode::Char('u') => {
                     self.input.drain(..self.cursor);
                     self.cursor = 0;
+                    self.input_scroll = 0;
+                    self.preferred_column = None;
                     self.dirty = true;
                     return TuiAction::None;
                 }
@@ -300,6 +478,27 @@ impl TuiState {
                     return TuiAction::None;
                 }
                 KeyCode::Char('l') => return TuiAction::Redraw,
+                KeyCode::Char('o') => {
+                    self.toggle_tool_logs();
+                    return TuiAction::Redraw;
+                }
+                // Workspace tabs are intentionally keyboard-only for now so
+                // the existing prompt workflow remains unchanged.  The tab
+                // bar mirrors these stable numbers in the BentoBox view.
+                KeyCode::Char(character) if ('1'..='5').contains(&character) => {
+                    let index = usize::from(character as u8 - b'1');
+                    if let Some(tab) = TabId::ALL.get(index).copied() {
+                        self.set_workspace_tab(tab);
+                    }
+                    return TuiAction::Redraw;
+                }
+                // Ctrl-J is the portable terminal spelling of a newline.
+                // Treat Ctrl-Enter the same way because a few terminals send
+                // that pair as `KeyCode::Enter` rather than `Char('j')`.
+                KeyCode::Char('j') | KeyCode::Enter => {
+                    self.insert_text("\n");
+                    return TuiAction::None;
+                }
                 _ => {}
             }
         }
@@ -309,15 +508,47 @@ impl TuiState {
             }
             KeyCode::Backspace => self.delete_previous_char(),
             KeyCode::Delete => self.delete_next_char(),
-            KeyCode::Left => self.cursor = previous_boundary(&self.input, self.cursor),
-            KeyCode::Right => self.cursor = next_boundary(&self.input, self.cursor),
-            KeyCode::Home => self.cursor = 0,
-            KeyCode::End => self.cursor = self.input.len(),
+            KeyCode::Left => {
+                self.cursor = previous_boundary(&self.input, self.cursor);
+                self.preferred_column = None;
+            }
+            KeyCode::Right => {
+                self.cursor = next_boundary(&self.input, self.cursor);
+                self.preferred_column = None;
+            }
+            // Home/End operate on the current logical line, as users expect
+            // in a multiline prompt.  Ctrl-Home/Ctrl-End still address the
+            // complete buffer.
+            KeyCode::Home => {
+                self.cursor = if modifiers.contains(KeyModifiers::CONTROL) {
+                    0
+                } else {
+                    line_start(&self.input, self.cursor)
+                };
+                self.preferred_column = None;
+            }
+            KeyCode::End => {
+                self.cursor = if modifiers.contains(KeyModifiers::CONTROL) {
+                    self.input.len()
+                } else {
+                    line_end(&self.input, self.cursor)
+                };
+                self.preferred_column = None;
+            }
             KeyCode::Up if self.input.is_empty() => self.history_move(-1),
             KeyCode::Down if self.input.is_empty() => self.history_move(1),
+            KeyCode::Up => self.move_vertical(-1),
+            KeyCode::Down => self.move_vertical(1),
             KeyCode::PageUp => self.scroll_up(8),
             KeyCode::PageDown => self.scroll_down(8),
             KeyCode::Enter => {
+                // A shifted Enter is an insertion operation, never a submit.
+                // This is handled after the Ctrl branch so terminals that
+                // report Ctrl-Shift-Enter remain newline-safe as well.
+                if modifiers.contains(KeyModifiers::SHIFT) {
+                    self.insert_text("\n");
+                    return TuiAction::None;
+                }
                 let text = self.input.trim().to_owned();
                 if !text.is_empty() {
                     self.history.push_back(text.clone());
@@ -327,6 +558,8 @@ impl TuiState {
                     self.input.clear();
                     self.cursor = 0;
                     self.history_cursor = None;
+                    self.input_scroll = 0;
+                    self.preferred_column = None;
                     self.scroll = 0;
                     self.dirty = true;
                     return TuiAction::Submit(text);
@@ -339,6 +572,8 @@ impl TuiState {
                 self.input.clear();
                 self.cursor = 0;
                 self.history_cursor = None;
+                self.input_scroll = 0;
+                self.preferred_column = None;
                 self.dirty = true;
             }
             _ => {}
@@ -349,13 +584,16 @@ impl TuiState {
 
     fn insert_text(&mut self, text: &str) {
         let remaining = MAX_MESSAGE_BYTES.saturating_sub(self.input.len());
-        let text = truncate_bytes(text, remaining);
+        let sanitized = sanitize_input_with_limit(text, remaining);
+        let text = truncate_bytes(&sanitized, remaining);
         if text.is_empty() {
             return;
         }
         self.input.insert_str(self.cursor, text);
         self.cursor += text.len();
         self.history_cursor = None;
+        self.input_scroll = 0;
+        self.preferred_column = None;
         self.dirty = true;
     }
 
@@ -366,6 +604,8 @@ impl TuiState {
         let start = previous_boundary(&self.input, self.cursor);
         self.input.drain(start..self.cursor);
         self.cursor = start;
+        self.input_scroll = 0;
+        self.preferred_column = None;
         self.dirty = true;
     }
 
@@ -375,6 +615,8 @@ impl TuiState {
         }
         let end = next_boundary(&self.input, self.cursor);
         self.input.drain(self.cursor..end);
+        self.input_scroll = 0;
+        self.preferred_column = None;
         self.dirty = true;
     }
 
@@ -386,6 +628,8 @@ impl TuiState {
             .map_or(0, |index| next_boundary(trimmed, index));
         self.input.drain(start..self.cursor);
         self.cursor = start;
+        self.input_scroll = 0;
+        self.preferred_column = None;
         self.dirty = true;
     }
 
@@ -405,6 +649,37 @@ impl TuiState {
             .and_then(|index| self.history.get(index).cloned())
             .unwrap_or_default();
         self.cursor = self.input.len();
+        self.input_scroll = 0;
+        self.preferred_column = None;
+        self.dirty = true;
+    }
+
+    /// Move to the adjacent logical line while retaining the requested
+    /// display-cell column.  Every offset is derived from UTF-8 boundaries,
+    /// so a wide or multibyte glyph can never leave `cursor` mid-codepoint.
+    fn move_vertical(&mut self, direction: isize) {
+        let current_start = line_start(&self.input, self.cursor);
+        let current_end = line_end(&self.input, self.cursor);
+        let current_column = UnicodeWidthStr::width(&self.input[current_start..self.cursor]);
+        let target_column = self.preferred_column.unwrap_or(current_column);
+        let target_start = if direction < 0 {
+            if current_start == 0 {
+                return;
+            }
+            let previous_end = current_start.saturating_sub(1);
+            line_start(&self.input, previous_end)
+        } else {
+            if current_end >= self.input.len() {
+                return;
+            }
+            current_end + 1
+        };
+        let target_end = line_end(&self.input, target_start);
+        self.cursor = byte_at_column(&self.input[target_start..target_end], target_column)
+            .saturating_add(target_start)
+            .min(target_end);
+        self.preferred_column = Some(target_column);
+        self.input_scroll = 0;
         self.dirty = true;
     }
 
@@ -416,13 +691,27 @@ impl TuiState {
             self.last_area = area;
             self.cached_transcript = None;
             self.scroll = 0;
+            self.input_scroll = 0;
         }
+        let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
+        let prompt_lines = wrap_plain(&self.input, prompt_width).len();
+        let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
+        // Keep header/footer visible whenever there is room, and let the
+        // transcript yield rows to the prompt first.  Tiny resize states can
+        // legitimately collapse the prompt to zero rows.
+        let input_height = if area.height > 3 {
+            u16::try_from(desired_input_height)
+                .unwrap_or(u16::MAX)
+                .min(area.height.saturating_sub(3))
+        } else {
+            0
+        };
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),
                 Constraint::Min(1),
-                Constraint::Length(3),
+                Constraint::Length(input_height),
                 Constraint::Length(1),
             ])
             .split(area);
@@ -465,10 +754,15 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        let title = if self.fold_tool_logs {
+            " Conversation (tools folded) "
+        } else {
+            " Conversation "
+        };
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray))
-            .title(" Conversation ");
+            .title(title);
         let inner = block.inner(area);
         let width = usize::from(inner.width).max(1);
         if self
@@ -476,7 +770,8 @@ impl TuiState {
             .as_ref()
             .is_none_or(|(cached_width, _)| *cached_width != inner.width)
         {
-            let mut lines = transcript_lines(&self.messages, width);
+            let messages = self.transcript_messages();
+            let mut lines = transcript_lines(&messages, width);
             if lines.len() > MAX_RENDER_LINES {
                 lines.drain(..lines.len() - MAX_RENDER_LINES);
             }
@@ -499,7 +794,33 @@ impl TuiState {
         frame.render_widget(Paragraph::new(Text::from(displayed)).block(block), area);
     }
 
-    fn render_input(&self, frame: &mut Frame<'_>, area: Rect) {
+    /// Build the render-only message view.  Folding never mutates the
+    /// canonical bounded queue, which means expanding the logs restores the
+    /// exact lifecycle entries and ordinary transcript ordering.
+    fn transcript_messages(&self) -> VecDeque<TuiMessage> {
+        if !self.fold_tool_logs {
+            return self.messages.clone();
+        }
+        let mut visible = VecDeque::new();
+        let mut folded = 0usize;
+        for message in &self.messages {
+            if message.role == MessageRole::Tool {
+                folded = folded.saturating_add(1);
+            } else {
+                visible.push_back(message.clone());
+            }
+        }
+        if folded > 0 {
+            let suffix = if folded == 1 { "" } else { "s" };
+            visible.push_back(TuiMessage::new(
+                MessageRole::System,
+                format!("{folded} tool log{suffix} folded; press Ctrl-O to expand"),
+            ));
+        }
+        visible
+    }
+
+    fn render_input(&mut self, frame: &mut Frame<'_>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -517,19 +838,37 @@ impl TuiState {
             .into_iter()
             .map(Line::from)
             .collect::<Vec<_>>();
+        let visible_height = usize::from(inner.height);
+        let (cursor_x, cursor_y) = cursor_position(&self.input, self.cursor, width);
+        let max_scroll = lines.len().saturating_sub(visible_height);
+        if visible_height > 0 {
+            let mut scroll = self.input_scroll.min(max_scroll);
+            let cursor_y = usize::from(cursor_y);
+            if cursor_y < scroll {
+                scroll = cursor_y;
+            } else if cursor_y >= scroll.saturating_add(visible_height) {
+                scroll = cursor_y.saturating_add(1).saturating_sub(visible_height);
+            }
+            self.input_scroll = scroll.min(max_scroll);
+        } else {
+            self.input_scroll = 0;
+        }
         frame.render_widget(
             Paragraph::new(Text::from(lines))
                 .block(block)
-                .wrap(Wrap { trim: false }),
+                .wrap(Wrap { trim: false })
+                .scroll((u16::try_from(self.input_scroll).unwrap_or(u16::MAX), 0)),
             area,
         );
-        let (cursor_x, cursor_y) = cursor_position(&self.input, self.cursor, width);
+        let cursor_y = usize::from(cursor_y).saturating_sub(self.input_scroll);
         let x = inner
             .x
             .saturating_add(cursor_x.min(inner.width.saturating_sub(1)));
-        let y = inner
-            .y
-            .saturating_add(cursor_y.min(inner.height.saturating_sub(1)));
+        let y = inner.y.saturating_add(
+            u16::try_from(cursor_y)
+                .unwrap_or(u16::MAX)
+                .min(inner.height.saturating_sub(1)),
+        );
         frame.set_cursor_position(Position::new(x, y));
     }
 
@@ -538,13 +877,244 @@ impl TuiState {
             return;
         }
         let text = truncate_to_width(
-            " Enter send  |  Ctrl-C quit  |  PgUp/PgDn scroll ",
+            " Enter send  |  Shift+Enter newline  |  Ctrl-C quit  |  PgUp/PgDn scroll ",
             usize::from(area.width),
         );
         frame.render_widget(
             Paragraph::new(Span::styled(text, Style::default().fg(Color::DarkGray))),
             area,
         );
+    }
+
+    /// Render the production workspace view using the bounded [`LayoutModel`].
+    ///
+    /// This is deliberately a small adapter rather than a second UI toolkit:
+    /// the model owns breakpoint/visibility decisions, while Ratatui only
+    /// receives clipped rectangles and renders the existing transcript and
+    /// prompt.  Browser and PTY panes are not enabled by default, so their
+    /// adapters cannot accidentally start a child process or network view.
+    pub fn render_bentobox(&mut self, frame: &mut Frame<'_>, title: &str) {
+        let area = frame.area();
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
+        let prompt_lines = wrap_plain(&self.input, prompt_width).len();
+        let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
+        let input_height = if area.height > 4 {
+            u16::try_from(desired_input_height)
+                .unwrap_or(u16::MAX)
+                .min(area.height.saturating_sub(4))
+        } else {
+            0
+        };
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(input_height),
+                Constraint::Length(1),
+            ])
+            .split(area);
+        self.render_header(frame, chunks[0], title);
+        self.render_workspace_tabs(frame, chunks[1]);
+        self.render_workspace(frame, chunks[2]);
+        self.render_input(frame, chunks[3]);
+        self.render_footer(frame, chunks[4]);
+    }
+
+    fn render_workspace_tabs(&self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let active = self.workspace_layout.tab;
+        let mut spans = Vec::with_capacity(TabId::ALL.len());
+        for (index, tab) in TabId::ALL.into_iter().enumerate() {
+            let style = if tab == active {
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            spans.push(Span::styled(
+                format!(" {}:{} ", index + 1, tab.as_str()),
+                style,
+            ));
+        }
+        frame.render_widget(Paragraph::new(Line::from(spans)), area);
+    }
+
+    fn render_workspace(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, area);
+        let canonical = conversation_pane_for_tab(adapter.tab());
+        for pane in adapter.visible_panes() {
+            if pane.rect.width == 0 || pane.rect.height == 0 {
+                continue;
+            }
+            if pane.id == canonical {
+                self.render_transcript(frame, pane.rect);
+            } else {
+                self.render_workspace_pane(frame, pane.id, pane.rect);
+            }
+        }
+    }
+
+    fn render_workspace_pane(&self, frame: &mut Frame<'_>, id: PaneId, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let title = workspace_pane_title(id);
+        let content = match id {
+            PaneId::Gantt => "No blueprint selected",
+            PaneId::Resources => "-",
+            PaneId::GoalConversation
+            | PaneId::ProjectConversation
+            | PaneId::LearnConversation
+            | PaneId::ReviewConversation
+            | PaneId::SessionConversation => "-",
+            PaneId::LearnResources
+            | PaneId::LearnQueue
+            | PaneId::LearnMapping
+            | PaneId::Evidence
+            | PaneId::Checks
+            | PaneId::ApprovalQueue
+            | PaneId::Diff
+            | PaneId::SessionList
+            | PaneId::ReplayControls
+            | PaneId::EventTimeline
+            | PaneId::Browser
+            | PaneId::Terminal => "-",
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray))
+            .title(title);
+        frame.render_widget(
+            Paragraph::new(content)
+                .style(Style::default().fg(Color::DarkGray))
+                .block(block)
+                .wrap(Wrap { trim: true }),
+            area,
+        );
+    }
+}
+
+/// Ratatui-facing rectangle for one pane in a computed BentoBox snapshot.
+/// The rectangle is clipped to the adapter area, so transient zero/one-cell
+/// resize events can never make a widget draw outside the frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaneFrame {
+    pub id: PaneId,
+    pub rect: Rect,
+    pub visibility: Visibility,
+}
+
+/// Reusable bridge from the terminal-independent [`LayoutModel`] to Ratatui.
+/// Consumers can inspect the snapshot for diagnostics or use `pane`/
+/// `visible_panes` to render their own widgets without duplicating breakpoint
+/// and capability logic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BentoBoxLayoutAdapter {
+    area: Rect,
+    snapshot: LayoutSnapshot,
+    panes: Vec<PaneFrame>,
+}
+
+impl BentoBoxLayoutAdapter {
+    pub fn new(model: &LayoutModel, area: Rect) -> Self {
+        let snapshot = model.compute(area.width, area.height);
+        let panes = snapshot
+            .panes
+            .iter()
+            .map(|pane| PaneFrame {
+                id: pane.id,
+                rect: translate_pane_rect(area, pane.rect),
+                visibility: pane.visibility,
+            })
+            .collect();
+        Self {
+            area,
+            snapshot,
+            panes,
+        }
+    }
+
+    pub fn area(&self) -> Rect {
+        self.area
+    }
+
+    pub fn tab(&self) -> TabId {
+        self.snapshot.tab
+    }
+
+    pub fn breakpoint(&self) -> Breakpoint {
+        self.snapshot.breakpoint
+    }
+
+    pub fn snapshot(&self) -> &LayoutSnapshot {
+        &self.snapshot
+    }
+
+    pub fn pane(&self, id: PaneId) -> Option<PaneFrame> {
+        self.panes.iter().find(|pane| pane.id == id).copied()
+    }
+
+    pub fn visible_panes(&self) -> impl Iterator<Item = PaneFrame> + '_ {
+        self.panes
+            .iter()
+            .copied()
+            .filter(|pane| pane.visibility == Visibility::Visible)
+    }
+}
+
+fn translate_pane_rect(area: Rect, pane: PaneRect) -> Rect {
+    let x_offset = pane.x.min(area.width);
+    let y_offset = pane.y.min(area.height);
+    let x = area.x.saturating_add(x_offset);
+    let y = area.y.saturating_add(y_offset);
+    let width = pane.width.min(area.width.saturating_sub(x_offset));
+    let height = pane.height.min(area.height.saturating_sub(y_offset));
+    Rect::new(x, y, width, height)
+}
+
+fn conversation_pane_for_tab(tab: TabId) -> PaneId {
+    match tab {
+        TabId::Project => PaneId::ProjectConversation,
+        TabId::Goal => PaneId::GoalConversation,
+        TabId::Learn => PaneId::LearnConversation,
+        TabId::Review => PaneId::ReviewConversation,
+        TabId::Session => PaneId::SessionConversation,
+    }
+}
+
+fn workspace_pane_title(id: PaneId) -> &'static str {
+    match id {
+        PaneId::ProjectConversation => "Project",
+        PaneId::Resources => "Resources",
+        PaneId::GoalConversation => "Goal",
+        PaneId::Gantt => "Gantt",
+        PaneId::Browser => "Browser",
+        PaneId::Terminal => "Terminal",
+        PaneId::LearnConversation => "Learn",
+        PaneId::LearnResources => "Learn resources",
+        PaneId::LearnQueue => "Learn queue",
+        PaneId::LearnMapping => "Learn mapping",
+        PaneId::Evidence => "Evidence",
+        PaneId::ReviewConversation => "Review",
+        PaneId::Checks => "Checks",
+        PaneId::ApprovalQueue => "Approval queue",
+        PaneId::Diff => "Diff",
+        PaneId::SessionList => "Sessions",
+        PaneId::SessionConversation => "Session",
+        PaneId::ReplayControls => "Replay",
+        PaneId::EventTimeline => "Events",
     }
 }
 
@@ -621,6 +1191,226 @@ pub enum TuiError {
     Io(#[from] io::Error),
 }
 
+/// The control result of a parsed slash command.
+///
+/// This is deliberately separate from [`TuiAction`].  Input editing remains
+/// a pure view concern, while the host decides whether an admitted command
+/// should interrupt a worker or leave the TUI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlashDispatchAction {
+    Continue,
+    Interrupt,
+    Quit,
+}
+
+/// Execute the local, transport-independent part of a slash command.
+///
+/// The function is intentionally side-effect-light: it updates the visible
+/// transcript and, when an agent is supplied, reads or changes only local
+/// agent state.  `/compete` and `/loop` are acknowledged as runtime routes but
+/// are not silently converted into model prompts; a future b3ehive adapter
+/// can replace that acknowledgement without changing the parser boundary.
+/// `Cancel` returns [`SlashDispatchAction::Interrupt`] so the owning runtime
+/// can issue its typed cancellation request.
+pub fn dispatch_slash_command(
+    command: SlashCommand,
+    state: &mut TuiState,
+    mut agent: Option<&mut crate::core::Agent>,
+) -> SlashDispatchAction {
+    match command {
+        SlashCommand::Help { topic } => match slash::help(topic.as_deref()) {
+            Some(help) => state.push_message(MessageRole::System, help),
+            None => state.push_message(
+                MessageRole::Error,
+                "unknown help topic; type /help for available commands",
+            ),
+        },
+        SlashCommand::Model { name } => {
+            let message = if let Some(agent) = agent.as_deref_mut() {
+                match name {
+                    Some(name) => match agent.set_model(Some(name.clone())) {
+                        Ok(()) => format!("model selected: {}", inline_token(&name, 160)),
+                        Err(error) => format!("model change failed: {error}"),
+                    },
+                    None => format!(
+                        "model: {}",
+                        agent
+                            .snapshot()
+                            .model
+                            .as_deref()
+                            .unwrap_or("<provider default>")
+                    ),
+                }
+            } else {
+                match name {
+                    Some(name) => format!(
+                        "model command acknowledged: {} (agent host unavailable)",
+                        inline_token(&name, 160)
+                    ),
+                    None => "model is managed by the agent host".into(),
+                }
+            };
+            state.push_message(MessageRole::System, message);
+        }
+        SlashCommand::Status => {
+            let message = if let Some(agent) = agent.as_deref_mut() {
+                format_agent_status(agent)
+            } else {
+                "status: agent host is busy; no model request was submitted".into()
+            };
+            state.push_message(MessageRole::System, message);
+        }
+        SlashCommand::History { limit } => {
+            let message = format_history(agent.as_deref(), state, limit);
+            state.push_message(MessageRole::System, message);
+        }
+        SlashCommand::Clear => {
+            state.clear_messages();
+            state.set_status("Ready");
+        }
+        SlashCommand::Cancel => {
+            state.set_status("Interrupt requested");
+            return SlashDispatchAction::Interrupt;
+        }
+        SlashCommand::Exit => return SlashDispatchAction::Quit,
+        SlashCommand::Goal { instruction } => {
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "goal command acknowledged (b3ehive owner pending): {}",
+                    bounded_display(&instruction)
+                ),
+            );
+        }
+        SlashCommand::Blueprint { action } => {
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "blueprint command acknowledged (owner pending): {}",
+                    blueprint_action_display(&action)
+                ),
+            );
+        }
+        SlashCommand::Learn { target } => {
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "learn command acknowledged (owner pending): {}",
+                    target
+                        .as_deref()
+                        .map(bounded_display)
+                        .unwrap_or_else(|| "current target".into())
+                ),
+            );
+        }
+        SlashCommand::Compete { args } => {
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "compete delegated to b3ehive runtime (adapter pending): {}",
+                    bounded_display(&args.join(" "))
+                ),
+            );
+        }
+        SlashCommand::Loop { args } => {
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "loop delegated to b3ehive runtime (adapter pending): {}",
+                    bounded_display(&args.join(" "))
+                ),
+            );
+        }
+    }
+    if !state.is_busy() {
+        state.set_status("Ready");
+    }
+    SlashDispatchAction::Continue
+}
+
+fn format_agent_status(agent: &crate::core::Agent) -> String {
+    let snapshot = agent.snapshot();
+    format!(
+        "phase={:?} backend={} model={} active_turn={} session_turns={}",
+        snapshot.phase,
+        inline_token(&snapshot.backend, 96),
+        snapshot
+            .model
+            .as_deref()
+            .map(|value| inline_token(value, 160))
+            .unwrap_or_else(|| "<provider default>".into()),
+        snapshot
+            .active_turn_id
+            .as_deref()
+            .map(|value| inline_token(value, 96))
+            .unwrap_or_else(|| "<none>".into()),
+        snapshot.session.turn_count,
+    )
+}
+
+fn format_history(
+    agent: Option<&crate::core::Agent>,
+    state: &TuiState,
+    limit: Option<usize>,
+) -> String {
+    let limit = limit.unwrap_or(20).clamp(1, 128);
+    if let Some(agent) = agent {
+        let turns = agent.history();
+        if turns.is_empty() {
+            return "history: empty".into();
+        }
+        let start = turns.len().saturating_sub(limit);
+        return turns[start..]
+            .iter()
+            .map(|turn| {
+                format!(
+                    "{} {}: {}",
+                    inline_token(&turn.id, 96),
+                    format!("{:?}", turn.role).to_ascii_lowercase(),
+                    bounded_display(&turn.content)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    let messages = state.messages.iter().rev().take(limit).collect::<Vec<_>>();
+    if messages.is_empty() {
+        "history: empty".into()
+    } else {
+        messages
+            .into_iter()
+            .rev()
+            .map(|message| {
+                format!(
+                    "{}: {}",
+                    message.role.label(),
+                    bounded_display(&message.text)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+fn blueprint_action_display(action: &BlueprintAction) -> String {
+    match action {
+        BlueprintAction::Show => "show".into(),
+        BlueprintAction::Status => "status".into(),
+        BlueprintAction::Validate { path } => format!(
+            "validate {}",
+            path.as_deref()
+                .map(bounded_display)
+                .unwrap_or_else(|| "configured blueprint".into())
+        ),
+        BlueprintAction::Run { target } => format!("run {}", bounded_display(target)),
+        BlueprintAction::Open { path } => format!("open {}", bounded_display(path)),
+    }
+}
+
+fn bounded_display(value: &str) -> String {
+    inline_token(value, 512)
+}
+
 /// Run the interactive mode for zenpi's shared agent.
 pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiError> {
     let mut state = TuiState::default();
@@ -636,6 +1426,9 @@ pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiErro
     let config = TuiConfig::default();
     run_with_state(config, state, |text, state| {
         let result = agent.process_sync(text);
+        for event in agent.take_events() {
+            apply_agent_tool_event(state, event);
+        }
         match result {
             Ok(result) => {
                 if let Some(assistant) = result.assistant {
@@ -663,6 +1456,9 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
         .ok()
         .and_then(|agent| agent.approval_coordinator());
     let worker_state = Arc::clone(&shared);
+    // Keep provider events bounded independently of the transcript. A slow
+    // terminal must not turn an unbounded stream into unbounded memory.
+    const MAX_PROVIDER_EVENTS: usize = 4096;
     let provider_events = Arc::new(Mutex::new(VecDeque::new()));
     let worker_events = Arc::clone(&provider_events);
     let runner = BackgroundRunner::spawn(
@@ -677,7 +1473,9 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                 crate::core::TurnInputRequest::new(text),
                 || token.is_cancelled(),
                 &mut |event| {
-                    if let Ok(mut pending) = worker_events.lock() {
+                    if let Ok(mut pending) = worker_events.lock()
+                        && pending.len() < MAX_PROVIDER_EVENTS
+                    {
                         pending.push_back(event);
                     }
                     Ok(())
@@ -686,6 +1484,9 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
+            // Prevent a shutdown that races the worker's done notification
+            // from rewriting a completed turn as a cancellation.
+            token.mark_completed();
             Ok(result)
         },
         RuntimeConfig::default(),
@@ -703,11 +1504,26 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
         }
     }
     let config = TuiConfig::default();
-    let mut guard = TerminalGuard::enter()
-        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+    // The runtime worker is spawned before terminal setup so it can own the
+    // agent independently of the terminal.  Terminal setup can still fail
+    // (for example when stdin is not a TTY), so every early return here must
+    // close and join the worker instead of relying on `Drop` to detach it.
+    let mut guard = match TerminalGuard::enter() {
+        Ok(guard) => guard,
+        Err(error) => {
+            let _ = runner.shutdown_and_join();
+            return Err(crate::error::ZenpiError::Message(error.to_string()));
+        }
+    };
     let backend = CrosstermBackend::new(io::stdout());
-    let mut terminal = Terminal::new(backend)
-        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+    let mut terminal = match Terminal::new(backend) {
+        Ok(terminal) => terminal,
+        Err(error) => {
+            let _ = runner.shutdown_and_join();
+            guard.leave();
+            return Err(crate::error::ZenpiError::Message(error.to_string()));
+        }
+    };
     let frame_interval = config.frame_interval.max(MIN_LOOP_INTERVAL);
     let poll_interval = config.poll_interval.max(MIN_LOOP_INTERVAL);
     let mut scheduler = RenderScheduler::new(frame_interval);
@@ -715,207 +1531,350 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     let mut last_tick = Instant::now();
     let mut active_job = None;
     let mut pending_approvals = VecDeque::new();
-    'outer: loop {
-        if let Ok(mut events) = provider_events.lock() {
-            for event in events.drain(..) {
+    let loop_result = (|| -> Result<(), crate::error::ZenpiError> {
+        'outer: loop {
+            // The worker holds the agent mutex while provider I/O is in flight;
+            // use a non-blocking drain so lifecycle events become visible as soon
+            // as that mutex is released without freezing keyboard/render polling.
+            drain_agent_tool_events(&shared, &mut state);
+            if let Ok(mut events) = provider_events.lock() {
+                for event in events.drain(..) {
+                    match event {
+                        crate::backend::ProviderEvent::TextDelta { delta } => {
+                            state.append_stream(MessageRole::Assistant, delta);
+                        }
+                        crate::backend::ProviderEvent::Refusal { text } => {
+                            state.append_stream(MessageRole::Error, text);
+                        }
+                        crate::backend::ProviderEvent::Warning { message } => {
+                            state.push_message(MessageRole::System, message);
+                        }
+                        crate::backend::ProviderEvent::ToolCallDelta { call_id, name, .. } => {
+                            if let Some(call_id) = call_id {
+                                state.tool_call_started(
+                                    call_id,
+                                    name.unwrap_or_else(|| "unknown".into()),
+                                );
+                            } else {
+                                state.set_status("Preparing tool call");
+                            }
+                        }
+                        crate::backend::ProviderEvent::ToolCallDone { call } => {
+                            state.tool_call_started(call.id, call.name);
+                        }
+                        _ => {}
+                    }
+                    scheduler.request();
+                }
+            }
+            if let Some(coordinator) = approval.as_ref() {
+                for request in coordinator.drain_pending() {
+                    state.push_message(
+                        // Keep the approval prompt visible while tool logs are
+                        // folded; hiding it would leave the user with no way to
+                        // know what the pending y/n response refers to.
+                        MessageRole::System,
+                        format!(
+                            "Approval required: {} {}\nType y to allow once, n to deny.",
+                            request.tool, request.arguments
+                        ),
+                    );
+                    // The coordinator itself is bounded by one request per tool
+                    // turn; keep a defensive host bound for malformed providers.
+                    if pending_approvals.len() < 128 {
+                        pending_approvals.push_back(request);
+                    }
+                    state.set_status("Approval required");
+                    scheduler.request();
+                }
+            }
+            while let Ok(event) = runner.try_next_event() {
                 match event {
-                    crate::backend::ProviderEvent::TextDelta { delta } => {
-                        state.append_stream(MessageRole::Assistant, delta);
+                    RuntimeEvent::Completed { id, outcome } if Some(id) == active_job => {
+                        // Approval prompts belong to the turn that just
+                        // reached a terminal state.  Drop any prompt that
+                        // raced with completion/cancellation; otherwise the
+                        // next normal user message would be consumed as a
+                        // stale y/n response.
+                        pending_approvals.clear();
+                        active_job = None;
+                        state.set_busy(false);
+                        drain_agent_tool_events(&shared, &mut state);
+                        match outcome {
+                            JobOutcome::Succeeded(result) => {
+                                if let Some(assistant) = result.assistant {
+                                    state.push_message(MessageRole::Assistant, assistant.content);
+                                }
+                                state.set_status("Ready");
+                            }
+                            JobOutcome::Failed(error) => {
+                                state.finish_running_tools(ToolRunStatus::Failed);
+                                state.push_message(MessageRole::Error, error.to_string());
+                                state.set_status("Request failed");
+                            }
+                            JobOutcome::Cancelled => {
+                                state.finish_running_tools(ToolRunStatus::Cancelled);
+                                state.set_status("Interrupted");
+                            }
+                            JobOutcome::Panicked => {
+                                state.finish_running_tools(ToolRunStatus::Failed);
+                                state.push_message(MessageRole::Error, "background job panicked");
+                                state.set_status("Request failed");
+                            }
+                        }
+                        scheduler.request();
                     }
-                    crate::backend::ProviderEvent::Refusal { text } => {
-                        state.append_stream(MessageRole::Error, text);
+                    RuntimeEvent::Rejected { id, reason } if Some(id) == active_job => {
+                        // A rejected active request cannot produce a valid
+                        // approval response.  Do not let its prompt swallow
+                        // the next user turn.
+                        pending_approvals.clear();
+                        active_job = None;
+                        state.set_busy(false);
+                        state.push_message(MessageRole::Error, reason.to_string());
+                        state.set_status("Request rejected");
+                        scheduler.request();
                     }
-                    crate::backend::ProviderEvent::Warning { message } => {
-                        state.push_message(MessageRole::System, message);
+                    RuntimeEvent::CancelRequested { id } if Some(id) == active_job => {
+                        // Cancellation can also be requested by the runtime
+                        // (rather than directly by the key handler).  Treat
+                        // that acknowledgement as the terminal boundary for
+                        // any approval prompt belonging to this turn.
+                        pending_approvals.clear();
+                        state.set_status("Interrupt requested");
+                        scheduler.request();
                     }
-                    crate::backend::ProviderEvent::ToolCallDone { call } => {
-                        state.push_message(MessageRole::Tool, format!("Using {}", call.name));
-                    }
+                    RuntimeEvent::Closed => break,
                     _ => {}
                 }
+            }
+            let now = Instant::now();
+            if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
+                state.tick();
+                scheduler.request();
+                last_tick = now;
+            }
+            if state.take_dirty() {
                 scheduler.request();
             }
-        }
-        if let Some(coordinator) = approval.as_ref() {
-            for request in coordinator.drain_pending() {
-                state.push_message(
-                    MessageRole::Tool,
-                    format!(
-                        "Approval required: {} {}\nType y to allow once, n to deny.",
-                        request.tool, request.arguments
-                    ),
-                );
-                pending_approvals.push_back(request);
-                state.set_status("Approval required");
-                scheduler.request();
+            if scheduler.due(now) {
+                if resize_pending {
+                    terminal
+                        .autoresize()
+                        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+                    resize_pending = false;
+                }
+                terminal
+                    .draw(|frame| state.render_bentobox(frame, &config.title))
+                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+                scheduler.rendered(Instant::now());
             }
-        }
-        while let Ok(event) = runner.try_next_event() {
-            match event {
-                RuntimeEvent::Completed { id, outcome } if Some(id) == active_job => {
-                    active_job = None;
-                    state.set_busy(false);
-                    match outcome {
-                        JobOutcome::Succeeded(result) => {
-                            if let Some(assistant) = result.assistant
-                                && !state.messages().any(|message| {
-                                    message.role == MessageRole::Assistant
-                                        && message.text == assistant.content
-                                })
-                            {
-                                state.push_message(MessageRole::Assistant, assistant.content);
+            let wait = if scheduler.is_dirty() {
+                frame_interval.min(poll_interval)
+            } else {
+                poll_interval
+            };
+            if !event::poll(wait)
+                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
+            {
+                continue;
+            }
+            let mut processed = 0usize;
+            loop {
+                let event = event::read()
+                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
+                if matches!(event, Event::Resize(_, _)) {
+                    resize_pending = true;
+                }
+                match state.handle_event(event) {
+                    TuiAction::Submit(text) => {
+                        // Parse before checking an approval prompt.  A slash
+                        // command is control-plane input even while a tool is
+                        // waiting for confirmation; it must never be mistaken
+                        // for a y/n answer or sent to the provider.
+                        match slash::route_input(&text) {
+                            Err(error) => {
+                                state.push_message(MessageRole::User, &text);
+                                state.push_message(MessageRole::Error, error.to_string());
+                                state.set_status("Command rejected");
                             }
+                            Ok(InputRoute::Slash(command)) => {
+                                state.push_message(MessageRole::User, &text);
+                                let action = match shared.try_lock() {
+                                    Ok(mut agent) => dispatch_slash_command(
+                                        command,
+                                        &mut state,
+                                        Some(&mut agent),
+                                    ),
+                                    Err(_) => dispatch_slash_command(command, &mut state, None),
+                                };
+                                match action {
+                                    SlashDispatchAction::Interrupt => {
+                                        if let Some(id) = active_job {
+                                            let cancel_result = runner.try_cancel(id);
+                                            if !matches!(
+                                                cancel_result,
+                                                Err(crate::runtime::SubmitError::QueueFull)
+                                            ) {
+                                                pending_approvals.clear();
+                                            }
+                                            state.set_status("Interrupt requested");
+                                        } else {
+                                            state.set_status("Ready");
+                                        }
+                                    }
+                                    SlashDispatchAction::Quit => break 'outer,
+                                    SlashDispatchAction::Continue => {}
+                                }
+                            }
+                            Ok(InputRoute::Prompt(text)) => {
+                                if let Some(request) = pending_approvals.pop_front() {
+                                    let normalized = text.trim().to_ascii_lowercase();
+                                    let decision = match normalized.as_str() {
+                                        "y" | "yes" | "allow" => {
+                                            crate::approval::ApprovalDecision::Allow
+                                        }
+                                        "n" | "no" | "deny" => {
+                                            crate::approval::ApprovalDecision::Deny
+                                        }
+                                        _ => {
+                                            pending_approvals.push_front(request);
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                "Type y to allow once or n to deny",
+                                            );
+                                            state.set_status("Approval required");
+                                            scheduler.request();
+                                            continue;
+                                        }
+                                    };
+                                    let response_result =
+                                        if let Some(coordinator) = approval.as_ref() {
+                                            coordinator.respond(crate::approval::ApprovalResponse {
+                                                request_id: request.request_id,
+                                                decision,
+                                                remember: false,
+                                            })
+                                        } else {
+                                            Err(crate::approval::ApprovalError::UnknownRequest)
+                                        };
+                                    match response_result {
+                                        Ok(()) => {
+                                            state.push_message(
+                                                MessageRole::System,
+                                                match decision {
+                                                    crate::approval::ApprovalDecision::Allow => {
+                                                        "Tool allowed once"
+                                                    }
+                                                    crate::approval::ApprovalDecision::Deny => {
+                                                        "Tool denied"
+                                                    }
+                                                },
+                                            );
+                                            state.set_status("Working");
+                                        }
+                                        Err(error) => {
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                error.to_string(),
+                                            );
+                                            state.set_status("Approval expired");
+                                        }
+                                    }
+                                    scheduler.request();
+                                    continue;
+                                }
+                                state.push_message(MessageRole::User, &text);
+                                if let Some(id) = active_job {
+                                    // A steer cancels the old turn.  Once cancellation
+                                    // is admitted, any approval queued for that turn
+                                    // is stale and must not intercept the steer text.
+                                    let cancel_result = runner.try_cancel(id);
+                                    if !matches!(
+                                        cancel_result,
+                                        Err(crate::runtime::SubmitError::QueueFull)
+                                    ) {
+                                        pending_approvals.clear();
+                                    }
+                                    match runner.try_submit(text) {
+                                        Ok(id) => {
+                                            active_job = Some(id);
+                                            state.set_busy(true);
+                                            state.set_status("Steering");
+                                        }
+                                        Err(error) => {
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                error.to_string(),
+                                            );
+                                            state.set_status("Steer rejected");
+                                        }
+                                    }
+                                } else {
+                                    match runner.try_submit(text) {
+                                        Ok(id) => {
+                                            active_job = Some(id);
+                                            state.set_busy(true);
+                                            state.set_status("Working");
+                                        }
+                                        Err(error) => {
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                error.to_string(),
+                                            );
+                                            state.set_status("Request rejected");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TuiAction::Interrupt => {
+                        if let Some(id) = active_job {
+                            let cancel_result = runner.try_cancel(id);
+                            if !matches!(cancel_result, Err(crate::runtime::SubmitError::QueueFull))
+                            {
+                                // The cancel command is admitted (or the
+                                // worker is already closed), so no approval
+                                // from this turn can be answered safely.
+                                pending_approvals.clear();
+                            }
+                            state.set_status("Interrupt requested");
+                        } else {
                             state.set_status("Ready");
                         }
-                        JobOutcome::Failed(error) => {
-                            state.push_message(MessageRole::Error, error.to_string());
-                            state.set_status("Request failed");
-                        }
-                        JobOutcome::Cancelled => state.set_status("Interrupted"),
-                        JobOutcome::Panicked => {
-                            state.push_message(MessageRole::Error, "background job panicked");
-                            state.set_status("Request failed");
-                        }
                     }
-                    scheduler.request();
+                    TuiAction::Quit => break 'outer,
+                    TuiAction::Redraw | TuiAction::None => {}
                 }
-                RuntimeEvent::Rejected { id, reason } if Some(id) == active_job => {
-                    active_job = None;
-                    state.set_busy(false);
-                    state.push_message(MessageRole::Error, reason.to_string());
-                    state.set_status("Request rejected");
-                    scheduler.request();
+                scheduler.request();
+                processed += 1;
+                if processed >= 256
+                    || !event::poll(Duration::ZERO)
+                        .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
+                {
+                    break;
                 }
-                RuntimeEvent::Closed => break,
-                _ => {}
             }
         }
-        let now = Instant::now();
-        if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
-            state.tick();
-            scheduler.request();
-            last_tick = now;
-        }
-        if state.take_dirty() {
-            scheduler.request();
-        }
-        if scheduler.due(now) {
-            if resize_pending {
-                terminal
-                    .autoresize()
-                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
-                resize_pending = false;
-            }
-            terminal
-                .draw(|frame| state.render(frame, &config.title))
-                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
-            scheduler.rendered(Instant::now());
-        }
-        let wait = if scheduler.is_dirty() {
-            frame_interval.min(poll_interval)
-        } else {
-            poll_interval
-        };
-        if !event::poll(wait)
-            .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
-        {
-            continue;
-        }
-        let mut processed = 0usize;
-        loop {
-            let event = event::read()
-                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?;
-            if matches!(event, Event::Resize(_, _)) {
-                resize_pending = true;
-            }
-            match state.handle_event(event) {
-                TuiAction::Submit(text) => {
-                    if let Some(request) = pending_approvals.pop_front() {
-                        let normalized = text.trim().to_ascii_lowercase();
-                        let decision = match normalized.as_str() {
-                            "y" | "yes" | "allow" => crate::approval::ApprovalDecision::Allow,
-                            "n" | "no" | "deny" => crate::approval::ApprovalDecision::Deny,
-                            _ => {
-                                pending_approvals.push_front(request);
-                                state.push_message(
-                                    MessageRole::Error,
-                                    "Type y to allow once or n to deny",
-                                );
-                                state.set_status("Approval required");
-                                scheduler.request();
-                                continue;
-                            }
-                        };
-                        if let Some(coordinator) = approval.as_ref() {
-                            let _ = coordinator.respond(crate::approval::ApprovalResponse {
-                                request_id: request.request_id,
-                                decision,
-                                remember: false,
-                            });
-                        }
-                        state.push_message(
-                            MessageRole::System,
-                            match decision {
-                                crate::approval::ApprovalDecision::Allow => "Tool allowed once",
-                                crate::approval::ApprovalDecision::Deny => "Tool denied",
-                            },
-                        );
-                        state.set_status("Working");
-                        scheduler.request();
-                        continue;
-                    }
-                    state.push_message(MessageRole::User, &text);
-                    if let Some(id) = active_job {
-                        let _ = runner.try_cancel(id);
-                        match runner.try_submit(text) {
-                            Ok(id) => {
-                                active_job = Some(id);
-                                state.set_busy(true);
-                                state.set_status("Steering");
-                            }
-                            Err(error) => {
-                                state.push_message(MessageRole::Error, error.to_string());
-                                state.set_status("Steer rejected");
-                            }
-                        }
-                    } else {
-                        match runner.try_submit(text) {
-                            Ok(id) => {
-                                active_job = Some(id);
-                                state.set_busy(true);
-                                state.set_status("Working");
-                            }
-                            Err(error) => {
-                                state.push_message(MessageRole::Error, error.to_string());
-                                state.set_status("Request rejected");
-                            }
-                        }
-                    }
-                }
-                TuiAction::Interrupt => {
-                    if let Some(id) = active_job {
-                        let _ = runner.try_cancel(id);
-                        state.set_status("Interrupt requested");
-                    } else {
-                        state.set_status("Ready");
-                    }
-                }
-                TuiAction::Quit => break 'outer,
-                TuiAction::Redraw | TuiAction::None => {}
-            }
-            scheduler.request();
-            processed += 1;
-            if processed >= 256
-                || !event::poll(Duration::ZERO)
-                    .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
-            {
-                break;
-            }
-        }
+        Ok(())
+    })();
+    // Terminal I/O can fail while a provider job is still active. Always
+    // cancel and join the owned runtime before returning that error; relying
+    // on `Drop` would detach a worker when its command queue is full.
+    let join_result = runner.shutdown_and_join();
+    if let Ok(mut agent) = shared.lock() {
+        agent.close();
     }
-    let _ = runner.shutdown_and_join();
     guard.leave();
-    Ok(())
+    match loop_result {
+        Err(error) => {
+            let _ = join_result;
+            Err(error)
+        }
+        Ok(()) => join_result
+            .map_err(|_| crate::error::ZenpiError::Message("runtime worker panicked".into())),
+    }
 }
 
 /// Run a TUI with a synchronous submit callback.  Callback errors become
@@ -987,16 +1946,34 @@ where
                 resize_pending = true;
             }
             match state.handle_event(event) {
-                TuiAction::Submit(text) => {
-                    state.push_message(MessageRole::User, &text);
-                    state.set_busy(true);
-                    state.set_status("Working");
-                    if let Err(error) = on_submit(text, &mut state) {
+                TuiAction::Submit(text) => match slash::route_input(&text) {
+                    Err(error) => {
+                        state.push_message(MessageRole::User, &text);
                         state.push_message(MessageRole::Error, error.to_string());
-                        state.set_status("Request failed");
+                        state.set_status("Command rejected");
                     }
-                    state.set_busy(false);
-                }
+                    Ok(InputRoute::Slash(command)) => {
+                        state.push_message(MessageRole::User, &text);
+                        match dispatch_slash_command(command, &mut state, None) {
+                            SlashDispatchAction::Quit => break 'outer,
+                            SlashDispatchAction::Interrupt => {
+                                state.set_busy(false);
+                                state.set_status("Interrupted");
+                            }
+                            SlashDispatchAction::Continue => {}
+                        }
+                    }
+                    Ok(InputRoute::Prompt(prompt)) => {
+                        state.push_message(MessageRole::User, &prompt);
+                        state.set_busy(true);
+                        state.set_status("Working");
+                        if let Err(error) = on_submit(prompt, &mut state) {
+                            state.push_message(MessageRole::Error, error.to_string());
+                            state.set_status("Request failed");
+                        }
+                        state.set_busy(false);
+                    }
+                },
                 TuiAction::Quit => break 'outer,
                 TuiAction::Interrupt => {
                     state.set_busy(false);
@@ -1046,8 +2023,115 @@ impl Drop for TerminalGuard {
     }
 }
 
+/// Project agent lifecycle events into the compact terminal transcript.  The
+/// production loop receives provider deltas through a separate queue (so it
+/// never locks the agent while network I/O is in progress), then drains these
+/// durable tool events once the worker releases the agent mutex.
+fn drain_agent_tool_events(shared: &Arc<Mutex<crate::core::Agent>>, state: &mut TuiState) {
+    let Ok(mut agent) = shared.try_lock() else {
+        return;
+    };
+    for event in agent.take_events() {
+        apply_agent_tool_event(state, event);
+    }
+}
+
+fn apply_agent_tool_event(state: &mut TuiState, event: crate::core::AgentEvent) {
+    match event {
+        crate::core::AgentEvent::ToolCall { call_id, tool, .. } => {
+            state.tool_call_started(call_id, tool)
+        }
+        crate::core::AgentEvent::ToolResult {
+            call_id, success, ..
+        } => state.tool_call_finished(
+            call_id,
+            if success {
+                ToolRunStatus::Succeeded
+            } else {
+                ToolRunStatus::Failed
+            },
+        ),
+        _ => {}
+    }
+}
+
 fn bound_text(text: String) -> String {
     truncate_bytes(&text, MAX_MESSAGE_BYTES).to_owned()
+}
+
+/// Keep pasted prompt text from emitting terminal control sequences. Newlines
+/// remain available for multiline editing, tabs become deterministic spaces,
+/// and all other control characters are rendered as a visible marker.
+fn sanitize_input(text: String) -> String {
+    sanitize_input_with_limit(&text, MAX_MESSAGE_BYTES)
+}
+
+fn sanitize_input_with_limit(text: &str, max_bytes: usize) -> String {
+    if !text.chars().any(char::is_control) {
+        return truncate_bytes(text, max_bytes).to_owned();
+    }
+    let mut result = String::with_capacity(text.len().min(max_bytes));
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        let replacement = match character {
+            '\n' => "\n",
+            '\r' if characters.peek() == Some(&'\n') => "",
+            '\r' => "\n",
+            '\t' => "    ",
+            character if character.is_control() => "?",
+            character => {
+                let mut buffer = [0_u8; 4];
+                let encoded = character.encode_utf8(&mut buffer);
+                if result.len().saturating_add(encoded.len()) > max_bytes {
+                    break;
+                }
+                result.push_str(encoded);
+                continue;
+            }
+        };
+        if result.len().saturating_add(replacement.len()) > max_bytes {
+            break;
+        }
+        result.push_str(replacement);
+    }
+    result
+}
+
+/// Keep provider-controlled identifiers and tool names on one terminal line.
+/// Control characters are removed rather than emitted, so a malformed model
+/// response cannot move the cursor or spoof transcript rows.
+fn inline_token(text: &str, max_chars: usize) -> String {
+    let mut result = String::new();
+    let mut count = 0usize;
+    for character in text.chars() {
+        if count >= max_chars {
+            break;
+        }
+        if !character.is_control() {
+            result.push(character);
+            count = count.saturating_add(1);
+        }
+    }
+    if result.is_empty() {
+        "unknown".into()
+    } else {
+        result
+    }
+}
+
+fn tool_log_key(call_id: &str) -> String {
+    format!("[tool:{call_id}]")
+}
+
+fn tool_log_matches(text: &str, key: &str) -> bool {
+    text.strip_prefix(key)
+        .is_some_and(|rest| rest.starts_with(' '))
+}
+
+fn tool_log_name(text: &str, key: &str) -> Option<String> {
+    let rest = text.strip_prefix(key)?.trim_start();
+    let name = rest.rsplit_once(" [")?.0;
+    (!name.is_empty()).then(|| name.to_owned())
 }
 
 fn truncate_bytes(text: &str, max_bytes: usize) -> &str {
@@ -1067,6 +2151,39 @@ fn clamp_char_boundary(text: &str, cursor: usize) -> usize {
         cursor -= 1;
     }
     cursor
+}
+
+fn line_start(text: &str, cursor: usize) -> usize {
+    let cursor = clamp_char_boundary(text, cursor);
+    text[..cursor].rfind('\n').map_or(0, |index| index + 1)
+}
+
+fn line_end(text: &str, cursor: usize) -> usize {
+    let cursor = clamp_char_boundary(text, cursor);
+    text[cursor..]
+        .find('\n')
+        .map_or(text.len(), |offset| cursor + offset)
+}
+
+/// Return a UTF-8 boundary in `line` at (or immediately before) a display
+/// column.  A wide glyph is never split: a target column that lands inside
+/// it resolves to the glyph's leading boundary.
+fn byte_at_column(line: &str, target_column: usize) -> usize {
+    if target_column == 0 {
+        return 0;
+    }
+    let mut column = 0usize;
+    for (index, character) in line.char_indices() {
+        let character_width = UnicodeWidthChar::width(character).unwrap_or(0);
+        if column.saturating_add(character_width) > target_column {
+            return index;
+        }
+        column = column.saturating_add(character_width);
+        if column >= target_column {
+            return index + character.len_utf8();
+        }
+    }
+    line.len()
 }
 
 fn previous_boundary(text: &str, cursor: usize) -> usize {
@@ -1142,28 +2259,32 @@ fn transcript_lines(messages: &VecDeque<TuiMessage>, width: usize) -> Vec<Line<'
     let width = width.max(1);
     let mut result = Vec::new();
     for message in messages {
-        let full_prefix = format!("{}: ", message.role.label());
-        // Reserve one cell for message content before truncating the role
-        // prefix.  Without this bound a one- or two-column viewport emitted
-        // lines wider than the area and Ratatui had to repair the overflow.
-        let prefix = truncate_to_width(&full_prefix, width.saturating_sub(1));
-        let prefix_width = UnicodeWidthStr::width(prefix.as_str());
-        let body_width = width.saturating_sub(prefix_width).max(1);
-        let continuation = " ".repeat(prefix_width);
-        for (logical_index, logical) in message.text.split('\n').enumerate() {
-            for (wrapped_index, body) in wrap_plain(logical, body_width).into_iter().enumerate() {
-                let left = if logical_index == 0 && wrapped_index == 0 {
-                    prefix.clone()
-                } else {
-                    continuation.clone()
-                };
-                result.push(Line::from(vec![
-                    Span::styled(left, message.role.style()),
-                    Span::raw(body),
-                ]));
-                if result.len() >= MAX_RENDER_LINES.saturating_mul(2) {
-                    return result;
-                }
+        let prefix = format!("{}: ", message.role.label());
+        // Provider prose gets the small Markdown renderer; user prompts,
+        // tool output, and errors stay literal so metadata or diff markers do
+        // not acquire surprising presentation semantics.
+        let rendered = match message.role {
+            MessageRole::Assistant | MessageRole::System => {
+                crate::render::render_markdown_prefixed(
+                    &prefix,
+                    &message.text,
+                    width,
+                    message.role.style(),
+                )
+            }
+            MessageRole::User | MessageRole::Tool | MessageRole::Error => {
+                crate::render::render_plain_prefixed(
+                    &prefix,
+                    &message.text,
+                    width,
+                    message.role.style(),
+                )
+            }
+        };
+        for line in rendered {
+            result.push(line);
+            if result.len() >= MAX_RENDER_LINES.saturating_mul(2) {
+                return result;
             }
         }
     }

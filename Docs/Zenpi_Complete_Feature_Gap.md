@@ -1,9 +1,9 @@
 # zenpi Complete Feature Gap and Delivery Blueprint
 
-> **Archived planning input.** The `CF-*` scope in this document was promoted
-> on 2026-09-04 into the sole authoritative checklist,
-> `Docs/Zenpi_Execution_Blueprint.md`. Status marks here are intentionally
-> absent; use the Blueprint and its generated Gantt for current state. The
+> **Archived planning input.** The `CF-*` scope in this document was recorded
+> in the frozen v1 receipt on 2026-09-04. Status marks here are intentionally
+> absent; use the non-authoritative v2 audit
+> (`Docs/Zenpi_Execution_Blueprint_v2.md`) for current product status. The
 > observations below describe the pre-migration baseline, not current zenpi.
 
 ## Why this gap exists

@@ -40,6 +40,9 @@ jobs:
       - name: Validate execution blueprint and Gantt
         run: python3 tools/validate_blueprint.py
 
+      - name: Validate v2 blueprint review draft
+        run: python3 tools/validate_blueprint_v2.py
+
       - name: Report Rust source inventory
         run: python3 tools/check_rust_loc.py
 

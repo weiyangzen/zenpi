@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     thread,
     time::Duration,
 };
@@ -42,6 +42,63 @@ fn malformed_frame_isolated_from_all_commands() {
     assert!(journal.iter().any(|v| v["kind"] == "handoff_record"));
     let seq: Vec<u64> = journal.iter().map(|v| v["seq"].as_u64().unwrap()).collect();
     assert!(seq.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+#[cfg(unix)]
+fn async_reader_bounds_overlong_and_invalid_frames_without_stopping() {
+    use zenpi::protocol::MAX_LINE_BYTES;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("async-bounds.jsonl");
+    let agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host = thread::spawn(move || {
+        zenpi::headless::run_async_streams(agent, reader, output).unwrap();
+    });
+
+    let mut oversized = vec![b'x'; MAX_LINE_BYTES + 1];
+    oversized.push(b'\n');
+    writer.write_all(&oversized).unwrap();
+    writer.write_all(b"\xff\n").unwrap();
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"status","id":"status-after-invalid"})
+    )
+    .unwrap();
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"shutdown","id":"shutdown-after-invalid"})
+    )
+    .unwrap();
+    drop(writer);
+    host.join().unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    assert!(
+        records
+            .iter()
+            .any(|record| { record["code"] == "line_too_long" && record["success"] == false })
+    );
+    assert!(
+        records
+            .iter()
+            .any(|record| { record["code"] == "invalid_utf8" && record["success"] == false })
+    );
+    assert!(
+        records
+            .iter()
+            .any(|record| { record["id"] == "status-after-invalid" && record["success"] == true })
+    );
+    assert!(
+        records.iter().any(|record| {
+            record["id"] == "shutdown-after-invalid" && record["success"] == true
+        })
+    );
 }
 
 #[test]
@@ -120,6 +177,86 @@ fn protocol_v2_accepts_resume_sequence_and_v1_remains_supported() {
     let response =
         zenpi::protocol::StdioResponse::success(Some("r2".into()), "status", None).for_version(2);
     assert_eq!(response.schema_version, 2);
+    assert!(parse_line(
+        r#"{"schema_version":2,"type":"resume","id":"both","path":"other.jsonl","from_sequence":7}"#
+    )
+    .unwrap()
+    .into_command()
+    .is_err());
+}
+
+#[test]
+fn headless_slash_commands_are_control_plane_only() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("slash-command.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let input = concat!(
+        "{\"type\":\"command\",\"id\":\"m\",\"text\":\"/model fixture\"}\n",
+        "{\"type\":\"command\",\"id\":\"g\",\"text\":\"/goal keep bounded\"}\n",
+        "{\"type\":\"command\",\"id\":\"s\",\"text\":\"/status\"}\n",
+        "{\"type\":\"command\",\"id\":\"h\",\"text\":\"/history 3\"}\n",
+        "{\"type\":\"command\",\"id\":\"c\",\"text\":\"/clear\"}\n",
+        "{\"type\":\"command\",\"id\":\"r\",\"text\":\"/compete run-a\"}\n",
+        "{\"type\":\"command\",\"id\":\"l\",\"text\":\"/loop --budget 1\"}\n",
+        "{\"type\":\"command\",\"id\":\"bad\",\"text\":\"/does-not-exist\"}\n",
+        "{\"type\":\"status\",\"id\":\"after\"}\n",
+        "{\"type\":\"shutdown\",\"id\":\"q\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    for id in ["m", "g", "s", "h", "c", "r", "l", "after", "q"] {
+        assert!(
+            records.iter().any(|record| {
+                record["id"] == id && record["type"] == "response" && record["success"] == true
+            }),
+            "missing successful response for {id}"
+        );
+    }
+    assert!(records.iter().any(|record| {
+        record["id"] == "bad"
+            && record["type"] == "response"
+            && record["success"] == false
+            && record["code"] == "slash_invalid"
+    }));
+    assert_eq!(agent.history().len(), 0, "slash input reached the model");
+    let status = records.iter().find(|record| record["id"] == "s").unwrap();
+    assert_eq!(status["data"]["model"], "fixture");
+}
+
+#[test]
+fn synchronous_replay_and_control_idempotency_are_explicit() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("replay.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let input = concat!(
+        "{\"type\":\"prompt\",\"id\":\"p\",\"text\":\"hello\"}\n",
+        "{\"type\":\"status\",\"id\":\"same-status\"}\n",
+        "{\"type\":\"status\",\"id\":\"same-status\"}\n",
+        "{\"schema_version\":2,\"type\":\"resume\",\"id\":\"replay\",\"from_sequence\":0}\n",
+        "{\"type\":\"shutdown\",\"id\":\"stop\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+
+    let statuses: Vec<&Value> = records
+        .iter()
+        .filter(|record| record["id"] == "same-status")
+        .collect();
+    assert_eq!(statuses.len(), 2);
+    assert_eq!(
+        statuses[0], statuses[1],
+        "same ID must replay the same response"
+    );
+
+    let replay = records
+        .iter()
+        .find(|record| record["id"] == "replay" && record["type"] == "response")
+        .expect("missing replay response");
+    assert_eq!(replay["schema_version"], 2);
+    assert!(replay["data"]["replayed"].as_u64().unwrap_or(0) > 0);
+    assert!(records.iter().any(|record| record["type"] == "event"));
 }
 
 #[test]
@@ -219,6 +356,12 @@ impl Write for SharedWriter {
 fn live_steer_cancels_and_reissues_without_losing_or_duplicating_input() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = listener.local_addr().unwrap().port();
+    // Keep the first response open after its initial delta. Otherwise the
+    // complete SSE payload can be consumed before the test writes the steer,
+    // turning a valid live-steer scenario into a scheduler-dependent
+    // `no_active_turn` race.
+    let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let (steer_tx, steer_rx) = mpsc::sync_channel(1);
     let server = thread::spawn(move || -> Result<(), String> {
         let (mut first, _) = listener.accept().map_err(|error| error.to_string())?;
         read_http_body(&mut first)?;
@@ -228,13 +371,26 @@ fn live_steer_cancels_and_reissues_without_losing_or_duplicating_input() {
             "event: response.completed\n",
             "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-1\"}}\n\n"
         );
+        let partial = "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n";
         write!(
             first,
-            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{first_payload}",
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{partial}",
             first_payload.len()
         )
         .map_err(|error| error.to_string())?;
         first.flush().map_err(|error| error.to_string())?;
+        ready_tx
+            .send(())
+            .map_err(|error| format!("ready signal failed: {error}"))?;
+        steer_rx
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|error| format!("steer signal failed: {error}"))?;
+        // Complete the first stream only after the steer is on the wire. The
+        // worker then observes cancellation at its completion boundary and
+        // the scheduler can issue exactly one replacement request.
+        let _ = first.write_all(&first_payload.as_bytes()[partial.len()..]);
+        let _ = first.flush();
+        drop(first);
 
         let (mut second, _) = listener.accept().map_err(|error| error.to_string())?;
         let body = read_http_body(&mut second)?;
@@ -281,12 +437,16 @@ fn live_steer_cancels_and_reissues_without_losing_or_duplicating_input() {
     )
     .unwrap();
     wait_for_output(&captured, "partial");
+    ready_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("fixture did not hold the first stream open");
     writeln!(
         input_writer,
         "{}",
         serde_json::json!({"schema_version":2,"type":"steer","id":"s1","text":"use the corrected request"})
     )
     .unwrap();
+    steer_tx.send(()).unwrap();
     wait_for_output(&captured, "corrected answer");
     writeln!(
         input_writer,
@@ -312,6 +472,18 @@ fn live_steer_cancels_and_reissues_without_losing_or_duplicating_input() {
             .iter()
             .any(|record| { record["id"] == "s1" && record["success"] == true })
     );
+    // ProviderEvent itself intentionally has no turn_id field.  The async
+    // host must source correlation from the accepted AsyncWork metadata.
+    let provider_events: Vec<&Value> = records
+        .iter()
+        .filter(|record| record["type"] == "event" && record["event"]["type"] == "text_delta")
+        .collect();
+    assert!(!provider_events.is_empty());
+    assert!(provider_events.iter().all(|record| {
+        record["turn_id"]
+            .as_str()
+            .is_some_and(|turn_id| turn_id.starts_with("turn-"))
+    }));
     let session = SessionStore::open(path).unwrap();
     assert_eq!(
         session

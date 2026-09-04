@@ -45,24 +45,46 @@ impl JobId {
 #[derive(Debug, Clone)]
 pub struct CancellationToken {
     cancelled: Arc<AtomicBool>,
+    /// Set by a job immediately before it returns a successful result.  A
+    /// host can race a late shutdown/cancel request with that final return;
+    /// once completion is published, that request must not rewrite a
+    /// successful result as `JobOutcome::Cancelled`.
+    completed: Arc<AtomicBool>,
 }
 
 impl CancellationToken {
     fn new() -> Self {
         Self {
             cancelled: Arc::new(AtomicBool::new(false)),
+            completed: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Request cancellation.  Returns `true` when this call changed the
     /// token from active to cancelled and `false` if it was already set.
     pub fn cancel(&self) -> bool {
+        // A completion marker wins over a late cancel request.  The job has
+        // already crossed its semantic terminal boundary, so changing the
+        // token here would make the worker misreport a successful result.
+        if self.completed.load(Ordering::Acquire) {
+            return false;
+        }
         !self.cancelled.swap(true, Ordering::Release)
     }
 
     /// Check whether cancellation has been requested.
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
+        self.cancelled.load(Ordering::Acquire) && !self.completed.load(Ordering::Acquire)
+    }
+
+    /// Publish that the job has reached its semantic completion boundary.
+    ///
+    /// This is intentionally opt-in: generic runtime jobs that do not call
+    /// it retain the historical cooperative-cancellation behavior, while
+    /// adapters that can distinguish a late cancel from an in-flight cancel
+    /// can preserve their successful terminal result.
+    pub fn mark_completed(&self) {
+        self.completed.store(true, Ordering::Release);
     }
 }
 
@@ -186,6 +208,11 @@ where
     event_rx: Receiver<RuntimeEvent<O, E>>,
     next_id: AtomicU64,
     join: Option<JoinHandle<()>>,
+    /// Set by the worker on every exit path, including an early exit caused
+    /// by a dropped event receiver.  Keeping this bit outside the event
+    /// channel lets an owner safely join after it already consumed `Closed`
+    /// (or after the worker failed before it could emit that event).
+    closed: Arc<AtomicBool>,
     _job: Arc<F>,
 }
 
@@ -217,17 +244,26 @@ where
         let config = config.normalized();
         let (command_tx, command_rx) = mpsc::sync_channel(config.command_capacity);
         let (event_tx, event_rx) = mpsc::sync_channel(config.event_capacity);
+        let closed = Arc::new(AtomicBool::new(false));
+        let worker_closed = Arc::clone(&closed);
         let job = Arc::new(job);
         let worker_job = Arc::clone(&job);
         let join = thread::Builder::new()
             .name("zenpi-runtime".into())
-            .spawn(move || worker_loop(command_rx, event_tx, worker_job, config))
+            .spawn(move || {
+                // The guard covers every return and panic in `worker_loop`,
+                // so shutdown helpers never wait forever for a consumed or
+                // unavailable `Closed` event.
+                let _closed_guard = WorkerClosedGuard(worker_closed);
+                worker_loop(command_rx, event_tx, worker_job, config)
+            })
             .expect("failed to spawn zenpi runtime worker");
         Self {
             command_tx,
             event_rx,
             next_id: AtomicU64::new(1),
             join: Some(join),
+            closed,
             _job: job,
         }
     }
@@ -289,8 +325,31 @@ where
     /// stream themselves. The worker owns and joins every job thread before
     /// this returns.
     pub fn shutdown_and_join(mut self) -> thread::Result<()> {
-        let _ = self.command_tx.send(Command::Shutdown);
-        while !matches!(self.event_rx.recv(), Ok(RuntimeEvent::Closed) | Err(_)) {}
+        // `send` can deadlock here: a full command queue can only be drained
+        // by a worker that may itself be blocked sending into a full event
+        // queue.  Keep both channels moving while retrying the shutdown
+        // command.  The worker's closed bit also handles the case where the
+        // caller already consumed `Closed` before invoking this helper.
+        while !self.closed.load(Ordering::Acquire) {
+            match self.command_tx.try_send(Command::Shutdown) {
+                Ok(()) => break,
+                Err(TrySendError::Disconnected(_)) => break,
+                Err(TrySendError::Full(_)) => {
+                    match self.event_rx.recv_timeout(Duration::from_millis(10)) {
+                        Ok(RuntimeEvent::Closed) => break,
+                        Ok(_) | Err(RecvTimeoutError::Timeout) => {}
+                        Err(RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+            }
+        }
+        while !self.closed.load(Ordering::Acquire) {
+            match self.event_rx.recv_timeout(Duration::from_millis(10)) {
+                Ok(RuntimeEvent::Closed) => break,
+                Ok(_) | Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
         self.join
             .take()
             .expect("runtime worker already joined")
@@ -476,6 +535,18 @@ fn worker_loop<I, O, E, F>(
                 }
             }
         }
+    }
+}
+
+/// RAII marker for the worker lifecycle.  This is intentionally separate
+/// from the event stream: event delivery is bounded and may be interrupted
+/// by a host that exits early, while joining must still have an authoritative
+/// completion signal.
+struct WorkerClosedGuard(Arc<AtomicBool>);
+
+impl Drop for WorkerClosedGuard {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
     }
 }
 

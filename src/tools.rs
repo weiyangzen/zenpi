@@ -39,6 +39,10 @@ pub const MAX_SEARCH_FILES: usize = 20_000;
 pub const MAX_SEARCH_NODES: usize = 50_000;
 pub const MAX_SEARCH_FILE_BYTES: usize = 1024 * 1024;
 pub const MAX_WRITE_BYTES: usize = 512 * 1024;
+/// Maximum number of bytes returned in a write/edit unified diff.  The file
+/// contents accepted by the tools are larger than this, so a diff can never
+/// turn a small tool call into an unbounded model response.
+pub const MAX_DIFF_BYTES: usize = 64 * 1024;
 pub const MAX_COMMAND_BYTES: usize = 16 * 1024;
 pub const MAX_COMMAND_OUTPUT_BYTES: usize = 256 * 1024;
 pub const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 30_000;
@@ -46,6 +50,8 @@ pub const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 30_000;
 const DEFAULT_READ_BYTES: usize = 256 * 1024;
 const DEFAULT_LIST_ENTRIES: usize = 64;
 const DEFAULT_SEARCH_MATCHES: usize = 100;
+const DIFF_CONTEXT_LINES: usize = 3;
+const DIFF_TRUNCATION_MARKER: &str = "[diff truncated]";
 
 static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(1);
 
@@ -885,12 +891,18 @@ impl WriteFileTool {
         let requested = required_string(arguments, "path", 4_096)?;
         let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
         let path = context.resolve_for_write(requested)?;
-        let before = fs::read_to_string(&path).unwrap_or_default();
+        let (before, source_truncated) = read_diff_source(&path);
+        let relative = relative_path_for_output(context, &path, requested)?;
+        let (diff, diff_truncated) =
+            render_unified_diff(&relative, &before, content, source_truncated);
+        let before_bytes = file_byte_len(&path).unwrap_or(before.len());
         Ok(json!({
-            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
-            "before_bytes": before.len(),
+            "path": relative,
+            "before_bytes": before_bytes,
             "after_bytes": content.len(),
-            "changed": before != content,
+            "changed": before != content || source_truncated,
+            "diff": diff,
+            "diff_truncated": diff_truncated,
         }))
     }
 }
@@ -899,7 +911,9 @@ impl Tool for WriteFileTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "write_file".into(),
-            description: "Atomically write UTF-8 text inside the workspace.".into(),
+            description:
+                "Atomically write UTF-8 text inside the workspace and return a bounded unified diff."
+                    .into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -926,11 +940,17 @@ impl Tool for WriteFileTool {
         }
         let path = context.resolve_for_write(requested)?;
         let created = !path.exists();
+        let (before, source_truncated) = read_diff_source(&path);
+        let relative = relative_path_for_output(context, &path, requested)?;
+        let (diff, diff_truncated) =
+            render_unified_diff(&relative, &before, content, source_truncated);
         atomic_write_text(&path, content.as_bytes())?;
         Ok(json!({
-            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
+            "path": relative,
             "bytes": content.len(),
-            "created": created
+            "created": created,
+            "diff": diff,
+            "diff_truncated": diff_truncated,
         }))
     }
 }
@@ -942,7 +962,9 @@ impl Tool for EditFileTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "edit_file".into(),
-            description: "Replace one exact UTF-8 text occurrence atomically.".into(),
+            description:
+                "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff."
+                    .into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -970,7 +992,11 @@ impl Tool for EditFileTool {
             return Err(ToolError::InvalidArguments("old must be non-empty".into()));
         }
         let path = context.resolve_existing(requested)?.canonical;
-        let original = fs::read_to_string(&path).map_err(|error| map_path_io(&path, error))?;
+        // An edit needs the complete source to prove that `old` occurs exactly
+        // once, but that does not justify an unbounded `read_to_string`.
+        // Read at most one byte past the write budget so oversized sources are
+        // rejected before they can consume unbounded memory.
+        let original = read_bounded_text(&path, MAX_WRITE_BYTES)?;
         let occurrences = original.matches(old).count();
         if occurrences != 1 {
             return Err(ToolError::InvalidArguments(format!(
@@ -983,11 +1009,15 @@ impl Tool for EditFileTool {
                 "edited content exceeds {MAX_WRITE_BYTES} bytes"
             )));
         }
+        let relative = relative_path_for_output(context, &path, requested)?;
+        let (diff, diff_truncated) = render_unified_diff(&relative, &original, &edited, false);
         atomic_write_text(&path, edited.as_bytes())?;
         Ok(json!({
-            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
+            "path": relative,
             "replacements": 1,
-            "bytes": edited.len()
+            "bytes": edited.len(),
+            "diff": diff,
+            "diff_truncated": diff_truncated,
         }))
     }
 }
@@ -1089,6 +1119,210 @@ impl RunCommandTool {
             std::thread::sleep(Duration::from_millis(5));
         }
     }
+}
+
+/// Return a workspace-relative path for a tool response. Write targets may
+/// not exist yet, so this intentionally uses the lexical path returned by
+/// `resolve_for_write` rather than requiring a canonicalized file.
+fn relative_path_for_output(
+    context: &ToolContext,
+    path: &Path,
+    requested: &str,
+) -> Result<String, ToolError> {
+    path.strip_prefix(context.workspace_root())
+        .map(relative_display)
+        .map_err(|_| ToolError::PathDenied(requested.to_owned()))
+}
+
+/// Read only a bounded prefix of a file for a diff. A write is allowed to
+/// replace an existing file larger than `MAX_WRITE_BYTES`; reading that file
+/// in full merely to render a preview would make the tool's memory use
+/// unbounded. The boolean reports that the source was clipped.
+fn read_diff_source(path: &Path) -> (String, bool) {
+    if !path.is_file() {
+        return (String::new(), false);
+    }
+    let Ok(file) = File::open(path) else {
+        return (String::new(), false);
+    };
+    let mut bytes = Vec::with_capacity(MAX_WRITE_BYTES.min(64 * 1024));
+    let Ok(_) = file
+        .take(MAX_WRITE_BYTES.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+    else {
+        return (String::new(), false);
+    };
+    let truncated = bytes.len() > MAX_WRITE_BYTES;
+    bytes.truncate(MAX_WRITE_BYTES);
+    (String::from_utf8_lossy(&bytes).into_owned(), truncated)
+}
+
+/// Read a UTF-8 file while enforcing a hard byte bound.  Unlike
+/// [`read_diff_source`], this helper rejects a clipped source because an exact
+/// edit cannot safely determine occurrence count from a prefix.
+fn read_bounded_text(path: &Path, max_bytes: usize) -> Result<String, ToolError> {
+    let file = File::open(path).map_err(|error| map_path_io(path, error))?;
+    let mut bytes = Vec::with_capacity(max_bytes.min(64 * 1024));
+    file.take(max_bytes.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| map_path_io(path, error))?;
+    if bytes.len() > max_bytes {
+        return Err(ToolError::LimitExceeded(format!(
+            "source file exceeds {max_bytes} bytes"
+        )));
+    }
+    String::from_utf8(bytes).map_err(|_| ToolError::InvalidUtf8(display_path(path)))
+}
+
+fn file_byte_len(path: &Path) -> Option<usize> {
+    fs::metadata(path)
+        .ok()
+        .and_then(|metadata| usize::try_from(metadata.len()).ok())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DiffText {
+    lines: Vec<String>,
+    final_newline: bool,
+}
+
+fn split_diff_text(text: &str) -> DiffText {
+    let final_newline = text.ends_with('\n');
+    let mut lines: Vec<String> = if text.is_empty() {
+        Vec::new()
+    } else {
+        text.split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line).to_owned())
+            .collect()
+    };
+    if final_newline {
+        // `split` produces an extra empty item after the terminating newline;
+        // the newline itself is represented by `final_newline` instead.
+        lines.pop();
+    }
+    DiffText {
+        lines,
+        final_newline,
+    }
+}
+
+fn diff_range_start(index: usize, count: usize) -> usize {
+    if count == 0 { index } else { index + 1 }
+}
+
+/// Render a compact, standard unified diff. The implementation deliberately
+/// uses one coarse hunk (common prefix/suffix plus three context lines) rather
+/// than an O(n^2) LCS algorithm: tool inputs are model-controlled and must
+/// remain cheap even when a file contains many short lines.
+fn render_unified_diff(
+    path: &str,
+    before: &str,
+    after: &str,
+    source_truncated: bool,
+) -> (String, bool) {
+    let old = split_diff_text(before);
+    let new = split_diff_text(after);
+    let mut prefix = 0_usize;
+    while prefix < old.lines.len()
+        && prefix < new.lines.len()
+        && old.lines[prefix] == new.lines[prefix]
+    {
+        prefix += 1;
+    }
+    let mut suffix = 0_usize;
+    while suffix < old.lines.len().saturating_sub(prefix)
+        && suffix < new.lines.len().saturating_sub(prefix)
+        && old.lines[old.lines.len() - suffix - 1] == new.lines[new.lines.len() - suffix - 1]
+    {
+        suffix += 1;
+    }
+    // A final-newline-only edit still needs a real +/- hunk; emitting only a
+    // marker after a context line would not give a patch consumer anything to
+    // apply. Treat the final line as changed in that case.
+    if old.lines == new.lines && old.final_newline != new.final_newline && !old.lines.is_empty() {
+        prefix = old.lines.len() - 1;
+        suffix = 0;
+    }
+    let content_unchanged = prefix == old.lines.len().min(new.lines.len())
+        && old.lines.len() == new.lines.len()
+        && old.final_newline == new.final_newline;
+    if content_unchanged && !source_truncated {
+        return (String::new(), false);
+    }
+
+    let old_change_end = old.lines.len().saturating_sub(suffix);
+    let new_change_end = new.lines.len().saturating_sub(suffix);
+    let context_before = prefix.min(DIFF_CONTEXT_LINES);
+    let context_after = suffix.min(DIFF_CONTEXT_LINES);
+    let old_start = prefix.saturating_sub(context_before);
+    let new_start = prefix.saturating_sub(context_before);
+    let old_end = (old_change_end + context_after).min(old.lines.len());
+    let new_end = (new_change_end + context_after).min(new.lines.len());
+    let old_count = old_end.saturating_sub(old_start);
+    let new_count = new_end.saturating_sub(new_start);
+
+    let mut rendered = String::new();
+    rendered.push_str("--- ");
+    rendered.push_str(path);
+    rendered.push('\n');
+    rendered.push_str("+++ ");
+    rendered.push_str(path);
+    rendered.push('\n');
+    rendered.push_str(&format!(
+        "@@ -{},{} +{},{} @@\n",
+        diff_range_start(old_start, old_count),
+        old_count,
+        diff_range_start(new_start, new_count),
+        new_count
+    ));
+
+    for line in &old.lines[old_start..prefix] {
+        rendered.push(' ');
+        rendered.push_str(line);
+        rendered.push('\n');
+    }
+    for line in &old.lines[prefix..old_change_end] {
+        rendered.push('-');
+        rendered.push_str(line);
+        rendered.push('\n');
+    }
+    if !source_truncated && !old.final_newline {
+        rendered.push_str("\\ No newline at end of file\n");
+    }
+    for line in &new.lines[prefix..new_change_end] {
+        rendered.push('+');
+        rendered.push_str(line);
+        rendered.push('\n');
+    }
+    if !source_truncated && !new.final_newline {
+        rendered.push_str("\\ No newline at end of file\n");
+    }
+    for line in &old.lines[old_change_end..old_end] {
+        rendered.push(' ');
+        rendered.push_str(line);
+        rendered.push('\n');
+    }
+    if source_truncated {
+        rendered.push_str(DIFF_TRUNCATION_MARKER);
+        rendered.push('\n');
+    }
+    let (diff, output_truncated) = bound_diff(rendered);
+    (diff, source_truncated || output_truncated)
+}
+
+fn bound_diff(mut diff: String) -> (String, bool) {
+    if diff.len() <= MAX_DIFF_BYTES {
+        return (diff, false);
+    }
+    let marker = format!("\n{DIFF_TRUNCATION_MARKER}\n");
+    let max_content = MAX_DIFF_BYTES.saturating_sub(marker.len());
+    let mut end = max_content.min(diff.len());
+    while end > 0 && !diff.is_char_boundary(end) {
+        end -= 1;
+    }
+    diff.truncate(end);
+    diff.push_str(&marker);
+    (diff, true)
 }
 
 fn terminate_process_tree(child: &mut std::process::Child) {
