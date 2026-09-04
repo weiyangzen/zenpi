@@ -5,6 +5,7 @@
 //! malformed trailing line, and append again without rewriting the transcript.
 
 use std::{
+    collections::BTreeMap,
     fs::{self, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
@@ -12,7 +13,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::OpenOptionsExt;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -38,6 +39,31 @@ pub struct SessionHeader {
 pub struct RecoveryWarning {
     pub line: usize,
     pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationKind {
+    Provider,
+    Tool,
+    Compaction,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationOutcome {
+    Succeeded,
+    Failed,
+    Cancelled,
+    Interrupted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InterruptedOperation {
+    pub operation_id: String,
+    pub kind: OperationKind,
+    pub turn_id: String,
+    pub retry_requires_confirmation: bool,
 }
 
 #[derive(Debug, Error)]
@@ -104,6 +130,14 @@ pub struct SessionSummary {
     pub event_count: usize,
     pub recovery_warnings: usize,
     pub next_seq: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SessionInspection {
+    pub summary: SessionSummary,
+    pub turns: Vec<Turn>,
+    pub events: Vec<Value>,
+    pub recovery_warnings: Vec<RecoveryWarning>,
 }
 
 impl SessionStore {
@@ -402,6 +436,57 @@ impl SessionStore {
         &self.event_values
     }
 
+    /// Return operations that reached durable `started` state without a
+    /// matching terminal marker. No operation is retried here: callers must
+    /// make an explicit policy decision, which prevents crash recovery from
+    /// repeating a side effect.
+    pub fn interrupted_operations(&self) -> Vec<InterruptedOperation> {
+        interrupted_operations(&self.event_values)
+    }
+
+    pub fn begin_operation(
+        &mut self,
+        operation: &InterruptedOperation,
+    ) -> Result<(), SessionError> {
+        self.append_event(json!({
+            "type": "operation_started",
+            "operation_id": operation.operation_id,
+            "operation_kind": operation.kind,
+            "turn_id": operation.turn_id,
+            "retry_requires_confirmation": operation.retry_requires_confirmation,
+        }))
+    }
+
+    pub fn finish_operation(
+        &mut self,
+        operation_id: &str,
+        outcome: OperationOutcome,
+    ) -> Result<(), SessionError> {
+        if operation_id.trim().is_empty() || operation_id.len() > 256 {
+            return Err(SessionError::InvalidRecord(
+                "operation ID is empty or too large".into(),
+            ));
+        }
+        self.append_event(json!({
+            "type": "operation_finished",
+            "operation_id": operation_id,
+            "outcome": outcome,
+        }))
+    }
+
+    /// Convert unfinished markers from a previous process into durable
+    /// interrupted terminals. The returned list remains available to the host
+    /// for an explicit retry/abandon decision.
+    pub fn mark_interrupted_operations(
+        &mut self,
+    ) -> Result<Vec<InterruptedOperation>, SessionError> {
+        let interrupted = self.interrupted_operations();
+        for operation in &interrupted {
+            self.finish_operation(&operation.operation_id, OperationOutcome::Interrupted)?;
+        }
+        Ok(interrupted)
+    }
+
     pub fn latest_assistant(&self) -> Option<&Turn> {
         self.turns
             .iter()
@@ -504,17 +589,51 @@ impl SessionStore {
     }
 }
 
+fn interrupted_operations(events: &[Value]) -> Vec<InterruptedOperation> {
+    let mut active = BTreeMap::<String, InterruptedOperation>::new();
+    for event in events {
+        match event.get("type").and_then(Value::as_str) {
+            Some("operation_started") => {
+                let Some(operation_id) = event.get("operation_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(turn_id) = event.get("turn_id").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Some(kind) = event
+                    .get("operation_kind")
+                    .cloned()
+                    .and_then(|value| serde_json::from_value(value).ok())
+                else {
+                    continue;
+                };
+                active.insert(
+                    operation_id.to_owned(),
+                    InterruptedOperation {
+                        operation_id: operation_id.to_owned(),
+                        kind,
+                        turn_id: turn_id.to_owned(),
+                        retry_requires_confirmation: event
+                            .get("retry_requires_confirmation")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(true),
+                    },
+                );
+            }
+            Some("operation_finished") => {
+                if let Some(operation_id) = event.get("operation_id").and_then(Value::as_str) {
+                    active.remove(operation_id);
+                }
+            }
+            _ => {}
+        }
+    }
+    active.into_values().collect()
+}
+
 #[cfg(unix)]
 fn restrict_session_permissions(path: &Path) -> io::Result<()> {
-    if !path.exists() {
-        return Ok(());
-    }
-    let mut permissions = fs::metadata(path)?.permissions();
-    if permissions.mode() & 0o777 != 0o600 {
-        permissions.set_mode(0o600);
-        fs::set_permissions(path, permissions)?;
-    }
-    Ok(())
+    crate::security::restrict_private_file(path)
 }
 
 #[cfg(not(unix))]
@@ -563,8 +682,27 @@ pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>,
     paths.sort();
     paths
         .into_iter()
-        .map(|path| SessionStore::open(path).map(|store| store.summary()))
+        .map(|path| inspect_session(path).map(|inspection| inspection.summary))
         .collect()
+}
+
+/// Open an existing journal for inspection. Unlike `SessionStore::open`, this
+/// rejects a missing source, preventing a typo in a read-only CLI command from
+/// creating an empty session.
+pub fn inspect_session(path: impl AsRef<Path>) -> Result<SessionInspection, SessionError> {
+    let path = path.as_ref();
+    if !path.is_file() {
+        return Err(SessionError::InvalidRecord(
+            "inspection source is not an existing session file".into(),
+        ));
+    }
+    let store = SessionStore::open(path)?;
+    Ok(SessionInspection {
+        summary: store.summary(),
+        turns: store.turns,
+        events: store.event_values,
+        recovery_warnings: store.warnings,
+    })
 }
 
 pub fn import_session(
@@ -578,10 +716,17 @@ pub fn import_session(
     }
     let source = SessionStore::open(source)?;
     source.export_to(&destination)?;
-    let imported = SessionStore::open(destination)?;
+    let imported = match SessionStore::open(destination.as_ref()) {
+        Ok(imported) => imported,
+        Err(error) => {
+            let _ = fs::remove_file(destination.as_ref());
+            return Err(error);
+        }
+    };
     if imported.session_id() != source.session_id()
         || imported.summary().next_seq != source.summary().next_seq
     {
+        let _ = fs::remove_file(destination.as_ref());
         return Err(SessionError::InvalidRecord(
             "imported journal identity or sequence differs from source".into(),
         ));

@@ -100,6 +100,7 @@ printf '%s\n' \
   '{"type":"resume","id":"r-1"}' \
   '{"type":"handoff","id":"h-1","to":"worker-b","summary":"handoff smoke","artifacts":["Docs/Zenpi_Execution_Spec.md"]}' \
   '{"type":"prompt","id":"p-1","text":"hello\u2028zenpi\u2029","mode":"start_if_idle","future_hint":"ignored"}' \
+  '{"schema_version":2,"type":"prompt","id":"p-1","text":"must not run twice"}' \
   '{"type":"status","id":"s-1"}' \
   '{"type":"steer","id":"t-1","text":"no active turn"}' \
   '{"type":"shutdown","id":"q-1"}' >"$INPUT"
@@ -175,13 +176,17 @@ for index, response in enumerate(responses, 1):
         raise AssertionError(f"line {index} has no typed protocol record")
 
 by_id: dict[str, dict] = {}
+duplicate_terminals: list[dict] = []
 for response in responses:
     if response.get("type") != "response":
         continue
     request_id = response.get("id")
     if request_id is not None:
         if request_id in by_id:
-            raise AssertionError(f"duplicate correlated response for {request_id}")
+            duplicate_terminals.append(response)
+            if response.get("success") is True:
+                by_id[request_id] = response
+            continue
         by_id[request_id] = response
 for request_id in ("bad-1", "p-1", "s-1", "t-1", "r-1", "h-1", "q-1"):
     if request_id not in by_id:
@@ -206,6 +211,8 @@ if by_id["bad-1"].get("success") is not False:
 invalid_frames = [response for response in responses if response.get("command") == "invalid"]
 if not invalid_frames or any(response.get("success") is not False for response in invalid_frames):
     raise AssertionError("malformed JSON frame was not rejected without terminating the loop")
+if len(duplicate_terminals) != 1:
+    raise AssertionError(f"in-flight duplicate request was not suppressed: {duplicate_terminals!r}")
 for request_id in ("p-1", "s-1", "t-1", "r-1", "h-1", "q-1"):
     if by_id[request_id].get("success") is not True:
         raise AssertionError(f"command {request_id} did not succeed: {by_id[request_id]}")

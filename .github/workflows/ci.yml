@@ -35,7 +35,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
-        run: cargo test --all-targets
+        run: cargo test --all-targets --all-features --locked
 
       - name: Validate execution blueprint and Gantt
         run: python3 tools/validate_blueprint.py
@@ -54,3 +54,9 @@ jobs:
 
       - name: Exercise the release headless protocol
         run: cargo build --release --features dev-fixtures && ZENPI_BIN=target/release/zenpi tools/headless_smoke.sh --release
+
+      - name: Package and verify the production artifact
+        run: |
+          tools/release.sh
+          (cd dist && shasum -a 256 -c *.sha256)
+          ! tar -tzf dist/*.tar.gz | grep -Eiq '(auth\.json|\.codex|\.zenpi|fixture|\.env)'

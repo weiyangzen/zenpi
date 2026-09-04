@@ -321,3 +321,26 @@ fn panicking_job_still_reaches_a_terminal_event_and_runner_survives() {
     assert!(matches!(runner.next_event().unwrap(), RuntimeEvent::Closed));
     runner.join().unwrap();
 }
+
+#[test]
+fn owned_shutdown_joins_the_active_job_before_returning() {
+    let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_finished = Arc::clone(&finished);
+    let runner = BackgroundRunner::spawn(
+        move |_request: (), token| {
+            while !token.is_cancelled() {
+                thread::yield_now();
+            }
+            worker_finished.store(true, std::sync::atomic::Ordering::Release);
+            Ok::<_, String>(())
+        },
+        RuntimeConfig::default(),
+    );
+    let id = runner.try_submit(()).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::Started { id: actual } if *actual == id),
+    );
+    runner.shutdown_and_join().unwrap();
+    assert!(finished.load(std::sync::atomic::Ordering::Acquire));
+}

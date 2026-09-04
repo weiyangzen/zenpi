@@ -23,6 +23,37 @@ use crate::{
     session::unix_time_ms,
 };
 
+const MAX_REPLAY_EVENTS: usize = 4096;
+
+#[derive(Default)]
+struct ReplayState {
+    events: std::collections::VecDeque<(u64, String)>,
+    terminals: HashMap<String, String>,
+}
+
+impl ReplayState {
+    fn remember_event(&mut self, sequence: u64, line: String) {
+        if self.events.len() == MAX_REPLAY_EVENTS {
+            self.events.pop_front();
+        }
+        self.events.push_back((sequence, line));
+    }
+
+    fn replay_from<W: Write>(&self, from_sequence: u64, output: &mut W) -> io::Result<usize> {
+        let mut count = 0;
+        for (_, line) in self
+            .events
+            .iter()
+            .filter(|(sequence, _)| *sequence >= from_sequence)
+        {
+            output.write_all(line.as_bytes())?;
+            count += 1;
+        }
+        output.flush()?;
+        Ok(count)
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum HeadlessError {
     #[error("headless I/O: {0}")]
@@ -203,26 +234,71 @@ pub fn run_stdio_owned(agent: Agent) -> Result<(), HeadlessError> {
     run_async_stdio(agent, stdin, stdout)
 }
 
+/// Asynchronous transport over caller-owned streams. This is public so PTY
+/// and reconnect tests can exercise the production scheduler without taking
+/// process-global stdin/stdout.
+pub fn run_async_streams<R: io::Read + Send + 'static, W: Write>(
+    agent: Agent,
+    input: R,
+    output: W,
+) -> Result<(), HeadlessError> {
+    run_async_stdio(agent, input, output)
+}
+
 struct AsyncWork {
     id: Option<String>,
     command: &'static str,
     events: Arc<Mutex<Vec<ProviderEvent>>>,
+    turn_id: Arc<Mutex<Option<String>>>,
+}
+
+enum AsyncTurn {
+    Standard(TurnInputRequest),
+    Reissue {
+        message: String,
+        superseded_turn_id: String,
+    },
 }
 
 struct AsyncRequest {
-    request: TurnInputRequest,
+    turn: AsyncTurn,
     events: Arc<Mutex<Vec<ProviderEvent>>>,
+    started_turn_id: Arc<Mutex<Option<String>>>,
 }
 
+type ProviderEventQueue = Arc<Mutex<Vec<ProviderEvent>>>;
+type StartedTurn = Arc<Mutex<Option<String>>>;
+type AsyncRequestParts = (AsyncRequest, ProviderEventQueue, StartedTurn);
+
 impl AsyncRequest {
-    fn new(request: TurnInputRequest) -> (Self, Arc<Mutex<Vec<ProviderEvent>>>) {
+    fn new(request: TurnInputRequest) -> AsyncRequestParts {
         let events = Arc::new(Mutex::new(Vec::new()));
+        let started_turn_id = Arc::new(Mutex::new(None));
         (
             Self {
-                request,
+                turn: AsyncTurn::Standard(request),
                 events: Arc::clone(&events),
+                started_turn_id: Arc::clone(&started_turn_id),
             },
             events,
+            started_turn_id,
+        )
+    }
+
+    fn reissue(message: String, superseded_turn_id: String) -> AsyncRequestParts {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let started_turn_id = Arc::new(Mutex::new(None));
+        (
+            Self {
+                turn: AsyncTurn::Reissue {
+                    message,
+                    superseded_turn_id,
+                },
+                events: Arc::clone(&events),
+                started_turn_id: Arc::clone(&started_turn_id),
+            },
+            events,
+            started_turn_id,
         )
     }
 }
@@ -231,6 +307,7 @@ fn drain_provider_events<W: Write>(
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     output: &mut W,
     sequence: &mut u64,
+    replay: &mut ReplayState,
 ) -> Result<(), HeadlessError> {
     for work in jobs.values() {
         let Ok(mut events) = work.events.lock() else {
@@ -243,8 +320,11 @@ fn drain_provider_events<W: Write>(
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_owned);
             let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, value);
+            let current = *sequence;
             *sequence = sequence.saturating_add(1);
-            output.write_all(encode_line(&envelope)?.as_bytes())?;
+            let line = encode_line(&envelope)?;
+            replay.remember_event(current, line.clone());
+            output.write_all(line.as_bytes())?;
         }
     }
     output.flush()?;
@@ -256,6 +336,7 @@ fn drain_approval_events<W: Write>(
     jobs: &HashMap<crate::runtime::JobId, AsyncWork>,
     output: &mut W,
     sequence: &mut u64,
+    replay: &mut ReplayState,
 ) -> Result<(), HeadlessError> {
     let Some(approval) = approval else {
         return Ok(());
@@ -271,8 +352,11 @@ fn drain_approval_events<W: Write>(
             "approval": request,
         });
         let envelope = StdioEvent::new(*sequence, request_id, turn_id, value);
+        let current = *sequence;
         *sequence = sequence.saturating_add(1);
-        output.write_all(encode_line(&envelope)?.as_bytes())?;
+        let line = encode_line(&envelope)?;
+        replay.remember_event(current, line.clone());
+        output.write_all(line.as_bytes())?;
     }
     output.flush()?;
     Ok(())
@@ -282,6 +366,7 @@ fn drain_provider_events_for_job<W: Write>(
     work: &AsyncWork,
     output: &mut W,
     sequence: &mut u64,
+    replay: &mut ReplayState,
 ) -> Result<(), HeadlessError> {
     let Ok(mut events) = work.events.lock() else {
         return Ok(());
@@ -293,8 +378,11 @@ fn drain_provider_events_for_job<W: Write>(
             .and_then(serde_json::Value::as_str)
             .map(str::to_owned);
         let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, value);
+        let current = *sequence;
         *sequence = sequence.saturating_add(1);
-        output.write_all(encode_line(&envelope)?.as_bytes())?;
+        let line = encode_line(&envelope)?;
+        replay.remember_event(current, line.clone());
+        output.write_all(line.as_bytes())?;
     }
     Ok(())
 }
@@ -353,16 +441,50 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
             let events = Arc::clone(&request.events);
-            let result = agent.process_with_cancel_and_events(
-                request.request,
-                || token.is_cancelled(),
-                &mut |event: ProviderEvent| {
-                    if let Ok(mut pending) = events.lock() {
-                        pending.push(event);
+            let started_turn_id = Arc::clone(&request.started_turn_id);
+            let mut sink = |event: ProviderEvent| {
+                if let Ok(mut pending) = events.lock() {
+                    pending.push(event);
+                }
+                Ok(())
+            };
+            let result = match request.turn {
+                AsyncTurn::Standard(request) => {
+                    let submission = agent.submit(request)?;
+                    if let Ok(mut active) = started_turn_id.lock() {
+                        *active = submission.turn_id().map(str::to_owned);
                     }
-                    Ok(())
-                },
-            )?;
+                    let assistant = if submission.accepted() {
+                        agent.run_active_turn_cancelable_with_events(
+                            || token.is_cancelled(),
+                            &mut sink,
+                        )?
+                    } else {
+                        None
+                    };
+                    ProcessResult {
+                        submission,
+                        assistant,
+                    }
+                }
+                AsyncTurn::Reissue {
+                    message,
+                    superseded_turn_id,
+                } => {
+                    let submission = agent.start_steer_reissue(message, &superseded_turn_id)?;
+                    if let Ok(mut active) = started_turn_id.lock() {
+                        *active = submission.turn_id().map(str::to_owned);
+                    }
+                    let assistant = agent.run_active_turn_cancelable_with_events(
+                        || token.is_cancelled(),
+                        &mut sink,
+                    )?;
+                    ProcessResult {
+                        submission,
+                        assistant,
+                    }
+                }
+            };
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
@@ -373,11 +495,18 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     let mut jobs: HashMap<crate::runtime::JobId, AsyncWork> = HashMap::new();
     let mut request_to_job: HashMap<String, crate::runtime::JobId> = HashMap::new();
     let mut event_sequence = 0_u64;
+    let mut replay = ReplayState::default();
     let mut stopping = false;
     let mut shutdown_sent = false;
     loop {
-        drain_provider_events(&mut jobs, &mut output, &mut event_sequence)?;
-        drain_approval_events(approval.as_ref(), &jobs, &mut output, &mut event_sequence)?;
+        drain_provider_events(&mut jobs, &mut output, &mut event_sequence, &mut replay)?;
+        drain_approval_events(
+            approval.as_ref(),
+            &jobs,
+            &mut output,
+            &mut event_sequence,
+            &mut replay,
+        )?;
         while let Ok(event) = runner.try_next_event() {
             if handle_runtime_event(
                 event,
@@ -386,6 +515,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &shared,
                 &mut output,
                 &mut event_sequence,
+                &mut replay,
                 stopping,
                 shutdown_sent,
             )? {
@@ -393,7 +523,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             }
         }
         if stopping {
-            drain_provider_events(&mut jobs, &mut output, &mut event_sequence)?;
+            drain_provider_events(&mut jobs, &mut output, &mut event_sequence, &mut replay)?;
             if jobs.is_empty() && !shutdown_sent {
                 let _ = runner.try_shutdown();
                 shutdown_sent = true;
@@ -407,6 +537,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         &shared,
                         &mut output,
                         &mut event_sequence,
+                        &mut replay,
                         true,
                         shutdown_sent,
                     )? {
@@ -428,6 +559,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &mut request_to_job,
                 &mut output,
                 &mut event_sequence,
+                &mut replay,
                 &mut stopping,
             )?,
             Ok(ReaderMessage::Eof) => {
@@ -461,6 +593,7 @@ fn handle_runtime_event<W: Write>(
     shared: &Arc<Mutex<Agent>>,
     output: &mut W,
     event_sequence: &mut u64,
+    replay: &mut ReplayState,
     stopping: bool,
     shutdown_sent: bool,
 ) -> Result<bool, HeadlessError> {
@@ -476,19 +609,20 @@ fn handle_runtime_event<W: Write>(
             }
             // Provider deltas precede the one terminal response, even when
             // the worker and output loop become ready on the same tick.
-            drain_provider_events_for_job(&meta, output, event_sequence)?;
+            drain_provider_events_for_job(&meta, output, event_sequence, replay)?;
             match outcome {
                 JobOutcome::Succeeded(result) => {
                     let data = json!({
                         "submission": result.submission,
                         "assistant": result.assistant,
                     });
-                    write_response(
+                    write_cached_response(
                         output,
                         StdioResponse::success(meta.id.clone(), meta.command, Some(data)),
+                        replay,
                     )?;
                 }
-                JobOutcome::Failed(error) => write_response(
+                JobOutcome::Failed(error) => write_cached_response(
                     output,
                     StdioResponse::error_with_code(
                         meta.id.clone(),
@@ -496,8 +630,9 @@ fn handle_runtime_event<W: Write>(
                         error.code(),
                         error.to_string(),
                     ),
+                    replay,
                 )?,
-                JobOutcome::Cancelled => write_response(
+                JobOutcome::Cancelled => write_cached_response(
                     output,
                     StdioResponse::error_with_code(
                         meta.id.clone(),
@@ -505,8 +640,9 @@ fn handle_runtime_event<W: Write>(
                         "backend_cancelled",
                         "request was cancelled",
                     ),
+                    replay,
                 )?,
-                JobOutcome::Panicked => write_response(
+                JobOutcome::Panicked => write_cached_response(
                     output,
                     StdioResponse::error_with_code(
                         meta.id.clone(),
@@ -514,6 +650,7 @@ fn handle_runtime_event<W: Write>(
                         "runtime_panic",
                         "background request panicked",
                     ),
+                    replay,
                 )?,
             }
             if let Ok(mut agent) = shared.lock() {
@@ -536,6 +673,7 @@ fn process_async_line<W, F>(
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     output: &mut W,
     event_sequence: &mut u64,
+    replay: &mut ReplayState,
     stopping: &mut bool,
 ) -> Result<(), HeadlessError>
 where
@@ -560,6 +698,14 @@ where
     };
     let id = request.id().map(str::to_owned);
     let name = request.kind.clone();
+    let request_version = request.schema_version;
+    if let Some(request_id) = id.as_ref()
+        && let Some(cached) = replay.terminals.get(request_id)
+    {
+        output.write_all(cached.as_bytes())?;
+        output.flush()?;
+        return Ok(());
+    }
     let command = match request.into_command() {
         Ok(command) => command,
         Err(error) => {
@@ -575,13 +721,29 @@ where
             text,
             mode,
             expected_turn_id,
+            attachments,
         } => {
+            if let Some(request_id) = id.as_ref()
+                && request_to_job.contains_key(request_id)
+            {
+                write_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "duplicate_request_in_flight",
+                        "request ID is already in flight",
+                    ),
+                )?;
+                return Ok(());
+            }
             let request = TurnInputRequest {
                 message: text,
                 expected_turn_id,
                 mode,
+                attachments,
             };
-            let (request, events) = AsyncRequest::new(request);
+            let (request, events, started_turn_id) = AsyncRequest::new(request);
             let job_id = runner.try_submit(request).map_err(|error| {
                 HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
             })?;
@@ -591,6 +753,7 @@ where
                     id: id.clone(),
                     command: "prompt",
                     events,
+                    turn_id: started_turn_id,
                 },
             );
             if let Some(request_id) = id.clone() {
@@ -601,12 +764,88 @@ where
             text,
             expected_turn_id,
         } => {
-            let request = TurnInputRequest {
-                message: text,
-                expected_turn_id,
-                mode: crate::protocol::TurnMode::Steer,
+            if let Some(request_id) = id.as_ref()
+                && request_to_job.contains_key(request_id)
+            {
+                write_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "duplicate_request_in_flight",
+                        "request ID is already in flight",
+                    ),
+                )?;
+                return Ok(());
+            }
+            let active = jobs
+                .iter()
+                .find(|(_, work)| work.command == "prompt" || work.command == "steer")
+                .map(|(job_id, work)| {
+                    (
+                        *job_id,
+                        work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone()),
+                    )
+                });
+            let (request, events, started_turn_id) = if let Some((job_id, active_turn_id)) = active
+            {
+                if expected_turn_id.as_deref().is_some_and(|expected| {
+                    active_turn_id
+                        .as_deref()
+                        .is_some_and(|active| expected != active)
+                }) {
+                    write_response(
+                        output,
+                        StdioResponse::error_with_code(
+                            id,
+                            name,
+                            "expected_turn_mismatch",
+                            "expected turn does not match the active request",
+                        ),
+                    )?;
+                    return Ok(());
+                }
+                let Some(active_turn_id) = active_turn_id else {
+                    let request = TurnInputRequest {
+                        message: text,
+                        expected_turn_id,
+                        mode: crate::protocol::TurnMode::Steer,
+                        attachments: Vec::new(),
+                    };
+                    let (request, events, started_turn_id) = AsyncRequest::new(request);
+                    let job_id = runner.try_submit(request).map_err(|error| {
+                        HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
+                    })?;
+                    jobs.insert(
+                        job_id,
+                        AsyncWork {
+                            id: id.clone(),
+                            command: "steer",
+                            events,
+                            turn_id: started_turn_id,
+                        },
+                    );
+                    if let Some(request_id) = id {
+                        request_to_job.insert(request_id, job_id);
+                    }
+                    return Ok(());
+                };
+                runner.try_cancel(job_id).map_err(|error| {
+                    HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
+                })?;
+                let (request, events, started_turn_id) =
+                    AsyncRequest::reissue(text, active_turn_id);
+                (request, events, started_turn_id)
+            } else {
+                let request = TurnInputRequest {
+                    message: text,
+                    expected_turn_id,
+                    mode: crate::protocol::TurnMode::Steer,
+                    attachments: Vec::new(),
+                };
+                let (request, events, started_turn_id) = AsyncRequest::new(request);
+                (request, events, started_turn_id)
             };
-            let (request, events) = AsyncRequest::new(request);
             let job_id = runner.try_submit(request).map_err(|error| {
                 HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
             })?;
@@ -616,6 +855,7 @@ where
                     id: id.clone(),
                     command: "steer",
                     events,
+                    turn_id: started_turn_id,
                 },
             );
             if let Some(request_id) = id.clone() {
@@ -703,6 +943,25 @@ where
                 )?,
             }
         }
+        Command::Resume {
+            path: None,
+            from_sequence: Some(from_sequence),
+        } => {
+            let count = replay.replay_from(from_sequence, output)?;
+            write_response(
+                output,
+                StdioResponse::success(
+                    id,
+                    name,
+                    Some(json!({
+                        "from_sequence": from_sequence,
+                        "replayed": count,
+                        "next_sequence": *event_sequence,
+                    })),
+                )
+                .for_version(request_version),
+            )?;
+        }
         other => match shared.try_lock() {
             Ok(mut agent) => {
                 let should_stop = handle_command(&mut agent, id, other, output, event_sequence)?;
@@ -737,11 +996,13 @@ fn handle_command<W: Write>(
             text,
             mode,
             expected_turn_id,
+            attachments,
         } => {
             let result = agent.process(TurnInputRequest {
                 message: text,
                 expected_turn_id,
                 mode,
+                attachments,
             });
             match result {
                 Ok(result) => {
@@ -774,6 +1035,7 @@ fn handle_command<W: Write>(
                 message: text,
                 expected_turn_id,
                 mode: crate::protocol::TurnMode::Steer,
+                attachments: Vec::new(),
             });
             match result {
                 Ok(result) => {
@@ -862,7 +1124,10 @@ fn handle_command<W: Write>(
                 )?,
             }
         }
-        Command::Resume { path } => match path {
+        Command::Resume {
+            path,
+            from_sequence: _,
+        } => match path {
             Some(path) => match agent.resume_session(path) {
                 Ok(()) => write_response(
                     output,
@@ -903,6 +1168,21 @@ fn write_response<W: Write>(output: &mut W, response: StdioResponse) -> Result<(
     let line = encode_line(&response)?;
     output.write_all(line.as_bytes())?;
     output.flush()?;
+    Ok(())
+}
+
+fn write_cached_response<W: Write>(
+    output: &mut W,
+    response: StdioResponse,
+    replay: &mut ReplayState,
+) -> Result<(), HeadlessError> {
+    let request_id = response.id.clone();
+    let line = encode_line(&response)?;
+    output.write_all(line.as_bytes())?;
+    output.flush()?;
+    if let Some(request_id) = request_id {
+        replay.terminals.insert(request_id, line);
+    }
     Ok(())
 }
 

@@ -113,6 +113,7 @@ pub struct TurnInputRequest {
     pub message: String,
     pub expected_turn_id: Option<String>,
     pub mode: TurnMode,
+    pub attachments: Vec<crate::backend::InputAttachment>,
 }
 
 impl TurnInputRequest {
@@ -121,6 +122,7 @@ impl TurnInputRequest {
             message: message.into(),
             expected_turn_id: None,
             mode: TurnMode::StartOrSteer,
+            attachments: Vec::new(),
         }
     }
 
@@ -131,6 +133,11 @@ impl TurnInputRequest {
 
     pub fn expecting(mut self, turn_id: impl Into<String>) -> Self {
         self.expected_turn_id = Some(turn_id.into());
+        self
+    }
+
+    pub fn with_attachments(mut self, attachments: Vec<crate::backend::InputAttachment>) -> Self {
+        self.attachments = attachments;
         self
     }
 }
@@ -241,6 +248,10 @@ pub enum AgentError {
     Tool(#[from] ToolError),
     #[error("tool loop exceeded {0} iterations")]
     ToolLoopLimit(usize),
+    #[error("operation recovery: {0}")]
+    Recovery(String),
+    #[error("resource governance: {0}")]
+    Governance(String),
 }
 
 impl AgentError {
@@ -256,6 +267,8 @@ impl AgentError {
             Self::B3(_) => "handoff_error",
             Self::Tool(_) => "tool_error",
             Self::ToolLoopLimit(_) => "tool_loop_limit",
+            Self::Recovery(_) => "operation_recovery",
+            Self::Governance(_) => "resource_budget_exceeded",
         }
     }
 }
@@ -273,6 +286,8 @@ pub struct Agent {
     tools: Option<ToolRuntime>,
     context_budget: crate::context::ContextBudget,
     skills: crate::skills::SkillSet,
+    active_attachments: Vec<crate::backend::RequestAttachment>,
+    governance: Option<crate::governance::BudgetLedger>,
 }
 
 struct ToolRuntime {
@@ -299,7 +314,8 @@ impl std::fmt::Debug for Agent {
 impl Agent {
     pub fn new(session: SessionStore, backend: Box<dyn Backend>) -> Self {
         let model = backend.model().map(str::to_owned);
-        Self {
+        let recovered = session.interrupted_operations();
+        let mut agent = Self {
             backend,
             session,
             phase: AgentPhase::Idle,
@@ -311,7 +327,29 @@ impl Agent {
             tools: None,
             context_budget: crate::context::ContextBudget::default(),
             skills: crate::skills::SkillSet::default(),
+            active_attachments: Vec::new(),
+            governance: None,
+        };
+        for operation in recovered {
+            agent.events.push(AgentEvent::Error {
+                message: format!(
+                    "interrupted {:?} operation {} requires explicit retry",
+                    operation.kind, operation.operation_id
+                ),
+            });
         }
+        agent
+    }
+
+    /// Persist terminal interruption markers for operations left open by a
+    /// previous process. This is separate from construction so embedders can
+    /// inspect recovery state without mutating the journal.
+    pub fn acknowledge_recovery(
+        &mut self,
+    ) -> Result<Vec<crate::session::InterruptedOperation>, AgentError> {
+        self.session
+            .mark_interrupted_operations()
+            .map_err(AgentError::from)
     }
 
     pub fn with_echo(session: SessionStore) -> Self {
@@ -403,6 +441,20 @@ impl Agent {
         });
     }
 
+    pub fn set_attachment_workspace(&mut self, context: ToolContext) {
+        if let Some(runtime) = self.tools.as_mut() {
+            runtime.context = context;
+        } else {
+            self.tools = Some(ToolRuntime {
+                registry: ToolRegistry::new(),
+                context,
+                policy: SideEffectPolicy::read_only(),
+                approval: ApprovalCoordinator::new(),
+                approval_policy: ApprovalPolicy::default(),
+            });
+        }
+    }
+
     /// Configure the approval policy and return the coordinator used by a
     /// host to surface/respond to pending side-effect requests.
     pub fn set_approval_policy(&mut self, policy: ApprovalPolicy) -> Option<ApprovalCoordinator> {
@@ -421,6 +473,17 @@ impl Agent {
 
     pub fn set_skills(&mut self, skills: crate::skills::SkillSet) {
         self.skills = skills;
+    }
+
+    pub fn set_resource_limits(
+        &mut self,
+        limits: crate::governance::ResourceLimits,
+    ) -> Result<(), AgentError> {
+        self.governance = Some(
+            crate::governance::BudgetLedger::restore(&self.session, limits)
+                .map_err(|error| AgentError::Governance(error.to_string()))?,
+        );
+        Ok(())
     }
 
     /// Admit a request without invoking the backend.  This named boundary is
@@ -443,6 +506,15 @@ impl Agent {
                 "prompt exceeds {MAX_TEXT_BYTES} bytes"
             )));
         }
+        if request.attachments.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
+            return Err(AgentError::InvalidTurn(format!(
+                "prompt exceeds {} attachments",
+                crate::backend::MAX_ATTACHMENTS_PER_TURN
+            )));
+        }
+        for attachment in &request.attachments {
+            attachment.validate()?;
+        }
         let current = self.active_turn_id.as_deref();
         if request
             .expected_turn_id
@@ -460,9 +532,9 @@ impl Agent {
 
         match request.mode {
             TurnMode::StartOrSteer if current.is_none() => {
-                self.start_new(request.message, TurnMode::StartOrSteer)
+                self.start_new(request.message, request.attachments, TurnMode::StartOrSteer)
             }
-            TurnMode::StartOrSteer => self.steer_existing(request.message),
+            TurnMode::StartOrSteer => self.steer_existing(request.message, request.attachments),
             TurnMode::StartIfIdle if current.is_some() => {
                 let submission = TurnSubmission::NotSubmitted {
                     reason: NotSubmittedReason::NotIdle,
@@ -472,7 +544,9 @@ impl Agent {
                 });
                 Ok(submission)
             }
-            TurnMode::StartIfIdle => self.start_new(request.message, TurnMode::StartIfIdle),
+            TurnMode::StartIfIdle => {
+                self.start_new(request.message, request.attachments, TurnMode::StartIfIdle)
+            }
             TurnMode::Steer if current.is_none() => {
                 let submission = TurnSubmission::NotSubmitted {
                     reason: NotSubmittedReason::NoActiveTurn,
@@ -491,7 +565,7 @@ impl Agent {
                 });
                 Ok(submission)
             }
-            TurnMode::Steer => self.steer_existing(request.message),
+            TurnMode::Steer => self.steer_existing(request.message, request.attachments),
         }
     }
 
@@ -519,11 +593,23 @@ impl Agent {
         self.submit(request)
     }
 
-    fn start_new(&mut self, message: String, mode: TurnMode) -> Result<TurnSubmission, AgentError> {
+    fn start_new(
+        &mut self,
+        message: String,
+        attachments: Vec<crate::backend::InputAttachment>,
+        mode: TurnMode,
+    ) -> Result<TurnSubmission, AgentError> {
         let turn_id = next_id("turn");
-        let turn = Turn::new(turn_id.clone(), TurnRole::User, message);
+        let mut turn = Turn::new(turn_id.clone(), TurnRole::User, message);
+        let materialized = self.materialize_attachments(&turn_id, &attachments)?;
+        if !attachments.is_empty() {
+            turn.metadata = Some(serde_json::json!({
+                "attachments": attachment_journal_metadata(&materialized),
+            }));
+        }
         turn.validate()?;
         self.session.append_turn(turn)?;
+        self.active_attachments = materialized;
         self.active_turn_id = Some(turn_id.clone());
         self.phase = AgentPhase::Running;
         self.active_steerable = true;
@@ -535,14 +621,27 @@ impl Agent {
         Ok(submission)
     }
 
-    fn steer_existing(&mut self, message: String) -> Result<TurnSubmission, AgentError> {
+    fn steer_existing(
+        &mut self,
+        message: String,
+        attachments: Vec<crate::backend::InputAttachment>,
+    ) -> Result<TurnSubmission, AgentError> {
         let turn_id = self
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
-        let turn = Turn::with_parent(next_id("input"), turn_id.clone(), TurnRole::User, message);
+        let input_id = next_id("input");
+        let mut turn =
+            Turn::with_parent(input_id.clone(), turn_id.clone(), TurnRole::User, message);
+        let materialized = self.materialize_attachments(&input_id, &attachments)?;
+        if !attachments.is_empty() {
+            turn.metadata = Some(serde_json::json!({
+                "attachments": attachment_journal_metadata(&materialized),
+            }));
+        }
         turn.validate()?;
         self.session.append_turn(turn)?;
+        self.active_attachments.extend(materialized);
         self.phase = AgentPhase::Running;
         self.last_error = None;
         let submission = TurnSubmission::Steered {
@@ -553,6 +652,106 @@ impl Agent {
             mode: TurnMode::Steer,
         });
         Ok(submission)
+    }
+
+    fn start_reissued(
+        &mut self,
+        message: String,
+        superseded_turn_id: &str,
+    ) -> Result<TurnSubmission, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        if message.trim().is_empty() || message.len() > MAX_TEXT_BYTES {
+            return Err(AgentError::InvalidTurn(
+                "steer reissue message is empty or too large".into(),
+            ));
+        }
+        if superseded_turn_id.trim().is_empty() || superseded_turn_id.len() > MAX_ID_BYTES {
+            return Err(AgentError::InvalidTurn(
+                "superseded turn ID is invalid".into(),
+            ));
+        }
+        let turn_id = next_id("turn");
+        let mut turn = Turn::with_parent(
+            turn_id.clone(),
+            superseded_turn_id.to_owned(),
+            TurnRole::User,
+            message,
+        );
+        turn.metadata = Some(serde_json::json!({
+            "steer": {
+                "strategy": "cancel_reissue",
+                "superseded_turn_id": superseded_turn_id,
+            }
+        }));
+        turn.validate()?;
+        self.session.append_turn(turn)?;
+        self.active_turn_id = Some(turn_id.clone());
+        self.phase = AgentPhase::Running;
+        self.active_steerable = true;
+        self.last_error = None;
+        self.events.push(AgentEvent::TurnAccepted {
+            turn_id: turn_id.clone(),
+            mode: TurnMode::Steer,
+        });
+        Ok(TurnSubmission::Steered { turn_id })
+    }
+
+    fn materialize_attachments(
+        &self,
+        input_turn_id: &str,
+        attachments: &[crate::backend::InputAttachment],
+    ) -> Result<Vec<crate::backend::RequestAttachment>, AgentError> {
+        use sha2::{Digest, Sha256};
+
+        let mut total = 0_usize;
+        let mut materialized = Vec::with_capacity(attachments.len());
+        for input in attachments {
+            input.validate()?;
+            let (filename, data, size_bytes, sha256) = if let Some(path) = &input.path {
+                let runtime = self.tools.as_ref().ok_or_else(|| {
+                    AgentError::InvalidTurn(
+                        "workspace attachments require a configured tool workspace".into(),
+                    )
+                })?;
+                let (relative, bytes) = runtime
+                    .context
+                    .read_attachment(path, crate::backend::MAX_ATTACHMENT_BYTES)?;
+                let size = bytes.len();
+                total = total.saturating_add(size);
+                if total > crate::backend::MAX_TOTAL_ATTACHMENT_BYTES {
+                    return Err(AgentError::InvalidTurn(format!(
+                        "attachments exceed {} total bytes",
+                        crate::backend::MAX_TOTAL_ATTACHMENT_BYTES
+                    )));
+                }
+                let digest = format!("{:x}", Sha256::digest(&bytes));
+                (
+                    relative
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .map(str::to_owned),
+                    Some(bytes),
+                    Some(u64::try_from(size).unwrap_or(u64::MAX)),
+                    Some(digest),
+                )
+            } else {
+                (None, None, None, None)
+            };
+            materialized.push(crate::backend::RequestAttachment {
+                turn_id: input_turn_id.to_owned(),
+                input: input.clone(),
+                filename,
+                data,
+                size_bytes,
+                sha256,
+            });
+        }
+        Ok(materialized)
     }
 
     /// Run the currently admitted turn and append the normalized assistant
@@ -603,6 +802,13 @@ impl Agent {
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
+        let provider_operation = crate::session::InterruptedOperation {
+            operation_id: format!("provider-{turn_id}"),
+            kind: crate::session::OperationKind::Provider,
+            turn_id: turn_id.clone(),
+            retry_requires_confirmation: false,
+        };
+        self.session.begin_operation(&provider_operation)?;
         const MAX_TOOL_ITERATIONS: usize = 8;
         let completion = match self.complete_with_tools(
             &turn_id,
@@ -612,9 +818,20 @@ impl Agent {
         ) {
             Ok(completion) => completion,
             Err(error) => {
+                let outcome = if matches!(
+                    error,
+                    AgentError::Backend(BackendError::Cancelled | BackendError::Steered)
+                ) {
+                    crate::session::OperationOutcome::Cancelled
+                } else {
+                    crate::session::OperationOutcome::Failed
+                };
+                self.session
+                    .finish_operation(&provider_operation.operation_id, outcome)?;
                 self.last_error = Some(error.to_string());
                 self.phase = AgentPhase::Idle;
                 self.active_turn_id = None;
+                self.active_attachments.clear();
                 self.events.push(AgentEvent::Error {
                     message: error.to_string(),
                 });
@@ -626,6 +843,11 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.active_attachments.clear();
+            self.session.finish_operation(
+                &provider_operation.operation_id,
+                crate::session::OperationOutcome::Cancelled,
+            )?;
             return Err(error.into());
         }
         if completion.content.trim().is_empty() {
@@ -633,9 +855,14 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.active_attachments.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
+            self.session.finish_operation(
+                &provider_operation.operation_id,
+                crate::session::OperationOutcome::Failed,
+            )?;
             return Err(error.into());
         }
         let mut assistant = Turn::with_parent(
@@ -665,9 +892,14 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.active_attachments.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
+            self.session.finish_operation(
+                &provider_operation.operation_id,
+                crate::session::OperationOutcome::Failed,
+            )?;
             return Err(error);
         }
         let content = assistant.content.clone();
@@ -675,14 +907,24 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.active_attachments.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
+            self.session.finish_operation(
+                &provider_operation.operation_id,
+                crate::session::OperationOutcome::Failed,
+            )?;
             return Err(error.into());
         }
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
+        self.active_attachments.clear();
         self.last_error = None;
+        self.session.finish_operation(
+            &provider_operation.operation_id,
+            crate::session::OperationOutcome::Succeeded,
+        )?;
         self.events
             .push(AgentEvent::AssistantMessage { turn_id, content });
         Ok(Some(assistant))
@@ -703,10 +945,17 @@ impl Agent {
             if is_cancelled() {
                 return Err(BackendError::Cancelled.into());
             }
-            let definitions = self
+            let definitions: Vec<crate::tools::ToolDefinition> = self
                 .tools
                 .as_ref()
-                .map(|runtime| runtime.registry.definitions())
+                .map(|runtime| {
+                    runtime
+                        .registry
+                        .definitions()
+                        .into_iter()
+                        .filter(|definition| self.skills.tool_allowed(&definition.name))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
             let prepared = crate::context::prepare_context(
                 self.session.turns(),
@@ -714,20 +963,45 @@ impl Agent {
                 is_cancelled,
             )
             .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+            if let Some(governance) = self.governance.as_mut() {
+                governance
+                    .charge(
+                        crate::governance::ResourceKind::InputTokens,
+                        prepared.estimate.input_tokens,
+                    )
+                    .and_then(|_| {
+                        governance.charge(crate::governance::ResourceKind::NetworkRequests, 1)
+                    })
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+                governance
+                    .persist(&mut self.session)
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+            }
             if let Some(checkpoint) = &prepared.checkpoint {
+                let operation_id = format!("compaction-{}", checkpoint.source_sha256);
+                self.session
+                    .begin_operation(&crate::session::InterruptedOperation {
+                        operation_id: operation_id.clone(),
+                        kind: crate::session::OperationKind::Compaction,
+                        turn_id: turn_id.to_owned(),
+                        retry_requires_confirmation: false,
+                    })?;
                 self.session.append_event(serde_json::json!({
                     "type": "context_compacted",
                     "checkpoint": checkpoint,
                 }))?;
+                self.session
+                    .finish_operation(&operation_id, crate::session::OperationOutcome::Succeeded)?;
             }
-            let instructions = self.skills.instructions();
+            let instructions = self.skills.effective_instructions();
             let request = CompletionRequest::new(
                 turn_id,
                 &prepared.turns,
                 self.model.as_deref(),
                 &definitions,
             )
-            .with_instructions((!instructions.is_empty()).then_some(instructions.as_str()));
+            .with_instructions((!instructions.is_empty()).then_some(instructions.as_str()))
+            .with_attachments(&self.active_attachments);
             let completion =
                 self.backend
                     .complete_with_control(request, is_cancelled, &mut |event| {
@@ -735,6 +1009,17 @@ impl Agent {
                         Ok(())
                     });
             let completion = completion.map_err(AgentError::from)?;
+            if let Some(usage) = completion.usage
+                && let Some(governance) = self.governance.as_mut()
+            {
+                governance
+                    .charge(
+                        crate::governance::ResourceKind::OutputTokens,
+                        usage.output_tokens,
+                    )
+                    .and_then(|_| governance.persist(&mut self.session))
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+            }
             if is_cancelled() {
                 return Err(BackendError::Cancelled.into());
             }
@@ -781,7 +1066,61 @@ impl Agent {
                     call_id: call.id.clone(),
                     tool: call.name.clone(),
                 });
+                let tool_operation_id = format!("tool-{}", call.id);
+                self.session
+                    .begin_operation(&crate::session::InterruptedOperation {
+                        operation_id: tool_operation_id.clone(),
+                        kind: crate::session::OperationKind::Tool,
+                        turn_id: turn_id.to_owned(),
+                        retry_requires_confirmation: true,
+                    })?;
                 let definition = runtime.registry.definition(&call.name).cloned();
+                if let Some(governance) = self.governance.as_mut()
+                    && matches!(
+                        definition.as_ref().map(|definition| definition.side_effect),
+                        Some(crate::tools::ToolSideEffect::CommandExecution)
+                    )
+                {
+                    governance
+                        .charge(crate::governance::ResourceKind::Processes, 1)
+                        .map_err(|error| AgentError::Governance(error.to_string()))?;
+                }
+                if !self.skills.tool_allowed(&call.name) {
+                    let result = crate::tools::ToolResult::Error {
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                        error: crate::tools::ToolFailure {
+                            code: crate::tools::ToolErrorCode::PolicyDenied,
+                            message: "tool denied by skill policy".into(),
+                        },
+                    };
+                    let serialized = serde_json::to_string(&result).map_err(|error| {
+                        AgentError::InvalidTurn(format!(
+                            "tool result serialization failed: {error}"
+                        ))
+                    })?;
+                    let mut tool_turn = Turn::with_parent(
+                        next_id("tool"),
+                        turn_id.to_owned(),
+                        TurnRole::Tool,
+                        serialized,
+                    );
+                    tool_turn.metadata = Some(serde_json::json!({
+                        "tool_call_id": call.id,
+                        "tool_name": call.name,
+                    }));
+                    self.session.append_turn(tool_turn)?;
+                    self.session.finish_operation(
+                        &tool_operation_id,
+                        crate::session::OperationOutcome::Failed,
+                    )?;
+                    self.events.push(AgentEvent::ToolResult {
+                        turn_id: turn_id.to_owned(),
+                        call_id: call.id,
+                        success: false,
+                    });
+                    continue;
+                }
                 let approval = definition.as_ref().and_then(|definition| {
                     if runtime.policy.allows(definition.side_effect) {
                         runtime
@@ -821,6 +1160,10 @@ impl Agent {
                         call_id: call.id,
                         success: false,
                     });
+                    self.session.finish_operation(
+                        &tool_operation_id,
+                        crate::session::OperationOutcome::Failed,
+                    )?;
                     continue;
                 }
                 if approval.is_none() {
@@ -874,6 +1217,10 @@ impl Agent {
                                 call_id: call.id,
                                 success: false,
                             });
+                            self.session.finish_operation(
+                                &tool_operation_id,
+                                crate::session::OperationOutcome::Failed,
+                            )?;
                             continue;
                         }
                     }
@@ -925,6 +1272,10 @@ impl Agent {
                         ..
                     }
                 ) {
+                    self.session.finish_operation(
+                        &tool_operation_id,
+                        crate::session::OperationOutcome::Cancelled,
+                    )?;
                     return Err(BackendError::Cancelled.into());
                 }
                 let success = result.is_success();
@@ -947,6 +1298,14 @@ impl Agent {
                     call_id: call.id,
                     success,
                 });
+                self.session.finish_operation(
+                    &tool_operation_id,
+                    if success {
+                        crate::session::OperationOutcome::Succeeded
+                    } else {
+                        crate::session::OperationOutcome::Failed
+                    },
+                )?;
             }
         }
         Err(AgentError::ToolLoopLimit(max_iterations))
@@ -995,6 +1354,36 @@ impl Agent {
         }
     }
 
+    /// Execute the portable live-steer fallback after the host has cancelled
+    /// and joined the superseded provider request. The new durable user turn
+    /// points at the old turn and is admitted exactly once.
+    pub fn process_steer_reissue_with_events<F, E>(
+        &mut self,
+        message: String,
+        superseded_turn_id: &str,
+        is_cancelled: F,
+        provider_sink: &mut E,
+    ) -> Result<ProcessResult, AgentError>
+    where
+        F: Fn() -> bool,
+        E: FnMut(ProviderEvent) -> Result<(), BackendError>,
+    {
+        let submission = self.start_reissued(message, superseded_turn_id)?;
+        let assistant = self.run_active_turn_cancelable_with_events(is_cancelled, provider_sink)?;
+        Ok(ProcessResult {
+            submission,
+            assistant,
+        })
+    }
+
+    pub fn start_steer_reissue(
+        &mut self,
+        message: String,
+        superseded_turn_id: &str,
+    ) -> Result<TurnSubmission, AgentError> {
+        self.start_reissued(message, superseded_turn_id)
+    }
+
     pub fn append_handoff(&mut self, handoff: Handoff) -> Result<(), AgentError> {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
@@ -1033,13 +1422,38 @@ impl Agent {
         self.session = replacement;
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
+        self.active_attachments.clear();
         self.last_error = None;
         Ok(())
     }
 
-    pub fn close(&mut self) {
+    pub fn try_close(&mut self) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Ok(());
+        }
+        for (order, output) in self.skills.session_close_outputs().into_iter().enumerate() {
+            self.session.append_event(serde_json::json!({
+                "type": "skill_session_close",
+                "order": order,
+                "output": output,
+            }))?;
+        }
         self.phase = AgentPhase::Closed;
         self.active_turn_id = None;
+        self.active_attachments.clear();
+        Ok(())
+    }
+
+    pub fn close(&mut self) {
+        if let Err(error) = self.try_close() {
+            self.last_error = Some(error.to_string());
+            self.events.push(AgentEvent::Error {
+                message: error.to_string(),
+            });
+            self.phase = AgentPhase::Closed;
+            self.active_turn_id = None;
+            self.active_attachments.clear();
+        }
     }
 }
 
@@ -1065,6 +1479,23 @@ fn next_id(prefix: &str) -> String {
     )
 }
 
+fn attachment_journal_metadata(attachments: &[crate::backend::RequestAttachment]) -> Vec<Value> {
+    attachments
+        .iter()
+        .map(|attachment| {
+            serde_json::json!({
+                "kind": attachment.input.kind,
+                "mime_type": attachment.input.mime_type,
+                "path": attachment.input.path,
+                "url": attachment.input.url,
+                "file_id": attachment.input.file_id,
+                "size_bytes": attachment.size_bytes,
+                "sha256": attachment.sha256,
+            })
+        })
+        .collect()
+}
+
 /// Runtime mode.  There are intentionally only these two variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunMode {
@@ -1081,6 +1512,9 @@ pub struct CliOptions {
     pub model: Option<String>,
     pub command: Option<CliCommand>,
     pub command_value: Option<String>,
+    pub command_value2: Option<String>,
+    pub retain_newest: Option<usize>,
+    pub older_than_seconds: Option<u64>,
     pub json: bool,
     pub yes: bool,
     pub help: bool,
@@ -1095,6 +1529,18 @@ pub enum CliCommand {
     PairImportCodex,
     PairStatus,
     PairRevoke,
+    SessionList,
+    SessionInspect,
+    SessionFork,
+    SessionExport,
+    SessionImport,
+    SessionGc,
+    ExtensionList,
+    ExtensionInstall,
+    ExtensionRemove,
+    ExtensionDisable,
+    ExtensionEnable,
+    ExtensionUpgrade,
 }
 
 impl Default for CliOptions {
@@ -1107,6 +1553,9 @@ impl Default for CliOptions {
             model: None,
             command: None,
             command_value: None,
+            command_value2: None,
+            retain_newest: None,
+            older_than_seconds: None,
             json: false,
             yes: false,
             help: false,
@@ -1121,10 +1570,12 @@ where
 {
     let mut options = CliOptions::default();
     let mut args = args.into_iter().map(Into::into).peekable();
-    if args
-        .peek()
-        .is_some_and(|argument| argument == "config" || argument == "pair")
-    {
+    if args.peek().is_some_and(|argument| {
+        matches!(
+            argument.as_str(),
+            "config" | "pair" | "session" | "extension"
+        )
+    }) {
         let group = args.next().unwrap_or_default();
         let action = args
             .next()
@@ -1137,6 +1588,18 @@ where
             ("pair", "import-codex") => CliCommand::PairImportCodex,
             ("pair", "status") => CliCommand::PairStatus,
             ("pair", "revoke") => CliCommand::PairRevoke,
+            ("session", "list") => CliCommand::SessionList,
+            ("session", "inspect") => CliCommand::SessionInspect,
+            ("session", "fork") => CliCommand::SessionFork,
+            ("session", "export") => CliCommand::SessionExport,
+            ("session", "import") => CliCommand::SessionImport,
+            ("session", "gc") => CliCommand::SessionGc,
+            ("extension", "list") => CliCommand::ExtensionList,
+            ("extension", "install") => CliCommand::ExtensionInstall,
+            ("extension", "remove") => CliCommand::ExtensionRemove,
+            ("extension", "disable") => CliCommand::ExtensionDisable,
+            ("extension", "enable") => CliCommand::ExtensionEnable,
+            ("extension", "upgrade") => CliCommand::ExtensionUpgrade,
             _ => {
                 return Err(ZenpiError::arguments(format!(
                     "unknown {group} action `{action}`"
@@ -1152,12 +1615,20 @@ where
                             CliCommand::ConfigDoctor
                                 | CliCommand::ConfigList
                                 | CliCommand::PairStatus
+                                | CliCommand::SessionList
+                                | CliCommand::SessionInspect
+                                | CliCommand::ExtensionList
                         )
                     ) =>
                 {
                     options.json = true;
                 }
-                "--yes" if matches!(options.command, Some(CliCommand::PairRevoke)) => {
+                "--yes"
+                    if matches!(
+                        options.command,
+                        Some(CliCommand::PairRevoke | CliCommand::SessionGc)
+                    ) =>
+                {
                     options.yes = true;
                 }
                 "--profile" => {
@@ -1171,6 +1642,63 @@ where
                         && options.command_value.is_none() =>
                 {
                     options.command_value = Some(value.to_owned());
+                }
+                "--retain-newest" if matches!(options.command, Some(CliCommand::SessionGc)) => {
+                    let value = args.next().ok_or_else(|| {
+                        ZenpiError::arguments("--retain-newest requires a number")
+                    })?;
+                    options.retain_newest = Some(value.parse().map_err(|_| {
+                        ZenpiError::arguments("--retain-newest must be a non-negative integer")
+                    })?);
+                }
+                "--older-than-seconds"
+                    if matches!(options.command, Some(CliCommand::SessionGc)) =>
+                {
+                    let value = args.next().ok_or_else(|| {
+                        ZenpiError::arguments("--older-than-seconds requires a number")
+                    })?;
+                    options.older_than_seconds = Some(value.parse().map_err(|_| {
+                        ZenpiError::arguments("--older-than-seconds must be a non-negative integer")
+                    })?);
+                }
+                value
+                    if matches!(
+                        options.command,
+                        Some(
+                            CliCommand::SessionInspect
+                                | CliCommand::SessionFork
+                                | CliCommand::SessionExport
+                                | CliCommand::SessionImport
+                        )
+                    ) && options.command_value.is_none() =>
+                {
+                    options.command_value = Some(value.to_owned());
+                }
+                value
+                    if matches!(
+                        options.command,
+                        Some(
+                            CliCommand::ExtensionInstall
+                                | CliCommand::ExtensionRemove
+                                | CliCommand::ExtensionDisable
+                                | CliCommand::ExtensionEnable
+                                | CliCommand::ExtensionUpgrade
+                        )
+                    ) && options.command_value.is_none() =>
+                {
+                    options.command_value = Some(value.to_owned());
+                }
+                value
+                    if matches!(
+                        options.command,
+                        Some(
+                            CliCommand::SessionFork
+                                | CliCommand::SessionExport
+                                | CliCommand::SessionImport
+                        )
+                    ) && options.command_value2.is_none() =>
+                {
+                    options.command_value2 = Some(value.to_owned());
                 }
                 _ => {
                     return Err(ZenpiError::arguments(format!(
@@ -1186,6 +1714,44 @@ where
         if matches!(options.command, Some(CliCommand::PairRevoke)) && !options.yes {
             return Err(ZenpiError::arguments(
                 "pair revoke requires --yes confirmation",
+            ));
+        }
+        if matches!(options.command, Some(CliCommand::SessionInspect))
+            && options.command_value.is_none()
+        {
+            return Err(ZenpiError::arguments("session inspect requires PATH"));
+        }
+        if matches!(
+            options.command,
+            Some(
+                CliCommand::ExtensionInstall
+                    | CliCommand::ExtensionRemove
+                    | CliCommand::ExtensionDisable
+                    | CliCommand::ExtensionEnable
+                    | CliCommand::ExtensionUpgrade
+            )
+        ) && options.command_value.is_none()
+        {
+            return Err(ZenpiError::arguments(format!(
+                "extension {action} requires a source path or extension name"
+            )));
+        }
+        if matches!(
+            options.command,
+            Some(CliCommand::SessionFork | CliCommand::SessionExport | CliCommand::SessionImport)
+        ) && (options.command_value.is_none() || options.command_value2.is_none())
+        {
+            return Err(ZenpiError::arguments(format!(
+                "session {action} requires SOURCE and DESTINATION"
+            )));
+        }
+        if matches!(options.command, Some(CliCommand::SessionGc))
+            && (!options.yes
+                || options.retain_newest.is_none()
+                || options.older_than_seconds.is_none())
+        {
+            return Err(ZenpiError::arguments(
+                "session gc requires --retain-newest N --older-than-seconds N --yes",
             ));
         }
         return Ok(options);
@@ -1333,6 +1899,11 @@ fn print_help() {
     println!("zenpi config doctor [--profile NAME] [--json]");
     println!("zenpi config list [--json] | config use NAME");
     println!("zenpi pair import-codex|status|revoke --yes [--profile NAME]");
+    println!("zenpi session list [--json] | inspect PATH [--json]");
+    println!("zenpi session fork|export|import SOURCE DESTINATION");
+    println!("zenpi session gc --retain-newest N --older-than-seconds N --yes");
+    println!("zenpi extension list [--json] | install|upgrade PATH");
+    println!("zenpi extension disable|enable|remove NAME");
     println!(
         "default provider: ~/.zenpi (or read-only ~/.codex fallback); echo exists only in dev-fixtures builds"
     );
@@ -1419,16 +1990,163 @@ pub fn run() -> Result<(), ZenpiError> {
                 println!("revoked={changed}");
                 Ok(())
             }
+            CliCommand::SessionList => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let sessions = crate::session::list_sessions(&paths.sessions)?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&sessions)
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else if sessions.is_empty() {
+                    println!("no sessions");
+                } else {
+                    for session in sessions {
+                        print_session_summary(&session);
+                    }
+                }
+                Ok(())
+            }
+            CliCommand::SessionInspect => {
+                let path = options
+                    .command_value
+                    .as_deref()
+                    .ok_or_else(|| ZenpiError::arguments("session inspect requires PATH"))?;
+                let session = crate::session::inspect_session(path)?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&session)
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else {
+                    print_session_summary(&session.summary);
+                    for turn in &session.turns {
+                        println!("{:?}\t{}\t{}", turn.role, turn.id, turn.content);
+                    }
+                }
+                Ok(())
+            }
+            CliCommand::SessionFork => {
+                let (source, destination) = command_source_destination(&options)?;
+                let source = SessionStore::open(source)?;
+                let fork = source.fork_to(destination)?;
+                print_session_summary(&fork.summary());
+                Ok(())
+            }
+            CliCommand::SessionExport => {
+                let (source, destination) = command_source_destination(&options)?;
+                SessionStore::open(source)?.export_to(destination)?;
+                println!("exported={destination}");
+                Ok(())
+            }
+            CliCommand::SessionImport => {
+                let (source, destination) = command_source_destination(&options)?;
+                let imported = crate::session::import_session(source, destination)?;
+                print_session_summary(&imported.summary());
+                Ok(())
+            }
+            CliCommand::SessionGc => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let removed = crate::session::garbage_collect_sessions(
+                    &paths.sessions,
+                    crate::session::GarbageCollectionPolicy {
+                        retain_newest: options.retain_newest.unwrap_or_default(),
+                        older_than_ms: options
+                            .older_than_seconds
+                            .unwrap_or_default()
+                            .saturating_mul(1_000),
+                    },
+                    crate::session::unix_time_ms(),
+                )?;
+                for path in &removed {
+                    println!("removed={}", path.display());
+                }
+                println!("removed_count={}", removed.len());
+                Ok(())
+            }
+            CliCommand::ExtensionList => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let catalog = crate::extensions::ExtensionCatalog::load(&paths.extensions)
+                    .map_err(|error| ZenpiError::Message(error.to_string()))?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(catalog.summaries())
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else if catalog.summaries().is_empty() {
+                    println!("no extensions");
+                } else {
+                    for extension in catalog.summaries() {
+                        println!(
+                            "{} {} disabled={} compatible={} tools={}",
+                            extension.name,
+                            extension.version,
+                            extension.disabled,
+                            extension.compatible,
+                            extension.tools.join(","),
+                        );
+                    }
+                }
+                Ok(())
+            }
+            CliCommand::ExtensionInstall | CliCommand::ExtensionUpgrade => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let source =
+                    PathBuf::from(options.command_value.as_deref().ok_or_else(|| {
+                        ZenpiError::arguments("extension source path is required")
+                    })?);
+                let summary = if command == CliCommand::ExtensionInstall {
+                    crate::extensions::install(&paths.extensions, &source)
+                } else {
+                    crate::extensions::upgrade(&paths.extensions, &source)
+                }
+                .map_err(|error| ZenpiError::Message(error.to_string()))?;
+                println!("extension={} version={}", summary.name, summary.version);
+                Ok(())
+            }
+            CliCommand::ExtensionRemove => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let name = options
+                    .command_value
+                    .as_deref()
+                    .ok_or_else(|| ZenpiError::arguments("extension name is required"))?;
+                let changed = crate::extensions::remove(&paths.extensions, name)
+                    .map_err(|error| ZenpiError::Message(error.to_string()))?;
+                println!("removed={changed}");
+                Ok(())
+            }
+            CliCommand::ExtensionDisable | CliCommand::ExtensionEnable => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let name = options
+                    .command_value
+                    .as_deref()
+                    .ok_or_else(|| ZenpiError::arguments("extension name is required"))?;
+                let disabled = command == CliCommand::ExtensionDisable;
+                let changed = crate::extensions::set_disabled(&paths.extensions, name, disabled)
+                    .map_err(|error| ZenpiError::Message(error.to_string()))?;
+                println!("disabled={disabled} changed={changed}");
+                Ok(())
+            }
         };
     }
     let backend = make_backend(&options)?;
     let session = SessionStore::open(&options.session)?;
     let mut agent = Agent::new(session, backend);
+    let _ = agent.acknowledge_recovery()?;
     // Advertise the complete bounded tool set. Side effects still cannot run
     // until the local approval policy grants the individual call.
     let workspace = env::current_dir()?;
-    let tools = crate::tools::ToolRegistry::with_all_builtins()
+    let mut tools = crate::tools::ToolRegistry::with_all_builtins()
         .map_err(|error| ZenpiError::Message(format!("tool registry: {error}")))?;
+    let paths = crate::config::ConfigPaths::discover()?;
+    let extensions = crate::extensions::ExtensionCatalog::load(&paths.extensions)
+        .map_err(|error| ZenpiError::Message(format!("extension loading: {error}")))?;
+    extensions
+        .register_tools(&mut tools)
+        .map_err(|error| ZenpiError::Message(format!("extension tools: {error}")))?;
     let tool_context = crate::tools::ToolContext::new(workspace)
         .map_err(|error| ZenpiError::Message(format!("tool workspace: {error}")))?;
     agent.set_tools(
@@ -1444,7 +2162,6 @@ pub fn run() -> Result<(), ZenpiError> {
         mode: approval_mode,
         ..crate::approval::ApprovalPolicy::default()
     });
-    let paths = crate::config::ConfigPaths::discover()?;
     let project_skills = env::current_dir()?.join(".zenpi").join("skills");
     let skills = crate::skills::SkillSet::load(&paths.skills, &project_skills)
         .map_err(|error| ZenpiError::Message(format!("skill loading: {error}")))?;
@@ -1461,6 +2178,31 @@ pub fn run() -> Result<(), ZenpiError> {
 
 fn display_option(value: Option<&str>) -> &str {
     value.unwrap_or("<not configured>")
+}
+
+fn command_source_destination(options: &CliOptions) -> Result<(&str, &str), ZenpiError> {
+    let source = options
+        .command_value
+        .as_deref()
+        .ok_or_else(|| ZenpiError::arguments("session command requires SOURCE"))?;
+    let destination = options
+        .command_value2
+        .as_deref()
+        .ok_or_else(|| ZenpiError::arguments("session command requires DESTINATION"))?;
+    Ok((source, destination))
+}
+
+fn print_session_summary(summary: &crate::session::SessionSummary) {
+    println!(
+        "session={} path={} turns={} events={} handoffs={} warnings={} next_seq={}",
+        summary.session_id,
+        summary.path,
+        summary.turn_count,
+        summary.event_count,
+        summary.handoff_count,
+        summary.recovery_warnings,
+        summary.next_seq,
+    );
 }
 
 fn print_config_status(report: &crate::config::ConfigStatus) {

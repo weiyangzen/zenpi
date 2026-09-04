@@ -166,6 +166,7 @@ struct Active<O, E> {
     id: JobId,
     token: CancellationToken,
     done: Receiver<JobExecution<O, E>>,
+    join: JoinHandle<()>,
 }
 
 enum JobExecution<O, E> {
@@ -283,6 +284,18 @@ where
             .expect("runtime worker already joined")
             .join()
     }
+
+    /// Orderly close for owners that cannot conveniently drain the event
+    /// stream themselves. The worker owns and joins every job thread before
+    /// this returns.
+    pub fn shutdown_and_join(mut self) -> thread::Result<()> {
+        let _ = self.command_tx.send(Command::Shutdown);
+        while !matches!(self.event_rx.recv(), Ok(RuntimeEvent::Closed) | Err(_)) {}
+        self.join
+            .take()
+            .expect("runtime worker already joined")
+            .join()
+    }
 }
 
 impl<I, O, E, F> Drop for BackgroundRunner<I, O, E, F>
@@ -293,11 +306,10 @@ where
     F: Fn(I, CancellationToken) -> Result<O, E> + Send + Sync + 'static,
 {
     fn drop(&mut self) {
-        // Do not join from Drop: if a host stopped consuming a full event
-        // channel, joining here could deadlock the dropping thread.  Best-
-        // effort shutdown lets cooperative jobs finish when the command
-        // channel has room; dropping the JoinHandle itself is safe because
-        // the worker owns no process-global resources.
+        // Drop cannot block because the caller may hold resources required by
+        // its job closure. Production owners use `shutdown_and_join`; this
+        // fallback still requests cancellation rather than silently leaking
+        // more work.
         let _ = self.command_tx.try_send(Command::Shutdown);
         let _ = self.join.take();
     }
@@ -321,6 +333,7 @@ fn worker_loop<I, O, E, F>(
     loop {
         if let Some(done) = active.as_ref().and_then(|item| item.done.try_recv().ok()) {
             let item = active.take().expect("active job disappeared");
+            let _ = item.join.join();
             let outcome = if item.token.is_cancelled() {
                 JobOutcome::Cancelled
             } else {
@@ -483,7 +496,7 @@ where
     let child_token = token.clone();
     let (done_tx, done_rx) = mpsc::sync_channel(1);
     let job = Arc::clone(job);
-    if thread::Builder::new()
+    let join = match thread::Builder::new()
         .name(format!("zenpi-job-{}", id.get()))
         .spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -494,21 +507,23 @@ where
                 Err(_) => JobExecution::Panicked,
             };
             let _ = done_tx.send(execution);
-        })
-        .is_err()
-    {
-        return emit(
-            event_tx,
-            RuntimeEvent::Rejected {
-                id,
-                reason: SubmitError::Closed,
-            },
-        );
-    }
+        }) {
+        Ok(join) => join,
+        Err(_) => {
+            return emit(
+                event_tx,
+                RuntimeEvent::Rejected {
+                    id,
+                    reason: SubmitError::Closed,
+                },
+            );
+        }
+    };
     *active = Some(Active {
         id,
         token,
         done: done_rx,
+        join,
     });
     emit(event_tx, RuntimeEvent::Started { id })
 }

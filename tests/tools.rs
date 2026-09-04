@@ -1,4 +1,8 @@
+#[path = "../src/security.rs"]
+#[allow(dead_code)]
+mod security;
 #[path = "../src/tools.rs"]
+#[allow(dead_code)]
 mod tools;
 
 use std::{

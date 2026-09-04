@@ -2,9 +2,9 @@
 
 This is a reproducible renderer gate, not a claim about provider latency. The
 release uses Ratatui's single `TestBackend`/terminal buffer and a 16 ms dirty
-scheduler. The provider callback is synchronous, so a remote request can block
-input; this is documented as an explicit MVP boundary rather than hidden by a
-second runtime.
+scheduler. Production provider work runs on the owned background runtime, so
+input, resize, approval, cancellation, and streaming rendering remain live
+while a remote request is active.
 
 ## Checks
 
@@ -30,6 +30,6 @@ passes all three tests. `TuiState::render` invalidates its cached transcript on 
 dimension change, clamps zero/one-cell areas, and lets Ratatui perform the
 buffer diff. `TerminalGuard` owns raw mode, alternate screen, cursor, and
 bracketed-paste cleanup; its `Drop` path is used on errors and normal exits.
-A PTY smoke run of the installed release binary (`zenpi --mode tui --backend
-echo`) accepted a prompt and Ctrl-C, returned exit status 0, and emitted the
-alternate-screen/raw-mode restoration sequences.
+PTY smoke runs of the installed release binary cover resize, a streamed
+Responses delta, cancellation while streaming, a deterministic local prompt,
+exit status 0, and alternate-screen/raw-mode restoration sequences.

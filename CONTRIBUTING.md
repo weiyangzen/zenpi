@@ -13,7 +13,7 @@ blueprint before implementation.
 ```bash
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets
+cargo test --all-targets --all-features --locked
 python3 tools/validate_blueprint.py
 python3 tools/generate_gantt.py
 python3 tools/check_rust_loc.py
@@ -21,6 +21,8 @@ python3 tools/check_modes.py
 tools/headless_smoke.sh
 tools/headless_smoke.sh --release
 python3 tools/user_smoke.py
+tools/release.sh
+(cd dist && shasum -a 256 -c *.sha256)
 ```
 
 The repository checks are intentionally dependency-free. `validate_blueprint.py`
@@ -34,8 +36,10 @@ and valid LF-JSONL frames, and confirms durable session and handoff records. It
 accepts `--bin PATH` when a prebuilt binary is available; use `--allow-skip`
 only in environments without a Rust toolchain.
 `user_smoke.py` builds and installs the release into an isolated root, then
-exercises help, echo, resume, the OpenAI-compatible adapter, invalid input, and
-the PTY TUI through the installed binary.
+exercises help, echo, resume, the OpenAI-compatible adapter, invalid input,
+resize, streaming interruption, terminal restoration, and the PTY TUI through
+the installed binary. `tools/release.sh` emits a locked production archive,
+CycloneDX inventory, and SHA-256 receipt without compiling `dev-fixtures`.
 
 Keep every checklist item's estimated implementation/test code attributable to
 that item below 5,000 LOC. The aggregate source inventory is informational.

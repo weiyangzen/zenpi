@@ -56,6 +56,8 @@ creating a session and tells you to run `zenpi config import-codex` or set
 `~/.zenpi/auth.json`. `config doctor` reports the effective endpoint host, API
 family, model, and credential presence without printing the key. A read-only
 fallback can use `~/.codex` on the first run; the explicit import persists it.
+Provider quota/rate/usage-limit failures are returned as errors; zenpi never
+turns them into a mock answer.
 
 The Responses API is the primary wire protocol (`/responses` and
 `/v1/responses`) and is consumed as SSE, including text deltas, completion
@@ -64,13 +66,36 @@ explicit compatibility adapter. `--backend echo` exists only in builds made
 with `--features dev-fixtures`; normal release binaries cannot use the mock.
 
 This checkout is under complete-framework delivery. Real provider requests,
-Codex pairing, Responses streaming, bounded tool continuation, cancellation,
-write/shell tools, and host approval are implemented. Context compaction,
-true live steer/reconnect, skills/extensions, and packaged cross-platform
-releases remain open. The authoritative status is the `CF-*` section in
+Codex pairing, Responses streaming, bounded multimodal attachments, tool
+continuation, cancellation/live steer, write/shell tools, approval, context
+compaction, session management, installable skills/extensions, recovery, and
+cross-platform release packaging are implemented. The authoritative status is
+the `CF-*` section in
 [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md); the
 gap document is archived planning input, not a second checklist. Installation
 currently requires Rust 1.88 or newer and a local clone.
+
+Session and extension lifecycle commands are available outside either runtime
+mode:
+
+```bash
+zenpi session list --json
+zenpi session inspect ~/.zenpi/sessions/example.jsonl --json
+zenpi session fork SOURCE DESTINATION
+zenpi session gc --retain-newest 20 --older-than-seconds 2592000 --yes
+
+zenpi extension install ./my-extension
+zenpi extension list --json
+zenpi extension disable my-extension
+zenpi extension upgrade ./my-extension-v2
+```
+
+Headless prompts can attach bounded workspace images/files without putting
+binary bytes in the journal:
+
+```json
+{"schema_version":2,"type":"prompt","id":"p-2","text":"Review these","attachments":[{"kind":"image","mime_type":"image/png","path":"screenshots/ui.png"},{"kind":"file","mime_type":"text/plain","path":"logs/result.txt"}]}
+```
 
 ### Headless protocol
 
@@ -80,8 +105,9 @@ stdout remains machine-readable.
 
 Supported commands are `prompt`, `steer`, `cancel`, `approve`, `status`,
 `handoff`, `resume`, and `shutdown`. Accepted prompts emit typed v2 progress
-events and one v1-compatible terminal response. Live steer/reconnect remains
-open and is not represented as completed behavior.
+events and one v1-compatible terminal response. A v2 `resume` can request
+`from_sequence`; duplicate in-process request IDs receive the cached terminal
+result rather than repeating provider or tool work.
 
 Example:
 
@@ -134,11 +160,15 @@ provider 工作在后台执行，TUI/headless 在流式响应期间仍可处理�
 `ZENPI_MODEL` 覆盖配置。`echo` 只存在于启用 `dev-fixtures` feature 的测试
 构建；正常 release 无法启用它。缺少 provider 时 zenpi 会在创建 session
 前失败，不会伪造回复。
+provider 的额度、限流或 usage-limit 错误会原样作为失败返回，不会退回 mock。
 
 当前已支持真实 provider、Codex 配对、Responses SSE（含 NUL padding）、
-流式输出、工具 continuation、取消、读写/shell 工具与审批；真正的 live steer、
-重连、上下文压缩、完整 session 管理、skills/extensions 和跨平台发布包仍未
-完成。权威状态在 `Docs/Zenpi_Execution_Blueprint.md` 的 `CF-*` 部分。
+流式输出、多模态附件、工具 continuation、取消/live steer、读写/shell 工具、
+审批、上下文压缩、session 管理、skills/extensions、崩溃恢复与跨平台发布包。
+权威状态在 `Docs/Zenpi_Execution_Blueprint.md` 的 `CF-*` 部分。
+会话可用 `zenpi session list|inspect|fork|export|import|gc` 管理；扩展可用
+`zenpi extension install|list|disable|enable|upgrade|remove` 管理。headless v2
+的 `prompt.attachments` 可引用工作区内的图片或文件，二进制内容不会写入日志。
 每个 Blueprint item 都为其实现/测试代码声明小于 5000 的 `Estimated LOC` 预估值；仓库 Rust 总行数只作
 信息性盘点，不是项目级上限。
 
@@ -163,11 +193,16 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 `ZENPI_BASE_URL`、`ZENPI_API_KEY`、`ZENPI_MODEL` も使用できます。テスト用の
 `echo` は `dev-fixtures` feature のテスト build だけで有効です。通常の release
 では使用できず、provider がない場合は session 作成前に失敗します。
+provider の quota/rate/usage-limit エラーも mock 応答に置き換えません。
 
-Responses SSE、Codex pairing、streaming、tool continuation、cancellation、
-write/shell tools と approval は実装済みです。true live steer/reconnect、
-context compaction、完全な session 管理、skills/extensions、cross-platform
-release artifacts は Blueprint の `CF-*` 項目として未完了です。
+Responses SSE、Codex pairing、streaming、multimodal attachments、tool
+continuation、cancellation/live steer、write/shell tools、approval、context
+compaction、session management、skills/extensions、recovery、cross-platform
+release packaging は実装済みです。
+Session は `zenpi session list|inspect|fork|export|import|gc`、extension は
+`zenpi extension install|list|disable|enable|upgrade|remove` で管理できます。
+headless v2 の `prompt.attachments` は workspace 内の画像・ファイルを参照し、
+binary data を journal に保存しません。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（5000 未満）を記載します。リポジトリ全体の
 Rust 行数は情報表示のみで、プロジェクト全体の上限ではありません。
 

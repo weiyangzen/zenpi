@@ -3,7 +3,8 @@
 > **Archived planning input.** The `CF-*` scope in this document was promoted
 > on 2026-09-04 into the sole authoritative checklist,
 > `Docs/Zenpi_Execution_Blueprint.md`. Status marks here are intentionally
-> absent; use the Blueprint and its generated Gantt for current state.
+> absent; use the Blueprint and its generated Gantt for current state. The
+> observations below describe the pre-migration baseline, not current zenpi.
 
 ## Why this gap exists
 
@@ -273,6 +274,5 @@ This proposal must not be “completed” by checking boxes in the existing
 - a release receipt containing artifact checksums, source revision, and a
   secret scan result.
 
-Until those conditions are met, zenpi should be described as an incomplete
-MVP and must not claim that the AI framework or complete feature list is
-implemented.
+Those promotion conditions are tracked and accepted only in the authoritative
+Blueprint. This archived proposal makes no claim about current completion.

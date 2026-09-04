@@ -22,11 +22,102 @@ use crate::tools::{ToolCall, ToolDefinition};
 /// Keep provider responses bounded even when an endpoint omits a content
 /// length.  The core applies the smaller per-turn text limit afterwards.
 pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_ATTACHMENTS_PER_TURN: usize = 8;
+pub const MAX_ATTACHMENT_BYTES: usize = 10 * 1024 * 1024;
+pub const MAX_TOTAL_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttachmentKind {
+    Image,
+    File,
+}
+
+/// A user-visible attachment reference. Exactly one source is accepted. A
+/// workspace source is persisted as a relative path and materialized only for
+/// the current bounded provider request; bytes never enter the journal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InputAttachment {
+    pub kind: AttachmentKind,
+    pub mime_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
+}
+
+impl InputAttachment {
+    pub fn validate(&self) -> Result<(), BackendError> {
+        if self.mime_type.trim().is_empty()
+            || self.mime_type.len() > 255
+            || !self.mime_type.contains('/')
+            || self.mime_type.chars().any(char::is_control)
+        {
+            return Err(BackendError::Configuration(
+                "attachment MIME type is invalid".into(),
+            ));
+        }
+        if self.kind == AttachmentKind::Image && !self.mime_type.starts_with("image/") {
+            return Err(BackendError::Configuration(
+                "image attachment requires an image/* MIME type".into(),
+            ));
+        }
+        let source_count = usize::from(self.path.is_some())
+            + usize::from(self.url.is_some())
+            + usize::from(self.file_id.is_some());
+        if source_count != 1 {
+            return Err(BackendError::Configuration(
+                "attachment requires exactly one of path, url, or file_id".into(),
+            ));
+        }
+        if let Some(path) = &self.path
+            && (path.trim().is_empty() || path.len() > 4096 || path.contains('\0'))
+        {
+            return Err(BackendError::Configuration(
+                "attachment path is invalid".into(),
+            ));
+        }
+        if let Some(url) = &self.url
+            && (self.kind != AttachmentKind::Image
+                || url.len() > 2048
+                || !url.starts_with("https://")
+                || url.chars().any(char::is_whitespace))
+        {
+            return Err(BackendError::Configuration(
+                "remote attachments must be HTTPS image URLs".into(),
+            ));
+        }
+        if let Some(file_id) = &self.file_id
+            && (file_id.trim().is_empty()
+                || file_id.len() > 512
+                || file_id.chars().any(char::is_control))
+        {
+            return Err(BackendError::Configuration(
+                "provider file ID is invalid".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RequestAttachment {
+    pub turn_id: String,
+    pub input: InputAttachment,
+    pub filename: Option<String>,
+    pub data: Option<Vec<u8>>,
+    pub size_bytes: Option<u64>,
+    pub sha256: Option<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProviderCapabilities {
     pub text: bool,
     pub images: bool,
+    pub files: bool,
     pub tools: bool,
     pub structured_output: bool,
     pub streaming: bool,
@@ -39,6 +130,7 @@ impl ProviderCapabilities {
             OpenAiWireApi::Responses => Self {
                 text: true,
                 images: true,
+                files: true,
                 tools: true,
                 structured_output: true,
                 streaming: true,
@@ -47,6 +139,7 @@ impl ProviderCapabilities {
             OpenAiWireApi::ChatCompletions => Self {
                 text: true,
                 images: true,
+                files: false,
                 tools: true,
                 structured_output: true,
                 streaming: false,
@@ -73,6 +166,7 @@ pub struct CompletionRequest<'a> {
     pub tools: &'a [ToolDefinition],
     pub instructions: Option<&'a str>,
     pub metadata: Option<&'a Value>,
+    pub attachments: &'a [RequestAttachment],
 }
 
 impl<'a> CompletionRequest<'a> {
@@ -89,6 +183,7 @@ impl<'a> CompletionRequest<'a> {
             tools,
             instructions: None,
             metadata: None,
+            attachments: &[],
         }
     }
 
@@ -99,6 +194,11 @@ impl<'a> CompletionRequest<'a> {
 
     pub fn with_metadata(mut self, metadata: Option<&'a Value>) -> Self {
         self.metadata = metadata;
+        self
+    }
+
+    pub fn with_attachments(mut self, attachments: &'a [RequestAttachment]) -> Self {
+        self.attachments = attachments;
         self
     }
 }
@@ -202,7 +302,14 @@ pub enum BackendError {
     #[error("backend transport: {0}")]
     Transport(String),
     #[error("backend HTTP status: {status}")]
-    HttpStatus { status: u16 },
+    HttpStatus {
+        status: u16,
+        /// Provider-directed retry delay. The value is bounded while parsing
+        /// so an endpoint cannot stall the runtime indefinitely.
+        retry_after_ms: Option<u64>,
+    },
+    #[error("backend circuit is open for another {retry_after_ms} ms")]
+    CircuitOpen { retry_after_ms: u64 },
     #[error("backend returned an invalid response: {0}")]
     InvalidResponse(String),
     #[error("backend returned an empty completion")]
@@ -219,7 +326,7 @@ impl BackendError {
     pub const fn is_retryable(&self) -> bool {
         match self {
             Self::Transport(_) => true,
-            Self::HttpStatus { status } => {
+            Self::HttpStatus { status, .. } => {
                 *status == 408
                     || *status == 409
                     || *status == 425
@@ -227,6 +334,7 @@ impl BackendError {
                     || (*status >= 500 && *status <= 599)
             }
             Self::Configuration(_)
+            | Self::CircuitOpen { .. }
             | Self::InvalidResponse(_)
             | Self::EmptyResponse
             | Self::Cancelled
@@ -239,6 +347,7 @@ impl BackendError {
             Self::Configuration(_) => "backend_configuration",
             Self::Transport(_) => "backend_transport",
             Self::HttpStatus { .. } => "backend_http_status",
+            Self::CircuitOpen { .. } => "backend_circuit_open",
             Self::InvalidResponse(_) => "backend_invalid_response",
             Self::EmptyResponse => "backend_empty_response",
             Self::Cancelled => "backend_cancelled",
@@ -364,6 +473,8 @@ pub struct OpenAiCompatibleBackend {
     reasoning_effort: Option<String>,
     verbosity: Option<String>,
     max_retries: u32,
+    circuit_failure_threshold: u32,
+    circuit_cooldown: Duration,
     circuit: Mutex<CircuitState>,
 }
 
@@ -378,6 +489,8 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("reasoning_effort", &self.reasoning_effort)
             .field("verbosity", &self.verbosity)
             .field("max_retries", &self.max_retries)
+            .field("circuit_failure_threshold", &self.circuit_failure_threshold)
+            .field("circuit_cooldown", &self.circuit_cooldown)
             .field("capabilities", &self.capabilities())
             .finish()
     }
@@ -468,6 +581,10 @@ impl OpenAiCompatibleBackend {
             // providers that pause between SSE heartbeats; cancellation is
             // still checked after every received frame.
             .timeout_recv_body(Some(timeout))
+            // Status responses must remain inspectable so Retry-After can be
+            // honored. They are converted to the typed error below before a
+            // response body reaches any parser.
+            .http_status_as_error(false)
             .build();
         Ok(Self {
             client: ureq::Agent::new_with_config(config),
@@ -478,6 +595,8 @@ impl OpenAiCompatibleBackend {
             reasoning_effort,
             verbosity,
             max_retries: 0,
+            circuit_failure_threshold: 3,
+            circuit_cooldown: Duration::from_secs(2),
             circuit: Mutex::new(CircuitState::default()),
         })
     }
@@ -584,6 +703,29 @@ impl OpenAiCompatibleBackend {
         self.max_retries = max_retries;
         Ok(self)
     }
+
+    /// Configure the per-backend circuit breaker. This is public primarily so
+    /// deterministic hosts and tests can choose a cooldown compatible with
+    /// their wall-clock budget; production defaults remain conservative.
+    pub fn with_circuit_breaker(
+        mut self,
+        failure_threshold: u32,
+        cooldown: Duration,
+    ) -> Result<Self, BackendError> {
+        if failure_threshold == 0 || failure_threshold > 100 {
+            return Err(BackendError::Configuration(
+                "circuit failure threshold must be between 1 and 100".into(),
+            ));
+        }
+        if cooldown.is_zero() || cooldown > Duration::from_secs(300) {
+            return Err(BackendError::Configuration(
+                "circuit cooldown must be between 1 millisecond and 5 minutes".into(),
+            ));
+        }
+        self.circuit_failure_threshold = failure_threshold;
+        self.circuit_cooldown = cooldown;
+        Ok(self)
+    }
 }
 
 fn normalize_endpoint(
@@ -666,7 +808,19 @@ impl OpenAiCompatibleBackend {
         }
         let body = match self.wire_api {
             OpenAiWireApi::ChatCompletions => {
+                if request
+                    .attachments
+                    .iter()
+                    .any(|attachment| attachment.input.kind == AttachmentKind::File)
+                {
+                    return Err(BackendError::Configuration(
+                        "Chat Completions adapter does not support file attachments".into(),
+                    ));
+                }
                 let mut messages: Vec<Value> = request.turns.iter().map(chat_message).collect();
+                let attachments = attachments_for_context(request.turns, request.attachments);
+                apply_chat_attachments(&mut messages, &attachments)?;
+                strip_internal_turn_ids(&mut messages);
                 let mut body = json!({
                     "model": model,
                     "messages": messages,
@@ -701,11 +855,14 @@ impl OpenAiCompatibleBackend {
                 body
             }
             OpenAiWireApi::Responses => {
-                let input: Vec<Value> = request
+                let mut input: Vec<Value> = request
                     .turns
                     .iter()
                     .flat_map(responses_input_items)
                     .collect();
+                let attachments = attachments_for_context(request.turns, request.attachments);
+                apply_responses_attachments(&mut input, &attachments)?;
+                strip_internal_turn_ids(&mut input);
                 let mut body = json!({
                     "model": model,
                     "input": input,
@@ -753,6 +910,17 @@ impl OpenAiCompatibleBackend {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
         }
         let mut response = request_builder.send_json(&body).map_err(map_ureq_error)?;
+        let status = response.status().as_u16();
+        if status >= 400 {
+            return Err(BackendError::HttpStatus {
+                status,
+                retry_after_ms: response
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|value| value.to_str().ok())
+                    .and_then(parse_retry_after),
+            });
+        }
         if cancelled() {
             return Err(BackendError::Cancelled);
         }
@@ -811,13 +979,13 @@ impl Backend for OpenAiCompatibleBackend {
                 .circuit
                 .lock()
                 .map_err(|_| BackendError::Transport("provider circuit lock poisoned".into()))?;
-            if circuit
-                .open_until
-                .is_some_and(|until| until > Instant::now())
+            if let Some(until) = circuit.open_until
+                && until > Instant::now()
             {
-                return Err(BackendError::Transport(
-                    "provider circuit is temporarily open".into(),
-                ));
+                let remaining = until.saturating_duration_since(Instant::now());
+                return Err(BackendError::CircuitOpen {
+                    retry_after_ms: duration_ms_ceil(remaining),
+                });
             }
             circuit.open_until = None;
         }
@@ -831,6 +999,7 @@ impl Backend for OpenAiCompatibleBackend {
                     tools: request.tools,
                     instructions: request.instructions,
                     metadata: request.metadata,
+                    attachments: request.attachments,
                 },
                 cancelled,
                 sink,
@@ -850,8 +1019,8 @@ impl Backend for OpenAiCompatibleBackend {
                     Err(error) if error.is_retryable() => {
                         circuit.consecutive_failures =
                             circuit.consecutive_failures.saturating_add(1);
-                        if circuit.consecutive_failures >= 3 {
-                            circuit.open_until = Some(Instant::now() + Duration::from_secs(2));
+                        if circuit.consecutive_failures >= self.circuit_failure_threshold {
+                            circuit.open_until = Some(Instant::now() + self.circuit_cooldown);
                         }
                     }
                     Err(_) => {}
@@ -864,7 +1033,17 @@ impl Backend for OpenAiCompatibleBackend {
             })?;
             // Capped exponential backoff. Polling the cancellation predicate
             // avoids making an interrupt wait for the whole sleep.
-            let delay = Duration::from_millis(100_u64.saturating_mul(1_u64 << attempt.min(5)));
+            let exponential = Duration::from_millis(
+                100_u64.saturating_mul(1_u64 << attempt.saturating_sub(1).min(5)),
+            );
+            let retry_after = match &result {
+                Err(BackendError::HttpStatus {
+                    retry_after_ms: Some(milliseconds),
+                    ..
+                }) => Duration::from_millis(*milliseconds),
+                _ => Duration::ZERO,
+            };
+            let delay = exponential.max(retry_after);
             let deadline = std::time::Instant::now() + delay;
             while std::time::Instant::now() < deadline {
                 if cancelled() {
@@ -893,6 +1072,25 @@ fn idempotency_key(turn_id: &str) -> String {
     format!("zenpi-{:x}", digest.finalize())
 }
 
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
+
+fn parse_retry_after(value: &str) -> Option<u64> {
+    let delay = if let Ok(seconds) = value.trim().parse::<u64>() {
+        Duration::from_secs(seconds)
+    } else {
+        let deadline = httpdate::parse_http_date(value.trim()).ok()?;
+        deadline.duration_since(std::time::SystemTime::now()).ok()?
+    }
+    .min(MAX_RETRY_AFTER);
+    Some(duration_ms_ceil(delay))
+}
+
+fn duration_ms_ceil(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis())
+        .unwrap_or(u64::MAX)
+        .max(u64::from(!duration.is_zero()))
+}
+
 fn chat_message(turn: &Turn) -> Value {
     let role = match turn.role {
         TurnRole::System => "system",
@@ -900,7 +1098,11 @@ fn chat_message(turn: &Turn) -> Value {
         TurnRole::Assistant => "assistant",
         TurnRole::Tool => "tool",
     };
-    let mut message = json!({"role": role, "content": turn.content});
+    let mut message = json!({
+        "role": role,
+        "content": turn.content,
+        "_zenpi_turn_id": turn.id,
+    });
     if turn.role == TurnRole::Tool {
         if let Some(call_id) = turn
             .metadata
@@ -934,6 +1136,160 @@ fn chat_message(turn: &Turn) -> Value {
         );
     }
     message
+}
+
+fn apply_chat_attachments(
+    messages: &mut [Value],
+    attachments: &[&RequestAttachment],
+) -> Result<(), BackendError> {
+    for attachment in attachments {
+        attachment.input.validate()?;
+        if attachment.input.kind != AttachmentKind::Image {
+            return Err(BackendError::Configuration(
+                "Chat Completions accepts image attachments only".into(),
+            ));
+        }
+        let message = messages
+            .iter_mut()
+            .rev()
+            .find(|message| {
+                message.get("role").and_then(Value::as_str) == Some("user")
+                    && attachment_turn_matches(message, &attachment.turn_id)
+                    && message.get("content").is_some()
+            })
+            .ok_or_else(|| {
+                BackendError::InvalidResponse("attachment has no corresponding user message".into())
+            })?;
+        let text = message
+            .get("content")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let content = message
+            .get_mut("content")
+            .ok_or_else(|| BackendError::InvalidResponse("message content missing".into()))?;
+        let parts = if let Value::Array(parts) = content {
+            parts
+        } else {
+            *content = Value::Array(vec![json!({"type":"text", "text": text})]);
+            content.as_array_mut().ok_or_else(|| {
+                BackendError::InvalidResponse("message content is not an array".into())
+            })?
+        };
+        parts.push(json!({
+            "type": "image_url",
+            "image_url": { "url": attachment_source(attachment)? },
+        }));
+    }
+    Ok(())
+}
+
+fn attachments_for_context<'a>(
+    turns: &[Turn],
+    attachments: &'a [RequestAttachment],
+) -> Vec<&'a RequestAttachment> {
+    attachments
+        .iter()
+        .filter(|attachment| turns.iter().any(|turn| turn.id == attachment.turn_id))
+        .collect()
+}
+
+fn apply_responses_attachments(
+    input: &mut [Value],
+    attachments: &[&RequestAttachment],
+) -> Result<(), BackendError> {
+    for attachment in attachments {
+        attachment.input.validate()?;
+        let message = input
+            .iter_mut()
+            .rev()
+            .find(|item| {
+                item.get("role").and_then(Value::as_str) == Some("user")
+                    && attachment_turn_matches(item, &attachment.turn_id)
+                    && item.get("content").is_some()
+            })
+            .ok_or_else(|| {
+                BackendError::InvalidResponse("attachment has no corresponding user message".into())
+            })?;
+        let text = message
+            .get("content")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let content = message
+            .get_mut("content")
+            .ok_or_else(|| BackendError::InvalidResponse("message content missing".into()))?;
+        let parts = if let Value::Array(parts) = content {
+            parts
+        } else {
+            *content = Value::Array(vec![json!({"type":"input_text", "text": text})]);
+            content.as_array_mut().ok_or_else(|| {
+                BackendError::InvalidResponse("message content is not an array".into())
+            })?
+        };
+        match attachment.input.kind {
+            AttachmentKind::Image => parts.push(json!({
+                "type": "input_image",
+                "image_url": attachment_source(attachment)?,
+            })),
+            AttachmentKind::File => {
+                let mut part = json!({ "type": "input_file" });
+                if let Some(file_id) = &attachment.input.file_id {
+                    part["file_id"] = json!(file_id);
+                } else if let Some(data) = &attachment.data {
+                    part["file_data"] = json!(data_url(&attachment.input.mime_type, data));
+                    if let Some(filename) = &attachment.filename {
+                        part["filename"] = json!(filename);
+                    }
+                } else {
+                    return Err(BackendError::Configuration(
+                        "file attachment requires workspace bytes or provider file_id".into(),
+                    ));
+                }
+                parts.push(part);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn attachment_source(attachment: &RequestAttachment) -> Result<String, BackendError> {
+    if let Some(url) = &attachment.input.url {
+        return Ok(url.clone());
+    }
+    if let Some(data) = &attachment.data {
+        return Ok(data_url(&attachment.input.mime_type, data));
+    }
+    if let Some(file_id) = &attachment.input.file_id {
+        return Ok(file_id.clone());
+    }
+    Err(BackendError::Configuration(
+        "attachment source was not materialized".into(),
+    ))
+}
+
+fn data_url(mime_type: &str, bytes: &[u8]) -> String {
+    use base64::Engine;
+
+    format!(
+        "data:{mime_type};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
+}
+
+fn attachment_turn_matches(message: &Value, turn_id: &str) -> bool {
+    message
+        .get("_zenpi_turn_id")
+        .and_then(Value::as_str)
+        .is_none_or(|candidate| candidate == turn_id)
+}
+
+fn strip_internal_turn_ids(items: &mut [Value]) {
+    for item in items {
+        if let Some(object) = item.as_object_mut() {
+            object.remove("_zenpi_turn_id");
+        }
+    }
 }
 
 fn responses_input_items(turn: &Turn) -> Vec<Value> {
@@ -975,12 +1331,19 @@ fn responses_input_items(turn: &Turn) -> Vec<Value> {
         TurnRole::Assistant => "assistant",
         TurnRole::Tool => unreachable!(),
     };
-    vec![json!({"role": role, "content": turn.content})]
+    vec![json!({
+        "role": role,
+        "content": turn.content,
+        "_zenpi_turn_id": turn.id,
+    })]
 }
 
 fn map_ureq_error(error: ureq::Error) -> BackendError {
     match error {
-        ureq::Error::StatusCode(status) => BackendError::HttpStatus { status },
+        ureq::Error::StatusCode(status) => BackendError::HttpStatus {
+            status,
+            retry_after_ms: None,
+        },
         other => BackendError::Transport(other.to_string()),
     }
 }

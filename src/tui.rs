@@ -865,9 +865,19 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                         continue;
                     }
                     state.push_message(MessageRole::User, &text);
-                    if active_job.is_some() {
-                        state.push_message(MessageRole::Error, "a request is already running");
-                        state.set_status("Busy");
+                    if let Some(id) = active_job {
+                        let _ = runner.try_cancel(id);
+                        match runner.try_submit(text) {
+                            Ok(id) => {
+                                active_job = Some(id);
+                                state.set_busy(true);
+                                state.set_status("Steering");
+                            }
+                            Err(error) => {
+                                state.push_message(MessageRole::Error, error.to_string());
+                                state.set_status("Steer rejected");
+                            }
+                        }
                     } else {
                         match runner.try_submit(text) {
                             Ok(id) => {
@@ -903,8 +913,7 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             }
         }
     }
-    let _ = runner.try_shutdown();
-    drop(runner);
+    let _ = runner.shutdown_and_join();
     guard.leave();
     Ok(())
 }

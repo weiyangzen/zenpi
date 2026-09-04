@@ -120,9 +120,27 @@ fn backend_failure_keeps_the_user_turn_and_returns_idle() {
 #[test]
 fn backend_retryability_is_typed() {
     assert!(BackendError::Transport("offline".into()).is_retryable());
-    assert!(BackendError::HttpStatus { status: 429 }.is_retryable());
-    assert!(BackendError::HttpStatus { status: 503 }.is_retryable());
-    assert!(!BackendError::HttpStatus { status: 400 }.is_retryable());
+    assert!(
+        BackendError::HttpStatus {
+            status: 429,
+            retry_after_ms: None,
+        }
+        .is_retryable()
+    );
+    assert!(
+        BackendError::HttpStatus {
+            status: 503,
+            retry_after_ms: None,
+        }
+        .is_retryable()
+    );
+    assert!(
+        !BackendError::HttpStatus {
+            status: 400,
+            retry_after_ms: None,
+        }
+        .is_retryable()
+    );
     assert!(!BackendError::Configuration("bad key".into()).is_retryable());
     assert!(!BackendError::EmptyResponse.is_retryable());
 }

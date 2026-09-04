@@ -15,6 +15,7 @@ use crate::b3::{
     MAX_ARTIFACT_PATH_BYTES, MAX_HANDOFF_ARTIFACTS as B3_MAX_HANDOFF_ARTIFACTS,
     validate_artifact_path,
 };
+use crate::backend::InputAttachment;
 
 /// Maximum accepted input frame.  A bounded frame keeps a composed agent from
 /// accidentally retaining an unbounded amount of memory on malformed input.
@@ -23,16 +24,16 @@ pub const MAX_LINE_BYTES: usize = 1024 * 1024;
 pub const MAX_TEXT_BYTES: usize = 256 * 1024;
 /// Maximum number of artifact names in one handoff.
 pub const MAX_HANDOFF_ARTIFACTS: usize = B3_MAX_HANDOFF_ARTIFACTS;
-/// Version of the headless request/response envelope.
-pub const PROTOCOL_VERSION: u16 = 1;
-/// Version for clients that consume asynchronous lifecycle events. Version 1
-/// remains accepted and receives the terminal-response projection.
-pub const ASYNC_PROTOCOL_VERSION: u16 = 2;
+/// Current headless request/event protocol.
+pub const PROTOCOL_VERSION: u16 = 2;
+/// Missing versions and explicit v1 requests retain the legacy projection.
+pub const LEGACY_PROTOCOL_VERSION: u16 = 1;
+pub const ASYNC_PROTOCOL_VERSION: u16 = PROTOCOL_VERSION;
 /// Maximum bytes in a correlation identifier.
 pub const MAX_ID_BYTES: usize = 128;
 
 const fn default_protocol_version() -> u16 {
-    PROTOCOL_VERSION
+    LEGACY_PROTOCOL_VERSION
 }
 
 /// How an incoming user message is admitted to the current turn.
@@ -86,6 +87,10 @@ pub struct StdioRequest {
     pub decision: Option<crate::approval::ApprovalDecision>,
     #[serde(default)]
     pub remember: bool,
+    #[serde(default)]
+    pub attachments: Vec<InputAttachment>,
+    #[serde(default)]
+    pub from_sequence: Option<u64>,
 }
 
 /// A validated command.  The command owns its payload so admission can move
@@ -96,6 +101,7 @@ pub enum Command {
         text: String,
         mode: TurnMode,
         expected_turn_id: Option<String>,
+        attachments: Vec<InputAttachment>,
     },
     Steer {
         text: String,
@@ -112,6 +118,7 @@ pub enum Command {
     },
     Resume {
         path: Option<String>,
+        from_sequence: Option<u64>,
     },
     Approve {
         approval_id: String,
@@ -124,7 +131,10 @@ pub enum Command {
 impl StdioRequest {
     /// Validate and convert the wire request into a bounded command.
     pub fn into_command(self) -> Result<Command, ProtocolError> {
-        if self.schema_version != PROTOCOL_VERSION {
+        if !matches!(
+            self.schema_version,
+            LEGACY_PROTOCOL_VERSION | PROTOCOL_VERSION
+        ) {
             return Err(ProtocolError::UnsupportedVersion {
                 found: self.schema_version,
                 expected: PROTOCOL_VERSION,
@@ -138,6 +148,7 @@ impl StdioRequest {
                 text: bounded_text(self.text.or(self.message), "prompt")?,
                 mode: self.mode.unwrap_or_default(),
                 expected_turn_id: self.expected_turn_id,
+                attachments: validate_attachments(self.attachments)?,
             }),
             "steer" => Ok(Command::Steer {
                 text: bounded_text(self.text.or(self.message), "steer")?,
@@ -183,7 +194,10 @@ impl StdioRequest {
                     artifacts: self.artifacts,
                 })
             }
-            "resume" => Ok(Command::Resume { path: self.path }),
+            "resume" => Ok(Command::Resume {
+                path: self.path,
+                from_sequence: self.from_sequence,
+            }),
             "approve" | "approval" => {
                 let approval_id = self.approval_id.ok_or(ProtocolError::MissingField {
                     field: "approval_id",
@@ -285,6 +299,24 @@ fn bounded_text(value: Option<String>, field: &'static str) -> Result<String, Pr
     Ok(value)
 }
 
+fn validate_attachments(
+    attachments: Vec<InputAttachment>,
+) -> Result<Vec<InputAttachment>, ProtocolError> {
+    if attachments.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
+        return Err(ProtocolError::TooManyAttachments {
+            max: crate::backend::MAX_ATTACHMENTS_PER_TURN,
+        });
+    }
+    for attachment in &attachments {
+        attachment
+            .validate()
+            .map_err(|_| ProtocolError::InvalidField {
+                field: "attachment",
+            })?;
+    }
+    Ok(attachments)
+}
+
 /// Protocol-level validation failures.  These are returned as JSON errors and
 /// do not mutate the session.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -301,6 +333,8 @@ pub enum ProtocolError {
     InvalidField { field: &'static str },
     #[error("too many handoff artifacts (maximum {max})")]
     TooManyArtifacts { max: usize },
+    #[error("too many attachments (maximum {max})")]
+    TooManyAttachments { max: usize },
     #[error("input frame exceeds {max} bytes")]
     LineTooLong { max: usize },
     #[error("invalid JSON: {0}")]
@@ -323,6 +357,7 @@ impl ProtocolError {
             Self::FieldTooLong { .. } => "field_too_long",
             Self::InvalidField { .. } => "invalid_field",
             Self::TooManyArtifacts { .. } => "too_many_artifacts",
+            Self::TooManyAttachments { .. } => "too_many_attachments",
             Self::LineTooLong { .. } => "line_too_long",
             Self::InvalidJson(_) => "invalid_json",
             Self::NotObject => "not_object",
@@ -414,7 +449,7 @@ impl StdioEvent {
 impl StdioResponse {
     pub fn success(id: Option<String>, command: impl Into<String>, data: Option<Value>) -> Self {
         Self {
-            schema_version: PROTOCOL_VERSION,
+            schema_version: LEGACY_PROTOCOL_VERSION,
             id,
             kind: "response",
             command: command.into(),
@@ -427,7 +462,7 @@ impl StdioResponse {
 
     pub fn error(id: Option<String>, command: impl Into<String>, error: impl Into<String>) -> Self {
         Self {
-            schema_version: PROTOCOL_VERSION,
+            schema_version: LEGACY_PROTOCOL_VERSION,
             id,
             kind: "response",
             command: command.into(),
@@ -448,6 +483,15 @@ impl StdioResponse {
         let mut response = Self::error(id, command, error);
         response.error_code = code.into();
         response
+    }
+
+    pub fn for_version(mut self, version: u16) -> Self {
+        self.schema_version = if version == PROTOCOL_VERSION {
+            PROTOCOL_VERSION
+        } else {
+            LEGACY_PROTOCOL_VERSION
+        };
+        self
     }
 }
 

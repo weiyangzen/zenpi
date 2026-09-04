@@ -7,17 +7,17 @@
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-04T00:57:53Z
+generated_at: 2026-09-04T02:16:26Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: e8c764ed68e75a4944e83af9da4389204c20547eddac44a33f749b9ae0624b38
+source_sha256: 09244063301119ce594548c741c4f2f0c540c3396c2964ddcd8014360ea16e9c
 spec_path: Docs/Zenpi_Execution_Spec.md
 spec_sha256: 772892a067481cd288089fda378f9f59bc632ee05a4b4d72ac37a09b71924f14
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:
-  unclaimed: 17
+  unclaimed: 0
   self_tested: 0
-  master_accepted: 50
+  master_accepted: 67
   pending_repair: 0
   pending_integration: 0
 ```
@@ -107,23 +107,23 @@ Blueprint and intentionally omitted from this relative-time projection.
 
 | CF-204 | master_accepted | CF-201 | Rust/Provider | none | none | dependency |
 
-| CF-205 | unclaimed | CF-202,CF-203 | Rust/Provider | none | none | dependency |
+| CF-205 | master_accepted | CF-202,CF-203 | Rust/Provider | none | none | dependency |
 
-| CF-206 | unclaimed | CF-202,CF-203 | Rust/Provider | none | none | dependency |
+| CF-206 | master_accepted | CF-202,CF-203 | Rust/Provider | none | none | dependency |
 
-| CF-301 | unclaimed | CF-201,CF-203 | Rust/Runtime | none | none | dependency |
+| CF-301 | master_accepted | CF-201,CF-203 | Rust/Runtime | none | none | dependency |
 
 | CF-302 | master_accepted | CF-301 | Rust/Runtime | none | none | dependency |
 
 | CF-303 | master_accepted | CF-301,CF-302 | Rust/Runtime | none | none | dependency |
 
-| CF-304 | unclaimed | CF-302,CF-303 | Rust/Core | none | none | dependency |
+| CF-304 | master_accepted | CF-302,CF-303 | Rust/Core | none | none | dependency |
 
-| CF-305 | unclaimed | CF-302,CF-303,CF-304 | Rust/TUI | none | none | dependency |
+| CF-305 | master_accepted | CF-302,CF-303,CF-304 | Rust/TUI | none | none | dependency |
 
-| CF-306 | unclaimed | CF-302,CF-303,CF-304 | Rust/Headless | none | none | dependency |
+| CF-306 | master_accepted | CF-302,CF-303,CF-304 | Rust/Headless | none | none | dependency |
 
-| CF-307 | unclaimed | CF-302,CF-306 | Rust/Headless | none | none | dependency |
+| CF-307 | master_accepted | CF-302,CF-306 | Rust/Headless | none | none | dependency |
 
 | CF-401 | master_accepted | CF-201,CF-302 | Rust/Tools | none | none | dependency |
 
@@ -137,7 +137,7 @@ Blueprint and intentionally omitted from this relative-time projection.
 
 | CF-406 | master_accepted | CF-402,CF-405 | Rust/Tools | none | none | dependency |
 
-| CF-407 | unclaimed | CF-401,CF-405 | Rust/Extensions | none | none | dependency |
+| CF-407 | master_accepted | CF-401,CF-405 | Rust/Extensions | none | none | dependency |
 
 | CF-501 | master_accepted | CF-201,CF-302 | Rust/Context | none | none | dependency |
 
@@ -145,25 +145,25 @@ Blueprint and intentionally omitted from this relative-time projection.
 
 | CF-503 | master_accepted | CF-101,CF-502 | Rust/Session | none | none | dependency |
 
-| CF-504 | unclaimed | CF-302,CF-402,CF-502 | Rust/Session | none | none | dependency |
+| CF-504 | master_accepted | CF-302,CF-402,CF-502 | Rust/Session | none | none | dependency |
 
 | CF-601 | master_accepted | CF-101,CF-401 | Rust/Skills | none | none | dependency |
 
-| CF-602 | unclaimed | CF-601,CF-502 | Rust/Skills | none | none | dependency |
+| CF-602 | master_accepted | CF-601,CF-502 | Rust/Skills | none | none | dependency |
 
-| CF-603 | unclaimed | CF-407,CF-601 | Rust/Extensions | none | none | dependency |
+| CF-603 | master_accepted | CF-407,CF-601 | Rust/Extensions | none | none | dependency |
 
-| CF-604 | unclaimed | CF-103,CF-603 | Rust/Extensions | none | none | dependency |
+| CF-604 | master_accepted | CF-103,CF-603 | Rust/Extensions | none | none | dependency |
 
-| CF-701 | unclaimed | CF-101,CF-103,CF-404 | Rust/Security | none | none | dependency |
+| CF-701 | master_accepted | CF-101,CF-103,CF-404 | Rust/Security | none | none | dependency |
 
-| CF-702 | unclaimed | CF-302,CF-701 | Rust/Observability | none | none | dependency |
+| CF-702 | master_accepted | CF-302,CF-701 | Rust/Observability | none | none | dependency |
 
-| CF-703 | unclaimed | CF-205,CF-402,CF-406 | Rust/Governance | none | none | dependency |
+| CF-703 | master_accepted | CF-205,CF-402,CF-406 | Rust/Governance | none | none | dependency |
 
-| CF-704 | unclaimed | CF-003,CF-701 | Release/CI | none | none | dependency |
+| CF-704 | master_accepted | CF-003,CF-701 | Release/CI | none | none | dependency |
 
-| CF-705 | unclaimed | CF-105,CF-305,CF-306,CF-402,CF-503,CF-704 | QA/Master | none | none | dependency |
+| CF-705 | master_accepted | CF-105,CF-305,CF-306,CF-402,CF-503,CF-704 | QA/Master | none | none | dependency |
 
 ## Unscheduled work
 

@@ -320,6 +320,10 @@ def assert_tui(binary: Path, root: Path) -> None:
                     break
         if b"Prompt" not in output:
             raise AssertionError(f"TUI did not reach prompt: {bytes(output)!r}")
+        # Exercise a real resize before typing; the render loop must remain
+        # live and restore the terminal after the changed geometry.
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 18, 72, 0, 0))
+        os.kill(pid, signal.SIGWINCH)
         os.write(fd, b"hello from installed tui")
         os.write(fd, b"\r")
         # Enter synchronously completes the deterministic echo turn. Wait for
@@ -369,6 +373,86 @@ def assert_tui(binary: Path, root: Path) -> None:
         raise AssertionError(f"TUI did not persist the submitted prompt: {journal!r}")
 
 
+def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
+    """Drive the production TUI against a deliberately slow Responses stream."""
+    class SlowHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            length = int(self.headers.get("content-length", "0"))
+            self.rfile.read(length)
+            first = (
+                'data: {"type":"response.output_text.delta","delta":"streaming"}\n\n'
+            ).encode()
+            tail = (
+                'data: {"type":"response.completed","response":{"id":"slow"}}\n\n'
+            ).encode()
+            self.send_response(200)
+            self.send_header("content-type", "text/event-stream")
+            self.send_header("connection", "close")
+            self.end_headers()
+            self.wfile.write(first)
+            self.wfile.flush()
+            time.sleep(0.5)
+            try:
+                self.wfile.write(tail)
+                self.wfile.flush()
+            except BrokenPipeError:
+                pass
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), SlowHandler)
+    server_thread = threading.Thread(target=server.handle_request, daemon=True)
+    server_thread.start()
+    session = root / "tui-stream-session.jsonl"
+    command = [str(binary), "--mode", "tui", "--session", str(session)]
+    env = {
+        **os.environ,
+        "ZENPI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1",
+        "ZENPI_WIRE_API": "responses",
+        "ZENPI_MODEL": "mock-model",
+        "ZENPI_HOME": str(root / "tui-stream-home"),
+    }
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execve(command[0], command, env)
+    exited = False
+    output = bytearray()
+    try:
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and b"Prompt" not in output:
+            ready, _, _ = select.select([fd], [], [], 0.1)
+            if ready:
+                output.extend(os.read(fd, 65536))
+        os.write(fd, b"slow request\r")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and b"streaming" not in strip_ansi(bytes(output)):
+            ready, _, _ = select.select([fd], [], [], 0.1)
+            if ready:
+                output.extend(os.read(fd, 65536))
+        if b"streaming" not in strip_ansi(bytes(output)):
+            raise AssertionError("TUI did not render a provider delta")
+        os.write(fd, b"\x03")
+        time.sleep(0.15)
+        os.write(fd, b"\x04")
+        exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
+        exited = True
+        output.extend(trailing)
+    finally:
+        if not exited:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                os.waitpid(pid, 0)
+            except (OSError, ChildProcessError):
+                pass
+        os.close(fd)
+        server_thread.join(timeout=3)
+        server.server_close()
+    if exit_code != 0 or b"\x1b[?1049l" not in output:
+        raise AssertionError(f"streaming TUI did not restore terminal: {output!r}")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="zenpi-user-smoke-") as directory:
         root = Path(directory)
@@ -411,7 +495,11 @@ def main() -> int:
         assert_invalid_inputs(binary, root)
         assert_openai_fixture(binary, root)
         assert_tui(binary, root)
-    print("user smoke passed: release, install, echo, resume, Responses fixture, and TUI")
+        assert_tui_interrupt_while_streaming(binary, root)
+    print(
+        "user smoke passed: release, install, echo fixture, resume, Responses fixture, "
+        "TUI resize, streaming interrupt, and terminal restoration"
+    )
     return 0
 
 

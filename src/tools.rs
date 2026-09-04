@@ -289,6 +289,32 @@ impl ToolContext {
         &self.workspace_root
     }
 
+    /// Resolve a model-independent user attachment inside the fixed workspace.
+    /// Symlinks that leave the workspace are rejected by canonicalization.
+    pub fn read_attachment(
+        &self,
+        requested: &str,
+        max_bytes: usize,
+    ) -> Result<(PathBuf, Vec<u8>), ToolError> {
+        let resolved = self.resolve_existing(requested)?;
+        if !resolved.canonical.is_file() {
+            return Err(ToolError::NotAFile(requested.to_owned()));
+        }
+        let metadata = fs::metadata(&resolved.canonical)?;
+        if metadata.len() > u64::try_from(max_bytes).unwrap_or(u64::MAX) {
+            return Err(ToolError::LimitExceeded(format!(
+                "attachment exceeds {max_bytes} bytes"
+            )));
+        }
+        let bytes = fs::read(&resolved.canonical)?;
+        if bytes.len() > max_bytes {
+            return Err(ToolError::LimitExceeded(format!(
+                "attachment exceeds {max_bytes} bytes"
+            )));
+        }
+        Ok((resolved.relative, bytes))
+    }
+
     fn resolve_for_write(&self, requested: &str) -> Result<PathBuf, ToolError> {
         validate_relative_path(requested)?;
         let candidate = self.workspace_root.join(requested);
@@ -409,6 +435,25 @@ impl ToolRegistry {
             RegisteredTool {
                 definition,
                 handler: Box::new(tool),
+            },
+        );
+        Ok(())
+    }
+
+    pub fn register_boxed(&mut self, tool: Box<dyn Tool>) -> Result<(), ToolError> {
+        let definition = tool.definition();
+        definition.validate()?;
+        if self.tools.contains_key(&definition.name) {
+            return Err(ToolError::InvalidDefinition(format!(
+                "duplicate tool name `{}`",
+                definition.name
+            )));
+        }
+        self.tools.insert(
+            definition.name.clone(),
+            RegisteredTool {
+                definition,
+                handler: tool,
             },
         );
         Ok(())
@@ -980,13 +1025,15 @@ impl RunCommandTool {
             // descendants launched by the shell, not just the shell itself.
             builder.process_group(0);
         }
+        let builder = builder.current_dir(context.workspace_root());
+        builder.env_clear();
+        for (key, value) in crate::security::child_environment() {
+            builder.env(key, value);
+        }
         let mut child = builder
-            .current_dir(context.workspace_root())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .env_clear()
-            .env("PATH", std::env::var("PATH").unwrap_or_default())
             .spawn()
             .map_err(ToolError::Io)?;
         let stdout = child

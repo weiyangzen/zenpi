@@ -29,6 +29,10 @@ pub struct SkillHooks {
     #[serde(default)]
     pub prompt_prefix: Option<String>,
     #[serde(default)]
+    pub context_prefix: Option<String>,
+    #[serde(default)]
+    pub tool_allowlist: Vec<String>,
+    #[serde(default)]
     pub session_close: Option<String>,
 }
 
@@ -54,6 +58,7 @@ impl SkillManifest {
         }
         for hook in [
             self.hooks.prompt_prefix.as_deref(),
+            self.hooks.context_prefix.as_deref(),
             self.hooks.session_close.as_deref(),
         ]
         .into_iter()
@@ -64,6 +69,9 @@ impl SkillManifest {
                     "hook output is invalid or too large".into(),
                 ));
             }
+        }
+        for tool in &self.hooks.tool_allowlist {
+            validate_id(tool)?;
         }
         Ok(())
     }
@@ -105,6 +113,55 @@ impl SkillSet {
             })
             .collect::<Vec<_>>()
             .join("\n\n")
+    }
+
+    /// Effective provider instructions in deterministic lifecycle order:
+    /// skill bodies, prompt preparation, then compaction context notes.
+    pub fn effective_instructions(&self) -> String {
+        let mut sections = Vec::new();
+        let instructions = self.instructions();
+        if !instructions.is_empty() {
+            sections.push(instructions);
+        }
+        let prompt = self.hook_outputs(|hooks| hooks.prompt_prefix.as_deref());
+        if !prompt.is_empty() {
+            sections.push(format!("## Prompt Preparation\n{}", prompt.join("\n")));
+        }
+        let context = self.hook_outputs(|hooks| hooks.context_prefix.as_deref());
+        if !context.is_empty() {
+            sections.push(format!("## Context Compaction\n{}", context.join("\n")));
+        }
+        sections.join("\n\n")
+    }
+
+    pub fn tool_allowed(&self, tool: &str) -> bool {
+        let allowlists = self
+            .skills
+            .values()
+            .filter(|skill| !skill.manifest.hooks.tool_allowlist.is_empty())
+            .map(|skill| &skill.manifest.hooks.tool_allowlist)
+            .collect::<Vec<_>>();
+        allowlists.is_empty()
+            || allowlists
+                .iter()
+                .all(|allowlist| allowlist.iter().any(|allowed| allowed == tool))
+    }
+
+    pub fn session_close_outputs(&self) -> Vec<String> {
+        self.hook_outputs(|hooks| hooks.session_close.as_deref())
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
+    }
+
+    fn hook_outputs<'a>(
+        &'a self,
+        select: impl Fn(&'a SkillHooks) -> Option<&'a str>,
+    ) -> Vec<&'a str> {
+        self.skills
+            .values()
+            .filter_map(|skill| select(&skill.manifest.hooks))
+            .collect()
     }
 
     pub fn prepare_prompt(&self, prompt: &str) -> String {

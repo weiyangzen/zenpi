@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use tempfile::tempdir;
 use zenpi::{
     core::{Turn, TurnRole},
-    session::SessionStore,
+    session::{InterruptedOperation, OperationKind, OperationOutcome, SessionStore},
 };
 
 #[test]
@@ -20,6 +20,42 @@ fn malformed_prefix_is_warned_and_append_remains_recoverable() {
     let recovered = SessionStore::open(&path).unwrap();
     assert_eq!(recovered.turns().len(), 1);
     assert!(recovered.summary().next_seq >= 2);
+}
+
+#[test]
+fn unfinished_operations_are_detected_and_never_retried_implicitly() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("interrupted.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    let provider = InterruptedOperation {
+        operation_id: "provider-turn-1".into(),
+        kind: OperationKind::Provider,
+        turn_id: "turn-1".into(),
+        retry_requires_confirmation: false,
+    };
+    let tool = InterruptedOperation {
+        operation_id: "tool-call-1".into(),
+        kind: OperationKind::Tool,
+        turn_id: "turn-1".into(),
+        retry_requires_confirmation: true,
+    };
+    store.begin_operation(&provider).unwrap();
+    store.begin_operation(&tool).unwrap();
+    store
+        .finish_operation(&provider.operation_id, OperationOutcome::Succeeded)
+        .unwrap();
+    drop(store);
+
+    let mut recovered = SessionStore::open(&path).unwrap();
+    assert_eq!(recovered.interrupted_operations(), vec![tool.clone()]);
+    let marked = recovered.mark_interrupted_operations().unwrap();
+    assert_eq!(marked, vec![tool]);
+    assert!(recovered.interrupted_operations().is_empty());
+    let reopened = SessionStore::open(path).unwrap();
+    assert!(reopened.interrupted_operations().is_empty());
+    assert!(reopened.events().iter().any(|event| {
+        event["operation_id"] == "tool-call-1" && event["outcome"] == "interrupted"
+    }));
 }
 
 #[test]

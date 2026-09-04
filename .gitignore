@@ -1,4 +1,6 @@
 /target/
+/dist/
+/.zenpi/
 .DS_Store
 *.pyc
 __pycache__/
