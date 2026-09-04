@@ -153,7 +153,7 @@ pub fn runtime_intent_value(
         "intent": intent,
         "estimator": estimator,
         "next_sequence": agent.session().next_sequence(),
-        "message": "runtime intent persisted for an external b3ehive owner",
+        "message": "runtime intent stored locally; external delivery and execution are untracked",
     }))
 }
 
@@ -306,6 +306,6 @@ fn status_value(agent: &Agent, kind: RuntimeIntentKind) -> Value {
         "intents": intents,
         "truncated": total > MAX_RUNTIME_INTENTS_VIEW,
         "latest_intent_id": latest_intent_id,
-        "message": "runtime intents are pending external ownership",
+        "message": "stored runtime intents only; external delivery and execution are untracked",
     })
 }
