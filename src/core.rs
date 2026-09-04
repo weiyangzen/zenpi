@@ -17,7 +17,9 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    approval::{ApprovalCoordinator, ApprovalDecision, ApprovalPolicy, ApprovalRequest},
+    approval::{
+        ApprovalCoordinator, ApprovalDecision, ApprovalError, ApprovalPolicy, ApprovalRequest,
+    },
     b3::{B3Error, Handoff, HandoffRecord},
     backend::{
         Backend, BackendError, CompletionRequest, EchoBackend, OpenAiCompatibleBackend,
@@ -228,6 +230,21 @@ pub struct AgentSnapshot {
     pub last_error: Option<String>,
 }
 
+/// Result of an explicit `/compact` owner operation.  The checkpoint is
+/// persisted in the session journal and is reused when preparing future
+/// provider requests; no provider/model call is made by this operation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CompactionReport {
+    pub compacted: bool,
+    pub already_recorded: bool,
+    pub source_turns: usize,
+    pub prepared_turns: usize,
+    pub estimated_tokens_before: u64,
+    pub estimated_tokens_after: u64,
+    pub marker_sequence: u64,
+    pub checkpoint: Option<crate::context::CompactionCheckpoint>,
+}
+
 #[derive(Debug, Error)]
 pub enum AgentError {
     #[error("agent is closed")]
@@ -252,6 +269,8 @@ pub enum AgentError {
     Recovery(String),
     #[error("resource governance: {0}")]
     Governance(String),
+    #[error("approval: {0}")]
+    Approval(#[from] ApprovalError),
 }
 
 impl AgentError {
@@ -269,6 +288,7 @@ impl AgentError {
             Self::ToolLoopLimit(_) => "tool_loop_limit",
             Self::Recovery(_) => "operation_recovery",
             Self::Governance(_) => "resource_budget_exceeded",
+            Self::Approval(_) => "approval_error",
         }
     }
 }
@@ -522,8 +542,165 @@ impl Agent {
         self.tools.as_ref().map(|runtime| runtime.approval.clone())
     }
 
+    /// Resolve one pending tool approval and durably record the accepted host
+    /// decision before the worker may enter the side-effecting handler.
+    pub fn respond_to_approval(
+        &self,
+        response: crate::approval::ApprovalResponse,
+    ) -> Result<ApprovalRequest, AgentError> {
+        let Some(runtime) = self.tools.as_ref() else {
+            return Err(AgentError::InvalidTurn(
+                "no tool registry or approval coordinator is configured".into(),
+            ));
+        };
+        let request = runtime.approval.reveal(&response.request_id)?;
+        runtime.approval.respond(response)?;
+        Ok(request)
+    }
+
     pub fn set_context_budget(&mut self, budget: crate::context::ContextBudget) {
         self.context_budget = budget;
+    }
+
+    pub fn context_budget(&self) -> crate::context::ContextBudget {
+        self.context_budget
+    }
+
+    /// Compact the current durable context without invoking the provider.
+    ///
+    /// A deterministic checkpoint is written to the session journal.  The
+    /// checkpoint is then picked up by `complete_with_tools`, including after
+    /// a process restart, so this command changes the context sent on the
+    /// next provider turn rather than merely printing an acknowledgement.
+    pub fn compact_context(&mut self) -> Result<CompactionReport, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase == AgentPhase::Running {
+            return Err(AgentError::NotIdle);
+        }
+        let source_turns = self.session.turns().len();
+        let prepared =
+            crate::context::prepare_context(self.session.turns(), self.context_budget, &|| false)
+                .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+        let before = crate::context::estimate_tokens(self.session.turns());
+        let marker_sequence = self.session.next_sequence();
+        let (compacted, checkpoint, already_recorded, marker_sequence) = if let Some(checkpoint) =
+            prepared.checkpoint.clone()
+        {
+            let already_recorded = self.session.events().iter().any(|event| {
+                event.get("type").and_then(Value::as_str) == Some("context_compacted")
+                    && event.get("trigger").and_then(Value::as_str) == Some("manual_slash")
+                    && event
+                        .get("checkpoint")
+                        .and_then(|value| {
+                            serde_json::from_value::<crate::context::CompactionCheckpoint>(
+                                value.clone(),
+                            )
+                            .ok()
+                        })
+                        .is_some_and(|existing| existing == checkpoint)
+            });
+            if already_recorded {
+                let recorded_sequence = self
+                    .session
+                    .records()
+                    .iter()
+                    .rev()
+                    .find(|record| {
+                        record.kind == "event"
+                            && record
+                                .value
+                                .get("event")
+                                .and_then(Value::as_object)
+                                .is_some_and(|event| {
+                                    event.get("type").and_then(Value::as_str)
+                                        == Some("context_compacted")
+                                        && event.get("trigger").and_then(Value::as_str)
+                                            == Some("manual_slash")
+                                        && event
+                                            .get("checkpoint")
+                                            .and_then(|value| {
+                                                serde_json::from_value::<
+                                                    crate::context::CompactionCheckpoint,
+                                                >(
+                                                    value.clone()
+                                                )
+                                                .ok()
+                                            })
+                                            .is_some_and(|existing| existing == checkpoint)
+                                })
+                    })
+                    .map_or(marker_sequence, |record| record.sequence);
+                (true, Some(checkpoint), true, recorded_sequence)
+            } else {
+                let operation_id = format!(
+                    "manual-compaction-{}-{}",
+                    checkpoint.source_sha256, marker_sequence
+                );
+                self.session
+                    .begin_operation(&crate::session::InterruptedOperation {
+                        operation_id: operation_id.clone(),
+                        kind: crate::session::OperationKind::Compaction,
+                        turn_id: format!("manual-{marker_sequence}"),
+                        retry_requires_confirmation: false,
+                    })?;
+                let checkpoint_sequence = self.session.next_sequence();
+                self.session.append_event(serde_json::json!({
+                    "type": "context_compacted",
+                    "trigger": "manual_slash",
+                    "checkpoint": checkpoint,
+                    "budget": self.context_budget,
+                }))?;
+                self.session
+                    .finish_operation(&operation_id, crate::session::OperationOutcome::Succeeded)?;
+                (true, Some(checkpoint), false, checkpoint_sequence)
+            }
+        } else {
+            let already_recorded = self.session.events().iter().any(|event| {
+                event.get("type").and_then(Value::as_str) == Some("context_compaction_skipped")
+                    && event.get("trigger").and_then(Value::as_str) == Some("manual_slash")
+            });
+            let recorded_sequence = self
+                .session
+                .records()
+                .iter()
+                .rev()
+                .find(|record| {
+                    record.kind == "event"
+                        && record
+                            .value
+                            .get("event")
+                            .and_then(Value::as_object)
+                            .is_some_and(|event| {
+                                event.get("type").and_then(Value::as_str)
+                                    == Some("context_compaction_skipped")
+                                    && event.get("trigger").and_then(Value::as_str)
+                                        == Some("manual_slash")
+                            })
+                })
+                .map_or(marker_sequence, |record| record.sequence);
+            if !already_recorded {
+                self.session.append_event(serde_json::json!({
+                    "type": "context_compaction_skipped",
+                    "trigger": "manual_slash",
+                    "reason": "within_budget",
+                    "estimated_tokens": before.input_tokens,
+                    "budget": self.context_budget,
+                }))?;
+            }
+            (false, None, already_recorded, recorded_sequence)
+        };
+        Ok(CompactionReport {
+            compacted,
+            already_recorded,
+            source_turns,
+            prepared_turns: prepared.turns.len(),
+            estimated_tokens_before: before.input_tokens,
+            estimated_tokens_after: prepared.estimate.input_tokens,
+            marker_sequence,
+            checkpoint,
+        })
     }
 
     pub fn set_skills(&mut self, skills: crate::skills::SkillSet) {
@@ -1061,12 +1238,10 @@ impl Agent {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let prepared = crate::context::prepare_context(
-                self.session.turns(),
-                self.context_budget,
-                is_cancelled,
-            )
-            .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+            let context_source = self.context_source_for_provider();
+            let prepared =
+                crate::context::prepare_context(&context_source, self.context_budget, is_cancelled)
+                    .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
             if let Some(governance) = self.governance.as_mut() {
                 governance
                     .charge(
@@ -1282,13 +1457,89 @@ impl Agent {
                             .unwrap_or(crate::tools::ToolSideEffect::ReadOnly),
                         arguments: call.arguments.clone(),
                     };
-                    match runtime.approval.request(
+                    let coordinator = runtime.approval.clone();
+                    let response = coordinator.request_response(
                         approval_request,
                         &mut runtime.approval_policy,
                         is_cancelled,
-                    ) {
-                        Ok(ApprovalDecision::Allow) => {}
-                        Ok(ApprovalDecision::Deny) | Err(_) => {
+                    );
+                    if response.is_ok() {
+                        let approval_id = format!("approval-{}", call.id);
+                        coordinator
+                            .persist_accepted(&approval_id, |accepted| {
+                                self.session.append_event(serde_json::json!({
+                                    "type": "approval_resolved",
+                                    "request_id": accepted.request.request_id,
+                                    "turn_id": accepted.request.turn_id,
+                                    "call_id": accepted.request.call_id,
+                                    "tool": accepted.request.tool,
+                                    "side_effect": accepted.request.side_effect,
+                                    "decision": accepted.response.decision,
+                                    "remember": accepted.response.remember,
+                                }))
+                            })
+                            .map_err(|error| match error {
+                                crate::approval::PersistApprovalError::Approval(error) => {
+                                    AgentError::Approval(error)
+                                }
+                                crate::approval::PersistApprovalError::Persistence(error) => {
+                                    AgentError::Session(error)
+                                }
+                            })?;
+                    }
+                    match response {
+                        Ok(response) => {
+                            // The host writes `approval_resolved` before waking
+                            // this worker.  Record consumption as a second
+                            // durable boundary before entering any side effect.
+                            self.session.append_event(serde_json::json!({
+                                "type": "approval_consumed",
+                                "request_id": response.request_id,
+                                "turn_id": turn_id,
+                                "call_id": call.id,
+                                "tool": call.name,
+                                "decision": response.decision,
+                                "remember": response.remember,
+                            }))?;
+                            if response.decision == ApprovalDecision::Deny {
+                                let result = crate::tools::ToolResult::Error {
+                                    call_id: call.id.clone(),
+                                    tool: call.name.clone(),
+                                    error: crate::tools::ToolFailure {
+                                        code: crate::tools::ToolErrorCode::PolicyDenied,
+                                        message: "tool approval denied or cancelled".into(),
+                                    },
+                                };
+                                let serialized =
+                                    serde_json::to_string(&result).map_err(|error| {
+                                        AgentError::InvalidTurn(format!(
+                                            "tool result serialization failed: {error}"
+                                        ))
+                                    })?;
+                                let mut tool_turn = Turn::with_parent(
+                                    next_id("tool"),
+                                    turn_id.to_owned(),
+                                    TurnRole::Tool,
+                                    serialized,
+                                );
+                                tool_turn.metadata = Some(serde_json::json!({
+                                    "tool_call_id": call.id,
+                                    "tool_name": call.name,
+                                }));
+                                self.session.append_turn(tool_turn)?;
+                                self.events.push(AgentEvent::ToolResult {
+                                    turn_id: turn_id.to_owned(),
+                                    call_id: call.id,
+                                    success: false,
+                                });
+                                self.session.finish_operation(
+                                    &tool_operation_id,
+                                    crate::session::OperationOutcome::Failed,
+                                )?;
+                                continue;
+                            }
+                        }
+                        Err(_) => {
                             // A denied/cancelled approval is represented as a
                             // normal bounded tool result so the provider can
                             // explain it without executing the side effect.
@@ -1413,6 +1664,30 @@ impl Agent {
             }
         }
         Err(AgentError::ToolLoopLimit(max_iterations))
+    }
+
+    /// Rebuild the latest explicit slash checkpoint from the durable journal.
+    /// Invalid/stale markers are ignored in favour of the raw history; this
+    /// keeps an edited or partially-written journal recoverable while never
+    /// trusting unverified summary content.
+    fn context_source_for_provider(&self) -> Vec<Turn> {
+        for event in self.session.events().iter().rev() {
+            if event.get("type").and_then(Value::as_str) != Some("context_compacted")
+                || event.get("trigger").and_then(Value::as_str) != Some("manual_slash")
+            {
+                continue;
+            }
+            let Some(checkpoint) = event.get("checkpoint").and_then(|value| {
+                serde_json::from_value::<crate::context::CompactionCheckpoint>(value.clone()).ok()
+            }) else {
+                continue;
+            };
+            if let Ok(turns) = crate::context::restore_checkpoint(self.session.turns(), &checkpoint)
+            {
+                return turns;
+            }
+        }
+        self.session.turns().to_vec()
     }
 
     /// Admit and, when accepted, immediately run one turn.

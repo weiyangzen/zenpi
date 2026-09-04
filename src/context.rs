@@ -165,6 +165,72 @@ pub fn prepare_context(
     })
 }
 
+/// Reconstruct a previously recorded deterministic checkpoint without asking
+/// the provider for a summary.  This is used by `/compact` markers after a
+/// process restart; a malformed or stale marker is rejected rather than being
+/// treated as an authoritative context replacement.
+pub fn restore_checkpoint(
+    turns: &[Turn],
+    checkpoint: &CompactionCheckpoint,
+) -> Result<Vec<Turn>, ContextError> {
+    if checkpoint.source_start != 0
+        || checkpoint.source_end == 0
+        || checkpoint.source_end > turns.len()
+    {
+        return Err(ContextError::InvalidCheckpoint);
+    }
+    let compacted = &turns[checkpoint.source_start..checkpoint.source_end];
+    let serialized =
+        serde_json::to_vec(compacted).map_err(|error| ContextError::Encoding(error.to_string()))?;
+    let digest = format!("{:x}", Sha256::digest(&serialized));
+    if digest != checkpoint.source_sha256 {
+        return Err(ContextError::InvalidCheckpoint);
+    }
+    let roles = compacted.iter().fold([0_usize; 4], |mut counts, turn| {
+        counts[match turn.role {
+            TurnRole::System => 0,
+            TurnRole::User => 1,
+            TurnRole::Assistant => 2,
+            TurnRole::Tool => 3,
+        }] += 1;
+        counts
+    });
+    let summary = format!(
+        "Compacted context checkpoint: {} records (system={}, user={}, assistant={}, tool={}), sha256={digest}.",
+        compacted.len(),
+        roles[0],
+        roles[1],
+        roles[2],
+        roles[3]
+    );
+    if summary != checkpoint.summary {
+        return Err(ContextError::InvalidCheckpoint);
+    }
+    let protected_system = turns
+        .iter()
+        .filter(|turn| turn.role == TurnRole::System)
+        .cloned()
+        .collect::<Vec<_>>();
+    let suffix = turns[checkpoint.source_end..]
+        .iter()
+        .filter(|turn| turn.role != TurnRole::System)
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut summary_turn = Turn::new(format!("context-{digest:.16}"), TurnRole::System, &summary);
+    summary_turn.created_at_ms = compacted.last().map_or(0, |turn| turn.created_at_ms);
+    summary_turn.metadata = Some(serde_json::json!({
+        "context_checkpoint": {
+            "source_start": checkpoint.source_start,
+            "source_end": checkpoint.source_end,
+            "source_sha256": digest,
+        }
+    }));
+    let mut prepared = protected_system;
+    prepared.push(summary_turn);
+    prepared.extend(suffix);
+    Ok(prepared)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
     #[error("context budget must reserve fewer tokens than its maximum")]
@@ -175,4 +241,6 @@ pub enum ContextError {
     BudgetExceeded { estimated: u64, available: u64 },
     #[error("context encoding failed: {0}")]
     Encoding(String),
+    #[error("context checkpoint is invalid or stale")]
+    InvalidCheckpoint,
 }

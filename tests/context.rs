@@ -1,5 +1,5 @@
 use zenpi::{
-    context::{ContextBudget, ContextError, estimate_tokens, prepare_context},
+    context::{ContextBudget, ContextError, estimate_tokens, prepare_context, restore_checkpoint},
     core::{Turn, TurnRole},
 };
 
@@ -57,4 +57,21 @@ fn cancellation_during_needed_compaction_preserves_source() {
     .unwrap_err();
     assert!(matches!(error, ContextError::Cancelled));
     assert_eq!(source, before);
+}
+
+#[test]
+fn restoring_a_checkpoint_rejects_changed_source_records() {
+    let source = turns(20, 500);
+    let budget = ContextBudget {
+        max_tokens: 1_500,
+        reserved_output_tokens: 300,
+    };
+    let prepared = prepare_context(&source, budget, &|| false).unwrap();
+    let checkpoint = prepared.checkpoint.unwrap();
+    let mut changed = source;
+    changed[0].content.push('!');
+    assert!(matches!(
+        restore_checkpoint(&changed, &checkpoint),
+        Err(ContextError::InvalidCheckpoint)
+    ));
 }

@@ -2933,6 +2933,59 @@ pub fn run_async_with_profile(
                                     scheduler.request();
                                     break;
                                 }
+                                if let SlashCommand::Approve { id, decision } = command {
+                                    let (decision, remember) = match decision {
+                                        crate::slash::ApproveDecision::Once => {
+                                            (crate::approval::ApprovalDecision::Allow, false)
+                                        }
+                                        crate::slash::ApproveDecision::Always => {
+                                            (crate::approval::ApprovalDecision::Allow, true)
+                                        }
+                                        crate::slash::ApproveDecision::Deny => {
+                                            (crate::approval::ApprovalDecision::Deny, false)
+                                        }
+                                    };
+                                    let result = approval
+                                        .as_ref()
+                                        .ok_or(crate::approval::ApprovalError::UnknownRequest)
+                                        .and_then(|coordinator| {
+                                            coordinator.respond(crate::approval::ApprovalResponse {
+                                                request_id: id.clone(),
+                                                decision,
+                                                remember,
+                                            })
+                                        });
+                                    match result {
+                                        Ok(()) => {
+                                            pending_approvals
+                                                .retain(|request| request.request_id != id);
+                                            state.push_message(
+                                                MessageRole::System,
+                                                match (decision, remember) {
+                                                    (
+                                                        crate::approval::ApprovalDecision::Allow,
+                                                        true,
+                                                    ) => "Tool allowed and remembered",
+                                                    (
+                                                        crate::approval::ApprovalDecision::Allow,
+                                                        false,
+                                                    ) => "Tool allowed once",
+                                                    _ => "Tool denied",
+                                                },
+                                            );
+                                            state.set_status("Working");
+                                        }
+                                        Err(error) => {
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                format!("approval failed: {error}"),
+                                            );
+                                            state.set_status("Approval expired");
+                                        }
+                                    }
+                                    scheduler.request();
+                                    continue;
+                                }
                                 let action = match shared.try_lock() {
                                     Ok(mut agent) => dispatch_slash_command(
                                         command,

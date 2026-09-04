@@ -116,6 +116,7 @@ pub struct SessionStore {
     handoff_records: Vec<HandoffRecord>,
     events: usize,
     event_values: Vec<Value>,
+    records: Vec<SessionRecord>,
     warnings: Vec<RecoveryWarning>,
     needs_separator: bool,
     next_seq: u64,
@@ -140,6 +141,19 @@ pub struct SessionInspection {
     pub turns: Vec<Turn>,
     pub events: Vec<Value>,
     pub recovery_warnings: Vec<RecoveryWarning>,
+}
+
+/// One validated journal record with its durable sequence number.
+///
+/// The in-memory turn/event projections above intentionally hide the envelope
+/// metadata.  Resume/recovery owners need that metadata to page through the
+/// append-only journal without reparsing the file (and without accidentally
+/// following a symlink), so the validated envelope is retained separately.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SessionRecord {
+    pub sequence: u64,
+    pub kind: String,
+    pub value: Value,
 }
 
 impl SessionStore {
@@ -202,6 +216,7 @@ impl SessionStore {
         let mut handoff_records = Vec::new();
         let mut events = 0;
         let mut event_values = Vec::new();
+        let mut records = Vec::new();
         let mut warnings = Vec::new();
         let mut next_seq = 0_u64;
         let mut last_seq = None;
@@ -253,6 +268,7 @@ impl SessionStore {
                 });
                 continue;
             }
+            let raw_value = value.clone();
             let record = match serde_json::from_value::<DecodedRecord>(value) {
                 Ok(record) => record,
                 Err(error) => {
@@ -263,6 +279,7 @@ impl SessionStore {
                     continue;
                 }
             };
+            let record_sequence = sequence.unwrap_or(next_seq);
             if let Some(sequence) = sequence {
                 last_seq = Some(sequence);
                 next_seq = sequence.saturating_add(1);
@@ -270,7 +287,7 @@ impl SessionStore {
                 next_seq = next_seq.saturating_add(1);
                 last_seq = next_seq.checked_sub(1);
             }
-            match record {
+            let accepted = match record {
                 DecodedRecord::Session {
                     version,
                     session_id,
@@ -282,11 +299,13 @@ impl SessionStore {
                             line: line_number,
                             reason: "ignored unsupported session version".into(),
                         });
+                        false
                     } else if header.is_some() {
                         warnings.push(RecoveryWarning {
                             line: line_number,
                             reason: "ignored duplicate session header".into(),
                         });
+                        false
                     } else {
                         header = Some(SessionHeader {
                             version,
@@ -294,14 +313,21 @@ impl SessionStore {
                             created_at_ms,
                             cwd,
                         });
+                        true
                     }
                 }
                 DecodedRecord::Turn { turn } => match turn.validate() {
-                    Ok(()) => turns.push(turn),
-                    Err(error) => warnings.push(RecoveryWarning {
-                        line: line_number,
-                        reason: format!("ignored invalid turn: {error}"),
-                    }),
+                    Ok(()) => {
+                        turns.push(turn);
+                        true
+                    }
+                    Err(error) => {
+                        warnings.push(RecoveryWarning {
+                            line: line_number,
+                            reason: format!("ignored invalid turn: {error}"),
+                        });
+                        false
+                    }
                 },
                 DecodedRecord::Handoff { handoff } => {
                     if handoff.validate().is_err() {
@@ -309,8 +335,10 @@ impl SessionStore {
                             line: line_number,
                             reason: "ignored invalid handoff".into(),
                         });
+                        false
                     } else {
                         handoffs.push(handoff);
+                        true
                     }
                 }
                 DecodedRecord::HandoffRecord { handoff } => {
@@ -323,14 +351,29 @@ impl SessionStore {
                             line: line_number,
                             reason: "ignored invalid handoff record".into(),
                         });
+                        false
                     } else {
                         handoff_records.push(handoff);
+                        true
                     }
                 }
                 DecodedRecord::Event { event } => {
                     event_values.push(event);
                     events += 1;
+                    true
                 }
+            };
+            if accepted {
+                let kind = raw_value
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+                    .to_owned();
+                records.push(SessionRecord {
+                    sequence: record_sequence,
+                    kind,
+                    value: raw_value,
+                });
             }
         }
 
@@ -351,6 +394,7 @@ impl SessionStore {
             handoff_records,
             events,
             event_values,
+            records,
             warnings,
             needs_separator,
             next_seq,
@@ -463,6 +507,18 @@ impl SessionStore {
 
     pub fn events(&self) -> &[Value] {
         &self.event_values
+    }
+
+    /// Return the validated append-only envelopes in durable sequence order.
+    /// Callers must still apply their own response/display byte budgets before
+    /// serializing the values across a transport boundary.
+    pub fn records(&self) -> &[SessionRecord] {
+        &self.records
+    }
+
+    /// Sequence that will be assigned to the next appended journal record.
+    pub fn next_sequence(&self) -> u64 {
+        self.next_seq
     }
 
     /// Return operations that reached durable `started` state without a
@@ -588,11 +644,12 @@ impl SessionStore {
             ));
         }
         let mut record = value.clone();
+        let sequence = self.next_seq;
         if let Value::Object(fields) = &mut record {
             let now = now_ms();
             fields.insert("schema_version".into(), json!(SESSION_VERSION));
             fields.insert("session_id".into(), json!(self.header.session_id));
-            fields.insert("seq".into(), json!(self.next_seq));
+            fields.insert("seq".into(), json!(sequence));
             fields.insert("timestamp_ms".into(), json!(now));
             fields.insert("timestamp".into(), json!(unix_ms_to_rfc3339(now)));
         }
@@ -620,6 +677,16 @@ impl SessionStore {
         file.flush()?;
         file.sync_data()?;
         self.next_seq = self.next_seq.saturating_add(1);
+        let kind = record
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_owned();
+        self.records.push(SessionRecord {
+            sequence,
+            kind,
+            value: record,
+        });
         Ok(())
     }
 }

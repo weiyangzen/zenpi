@@ -23,6 +23,25 @@ fn malformed_prefix_is_warned_and_append_remains_recoverable() {
 }
 
 #[test]
+fn validated_records_retain_durable_sequences_for_replay_owners() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("records.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    store
+        .append_turn(Turn::new("u", TurnRole::User, "hello"))
+        .unwrap();
+    store
+        .append_event(serde_json::json!({"type":"progress"}))
+        .unwrap();
+    let records = store.records();
+    assert_eq!(records.len(), 3, "header, turn, and event");
+    assert_eq!(records[0].sequence, 0);
+    assert_eq!(records[1].kind, "turn");
+    assert_eq!(records[2].kind, "event");
+    assert_eq!(store.next_sequence(), 3);
+}
+
+#[test]
 fn unfinished_operations_are_detected_and_never_retried_implicitly() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("interrupted.jsonl");

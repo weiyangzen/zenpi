@@ -51,6 +51,12 @@ const MAX_WORKSPACE_PATH_BYTES: usize = 4096;
 /// below the replay/cache budget so one `/blueprint show` can always be
 /// replayed by request ID.
 const MAX_DOMAIN_VIEW_BYTES: usize = 512 * 1024;
+/// Keep slash-session recovery useful without turning one response into a
+/// transcript dump.  The cursor in the response lets callers request the
+/// following page with another `/resume <sequence>` command.
+const MAX_SLASH_RESUME_RECORDS: usize = 128;
+const MAX_SLASH_RESUME_BYTES: usize = 128 * 1024;
+const MAX_SLASH_RESUME_EVENT_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Clone)]
 struct TerminalRecord {
@@ -1012,6 +1018,206 @@ pub fn open_session_path(agent: &mut Agent, raw_path: &str) -> Result<serde_json
         "action": "open",
         "session": serialized_session_summary(&summary),
     }))
+}
+
+/// Replay a bounded suffix of the active durable journal for the local slash
+/// owner.  Unlike the transport-level `resume` command (which replays an
+/// in-memory event queue), this operation survives process restarts and writes
+/// a `session_resumed` marker before reporting success.
+pub fn resume_session_view(
+    agent: &mut Agent,
+    requested_sequence: Option<u64>,
+) -> Result<serde_json::Value, String> {
+    if agent.phase() == crate::core::AgentPhase::Closed {
+        return Err("agent is closed".into());
+    }
+    if agent.phase() == crate::core::AgentPhase::Running {
+        return Err("session replay is unavailable while the agent is busy".into());
+    }
+    let session = agent.session();
+    let next_sequence = session.next_sequence();
+    if requested_sequence.is_some_and(|sequence| sequence > next_sequence) {
+        return Err(format!(
+            "resume sequence is ahead of the session (next sequence is {next_sequence})"
+        ));
+    }
+    let first_available = session.records().first().map(|record| record.sequence);
+    let last_available = session.records().last().map(|record| record.sequence);
+    let from_sequence = requested_sequence.unwrap_or_else(|| {
+        last_available
+            .or(first_available)
+            .map(|last| last.saturating_sub(31))
+            .unwrap_or(next_sequence)
+    });
+    let replay_gap = first_available.is_some_and(|first| from_sequence < first);
+    let mut records = Vec::new();
+    let mut retained_bytes = 0_usize;
+    let mut truncated = false;
+    for record in session
+        .records()
+        .iter()
+        .filter(|record| record.sequence >= from_sequence)
+    {
+        if records.len() >= MAX_SLASH_RESUME_RECORDS {
+            truncated = true;
+            break;
+        }
+        let projected = project_session_record(record);
+        let encoded_len = serde_json::to_vec(&projected)
+            .map_err(|error| format!("resume projection failed: {error}"))?
+            .len();
+        if !records.is_empty()
+            && retained_bytes.saturating_add(encoded_len) > MAX_SLASH_RESUME_BYTES
+        {
+            truncated = true;
+            break;
+        }
+        retained_bytes = retained_bytes.saturating_add(encoded_len);
+        records.push(projected);
+    }
+    if !truncated {
+        truncated = session.records().iter().any(|record| {
+            record.sequence >= from_sequence
+                && record.sequence
+                    > records
+                        .last()
+                        .and_then(|value| value.get("sequence"))
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(from_sequence)
+        });
+    }
+    let replay_cursor = records
+        .last()
+        .and_then(|record| record.get("sequence"))
+        .and_then(serde_json::Value::as_u64)
+        .map_or(from_sequence, |sequence| sequence.saturating_add(1));
+    let replayed = records.len();
+    let recovered_operations = session
+        .interrupted_operations()
+        .into_iter()
+        .map(|operation| {
+            serde_json::json!({
+                "operation_id": operation.operation_id,
+                "kind": operation.kind,
+                "turn_id": operation.turn_id,
+                "retry_requires_confirmation": operation.retry_requires_confirmation,
+            })
+        })
+        .collect::<Vec<_>>();
+    // The marker is appended only after projection succeeds. A disk failure
+    // therefore returns an error instead of claiming that recovery happened.
+    let marker_sequence = agent.session().next_sequence();
+    agent
+        .session_mut()
+        .append_event(json!({
+            "type": "session_resumed",
+            "operation": "resume",
+            "trigger": "manual_slash",
+            "requested_sequence": requested_sequence,
+            "from_sequence": from_sequence,
+            "replayed": replayed,
+            "truncated": truncated,
+            "replay_cursor": replay_cursor,
+        }))
+        .map_err(|error| format!("resume marker could not be persisted: {error}"))?;
+    let next_sequence = agent.session().next_sequence();
+    Ok(json!({
+        "command": "resume",
+        "route": "local",
+        "accepted": true,
+        // Keep the original slash response field while making the durable
+        // journal interpretation explicit below.
+        "sequence": requested_sequence,
+        "durable": true,
+        "requested_sequence": requested_sequence,
+        "from_sequence": from_sequence,
+        "first_available_sequence": first_available,
+        "last_available_sequence": last_available,
+        "replayed": replayed,
+        "replay_gap": replay_gap,
+        "truncated": truncated,
+        "replay_cursor": replay_cursor,
+        "next_sequence": next_sequence,
+        "marker_sequence": marker_sequence,
+        "recovered_operations": recovered_operations,
+        "records": records,
+    }))
+}
+
+fn project_session_record(record: &crate::session::SessionRecord) -> serde_json::Value {
+    match record.kind.as_str() {
+        "session" => json!({
+            "sequence": record.sequence,
+            "kind": "session",
+            "session_id": record.value.get("session_id"),
+            "version": record.value.get("version"),
+        }),
+        "turn" => {
+            let turn = record.value.get("turn");
+            let content = turn
+                .and_then(|value| value.get("content"))
+                .and_then(serde_json::Value::as_str)
+                .map(|value| bound_slash_text(value, 4096));
+            let original_len = turn
+                .and_then(|value| value.get("content"))
+                .and_then(serde_json::Value::as_str)
+                .map_or(0, str::len);
+            json!({
+                "sequence": record.sequence,
+                "kind": "turn",
+                "id": turn.and_then(|value| value.get("id")),
+                "parent_id": turn.and_then(|value| value.get("parent_id")),
+                "role": turn.and_then(|value| value.get("role")),
+                "content": content,
+                "content_truncated": original_len > 4096,
+            })
+        }
+        "event" => {
+            let event = record.value.get("event").cloned().unwrap_or_default();
+            let encoded_len = serde_json::to_vec(&event).map_or(0, |bytes| bytes.len());
+            if encoded_len > MAX_SLASH_RESUME_EVENT_BYTES {
+                json!({
+                    "sequence": record.sequence,
+                    "kind": "event",
+                    "event_type": event.get("type").and_then(serde_json::Value::as_str),
+                    "truncated": true,
+                    "encoded_bytes": encoded_len,
+                })
+            } else {
+                json!({
+                    "sequence": record.sequence,
+                    "kind": "event",
+                    "event": event,
+                })
+            }
+        }
+        kind => json!({
+            "sequence": record.sequence,
+            "kind": kind,
+            "redacted": true,
+        }),
+    }
+}
+
+/// Execute deterministic context compaction through the core owner and add a
+/// small transport-neutral projection for TUI/headless callers.
+pub fn compact_context_view(agent: &mut Agent) -> Result<serde_json::Value, String> {
+    let report = agent
+        .compact_context()
+        .map_err(|error| format!("context compaction failed: {error}"))?;
+    let mut value = serde_json::to_value(report)
+        .map_err(|error| format!("context compaction response failed: {error}"))?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("command".into(), json!("compact"));
+        object.insert("route".into(), json!("local"));
+        object.insert("accepted".into(), json!(true));
+        object.insert("durable".into(), json!(true));
+        object.insert(
+            "next_sequence".into(),
+            json!(agent.session().next_sequence()),
+        );
+    }
+    Ok(value)
 }
 
 fn serialized_session_summary(summary: &SessionSummary) -> serde_json::Value {
@@ -2328,6 +2534,72 @@ where
                 }
             };
             let command_name = parsed.name();
+            if let crate::slash::SlashCommand::Approve {
+                id: approval_id,
+                decision,
+            } = parsed
+            {
+                let (decision, remember) = match decision {
+                    crate::slash::ApproveDecision::Once => {
+                        (crate::approval::ApprovalDecision::Allow, false)
+                    }
+                    crate::slash::ApproveDecision::Always => {
+                        (crate::approval::ApprovalDecision::Allow, true)
+                    }
+                    crate::slash::ApproveDecision::Deny => {
+                        (crate::approval::ApprovalDecision::Deny, false)
+                    }
+                };
+                let Some(approval) = approval else {
+                    write_cached_versioned_response(
+                        output,
+                        StdioResponse::error_with_code(
+                            id,
+                            command_name,
+                            "approval_unavailable",
+                            "no tool registry or approval coordinator is configured",
+                        ),
+                        request_version,
+                        replay,
+                    )?;
+                    return Ok(());
+                };
+                match approval.respond(crate::approval::ApprovalResponse {
+                    request_id: approval_id.clone(),
+                    decision,
+                    remember,
+                }) {
+                    Ok(()) => write_cached_versioned_response(
+                        output,
+                        StdioResponse::success(
+                            id,
+                            command_name,
+                            Some(json!({
+                                "command": "approve",
+                                "route": "local",
+                                "accepted": true,
+                                "approval_id": approval_id,
+                                "decision": decision,
+                                "remember": remember,
+                            })),
+                        ),
+                        request_version,
+                        replay,
+                    )?,
+                    Err(error) => write_cached_versioned_response(
+                        output,
+                        StdioResponse::error_with_code(
+                            id,
+                            command_name,
+                            "approval_error",
+                            error.to_string(),
+                        ),
+                        request_version,
+                        replay,
+                    )?,
+                }
+                return Ok(());
+            }
             let session_open = matches!(
                 &parsed,
                 crate::slash::SlashCommand::Session {
@@ -3282,6 +3554,40 @@ pub fn transition_goal_status(
     goal_status_response(agent, id, next_status).map_err(|error| error.message)
 }
 
+/// Resolve a slash approval through the agent-owned coordinator.  This adapter
+/// is shared with the TUI so both transports use the same durable, fail-closed
+/// owner rather than acknowledging a parsed command without taking action.
+pub fn respond_to_slash_approval(
+    agent: &mut Agent,
+    id: &str,
+    decision: crate::slash::ApproveDecision,
+) -> Result<serde_json::Value, String> {
+    let (decision, remember) = match decision {
+        crate::slash::ApproveDecision::Once => (crate::approval::ApprovalDecision::Allow, false),
+        crate::slash::ApproveDecision::Always => (crate::approval::ApprovalDecision::Allow, true),
+        crate::slash::ApproveDecision::Deny => (crate::approval::ApprovalDecision::Deny, false),
+    };
+    let request = agent
+        .respond_to_approval(crate::approval::ApprovalResponse {
+            request_id: id.to_owned(),
+            decision,
+            remember,
+        })
+        .map_err(|error| error.to_string())?;
+    Ok(json!({
+        "command": "approve",
+        "route": "local",
+        "accepted": true,
+        "approval_id": request.request_id,
+        "turn_id": request.turn_id,
+        "call_id": request.call_id,
+        "tool": request.tool,
+        "side_effect": request.side_effect,
+        "decision": decision,
+        "remember": remember,
+    }))
+}
+
 /// Execute the transport-independent portion of a slash command.  Commands
 /// that inspect mutable agent state require a lock; view/runtime acknowledgements
 /// deliberately do not, so they remain usable while a provider turn is busy.
@@ -3477,19 +3783,37 @@ fn execute_headless_slash(
                 "message": "session action is parsed but not executable in this host",
             }))),
         },
-        SlashCommand::Resume { sequence } => Ok(SlashExecution::Response(json!({
-            "command": "resume",
-            "route": "local",
-            "accepted": false,
-            "sequence": sequence,
-            "message": "resume command is parsed but event replay is not configured",
-        }))),
-        SlashCommand::Compact => Ok(SlashExecution::Response(json!({
-            "command": "compact",
-            "route": "local",
-            "accepted": false,
-            "message": "compact command is parsed but context compaction is not configured",
-        }))),
+        SlashCommand::Resume { sequence } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "session replay is temporarily unavailable while the agent is busy"
+                        .into(),
+                });
+            };
+            resume_session_view(agent, sequence)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "resume_error",
+                    message,
+                })
+        }
+        SlashCommand::Compact => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message:
+                        "context compaction is temporarily unavailable while the agent is busy"
+                            .into(),
+                });
+            };
+            compact_context_view(agent)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "compact_error",
+                    message,
+                })
+        }
         SlashCommand::Diff { path } => {
             crate::slash_actions::diff_value_for_agent(agent.as_deref(), path.as_deref())
                 .map(|mut data| {
@@ -3518,14 +3842,21 @@ fn execute_headless_slash(
                     message: error.to_string(),
                 })
         }
-        SlashCommand::Approve { id, decision } => Ok(SlashExecution::Response(json!({
-            "command": "approve",
-            "route": "local",
-            "accepted": false,
-            "id": id,
-            "decision": decision,
-            "message": "approve command is parsed but approval routing is not configured",
-        }))),
+        SlashCommand::Approve { id, decision } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "approval response is temporarily unavailable while the agent is busy"
+                        .into(),
+                });
+            };
+            respond_to_slash_approval(agent, &id, decision)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "approval_error",
+                    message,
+                })
+        }
         SlashCommand::Blueprint { action } => {
             let action_name = match &action {
                 BlueprintAction::Show => "show",
