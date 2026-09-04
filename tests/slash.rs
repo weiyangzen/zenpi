@@ -15,6 +15,8 @@ fn core_slash_commands_parse_to_typed_values() {
             name: Some("gpt-test".into()),
         })
     );
+    assert_eq!(parse("/models").unwrap(), Some(SlashCommand::Models));
+    assert_eq!(parse("/doctor").unwrap(), Some(SlashCommand::Doctor));
     assert_eq!(
         parse("/blueprint validate \"Docs/Blueprint v2.md\"").unwrap(),
         Some(SlashCommand::Blueprint {
@@ -57,6 +59,10 @@ fn malformed_commands_fail_closed() {
         parse("/does-not-exist").unwrap_err(),
         SlashError::UnknownCommand(_)
     ));
+    assert!(matches!(
+        parse("/models extra").unwrap_err(),
+        SlashError::UnexpectedArgument { command: "models" }
+    ));
     assert_eq!(
         parse("/goal 'unfinished").unwrap_err(),
         SlashError::UnterminatedQuote
@@ -83,6 +89,8 @@ fn history_default_and_completion_are_bounded() {
     assert!(help(None).unwrap().contains("/goal <instruction>"));
     assert!(help(Some("loop")).unwrap().contains("b3ehive runtime"));
     assert!(help(Some("missing")).is_none());
+    assert!(help(Some("doctor")).unwrap().contains("redacted"));
+    assert!(complete("/mo").contains(&"models"));
 }
 
 #[test]

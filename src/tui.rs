@@ -1308,8 +1308,13 @@ impl TuiState {
                     self.insert_text("\n");
                     return TuiAction::None;
                 }
-                let text = self.input.trim().to_owned();
-                if !text.is_empty() {
+                // Use trimming only to decide whether the buffer is blank;
+                // preserve the submitted bytes themselves. Leading spaces,
+                // indentation, and a deliberate trailing newline are part of
+                // a code-oriented prompt and must not be rewritten by the
+                // terminal host.
+                if !self.input.trim().is_empty() {
+                    let text = self.input.clone();
                     self.history.push_back(text.clone());
                     while self.history.len() > self.max_history {
                         self.history.pop_front();
@@ -2190,6 +2195,48 @@ pub fn dispatch_slash_command(
             };
             state.push_message(role, message);
         }
+        SlashCommand::Models => match crate::config::model_catalog(None) {
+            Ok(entries) => {
+                let text = if entries.is_empty() {
+                    "models: no configured profiles".to_owned()
+                } else {
+                    entries
+                        .into_iter()
+                        .map(|entry| {
+                            format!(
+                                "{}{} model={} provider={} backend={} {}",
+                                if entry.active { "* " } else { "  " },
+                                entry.profile.as_deref().unwrap_or("default"),
+                                entry.model.as_deref().unwrap_or("<unset>"),
+                                entry.provider.as_deref().unwrap_or("<unset>"),
+                                entry.backend,
+                                if entry.configured {
+                                    "ready"
+                                } else {
+                                    "incomplete"
+                                },
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                state.push_message(MessageRole::System, text);
+            }
+            Err(error) => state.push_message(
+                MessageRole::Error,
+                format!("model catalogue unavailable: {error}"),
+            ),
+        },
+        SlashCommand::Doctor => match crate::config::doctor_value(None) {
+            Ok(value) => state.push_message(
+                MessageRole::System,
+                format!(
+                    "doctor:\n{}",
+                    bounded_display(&serde_json::to_string(&value).unwrap_or_else(|_| "{}".into()))
+                ),
+            ),
+            Err(error) => state.push_message(MessageRole::Error, format!("doctor failed: {error}")),
+        },
         SlashCommand::Status => {
             let message = if let Some(agent) = agent.as_deref_mut() {
                 format_agent_status(agent)

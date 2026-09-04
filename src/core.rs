@@ -420,6 +420,11 @@ impl Agent {
                 "model name contains control characters".into(),
             ));
         }
+        if model.as_deref().is_some_and(|value| value.len() > 256) {
+            return Err(AgentError::InvalidTurn(
+                "model name must be at most 256 bytes".into(),
+            ));
+        }
         self.model = model;
         Ok(())
     }

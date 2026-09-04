@@ -4229,6 +4229,26 @@ fn execute_headless_slash(
                 "model": agent.snapshot().model,
             })))
         }
+        SlashCommand::Models => {
+            let entries =
+                crate::config::model_catalog(None).map_err(|error| SlashDispatchError {
+                    code: "model_catalog_error",
+                    message: error.to_string(),
+                })?;
+            Ok(SlashExecution::Response(json!({
+                "command": "models",
+                "route": "local",
+                "accepted": true,
+                "models": entries,
+            })))
+        }
+        SlashCommand::Doctor => {
+            let value = crate::config::doctor_value(None).map_err(|error| SlashDispatchError {
+                code: "doctor_error",
+                message: error.to_string(),
+            })?;
+            Ok(SlashExecution::Response(value))
+        }
         SlashCommand::Status => {
             let Some(agent) = agent else {
                 return Err(SlashDispatchError {

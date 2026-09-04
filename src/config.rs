@@ -1088,6 +1088,109 @@ pub struct ConfigStatus {
     pub supports_websockets: bool,
 }
 
+/// A secret-free entry in the model picker exposed by the interactive hosts.
+/// Profiles are listed rather than credentials, so `/models` remains useful
+/// even when a provider is not currently reachable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelCatalogEntry {
+    pub profile: Option<String>,
+    pub active: bool,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub backend: String,
+    pub configured: bool,
+}
+
+/// Return the bounded, redacted model/profile catalogue used by `/models`.
+/// This is deliberately read-only and never contacts a provider. A legacy
+/// flat config is represented by one `default` entry; named profiles remain
+/// independently selectable in the output.
+pub fn model_catalog(profile: Option<&str>) -> Result<Vec<ModelCatalogEntry>, ConfigError> {
+    let paths = ConfigPaths::discover()?;
+    let config = load_config(&paths)?;
+    if config.profiles.is_empty() {
+        let resolved = resolve_default(&ConfigOverrides {
+            profile: profile.map(str::to_owned),
+            ..ConfigOverrides::default()
+        })?;
+        let configured = resolved.model.is_some()
+            && resolved.base_url.is_some()
+            && (!resolved.requires_openai_auth || resolved.api_key.is_some());
+        return Ok(vec![ModelCatalogEntry {
+            profile: resolved.profile,
+            active: true,
+            provider: resolved.provider,
+            model: resolved.model,
+            backend: resolved.backend,
+            configured,
+        }]);
+    }
+
+    let active = profile
+        .map(str::to_owned)
+        .or_else(|| env::var("ZENPI_PROFILE").ok())
+        .or_else(|| config.default_profile.clone());
+    let auth = load_auth(&paths)?;
+    Ok(config
+        .profiles
+        .iter()
+        .map(|(name, profile_config)| {
+            let api_key_present = auth.api_key_for_profile(Some(name)).is_some();
+            let backend = profile_config
+                .backend
+                .clone()
+                .unwrap_or_else(|| "openai".into());
+            let configured = profile_config.model.is_some()
+                && profile_config.base_url.is_some()
+                && (!profile_config.requires_openai_auth.unwrap_or(true) || api_key_present);
+            ModelCatalogEntry {
+                profile: Some(name.clone()),
+                active: active.as_deref() == Some(name.as_str()),
+                provider: profile_config.provider.clone(),
+                model: profile_config.model.clone(),
+                backend,
+                configured,
+            }
+        })
+        .collect())
+}
+
+/// Build the structured `/doctor` response. Endpoint values are reduced to
+/// scheme plus host by `status_for_profile`; credentials are represented only
+/// by presence/source. The checks are intentionally deterministic and local.
+pub fn doctor_value(profile: Option<&str>) -> Result<Value, ConfigError> {
+    let paths = ConfigPaths::discover()?;
+    let status = status_for_profile(&paths, profile)?;
+    let ready = (!status.requires_openai_auth || status.api_key_present)
+        && status.base_url.is_some()
+        && status.model.is_some();
+    let mut checks = BTreeMap::new();
+    checks.insert("config_file".to_owned(), status.config_exists);
+    checks.insert(
+        "auth".to_owned(),
+        !status.requires_openai_auth || status.api_key_present,
+    );
+    checks.insert("endpoint".to_owned(), status.base_url.is_some());
+    checks.insert("model".to_owned(), status.model.is_some());
+    Ok(serde_json::json!({
+        "command": "doctor",
+        "route": "local",
+        "accepted": true,
+        "ready": ready,
+        "profile": status.profile,
+        "backend": status.backend,
+        "provider": status.provider,
+        "model": status.model,
+        "base_url": status.base_url.as_deref().map(redacted_endpoint),
+        "wire_api": status.wire_api,
+        "api_key_present": status.api_key_present,
+        "api_key_source": status.api_key_source,
+        "requires_openai_auth": status.requires_openai_auth,
+        "supports_websockets": status.supports_websockets,
+        "checks": checks,
+    }))
+}
+
 pub fn status(paths: &ConfigPaths) -> Result<ConfigStatus, ConfigError> {
     status_for_profile(paths, None)
 }

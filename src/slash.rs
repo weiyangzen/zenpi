@@ -57,6 +57,10 @@ pub enum SlashCommand {
     Model {
         name: Option<String>,
     },
+    /// List the bounded model/profile catalog visible to the host.
+    Models,
+    /// Run redacted local configuration and runtime diagnostics.
+    Doctor,
     /// Operate on the first-class blueprint owner.
     Blueprint {
         action: BlueprintAction,
@@ -234,6 +238,8 @@ impl SlashCommand {
             Self::GoalPut { .. } => "goal",
             Self::Plan { .. } => "plan",
             Self::Model { .. } => "model",
+            Self::Models => "models",
+            Self::Doctor => "doctor",
             Self::Blueprint { .. } => "blueprint",
             Self::Learn { .. } => "learn",
             Self::LearnPut { .. } => "learn",
@@ -267,6 +273,8 @@ impl SlashCommand {
                 | Self::GoalPut { .. }
                 | Self::Plan { .. }
                 | Self::Model { .. }
+                | Self::Models
+                | Self::Doctor
                 | Self::Blueprint { .. }
                 | Self::Learn { .. }
                 | Self::LearnPut { .. }
@@ -330,6 +338,20 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Local,
         usage: "/model [name]",
         summary: "show or select the provider model",
+    },
+    SlashCommandSpec {
+        name: "models",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/models",
+        summary: "list configured provider models and profiles",
+    },
+    SlashCommandSpec {
+        name: "doctor",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/doctor",
+        summary: "run redacted configuration and runtime diagnostics",
     },
     SlashCommandSpec {
         name: "blueprint",
@@ -597,6 +619,8 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
                 name: args.first().cloned(),
             }
         }
+        "models" => unit_command(args, "models", SlashCommand::Models)?,
+        "doctor" => unit_command(args, "doctor", SlashCommand::Doctor)?,
         "blueprint" | "bp" => SlashCommand::Blueprint {
             action: parse_blueprint(args)?,
         },
