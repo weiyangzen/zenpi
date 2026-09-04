@@ -528,3 +528,46 @@ fn shutdown_and_join_drains_saturated_command_and_event_queues() {
         .recv_timeout(Duration::from_secs(2))
         .expect("saturated runtime did not shut down");
 }
+
+#[test]
+fn bounded_shutdown_detaches_a_noncooperative_job() {
+    let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker_started = Arc::clone(&started);
+    let worker_release = Arc::clone(&release);
+    let runner = BackgroundRunner::spawn(
+        move |_request: (), _token| {
+            worker_started.store(true, std::sync::atomic::Ordering::Release);
+            // Deliberately ignore cancellation. The owner releases this
+            // fixture after shutdown has detached it so no test thread is
+            // left running beyond the test process.
+            while !worker_release.load(std::sync::atomic::Ordering::Acquire) {
+                thread::yield_now();
+            }
+            Ok::<_, String>(())
+        },
+        RuntimeConfig::default(),
+    );
+    let id = runner.try_submit(()).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::Started { id: actual } if *actual == id),
+    );
+    while !started.load(std::sync::atomic::Ordering::Acquire) {
+        thread::yield_now();
+    }
+
+    let began = Instant::now();
+    runner
+        .shutdown_and_join_with_grace(Duration::from_millis(25))
+        .unwrap();
+    assert!(
+        began.elapsed() < Duration::from_millis(500),
+        "bounded shutdown waited for a non-cooperative job: {:?}",
+        began.elapsed()
+    );
+
+    // Let the detached fixture finish before the test exits. The runtime has
+    // already dropped its result receiver, so this late result is ignored.
+    release.store(true, std::sync::atomic::Ordering::Release);
+}

@@ -6,7 +6,10 @@
 //! admitted through a bounded queue, work runs on a dedicated thread, and a
 //! cancellation token is passed to the job implementation.  A job may return
 //! an error or observe cancellation at its own boundary; no unsafe thread
-//! termination is attempted.
+//! termination is attempted. During shutdown, a job that does not cooperate
+//! is detached after a bounded grace period so terminal hosts are not held
+//! open forever. Detaching stops the runtime from accepting that job's result;
+//! it cannot roll back side effects or forcibly stop arbitrary Rust code.
 //!
 //! The runner is generic so it can be wired to `Agent` without coupling the
 //! channel protocol to the UI.  An adapter normally captures an `Arc` of the
@@ -22,8 +25,15 @@ use std::{
         mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
     },
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+/// Grace period used by the ordinary shutdown helpers before a
+/// non-cooperative job is detached.
+pub const DEFAULT_SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
+
+/// Upper bound accepted by configurable shutdown helpers.
+pub const MAX_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
 
 /// Monotonically increasing identifier assigned to one submitted job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -148,6 +158,10 @@ impl std::error::Error for SubmitError {}
 pub enum JobOutcome<O, E> {
     Succeeded(O),
     Failed(E),
+    /// The runtime stopped accepting this job's result after cancellation.
+    /// A cooperative job has returned before this is emitted. During bounded
+    /// shutdown, arbitrary non-cooperative code may instead be detached and
+    /// can briefly outlive the runtime; cancellation is not a rollback.
     Cancelled,
     /// The job panicked.  The worker remains alive and can drain queued
     /// follow-ups instead of silently leaving a request in Running forever.
@@ -181,7 +195,7 @@ pub enum RuntimeEvent<O, E> {
 enum Command<I> {
     Submit { id: JobId, request: I },
     Cancel { id: JobId },
-    Shutdown,
+    Shutdown { grace: Duration },
 }
 
 struct Active<O, E> {
@@ -189,6 +203,29 @@ struct Active<O, E> {
     token: CancellationToken,
     done: Receiver<JobExecution<O, E>>,
     join: JoinHandle<()>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ShutdownState {
+    deadline: Instant,
+}
+
+impl ShutdownState {
+    fn new(grace: Duration) -> Self {
+        Self {
+            deadline: Instant::now() + grace,
+        }
+    }
+
+    fn remaining(self, poll_interval: Duration) -> Duration {
+        self.deadline
+            .saturating_duration_since(Instant::now())
+            .min(poll_interval)
+    }
+
+    fn expired(self) -> bool {
+        Instant::now() >= self.deadline
+    }
 }
 
 enum JobExecution<O, E> {
@@ -288,9 +325,24 @@ where
     }
 
     /// Request orderly shutdown without blocking.  The active job receives a
-    /// cancellation request and the worker emits `Closed` after it returns.
+    /// cancellation request. The worker waits up to
+    /// [`DEFAULT_SHUTDOWN_GRACE`] before detaching a non-cooperative job and
+    /// emitting its terminal event followed by `Closed`.
     pub fn try_shutdown(&self) -> Result<(), SubmitError> {
-        match self.command_tx.try_send(Command::Shutdown) {
+        self.try_shutdown_with_grace(DEFAULT_SHUTDOWN_GRACE)
+    }
+
+    /// Request orderly shutdown with a caller-selected grace period.
+    ///
+    /// The request itself is nonblocking. `grace` is clamped to
+    /// [`MAX_SHUTDOWN_GRACE`]; a zero duration requests immediate detach after
+    /// the cancellation token is set. This bound applies to the runtime's
+    /// worker ownership, not to arbitrary side effects already in progress in
+    /// detached job code.
+    pub fn try_shutdown_with_grace(&self, grace: Duration) -> Result<(), SubmitError> {
+        match self.command_tx.try_send(Command::Shutdown {
+            grace: normalize_shutdown_grace(grace),
+        }) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => Err(SubmitError::QueueFull),
             Err(TrySendError::Disconnected(_)) => Err(SubmitError::Closed),
@@ -322,16 +374,28 @@ where
     }
 
     /// Orderly close for owners that cannot conveniently drain the event
-    /// stream themselves. The worker owns and joins every job thread before
-    /// this returns.
-    pub fn shutdown_and_join(mut self) -> thread::Result<()> {
+    /// stream themselves. Cooperative jobs are joined before this returns;
+    /// non-cooperative jobs are detached after the default grace period.
+    pub fn shutdown_and_join(self) -> thread::Result<()> {
+        self.shutdown_and_join_with_grace(DEFAULT_SHUTDOWN_GRACE)
+    }
+
+    /// Orderly close with a bounded grace period for the active job.
+    ///
+    /// The runtime worker and every cooperative job thread are joined. A job
+    /// that does not return within `grace` is detached: this call then returns
+    /// after the runtime worker has emitted terminal state and exited, while
+    /// the detached job may briefly continue executing. The duration is
+    /// clamped to [`MAX_SHUTDOWN_GRACE`].
+    pub fn shutdown_and_join_with_grace(mut self, grace: Duration) -> thread::Result<()> {
+        let grace = normalize_shutdown_grace(grace);
         // `send` can deadlock here: a full command queue can only be drained
         // by a worker that may itself be blocked sending into a full event
         // queue.  Keep both channels moving while retrying the shutdown
         // command.  The worker's closed bit also handles the case where the
         // caller already consumed `Closed` before invoking this helper.
         while !self.closed.load(Ordering::Acquire) {
-            match self.command_tx.try_send(Command::Shutdown) {
+            match self.command_tx.try_send(Command::Shutdown { grace }) {
                 Ok(()) => break,
                 Err(TrySendError::Disconnected(_)) => break,
                 Err(TrySendError::Full(_)) => {
@@ -369,7 +433,9 @@ where
         // its job closure. Production owners use `shutdown_and_join`; this
         // fallback still requests cancellation rather than silently leaking
         // more work.
-        let _ = self.command_tx.try_send(Command::Shutdown);
+        let _ = self.command_tx.try_send(Command::Shutdown {
+            grace: Duration::ZERO,
+        });
         let _ = self.join.take();
     }
 }
@@ -387,75 +453,96 @@ fn worker_loop<I, O, E, F>(
 {
     let mut active: Option<Active<O, E>> = None;
     let mut pending = VecDeque::new();
-    let mut stopping = false;
+    let mut stopping: Option<ShutdownState> = None;
 
     loop {
-        if let Some(done) = active.as_ref().and_then(|item| item.done.try_recv().ok()) {
-            let item = active.take().expect("active job disappeared");
-            let _ = item.join.join();
-            let outcome = if item.token.is_cancelled() {
-                JobOutcome::Cancelled
-            } else {
-                match done {
-                    JobExecution::Completed(Ok(output)) => JobOutcome::Succeeded(output),
-                    JobExecution::Completed(Err(error)) => JobOutcome::Failed(error),
-                    JobExecution::Panicked => JobOutcome::Panicked,
-                }
-            };
-            if !emit(
-                &event_tx,
-                RuntimeEvent::Completed {
-                    id: item.id,
+        match active.as_ref().map(|item| item.done.try_recv()) {
+            Some(Ok(done)) => {
+                let item = active.take().expect("active job disappeared");
+                let _ = item.join.join();
+                let outcome = classify_execution(&item.token, done);
+                if !finish_active(
+                    &event_tx,
+                    item.id,
                     outcome,
-                },
-            ) {
-                return;
-            }
-            if stopping {
-                // Preserve submission order during shutdown. The active job
-                // owns the oldest request, so its terminal event must be
-                // observable before queued follow-ups are cancelled. This is
-                // important to hosts that use terminal responses as an
-                // ordered completion stream rather than merely a set of IDs.
-                while let Some((id, _)) = pending.pop_front() {
-                    if !emit(&event_tx, RuntimeEvent::CancelRequested { id })
-                        || !emit(
-                            &event_tx,
-                            RuntimeEvent::Completed {
-                                id,
-                                outcome: JobOutcome::Cancelled,
-                            },
-                        )
-                    {
-                        return;
-                    }
+                    &mut pending,
+                    stopping.is_some(),
+                ) {
+                    return;
                 }
-                let _ = emit(&event_tx, RuntimeEvent::Closed);
+                if stopping.is_some() {
+                    return;
+                }
+                if let Some((id, request)) = pending.pop_front()
+                    && !start_job(&event_tx, &job, &mut active, id, request)
+                {
+                    return;
+                }
+                continue;
+            }
+            // A job thread exiting without delivering its result is still a
+            // terminal condition. Treat it as a panic rather than polling a
+            // permanently disconnected `done` receiver forever.
+            Some(Err(TryRecvError::Disconnected)) => {
+                let item = active.take().expect("active job disappeared");
+                let _ = item.join.join();
+                if !finish_active(
+                    &event_tx,
+                    item.id,
+                    JobOutcome::Panicked,
+                    &mut pending,
+                    stopping.is_some(),
+                ) {
+                    return;
+                }
+                if stopping.is_some() {
+                    return;
+                }
+                if let Some((id, request)) = pending.pop_front()
+                    && !start_job(&event_tx, &job, &mut active, id, request)
+                {
+                    return;
+                }
+                continue;
+            }
+            Some(Err(TryRecvError::Empty)) | None => {}
+        }
+
+        if stopping.is_some_and(ShutdownState::expired) && active.is_some() {
+            // Dropping JoinHandle detaches only the job thread. Its one-shot
+            // done channel is disconnected when the receiver below is
+            // dropped, so a late result can never re-enter this runtime.
+            let item = active.take().expect("active job disappeared");
+            let id = item.id;
+            drop(item);
+            if !finish_active(&event_tx, id, JobOutcome::Cancelled, &mut pending, true) {
                 return;
             }
-            if let Some((id, request)) = pending.pop_front()
-                && !start_job(&event_tx, &job, &mut active, id, request)
-            {
-                return;
-            }
-            continue;
+            return;
         }
 
         let command = if active.is_some() {
-            match command_rx.recv_timeout(config.poll_interval) {
+            let wait = stopping
+                .map(|state| state.remaining(config.poll_interval))
+                .unwrap_or(config.poll_interval);
+            match command_rx.recv_timeout(wait) {
                 Ok(command) => command,
                 Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => Command::Shutdown,
+                Err(RecvTimeoutError::Disconnected) => Command::Shutdown {
+                    grace: DEFAULT_SHUTDOWN_GRACE,
+                },
             }
         } else {
             match command_rx.recv() {
                 Ok(command) => command,
-                Err(_) => Command::Shutdown,
+                Err(_) => Command::Shutdown {
+                    grace: DEFAULT_SHUTDOWN_GRACE,
+                },
             }
         };
 
         match command {
-            Command::Submit { id, request } if active.is_none() && !stopping => {
+            Command::Submit { id, request } if active.is_none() && stopping.is_none() => {
                 if !emit(&event_tx, RuntimeEvent::Accepted { id, queued: false }) {
                     return;
                 }
@@ -463,7 +550,7 @@ fn worker_loop<I, O, E, F>(
                     return;
                 }
             }
-            Command::Submit { id, request } if !stopping => {
+            Command::Submit { id, request } if stopping.is_none() => {
                 if pending.len() >= config.max_pending {
                     if !emit(
                         &event_tx,
@@ -527,33 +614,87 @@ fn worker_loop<I, O, E, F>(
                     }
                 }
             }
-            Command::Shutdown => {
-                stopping = true;
+            Command::Shutdown { grace } => {
+                let candidate = ShutdownState::new(grace);
+                stopping = Some(match stopping {
+                    // Repeated shutdown requests may shorten, but never
+                    // extend, the owner's already established deadline.
+                    Some(existing) if existing.deadline <= candidate.deadline => existing,
+                    _ => candidate,
+                });
                 if let Some(item) = active.as_ref() {
                     item.token.cancel();
                     if !emit(&event_tx, RuntimeEvent::CancelRequested { id: item.id }) {
                         return;
                     }
                 } else {
-                    while let Some((id, _)) = pending.pop_front() {
-                        if !emit(&event_tx, RuntimeEvent::CancelRequested { id })
-                            || !emit(
-                                &event_tx,
-                                RuntimeEvent::Completed {
-                                    id,
-                                    outcome: JobOutcome::Cancelled,
-                                },
-                            )
-                        {
-                            return;
-                        }
-                    }
+                    cancel_pending(&event_tx, &mut pending);
                     let _ = emit(&event_tx, RuntimeEvent::Closed);
                     return;
                 }
             }
         }
     }
+}
+
+fn classify_execution<O, E>(
+    token: &CancellationToken,
+    done: JobExecution<O, E>,
+) -> JobOutcome<O, E> {
+    if token.is_cancelled() {
+        JobOutcome::Cancelled
+    } else {
+        match done {
+            JobExecution::Completed(Ok(output)) => JobOutcome::Succeeded(output),
+            JobExecution::Completed(Err(error)) => JobOutcome::Failed(error),
+            JobExecution::Panicked => JobOutcome::Panicked,
+        }
+    }
+}
+
+fn finish_active<I, O, E>(
+    event_tx: &SyncSender<RuntimeEvent<O, E>>,
+    id: JobId,
+    outcome: JobOutcome<O, E>,
+    pending: &mut VecDeque<(JobId, I)>,
+    stopping: bool,
+) -> bool {
+    if !emit(event_tx, RuntimeEvent::Completed { id, outcome }) {
+        return false;
+    }
+    if stopping {
+        // Preserve submission order during shutdown. The active job owns the
+        // oldest request, so its terminal event precedes queued cancellation.
+        if !cancel_pending(event_tx, pending) {
+            return false;
+        }
+        return emit(event_tx, RuntimeEvent::Closed);
+    }
+    true
+}
+
+fn cancel_pending<I, O, E>(
+    event_tx: &SyncSender<RuntimeEvent<O, E>>,
+    pending: &mut VecDeque<(JobId, I)>,
+) -> bool {
+    while let Some((id, _)) = pending.pop_front() {
+        if !emit(event_tx, RuntimeEvent::CancelRequested { id })
+            || !emit(
+                event_tx,
+                RuntimeEvent::Completed {
+                    id,
+                    outcome: JobOutcome::Cancelled,
+                },
+            )
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn normalize_shutdown_grace(grace: Duration) -> Duration {
+    grace.min(MAX_SHUTDOWN_GRACE)
 }
 
 /// RAII marker for the worker lifecycle.  This is intentionally separate
