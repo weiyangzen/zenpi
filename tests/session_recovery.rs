@@ -153,6 +153,203 @@ fn out_of_order_envelope_is_warned() {
     );
 }
 
+#[test]
+fn rejected_business_record_does_not_advance_recovery_sequence() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("rejected-sequence.jsonl");
+    let high_sequence = u64::MAX - 1;
+    let header = serde_json::json!({
+        "kind": "session",
+        "version": 1,
+        "session_id": "session-a",
+        "created_at_ms": 1,
+        "cwd": ".",
+        "schema_version": 1,
+        "seq": 0
+    });
+    let invalid_turn = serde_json::json!({
+        "kind": "turn",
+        "turn": {
+            "id": "",
+            "role": "user",
+            "content": "must be ignored",
+            "created_at_ms": 1
+        },
+        "schema_version": 1,
+        "session_id": "session-a",
+        "seq": high_sequence
+    });
+    let following_event = serde_json::json!({
+        "kind": "event",
+        "event": {"type": "survived"},
+        "schema_version": 1,
+        "session_id": "session-a",
+        "seq": 1
+    });
+    fs::write(
+        &path,
+        format!("{header}\n{invalid_turn}\n{following_event}\n"),
+    )
+    .unwrap();
+
+    let store = SessionStore::open(&path).unwrap();
+    assert!(
+        store
+            .recovery_warnings()
+            .iter()
+            .any(|warning| warning.reason.contains("invalid turn"))
+    );
+    assert_eq!(store.events(), &[serde_json::json!({"type": "survived"})]);
+    assert_eq!(store.next_sequence(), 2);
+    assert_eq!(
+        store
+            .records()
+            .iter()
+            .map(|record| record.sequence)
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
+}
+
+#[test]
+fn maximum_sequence_is_ignored_without_poisoning_later_appends() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("maximum-sequence.jsonl");
+    let header = serde_json::json!({
+        "kind": "session",
+        "version": 1,
+        "session_id": "session-a",
+        "created_at_ms": 1,
+        "cwd": ".",
+        "schema_version": 1,
+        "seq": 0
+    });
+    let exhausted = serde_json::json!({
+        "kind": "event",
+        "event": {"type": "poison"},
+        "schema_version": 1,
+        "session_id": "session-a",
+        "seq": u64::MAX
+    });
+    fs::write(&path, format!("{header}\n{exhausted}\n")).unwrap();
+
+    let mut store = SessionStore::open(&path).unwrap();
+    assert_eq!(store.next_sequence(), 1);
+    assert!(store.events().is_empty());
+    assert!(
+        store
+            .recovery_warnings()
+            .iter()
+            .any(|warning| warning.reason.contains("exhausted sequence"))
+    );
+    store
+        .append_event(serde_json::json!({"type": "survived"}))
+        .unwrap();
+    drop(store);
+
+    let reopened = SessionStore::open_existing(&path).unwrap();
+    assert_eq!(
+        reopened.events(),
+        &[serde_json::json!({"type": "survived"})]
+    );
+    assert_eq!(reopened.next_sequence(), 2);
+}
+
+#[test]
+fn append_rejects_sequence_exhaustion_before_mutating_the_journal() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("exhausted-append.jsonl");
+    let header = serde_json::json!({
+        "kind": "session",
+        "version": 1,
+        "session_id": "session-a",
+        "created_at_ms": 1,
+        "cwd": ".",
+        "schema_version": 1,
+        "seq": u64::MAX - 1
+    });
+    fs::write(&path, format!("{header}\n")).unwrap();
+    let mut store = SessionStore::open(&path).unwrap();
+    assert_eq!(store.next_sequence(), u64::MAX);
+    let before = fs::read(&path).unwrap();
+
+    let error = store
+        .append_event(serde_json::json!({"type": "must-not-write"}))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SessionError::InvalidRecord(reason) if reason.contains("sequence space is exhausted")
+    ));
+    assert_eq!(fs::read(path).unwrap(), before);
+}
+
+#[test]
+fn foreign_runtime_intent_before_header_is_quarantined() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("pre-header-intent.jsonl");
+    let intent = serde_json::json!({
+        "schema_version": 1,
+        "intent_id": "intent-1",
+        "kind": "compete",
+        "parent_ref": "goal-1",
+        "args": ["audit"],
+        "route": {
+            "route_id": "route-1",
+            "parent_ref": "goal-1",
+            "route_class": "external_compete",
+            "runner": "external_b3ehive",
+            "validator_strength": "host_selected"
+        },
+        "envelope": {
+            "envelope_id": "envelope-1",
+            "owner": "compete",
+            "limit": {
+                "tokens": 1,
+                "wall_clock_ms": 1,
+                "attempts": 1,
+                "disk_bytes": 1
+            },
+            "spent": {
+                "tokens": 0,
+                "wall_clock_ms": 0,
+                "attempts": 0,
+                "disk_bytes": 0
+            },
+            "status": "active"
+        },
+        "session_id": "foreign-session",
+        "created_at_ms": 1
+    });
+    let pre_header = serde_json::json!({
+        "kind": "runtime_intent",
+        "intent": intent,
+        "schema_version": 1,
+        "session_id": "foreign-session",
+        "seq": 0
+    });
+    fs::write(&path, format!("{pre_header}\n")).unwrap();
+
+    let generated_session_id = {
+        let store = SessionStore::open(&path).unwrap();
+        assert!(store.runtime_intents().is_empty());
+        assert_eq!(store.next_sequence(), 1);
+        assert!(
+            store
+                .recovery_warnings()
+                .iter()
+                .any(|warning| warning.reason.contains("before session header"))
+        );
+        store.session_id().to_owned()
+    };
+
+    let reopened = SessionStore::open_existing(&path).unwrap();
+    assert_eq!(reopened.session_id(), generated_session_id);
+    assert!(reopened.runtime_intents().is_empty());
+    assert_eq!(reopened.records().len(), 1);
+    assert_eq!(reopened.records()[0].kind, "session");
+    assert_eq!(reopened.records()[0].sequence, 0);
+}
+
 #[cfg(unix)]
 #[test]
 fn session_journal_is_private_to_the_current_user() {
