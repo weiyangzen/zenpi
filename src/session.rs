@@ -997,7 +997,7 @@ pub fn import_session(
             "import source is not an existing session file".into(),
         ));
     }
-    let source = SessionStore::open(source)?;
+    let source = SessionStore::open_existing(source)?;
     source.export_to(&destination)?;
     let imported = match SessionStore::open(destination.as_ref()) {
         Ok(imported) => imported,
