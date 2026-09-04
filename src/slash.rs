@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::layout::{PaneId, TabId};
+
 /// Maximum UTF-8 bytes accepted for one slash command.
 pub const MAX_SLASH_INPUT_BYTES: usize = 16 * 1024;
 
@@ -92,6 +94,15 @@ pub enum SlashCommand {
     Resources {
         path: Option<String>,
     },
+    /// Inspect or mutate the user-owned BentoBox layout. Layout commands are
+    /// local control-plane messages and never become provider prompts.
+    Layout {
+        action: LayoutAction,
+    },
+    /// Focus or change visibility of one BentoBox pane.
+    Pane {
+        action: PaneAction,
+    },
     /// Navigate the durable session owner. Parsing never touches the file
     /// system; hosts must execute supported actions explicitly.
     Session {
@@ -144,6 +155,36 @@ pub enum SessionAction {
     Export { source: String, destination: String },
     Import { source: String, destination: String },
     Gc,
+}
+
+/// Operations supported by `/layout`.
+///
+/// `tab: None` means the host's active tab. A headless host, which has no
+/// terminal focus, uses the Project tab as its deterministic default. The
+/// `Preset` operation selects a tab and restores its built-in geometry;
+/// `Reset` removes the persisted customization for one tab (or the whole
+/// profile when omitted).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutAction {
+    Show { tab: Option<TabId> },
+    Preset { tab: Option<TabId> },
+    Reset { tab: Option<TabId> },
+    Save,
+}
+
+/// Operations supported by `/pane`.
+///
+/// A bare pane name is a focus request. Explicit visibility actions make the
+/// intent unambiguous for headless clients and future GUI hosts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaneAction {
+    Show,
+    Focus { pane: PaneId },
+    Collapse { pane: PaneId },
+    Expand { pane: PaneId },
+    Toggle { pane: PaneId },
 }
 
 /// Slash-level approval intent. `Always` maps to an allow decision with the
@@ -200,6 +241,8 @@ impl SlashCommand {
             Self::LearnResume { .. } => "learn",
             Self::History { .. } => "history",
             Self::Resources { .. } => "resources",
+            Self::Layout { .. } => "layout",
+            Self::Pane { .. } => "pane",
             Self::Session { .. } => "session",
             Self::Resume { .. } => "resume",
             Self::Compact => "compact",
@@ -229,6 +272,8 @@ impl SlashCommand {
                 | Self::LearnPut { .. }
                 | Self::LearnEvidence { .. }
                 | Self::LearnResume { .. }
+                | Self::Layout { .. }
+                | Self::Pane { .. }
         )
     }
 
@@ -313,6 +358,20 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Local,
         usage: "/resources [path]",
         summary: "collect bounded workspace and host resource signals",
+    },
+    SlashCommandSpec {
+        name: "layout",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/layout [show|preset [tab]|reset [tab]|save]",
+        summary: "inspect or persist the BentoBox workspace layout",
+    },
+    SlashCommandSpec {
+        name: "pane",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/pane [name|focus|collapse|expand|toggle NAME]",
+        summary: "focus or change visibility of a BentoBox pane",
     },
     SlashCommandSpec {
         name: "session",
@@ -449,6 +508,22 @@ pub enum SlashError {
     InvalidApproveDecision,
     #[error("/blueprint has unknown action `/{action}`")]
     UnknownBlueprintAction { action: String },
+    #[error("/layout has unknown action `/{action}`")]
+    UnknownLayoutAction { action: String },
+    #[error("/layout {action} requires a tab name")]
+    MissingLayoutTab { action: &'static str },
+    #[error("/layout {action} received an unexpected argument")]
+    UnexpectedLayoutArgument { action: &'static str },
+    #[error("unknown layout tab `{0}`; expected project, goal, learn, review, or session")]
+    UnknownLayoutTab(String),
+    #[error("/pane has unknown action `/{action}`")]
+    UnknownPaneAction { action: String },
+    #[error("/pane {action} requires a pane name")]
+    MissingPaneName { action: &'static str },
+    #[error("/pane {action} received an unexpected argument")]
+    UnexpectedPaneArgument { action: &'static str },
+    #[error("unknown pane `{0}`; use /help pane for pane names")]
+    UnknownPane(String),
 }
 
 /// Classification result for an input buffer before it reaches the model.
@@ -554,6 +629,12 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
                 path: args.first().cloned(),
             }
         }
+        "layout" => SlashCommand::Layout {
+            action: parse_layout(args)?,
+        },
+        "pane" => SlashCommand::Pane {
+            action: parse_pane(args)?,
+        },
         "session" => SlashCommand::Session {
             action: parse_session(args)?,
         },
@@ -701,6 +782,131 @@ fn unit_command(
     } else {
         Err(SlashError::UnexpectedArgument { command })
     }
+}
+
+fn parse_layout(args: &[String]) -> Result<LayoutAction, SlashError> {
+    let Some(action) = args.first() else {
+        return Ok(LayoutAction::Show { tab: None });
+    };
+    let action_lower = action.to_ascii_lowercase();
+    match action_lower.as_str() {
+        "show" | "status" => {
+            if args.len() > 2 {
+                return Err(SlashError::UnexpectedLayoutArgument { action: "show" });
+            }
+            Ok(LayoutAction::Show {
+                tab: args.get(1).map(|value| parse_tab(value)).transpose()?,
+            })
+        }
+        "preset" | "use" | "select" => {
+            if args.len() > 2 {
+                return Err(SlashError::UnexpectedLayoutArgument { action: "preset" });
+            }
+            Ok(LayoutAction::Preset {
+                tab: args.get(1).map(|value| parse_tab(value)).transpose()?,
+            })
+        }
+        "reset" => {
+            if args.len() > 2 {
+                return Err(SlashError::UnexpectedLayoutArgument { action: "reset" });
+            }
+            let tab = match args.get(1).map(String::as_str) {
+                None | Some("all") | Some("profile") => None,
+                Some(value) => Some(parse_tab(value)?),
+            };
+            Ok(LayoutAction::Reset { tab })
+        }
+        "save" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedLayoutArgument { action: "save" });
+            }
+            Ok(LayoutAction::Save)
+        }
+        // A bare tab name is a convenient shorthand for `/layout preset TAB`.
+        value => Ok(LayoutAction::Preset {
+            tab: Some(parse_tab(value)?),
+        }),
+    }
+}
+
+fn parse_pane(args: &[String]) -> Result<PaneAction, SlashError> {
+    let Some(action) = args.first() else {
+        return Ok(PaneAction::Show);
+    };
+    let action_lower = action.to_ascii_lowercase();
+    match action_lower.as_str() {
+        "show" | "list" | "status" if args.len() == 1 => Ok(PaneAction::Show),
+        "focus" | "select" | "use" => Ok(PaneAction::Focus {
+            pane: required_pane_name(args, "focus")?,
+        }),
+        "collapse" | "hide" => Ok(PaneAction::Collapse {
+            pane: required_pane_name(args, "collapse")?,
+        }),
+        "expand" | "show-pane" => Ok(PaneAction::Expand {
+            pane: required_pane_name(args, "expand")?,
+        }),
+        "toggle" => Ok(PaneAction::Toggle {
+            pane: required_pane_name(args, "toggle")?,
+        }),
+        _ => {
+            if args.len() != 1 {
+                return Err(SlashError::UnknownPaneAction {
+                    action: action.clone(),
+                });
+            }
+            Ok(PaneAction::Focus {
+                pane: parse_pane_name(action)?,
+            })
+        }
+    }
+}
+
+fn parse_tab(value: &str) -> Result<TabId, SlashError> {
+    match value.to_ascii_lowercase().as_str() {
+        "project" | "proj" => Ok(TabId::Project),
+        "goal" => Ok(TabId::Goal),
+        "learn" => Ok(TabId::Learn),
+        "review" => Ok(TabId::Review),
+        "session" | "sessions" => Ok(TabId::Session),
+        _ => Err(SlashError::UnknownLayoutTab(value.to_owned())),
+    }
+}
+
+fn required_pane_name(args: &[String], action: &'static str) -> Result<PaneId, SlashError> {
+    if args.len() < 2 {
+        return Err(SlashError::MissingPaneName { action });
+    }
+    if args.len() > 2 {
+        return Err(SlashError::UnexpectedPaneArgument { action });
+    }
+    parse_pane_name(&args[1])
+}
+
+fn parse_pane_name(value: &str) -> Result<PaneId, SlashError> {
+    let normalized = value.trim().to_ascii_lowercase().replace(['-', ' '], "_");
+    let pane = match normalized.as_str() {
+        "project_conversation" | "project" | "conversation" => PaneId::ProjectConversation,
+        "resources" | "resource" => PaneId::Resources,
+        "goal_conversation" | "goal" => PaneId::GoalConversation,
+        "gantt" | "board" => PaneId::Gantt,
+        "browser" | "web" => PaneId::Browser,
+        "terminal" | "pty" => PaneId::Terminal,
+        "learn_conversation" | "learn" => PaneId::LearnConversation,
+        "learn_resources" | "source_resources" => PaneId::LearnResources,
+        "learn_queue" | "queue" => PaneId::LearnQueue,
+        "learn_mapping" | "mapping" => PaneId::LearnMapping,
+        "evidence" => PaneId::Evidence,
+        "review_conversation" | "review" => PaneId::ReviewConversation,
+        "checks" | "check" => PaneId::Checks,
+        "approval_queue" | "approvals" | "approval" => PaneId::ApprovalQueue,
+        "diff" => PaneId::Diff,
+        "session_list" | "sessions" | "session" => PaneId::SessionList,
+        "session_conversation" => PaneId::SessionConversation,
+        "replay_controls" | "replay" => PaneId::ReplayControls,
+        "event_timeline" | "events" | "timeline" => PaneId::EventTimeline,
+        _ => return Err(SlashError::UnknownPane(value.to_owned())),
+    };
+    Ok(pane)
 }
 
 fn parse_blueprint(args: &[String]) -> Result<BlueprintAction, SlashError> {
@@ -1042,5 +1248,57 @@ mod tests {
                 instruction: "read my file path with spaces".into()
             }
         );
+    }
+
+    #[test]
+    fn layout_and_pane_commands_parse_to_bounded_typed_actions() {
+        assert_eq!(
+            parse("/layout preset learn").unwrap(),
+            Some(SlashCommand::Layout {
+                action: LayoutAction::Preset {
+                    tab: Some(TabId::Learn),
+                },
+            })
+        );
+        assert_eq!(
+            parse("/layout reset").unwrap(),
+            Some(SlashCommand::Layout {
+                action: LayoutAction::Reset { tab: None },
+            })
+        );
+        assert_eq!(
+            parse("/pane collapse gantt").unwrap(),
+            Some(SlashCommand::Pane {
+                action: PaneAction::Collapse { pane: PaneId::Gantt },
+            })
+        );
+        assert_eq!(
+            parse("/pane terminal").unwrap(),
+            Some(SlashCommand::Pane {
+                action: PaneAction::Focus {
+                    pane: PaneId::Terminal,
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn layout_and_pane_commands_fail_closed_on_invalid_arguments() {
+        assert!(matches!(
+            parse("/layout preset unknown").unwrap_err(),
+            SlashError::UnknownLayoutTab(_)
+        ));
+        assert!(matches!(
+            parse("/layout save extra").unwrap_err(),
+            SlashError::UnexpectedLayoutArgument { .. }
+        ));
+        assert!(matches!(
+            parse("/pane collapse").unwrap_err(),
+            SlashError::MissingPaneName { .. }
+        ));
+        assert!(matches!(
+            parse("/pane nope").unwrap_err(),
+            SlashError::UnknownPane(_)
+        ));
     }
 }
