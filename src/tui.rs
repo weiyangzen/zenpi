@@ -31,6 +31,7 @@ use ratatui::{Frame, Terminal};
 use thiserror::Error;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
+use crate::domains::GoalStatus;
 use crate::layout::{
     Breakpoint, FocusDirection, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility,
 };
@@ -1437,6 +1438,76 @@ pub enum SlashDispatchAction {
     Quit,
 }
 
+/// Interpret the existing `/goal <instruction>` payload for the TUI owner.
+/// The slash grammar intentionally keeps Goal as a compact instruction so
+/// natural-language submissions remain possible; these bounded forms mirror
+/// the headless owner without adding a second parser variant:
+/// `show|list [id]`, `status [id] [state]`, and `transition <id> <state>`.
+#[derive(Debug)]
+enum TuiGoalOwnerAction {
+    ShowAll,
+    Show(String),
+    Transition(String, GoalStatus),
+}
+
+fn parse_tui_goal_owner_action(
+    instruction: &str,
+) -> Result<Option<TuiGoalOwnerAction>, &'static str> {
+    let tokens = instruction.split_whitespace().collect::<Vec<_>>();
+    let Some(action) = tokens.first() else {
+        return Ok(None);
+    };
+    let is_show = action.eq_ignore_ascii_case("show") || action.eq_ignore_ascii_case("list");
+    let is_status = action.eq_ignore_ascii_case("status");
+    let is_transition =
+        action.eq_ignore_ascii_case("transition") || action.eq_ignore_ascii_case("set-status");
+    if !is_show && !is_status && !is_transition {
+        return Ok(None);
+    }
+    let valid_id = |raw: &str| {
+        if raw.is_empty()
+            || raw.len() > crate::domains::MAX_ID_BYTES
+            || raw.chars().any(char::is_control)
+            || !raw
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character))
+        {
+            return Err("goal id is not a valid bounded identifier");
+        }
+        Ok(raw.to_owned())
+    };
+    let usage = || "use `/goal status`, `/goal status <goal-id>`, or `/goal status <goal-id> <queued|running|paused|blocked|cancelled|done>`";
+
+    if is_show {
+        return match tokens.len() {
+            1 => Ok(Some(TuiGoalOwnerAction::ShowAll)),
+            2 => Ok(Some(TuiGoalOwnerAction::Show(valid_id(tokens[1])?))),
+            _ => Err(usage()),
+        };
+    }
+    if is_status {
+        return match tokens.len() {
+            1 => Ok(Some(TuiGoalOwnerAction::ShowAll)),
+            2 => Ok(Some(TuiGoalOwnerAction::Show(valid_id(tokens[1])?))),
+            3 => {
+                let id = valid_id(tokens[1])?;
+                let status = GoalStatus::parse_token(tokens[2]).ok_or(
+                    "goal status must be queued, running, paused, blocked, cancelled, or done",
+                )?;
+                Ok(Some(TuiGoalOwnerAction::Transition(id, status)))
+            }
+            _ => Err(usage()),
+        };
+    }
+    if tokens.len() != 3 {
+        return Err(usage());
+    }
+    let id = valid_id(tokens[1])?;
+    let status = GoalStatus::parse_token(tokens[2])
+        .ok_or("goal status must be queued, running, paused, blocked, cancelled, or done")?;
+    Ok(Some(TuiGoalOwnerAction::Transition(id, status)))
+}
+
 /// Execute the local, transport-independent part of a slash command.
 ///
 /// The function is intentionally side-effect-light: it updates the visible
@@ -1534,10 +1605,8 @@ pub fn dispatch_slash_command(
             return SlashDispatchAction::Interrupt;
         }
         SlashCommand::Exit => return SlashDispatchAction::Quit,
-        SlashCommand::Goal { instruction } => {
-            if instruction.trim().eq_ignore_ascii_case("show")
-                || instruction.trim().eq_ignore_ascii_case("status")
-            {
+        SlashCommand::Goal { instruction } => match parse_tui_goal_owner_action(&instruction) {
+            Ok(Some(TuiGoalOwnerAction::ShowAll)) => {
                 match crate::headless::domain_store_view(agent.as_deref()) {
                     Ok(data) => state.push_message(
                         MessageRole::System,
@@ -1554,16 +1623,70 @@ pub fn dispatch_slash_command(
                         format!("goal store unavailable: {error}"),
                     ),
                 }
-            } else {
-                state.push_message(
-                    MessageRole::Error,
-                    format!(
-                        "goal creation/execution requires an external b3ehive owner: {}",
-                        bounded_display(&instruction)
-                    ),
-                );
             }
-        }
+            Ok(Some(TuiGoalOwnerAction::Show(id))) => {
+                match crate::headless::domain_store_view(agent.as_deref()) {
+                    Ok(data) => {
+                        let goal = data
+                            .get("goals")
+                            .and_then(serde_json::Value::as_array)
+                            .and_then(|goals| {
+                                goals.iter().find(|goal| {
+                                    goal.get("id").and_then(serde_json::Value::as_str)
+                                        == Some(id.as_str())
+                                })
+                            });
+                        match goal {
+                            Some(goal) => state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "goal show:\n{}",
+                                    bounded_display(
+                                        &serde_json::to_string(goal)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            ),
+                            None => state.push_message(
+                                MessageRole::Error,
+                                format!("goal `{id}` is not found"),
+                            ),
+                        }
+                    }
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("goal store unavailable: {error}"),
+                    ),
+                }
+            }
+            Ok(Some(TuiGoalOwnerAction::Transition(id, status))) => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::transition_goal_status(agent, &id, status) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "goal status:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state
+                        .push_message(MessageRole::Error, format!("goal status failed: {error}")),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "goal status is unavailable while the agent is busy",
+                ),
+            },
+            Ok(None) => state.push_message(
+                MessageRole::Error,
+                format!(
+                    "goal creation/execution requires an external b3ehive owner: {}",
+                    bounded_display(&instruction)
+                ),
+            ),
+            Err(error) => state.push_message(MessageRole::Error, error),
+        },
         SlashCommand::GoalPut { path } => {
             let Some(agent) = agent.as_deref_mut() else {
                 state.push_message(
