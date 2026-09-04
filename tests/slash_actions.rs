@@ -8,6 +8,7 @@ use zenpi::{
     session::SessionStore,
     slash_actions::{self, MAX_SLASH_DIFF_BYTES},
     tools::ToolContext,
+    tui::{MessageRole, SlashDispatchAction, TuiState, dispatch_slash_command},
 };
 
 fn git(root: &std::path::Path, args: &[&str]) {
@@ -232,4 +233,29 @@ fn diff_owner_supports_a_new_repository_without_head() {
     let value = slash_actions::diff_value_at(root, Some("first.txt")).unwrap();
     assert_eq!(value["changed"], true);
     assert!(value["diff"].as_str().unwrap().contains("+initial"));
+}
+
+#[test]
+fn tui_diff_owner_keeps_hunks_as_multiline_transcript_text() {
+    let directory = tempdir().unwrap();
+    let session = SessionStore::open(directory.path().join("session.jsonl")).unwrap();
+    let mut agent = Agent::with_echo(session);
+    agent.set_attachment_workspace(ToolContext::new(std::env::current_dir().unwrap()).unwrap());
+    let mut state = TuiState::default();
+    assert_eq!(
+        dispatch_slash_command(
+            zenpi::slash::SlashCommand::Diff {
+                path: Some("README.md".into()),
+            },
+            &mut state,
+            Some(&mut agent),
+        ),
+        SlashDispatchAction::Continue
+    );
+    let message = state
+        .messages()
+        .find(|message| message.role == MessageRole::System)
+        .expect("diff transcript message");
+    assert!(message.text.starts_with("diff README.md changed="));
+    assert!(message.text.contains("status:") || message.text.contains("truncated="));
 }

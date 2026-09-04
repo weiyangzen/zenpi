@@ -1879,15 +1879,7 @@ pub fn dispatch_slash_command(
         }
         SlashCommand::Diff { path } => {
             match crate::slash_actions::diff_value_for_agent(agent.as_deref(), path.as_deref()) {
-                Ok(data) => state.push_message(
-                    MessageRole::System,
-                    format!(
-                        "diff:\n{}",
-                        bounded_display(
-                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                        )
-                    ),
-                ),
+                Ok(data) => state.push_message(MessageRole::System, format_diff_view(&data)),
                 Err(error) => {
                     state.push_message(MessageRole::Error, format!("diff failed: {error}"))
                 }
@@ -2204,6 +2196,46 @@ fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
 
 fn bounded_display(value: &str) -> String {
     inline_token(value, 512)
+}
+
+/// Render a diff owner response without collapsing its hunks into the short
+/// one-line diagnostic bound used by ordinary slash-command messages.
+fn format_diff_view(value: &serde_json::Value) -> String {
+    let path = value
+        .get("path")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(".");
+    let changed = value
+        .get("changed")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let truncated = value
+        .get("truncated")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let status = value
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    let diff = value
+        .get("diff")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    let mut rendered = format!(
+        "diff {} changed={} truncated={}",
+        bounded_display(path),
+        changed,
+        truncated
+    );
+    if !status.is_empty() {
+        rendered.push_str("\nstatus: ");
+        rendered.push_str(status);
+    }
+    if !diff.is_empty() {
+        rendered.push('\n');
+        rendered.push_str(diff);
+    }
+    rendered
 }
 
 fn signal_status(status: crate::resources::SignalStatus) -> &'static str {
