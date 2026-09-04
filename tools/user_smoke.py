@@ -206,6 +206,24 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
             {
                 "schema_version": 2,
                 "type": "command",
+                "id": "models",
+                "text": "/models",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "doctor",
+                "text": "/doctor",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "help-doctor",
+                "text": "/help doctor",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
                 "id": "diff",
                 "text": "/diff tracked.txt",
             },
@@ -245,12 +263,35 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
         for record in first_records
         if record.get("type") == "response" and record.get("id")
     }
-    for request_id in ("compete", "diff", "attach", "prompt", "shutdown"):
+    for request_id in (
+        "compete",
+        "models",
+        "doctor",
+        "help-doctor",
+        "diff",
+        "attach",
+        "prompt",
+        "shutdown",
+    ):
         response = first_responses.get(request_id, {})
         if response.get("schema_version") != 2 or response.get("success") is not True:
             raise AssertionError(
                 f"missing successful v2 slash-owner response for {request_id}: {first_records!r}"
             )
+
+    models = first_responses["models"].get("data", {})
+    if models.get("command") != "models" or models.get("route") != "local" or not isinstance(
+        models.get("models"), list
+    ):
+        raise AssertionError(f"installed /models did not return its local catalog: {models!r}")
+    doctor = first_responses["doctor"].get("data", {})
+    if doctor.get("command") != "doctor" or doctor.get("accepted") is not True:
+        raise AssertionError(f"installed /doctor was not a successful local check: {doctor!r}")
+    if any(secret in json.dumps(doctor) for secret in ("OPENAI_API_KEY", "sk-")):
+        raise AssertionError(f"installed /doctor leaked credential material: {doctor!r}")
+    help_doctor = first_responses["help-doctor"].get("data", {})
+    if "/doctor" not in help_doctor.get("text", ""):
+        raise AssertionError(f"installed /help doctor omitted command metadata: {help_doctor!r}")
 
     compete = first_responses["compete"].get("data", {})
     if not (
