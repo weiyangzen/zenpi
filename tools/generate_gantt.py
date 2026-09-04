@@ -53,7 +53,7 @@ def main() -> int:
             anchor = "\n## Unscheduled work"
             if anchor not in text:
                 raise SystemExit("gantt generator: missing Unscheduled work heading")
-            text = text.replace(anchor, f"{row}{anchor}", 1)
+            text = text.replace(anchor, f"\n{row}{anchor}", 1)
     fd, temporary = tempfile.mkstemp(prefix=".zenpi-gantt.", dir=GANTT.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:

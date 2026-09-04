@@ -30,6 +30,80 @@ pub const SKILLS_DIR: &str = "skills";
 pub const EXTENSIONS_DIR: &str = "extensions";
 pub const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
+/// A named provider profile. The legacy flat fields in [`ConfigFile`] remain
+/// readable as the implicit `default` profile, while new writes can use this
+/// explicit shape without putting credentials in TOML.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderProfile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire_api: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_env: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_reasoning_effort: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_verbosity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_retries: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_openai_auth: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_websockets: Option<bool>,
+}
+
+impl ProviderProfile {
+    fn from_flat(config: &ConfigFile) -> Self {
+        Self {
+            backend: config.backend.clone(),
+            provider: config.provider.clone(),
+            model: config.model.clone(),
+            base_url: config.base_url.clone(),
+            wire_api: config.wire_api.clone(),
+            auth_env: config.auth_env.clone(),
+            model_reasoning_effort: config.model_reasoning_effort.clone(),
+            model_verbosity: config.model_verbosity.clone(),
+            timeout_seconds: config.timeout_seconds,
+            max_retries: config.max_retries,
+            requires_openai_auth: config.requires_openai_auth,
+            supports_websockets: config.supports_websockets,
+        }
+    }
+
+    fn into_flat(self) -> ConfigFile {
+        ConfigFile {
+            backend: self.backend,
+            provider: self.provider,
+            model: self.model,
+            base_url: self.base_url,
+            wire_api: self.wire_api,
+            auth_env: self.auth_env,
+            model_reasoning_effort: self.model_reasoning_effort,
+            model_verbosity: self.model_verbosity,
+            timeout_seconds: self.timeout_seconds,
+            max_retries: self.max_retries,
+            requires_openai_auth: self.requires_openai_auth,
+            supports_websockets: self.supports_websockets,
+            default_profile: None,
+            profiles: BTreeMap::new(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        self.clone().into_flat().validate_flat()
+    }
+}
+
 /// Paths for the zenpi configuration and auth files.  Tests can construct
 /// this with `for_home`; normal callers should use `discover`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,7 +189,12 @@ impl ConfigPaths {
 /// putting a key in config.toml makes accidental logging and source control
 /// leaks much too easy.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub profiles: BTreeMap<String, ProviderProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backend: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -144,6 +223,23 @@ pub struct ConfigFile {
 
 impl ConfigFile {
     pub fn validate(&self) -> Result<(), ConfigError> {
+        self.validate_flat()?;
+        validate_optional("default_profile", self.default_profile.as_deref(), 128)?;
+        for (name, profile) in &self.profiles {
+            validate_profile_name(name)?;
+            profile.validate()?;
+        }
+        if let Some(selected) = &self.default_profile
+            && !self.profiles.contains_key(selected)
+        {
+            return Err(ConfigError::Invalid(format!(
+                "default_profile `{selected}` does not exist"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_flat(&self) -> Result<(), ConfigError> {
         validate_optional("backend", self.backend.as_deref(), 64)?;
         validate_optional("provider", self.provider.as_deref(), 128)?;
         validate_optional("model", self.model.as_deref(), 256)?;
@@ -189,6 +285,24 @@ impl ConfigFile {
         }
         Ok(())
     }
+
+    pub fn selected_profile(
+        &self,
+        requested: Option<&str>,
+    ) -> Result<(Option<String>, Self), ConfigError> {
+        let selected = requested.or(self.default_profile.as_deref());
+        let Some(name) = selected else {
+            let mut flat = self.clone();
+            flat.default_profile = None;
+            flat.profiles.clear();
+            return Ok((None, flat));
+        };
+        validate_profile_name(name)?;
+        let profile = self.profiles.get(name).ok_or_else(|| {
+            ConfigError::Invalid(format!("provider profile `{name}` does not exist"))
+        })?;
+        Ok((Some(name.to_owned()), profile.clone().into_flat()))
+    }
 }
 
 /// JSON auth storage is intentionally a map so pairing preserves credentials
@@ -215,12 +329,7 @@ impl AuthFile {
 
     pub fn set_openai_api_key(&mut self, key: impl Into<String>) -> Result<(), ConfigError> {
         let key = key.into();
-        if key.trim().is_empty() || key.chars().any(char::is_control) || key.len() > 16 * 1024 {
-            return Err(ConfigError::Invalid(
-                "OPENAI_API_KEY must be non-empty, bounded, and contain no control characters"
-                    .into(),
-            ));
-        }
+        validate_api_key(&key)?;
         self.0.insert(OPENAI_API_KEY.to_owned(), Value::String(key));
         Ok(())
     }
@@ -228,12 +337,73 @@ impl AuthFile {
     pub fn remove_openai_api_key(&mut self) -> bool {
         self.0.remove(OPENAI_API_KEY).is_some()
     }
+
+    pub fn api_key_for_profile(&self, profile: Option<&str>) -> Option<&str> {
+        match profile {
+            Some(name) => self
+                .0
+                .get("profiles")
+                .and_then(Value::as_object)
+                .and_then(|profiles| profiles.get(name))
+                .and_then(Value::as_object)
+                .and_then(|profile| {
+                    profile
+                        .get("api_key")
+                        .or_else(|| profile.get(OPENAI_API_KEY))
+                })
+                .and_then(Value::as_str),
+            None => self.openai_api_key(),
+        }
+    }
+
+    pub fn set_profile_api_key(
+        &mut self,
+        profile: &str,
+        key: impl Into<String>,
+    ) -> Result<(), ConfigError> {
+        validate_profile_name(profile)?;
+        let key = key.into();
+        validate_api_key(&key)?;
+        let profiles = self
+            .0
+            .entry("profiles".into())
+            .or_insert_with(|| Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .ok_or_else(|| ConfigError::Invalid("auth profiles must be an object".into()))?;
+        let profile_value = profiles
+            .entry(profile.to_owned())
+            .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        let fields = profile_value
+            .as_object_mut()
+            .ok_or_else(|| ConfigError::Invalid("auth profile must be an object".into()))?;
+        fields.insert("api_key".into(), Value::String(key));
+        Ok(())
+    }
+
+    pub fn remove_profile_api_key(&mut self, profile: &str) -> Result<bool, ConfigError> {
+        validate_profile_name(profile)?;
+        let Some(profiles) = self.0.get_mut("profiles").and_then(Value::as_object_mut) else {
+            return Ok(false);
+        };
+        let Some(fields) = profiles.get_mut(profile).and_then(Value::as_object_mut) else {
+            return Ok(false);
+        };
+        let changed = fields.remove("api_key").is_some() | fields.remove(OPENAI_API_KEY).is_some();
+        if fields.is_empty() {
+            profiles.remove(profile);
+        }
+        if profiles.is_empty() {
+            self.0.remove("profiles");
+        }
+        Ok(changed)
+    }
 }
 
 /// Explicit command-line overrides.  `None` means no override, not an empty
 /// value.  The CLI parser can fill this directly without reading secrets.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigOverrides {
+    pub profile: Option<String>,
     pub backend: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -260,6 +430,7 @@ pub enum CredentialSource {
 /// the custom Debug implementation, but remains available to backend setup.
 #[derive(Clone, PartialEq, Eq)]
 pub struct EffectiveConfig {
+    pub profile: Option<String>,
     pub backend: String,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -279,6 +450,7 @@ impl std::fmt::Debug for EffectiveConfig {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("EffectiveConfig")
+            .field("profile", &self.profile)
             .field("backend", &self.backend)
             .field("provider", &self.provider)
             .field("model", &self.model)
@@ -306,6 +478,12 @@ pub fn resolve(
     environment: &BTreeMap<String, String>,
 ) -> Result<EffectiveConfig, ConfigError> {
     config.validate()?;
+    let requested_profile = overrides
+        .profile
+        .as_deref()
+        .or_else(|| environment.get("ZENPI_PROFILE").map(String::as_str));
+    let (profile, selected) = config.selected_profile(requested_profile)?;
+    let config = &selected;
     let backend = choose(
         overrides.backend.as_deref(),
         environment.get("ZENPI_BACKEND").map(String::as_str),
@@ -383,8 +561,9 @@ pub fn resolve(
         (Some(key.clone()), CredentialSource::Environment)
     } else {
         (
-            auth.openai_api_key().map(str::to_owned),
-            if auth.openai_api_key().is_some() {
+            auth.api_key_for_profile(profile.as_deref())
+                .map(str::to_owned),
+            if auth.api_key_for_profile(profile.as_deref()).is_some() {
                 CredentialSource::AuthFile
             } else {
                 CredentialSource::None
@@ -397,6 +576,7 @@ pub fn resolve(
         return Err(ConfigError::Invalid("API key is invalid".into()));
     }
     Ok(EffectiveConfig {
+        profile,
         backend,
         provider,
         model,
@@ -422,7 +602,17 @@ pub fn resolve_default(overrides: &ConfigOverrides) -> Result<EffectiveConfig, C
     // A fresh zenpi install should work with the provider the user already
     // configured for Codex. This fallback is read-only; `config import-codex`
     // remains the explicit persistence command.
-    if (config.base_url.is_none() || config.model.is_none() || auth.openai_api_key().is_none())
+    let environment_profile = env::var("ZENPI_PROFILE").ok();
+    let requested_profile = overrides
+        .profile
+        .as_deref()
+        .or(environment_profile.as_deref());
+    let (_, effective_file) = config.selected_profile(requested_profile)?;
+    if (effective_file.base_url.is_none()
+        || effective_file.model.is_none()
+        || auth
+            .api_key_for_profile(requested_profile.or(config.default_profile.as_deref()))
+            .is_none())
         && let Ok(import) = import_codex_from_root(codex_root()?)
     {
         if config.provider.is_none() {
@@ -452,7 +642,9 @@ pub fn resolve_default(overrides: &ConfigOverrides) -> Result<EffectiveConfig, C
         if config.supports_websockets.is_none() {
             config.supports_websockets = import.config.supports_websockets;
         }
-        if auth.openai_api_key().is_none()
+        if auth
+            .api_key_for_profile(requested_profile.or(config.default_profile.as_deref()))
+            .is_none()
             && let Some(key) = import.api_key
         {
             auth.set_openai_api_key(key)?;
@@ -561,6 +753,8 @@ fn import_codex_from_root(codex_root: impl AsRef<Path>) -> Result<CodexImport, C
             .map(str::to_owned)
     });
     let config = ConfigFile {
+        default_profile: None,
+        profiles: BTreeMap::new(),
         backend: Some("openai".into()),
         provider,
         model,
@@ -616,6 +810,33 @@ pub fn import_codex() -> Result<ConfigSummary, ConfigError> {
         changed: Some(pair.changed),
         status,
     })
+}
+
+/// Import Codex into an explicit profile and make that profile active. This
+/// is the preferred new-file representation; the legacy flat import remains
+/// available so existing installations are not rewritten unexpectedly.
+pub fn import_codex_profile(profile: &str) -> Result<ConfigSummary, ConfigError> {
+    validate_profile_name(profile)?;
+    let paths = ConfigPaths::discover()?;
+    let import = import_codex_from_root(codex_root()?)?;
+    paths.ensure_root()?;
+    let mut config = load_config(&paths)?;
+    config.profiles.insert(
+        profile.to_owned(),
+        ProviderProfile::from_flat(&import.config),
+    );
+    config.default_profile = Some(profile.to_owned());
+    config.validate()?;
+    let mut auth = load_auth(&paths)?;
+    if let Some(key) = import.api_key {
+        auth.set_profile_api_key(profile, key)?;
+    }
+    let config_changed = save_config(&paths, &config)?;
+    let auth_changed = save_auth(&paths, &auth)?;
+    let mut summary = doctor_for_profile(&paths, Some(profile))?;
+    summary.operation = "import-codex".into();
+    summary.changed = Some(config_changed || auth_changed);
+    Ok(summary)
 }
 
 fn pair_from_codex_with_source(
@@ -699,11 +920,73 @@ fn pair_from_codex_with_root(
 /// only provider metadata and credential presence/source, never a key.
 pub fn doctor() -> Result<ConfigSummary, ConfigError> {
     let paths = ConfigPaths::discover()?;
+    doctor_for_profile(&paths, None)
+}
+
+pub fn doctor_for_profile(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+) -> Result<ConfigSummary, ConfigError> {
     Ok(ConfigSummary {
         operation: "doctor".into(),
         changed: None,
-        status: status(&paths)?,
+        status: status_for_profile(paths, profile)?,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProfileSummary {
+    pub name: String,
+    pub active: bool,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub wire_api: Option<String>,
+    pub api_key_present: bool,
+}
+
+pub fn list_profiles(paths: &ConfigPaths) -> Result<Vec<ProfileSummary>, ConfigError> {
+    let config = load_config(paths)?;
+    let auth = load_auth(paths)?;
+    let mut profiles = Vec::with_capacity(config.profiles.len());
+    for (name, profile) in &config.profiles {
+        profiles.push(ProfileSummary {
+            name: name.clone(),
+            active: config.default_profile.as_deref() == Some(name),
+            provider: profile.provider.clone(),
+            model: profile.model.clone(),
+            base_url: profile.base_url.as_deref().map(redacted_endpoint),
+            wire_api: profile.wire_api.clone(),
+            api_key_present: auth.api_key_for_profile(Some(name)).is_some(),
+        });
+    }
+    Ok(profiles)
+}
+
+pub fn use_profile(paths: &ConfigPaths, profile: &str) -> Result<bool, ConfigError> {
+    validate_profile_name(profile)?;
+    let mut config = load_config(paths)?;
+    if !config.profiles.contains_key(profile) {
+        return Err(ConfigError::Invalid(format!(
+            "provider profile `{profile}` does not exist"
+        )));
+    }
+    config.default_profile = Some(profile.to_owned());
+    save_config(paths, &config)
+}
+
+/// Remove only credentials owned by zenpi. Codex config/auth files are never
+/// opened for writing by this path.
+pub fn revoke(paths: &ConfigPaths, profile: Option<&str>) -> Result<bool, ConfigError> {
+    let mut auth = load_auth(paths)?;
+    let changed = match profile {
+        Some(profile) => auth.remove_profile_api_key(profile)?,
+        None => auth.remove_openai_api_key(),
+    };
+    if changed {
+        save_auth(paths, &auth)?;
+    }
+    Ok(changed)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -722,9 +1005,10 @@ impl ConfigSummary {
             .changed
             .map_or_else(String::new, |value| format!(" changed={value}"));
         format!(
-            "zenpi {operation}:{changed} backend={backend} provider={provider} model={model} base_url={base_url} wire_api={wire_api} api_key={key}",
+            "zenpi {operation}:{changed} profile={profile} backend={backend} provider={provider} model={model} base_url={base_url} wire_api={wire_api} api_key={key}",
             operation = self.operation,
             changed = changed,
+            profile = self.status.profile.as_deref().unwrap_or("default"),
             backend = self.status.backend,
             provider = self.status.provider.as_deref().unwrap_or("-"),
             model = self.status.model.as_deref().unwrap_or("-"),
@@ -767,6 +1051,7 @@ pub struct PairReport {
 /// carries the key itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigStatus {
+    pub profile: Option<String>,
     pub config_exists: bool,
     pub auth_exists: bool,
     pub backend: String,
@@ -781,20 +1066,39 @@ pub struct ConfigStatus {
 }
 
 pub fn status(paths: &ConfigPaths) -> Result<ConfigStatus, ConfigError> {
+    status_for_profile(paths, None)
+}
+
+pub fn status_for_profile(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+) -> Result<ConfigStatus, ConfigError> {
     let config_exists = paths.config.exists();
     let auth_exists = paths.auth.exists();
     // Use the same read-only Codex fallback as runtime resolution for the
     // process-wide profile.  Explicit test/custom paths remain isolated and
     // report only the files represented by that path.
     let resolved = if ConfigPaths::discover().ok().as_ref() == Some(paths) {
-        resolve_default(&ConfigOverrides::default())?
+        resolve_default(&ConfigOverrides {
+            profile: profile.map(str::to_owned),
+            ..ConfigOverrides::default()
+        })?
     } else {
         let config = load_config(paths)?;
         let auth = load_auth(paths)?;
         let environment = env::vars().collect::<BTreeMap<_, _>>();
-        resolve(&ConfigOverrides::default(), &config, &auth, &environment)?
+        resolve(
+            &ConfigOverrides {
+                profile: profile.map(str::to_owned),
+                ..ConfigOverrides::default()
+            },
+            &config,
+            &auth,
+            &environment,
+        )?
     };
     Ok(ConfigStatus {
+        profile: resolved.profile,
         config_exists,
         auth_exists,
         backend: resolved.backend,
@@ -985,6 +1289,29 @@ fn validate_optional(name: &str, value: Option<&str>, max: usize) -> Result<(), 
         && (value.trim().is_empty() || value.len() > max || value.chars().any(char::is_control))
     {
         return Err(ConfigError::Invalid(format!("{name} is invalid")));
+    }
+    Ok(())
+}
+
+fn validate_profile_name(name: &str) -> Result<(), ConfigError> {
+    if name.is_empty()
+        || name.len() > 128
+        || name
+            .chars()
+            .any(|character| !(character.is_ascii_alphanumeric() || matches!(character, '_' | '-')))
+    {
+        return Err(ConfigError::Invalid(
+            "profile name must use 1-128 ASCII letters, digits, `_`, or `-`".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_api_key(key: &str) -> Result<(), ConfigError> {
+    if key.trim().is_empty() || key.chars().any(char::is_control) || key.len() > 16 * 1024 {
+        return Err(ConfigError::Invalid(
+            "API key must be non-empty, bounded, and contain no control characters".into(),
+        ));
     }
     Ok(())
 }

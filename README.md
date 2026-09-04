@@ -29,7 +29,7 @@ cargo install --path . --locked
 zenpi --help
 
 # Pair with the provider already configured for Codex.
-zenpi config import-codex
+zenpi config import-codex --profile codex
 zenpi config doctor
 
 # Interactive terminal mode, using the imported provider.
@@ -38,6 +38,14 @@ zenpi --mode tui
 # Scriptable JSONL mode.
 printf '%s\n' '{"type":"prompt","id":"1","text":"Say hello"}' \
   | zenpi --mode headless --session ./session.jsonl
+```
+
+Named profiles can be inspected and switched without exposing credentials:
+
+```bash
+zenpi config list
+zenpi config use codex
+zenpi config doctor --profile codex --json
 ```
 
 The production default is the configured OpenAI-compatible provider. zenpi
@@ -117,7 +125,7 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 provider 工作在后台执行，TUI/headless 在流式响应期间仍可处理输入和取消。
 
 生产默认 backend 是配置的 OpenAI-compatible provider，不再静默使用
-`echo`。首次使用先执行 `zenpi config import-codex`，它从
+`echo`。首次使用先执行 `zenpi config import-codex --profile codex`，它从
 `~/.codex/config.toml` 读取 URL、Responses API 和模型，从
 `~/.codex/auth.json` 读取 key，并将非 secret 配置写入
 `~/.zenpi/config.toml`、key 写入权限为 0600 的 `~/.zenpi/auth.json`。
@@ -147,7 +155,7 @@ b3ehive handoff レコードを共有します。headless は一本のパイプ�
 TUI はフレームをまとめ、端末バッファ差分を使うため、リサイズや高速な応答
 更新でも不要な全画面再描画を避けます。
 本番の既定 backend は設定済みの OpenAI-compatible provider です。暗黙の
-`echo` mock は使いません。最短手順は `zenpi config import-codex`、
+`echo` mock は使いません。最短手順は `zenpi config import-codex --profile codex`、
 `zenpi config doctor`、`zenpi --mode tui` です。最初のコマンドは
 `~/.codex/config.toml` の URL、Responses API、モデルと
 `~/.codex/auth.json` の key を読み、`~/.zenpi/config.toml` と権限 0600 の

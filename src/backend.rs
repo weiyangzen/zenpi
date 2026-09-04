@@ -5,7 +5,12 @@
 //! returns one normalized completion.  This keeps the headless and TUI modes
 //! behaviorally identical and makes a deterministic backend useful in tests.
 
-use std::{env, str::FromStr, time::Duration};
+use std::{
+    env,
+    str::FromStr,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -17,6 +22,45 @@ use crate::tools::{ToolCall, ToolDefinition};
 /// Keep provider responses bounded even when an endpoint omits a content
 /// length.  The core applies the smaller per-turn text limit afterwards.
 pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProviderCapabilities {
+    pub text: bool,
+    pub images: bool,
+    pub tools: bool,
+    pub structured_output: bool,
+    pub streaming: bool,
+    pub reasoning: bool,
+}
+
+impl ProviderCapabilities {
+    pub const fn for_wire_api(wire_api: OpenAiWireApi) -> Self {
+        match wire_api {
+            OpenAiWireApi::Responses => Self {
+                text: true,
+                images: true,
+                tools: true,
+                structured_output: true,
+                streaming: true,
+                reasoning: true,
+            },
+            OpenAiWireApi::ChatCompletions => Self {
+                text: true,
+                images: true,
+                tools: true,
+                structured_output: true,
+                streaming: false,
+                reasoning: false,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct CircuitState {
+    consecutive_failures: u32,
+    open_until: Option<Instant>,
+}
 
 /// A normalized request independent of the provider protocol.
 #[derive(Debug)]
@@ -320,6 +364,7 @@ pub struct OpenAiCompatibleBackend {
     reasoning_effort: Option<String>,
     verbosity: Option<String>,
     max_retries: u32,
+    circuit: Mutex<CircuitState>,
 }
 
 impl std::fmt::Debug for OpenAiCompatibleBackend {
@@ -333,6 +378,7 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("reasoning_effort", &self.reasoning_effort)
             .field("verbosity", &self.verbosity)
             .field("max_retries", &self.max_retries)
+            .field("capabilities", &self.capabilities())
             .finish()
     }
 }
@@ -432,6 +478,7 @@ impl OpenAiCompatibleBackend {
             reasoning_effort,
             verbosity,
             max_retries: 0,
+            circuit: Mutex::new(CircuitState::default()),
         })
     }
 
@@ -522,6 +569,10 @@ impl OpenAiCompatibleBackend {
 
     pub const fn wire_api(&self) -> OpenAiWireApi {
         self.wire_api
+    }
+
+    pub const fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities::for_wire_api(self.wire_api)
     }
 
     pub fn with_max_retries(mut self, max_retries: u32) -> Result<Self, BackendError> {
@@ -696,7 +747,8 @@ impl OpenAiCompatibleBackend {
         let mut request_builder = self
             .client
             .post(&self.endpoint)
-            .header("content-type", "application/json");
+            .header("content-type", "application/json")
+            .header("x-idempotency-key", idempotency_key(request.turn_id));
         if let Some(key) = &self.api_key {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
         }
@@ -754,6 +806,21 @@ impl Backend for OpenAiCompatibleBackend {
         cancelled: &dyn Fn() -> bool,
         sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
     ) -> Result<Completion, BackendError> {
+        {
+            let mut circuit = self
+                .circuit
+                .lock()
+                .map_err(|_| BackendError::Transport("provider circuit lock poisoned".into()))?;
+            if circuit
+                .open_until
+                .is_some_and(|until| until > Instant::now())
+            {
+                return Err(BackendError::Transport(
+                    "provider circuit is temporarily open".into(),
+                ));
+            }
+            circuit.open_until = None;
+        }
         let mut attempt = 0_u32;
         loop {
             let result = self.complete_openai(
@@ -772,6 +839,23 @@ impl Backend for OpenAiCompatibleBackend {
                 .as_ref()
                 .is_err_and(|error| error.is_retryable() && attempt < self.max_retries);
             if !should_retry {
+                let mut circuit = self.circuit.lock().map_err(|_| {
+                    BackendError::Transport("provider circuit lock poisoned".into())
+                })?;
+                match &result {
+                    Ok(_) => {
+                        circuit.consecutive_failures = 0;
+                        circuit.open_until = None;
+                    }
+                    Err(error) if error.is_retryable() => {
+                        circuit.consecutive_failures =
+                            circuit.consecutive_failures.saturating_add(1);
+                        if circuit.consecutive_failures >= 3 {
+                            circuit.open_until = Some(Instant::now() + Duration::from_secs(2));
+                        }
+                    }
+                    Err(_) => {}
+                }
                 return result;
             }
             attempt = attempt.saturating_add(1);
@@ -798,6 +882,15 @@ impl Backend for OpenAiCompatibleBackend {
     fn model(&self) -> Option<&str> {
         Some(&self.model)
     }
+}
+
+fn idempotency_key(turn_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut digest = Sha256::new();
+    digest.update(b"zenpi-provider-turn-v1\0");
+    digest.update(turn_id.as_bytes());
+    format!("zenpi-{:x}", digest.finalize())
 }
 
 fn chat_message(turn: &Turn) -> Value {

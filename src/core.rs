@@ -271,6 +271,8 @@ pub struct Agent {
     last_error: Option<String>,
     events: Vec<AgentEvent>,
     tools: Option<ToolRuntime>,
+    context_budget: crate::context::ContextBudget,
+    skills: crate::skills::SkillSet,
 }
 
 struct ToolRuntime {
@@ -307,6 +309,8 @@ impl Agent {
             last_error: None,
             events: Vec::new(),
             tools: None,
+            context_budget: crate::context::ContextBudget::default(),
+            skills: crate::skills::SkillSet::default(),
         }
     }
 
@@ -409,6 +413,14 @@ impl Agent {
 
     pub fn approval_coordinator(&self) -> Option<ApprovalCoordinator> {
         self.tools.as_ref().map(|runtime| runtime.approval.clone())
+    }
+
+    pub fn set_context_budget(&mut self, budget: crate::context::ContextBudget) {
+        self.context_budget = budget;
+    }
+
+    pub fn set_skills(&mut self, skills: crate::skills::SkillSet) {
+        self.skills = skills;
     }
 
     /// Admit a request without invoking the backend.  This named boundary is
@@ -696,12 +708,26 @@ impl Agent {
                 .as_ref()
                 .map(|runtime| runtime.registry.definitions())
                 .unwrap_or_default();
+            let prepared = crate::context::prepare_context(
+                self.session.turns(),
+                self.context_budget,
+                is_cancelled,
+            )
+            .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+            if let Some(checkpoint) = &prepared.checkpoint {
+                self.session.append_event(serde_json::json!({
+                    "type": "context_compacted",
+                    "checkpoint": checkpoint,
+                }))?;
+            }
+            let instructions = self.skills.instructions();
             let request = CompletionRequest::new(
                 turn_id,
-                self.session.turns(),
+                &prepared.turns,
                 self.model.as_deref(),
                 &definitions,
-            );
+            )
+            .with_instructions((!instructions.is_empty()).then_some(instructions.as_str()));
             let completion =
                 self.backend
                     .complete_with_control(request, is_cancelled, &mut |event| {
@@ -877,17 +903,18 @@ impl Agent {
                                 },
                             },
                         },
-                        None => {
-                            runtime
-                                .registry
-                                .execute(&runtime.context, runtime.policy, call.clone())
-                        }
+                        None => runtime.registry.execute_compact(
+                            &runtime.context,
+                            runtime.policy,
+                            call.clone(),
+                        ),
                     }
                 } else {
                     runtime
                         .registry
-                        .execute(&runtime.context, runtime.policy, call.clone())
+                        .execute_compact(&runtime.context, runtime.policy, call.clone())
                 };
+                let result = crate::tools::compact_tool_result(&runtime.context, result)?;
                 if matches!(
                     &result,
                     crate::tools::ToolResult::Error {
@@ -1053,6 +1080,9 @@ pub struct CliOptions {
     pub backend_explicit: bool,
     pub model: Option<String>,
     pub command: Option<CliCommand>,
+    pub command_value: Option<String>,
+    pub json: bool,
+    pub yes: bool,
     pub help: bool,
 }
 
@@ -1060,8 +1090,11 @@ pub struct CliOptions {
 pub enum CliCommand {
     ConfigImportCodex,
     ConfigDoctor,
+    ConfigList,
+    ConfigUse,
     PairImportCodex,
     PairStatus,
+    PairRevoke,
 }
 
 impl Default for CliOptions {
@@ -1073,6 +1106,9 @@ impl Default for CliOptions {
             backend_explicit: false,
             model: None,
             command: None,
+            command_value: None,
+            json: false,
+            yes: false,
             help: false,
         }
     }
@@ -1096,18 +1132,61 @@ where
         options.command = Some(match (group.as_str(), action.as_str()) {
             ("config", "import-codex") => CliCommand::ConfigImportCodex,
             ("config", "doctor") => CliCommand::ConfigDoctor,
+            ("config", "list") => CliCommand::ConfigList,
+            ("config", "use") => CliCommand::ConfigUse,
             ("pair", "import-codex") => CliCommand::PairImportCodex,
             ("pair", "status") => CliCommand::PairStatus,
+            ("pair", "revoke") => CliCommand::PairRevoke,
             _ => {
                 return Err(ZenpiError::arguments(format!(
                     "unknown {group} action `{action}`"
                 )));
             }
         });
-        if args.next().is_some() {
-            return Err(ZenpiError::arguments(format!(
-                "{group} {action} does not accept additional arguments"
-            )));
+        while let Some(argument) = args.next() {
+            match argument.as_str() {
+                "--json"
+                    if matches!(
+                        options.command,
+                        Some(
+                            CliCommand::ConfigDoctor
+                                | CliCommand::ConfigList
+                                | CliCommand::PairStatus
+                        )
+                    ) =>
+                {
+                    options.json = true;
+                }
+                "--yes" if matches!(options.command, Some(CliCommand::PairRevoke)) => {
+                    options.yes = true;
+                }
+                "--profile" => {
+                    options.command_value = Some(
+                        args.next()
+                            .ok_or_else(|| ZenpiError::arguments("--profile requires a name"))?,
+                    );
+                }
+                value
+                    if matches!(options.command, Some(CliCommand::ConfigUse))
+                        && options.command_value.is_none() =>
+                {
+                    options.command_value = Some(value.to_owned());
+                }
+                _ => {
+                    return Err(ZenpiError::arguments(format!(
+                        "unsupported argument for {group} {action}: `{argument}`"
+                    )));
+                }
+            }
+        }
+        if matches!(options.command, Some(CliCommand::ConfigUse)) && options.command_value.is_none()
+        {
+            return Err(ZenpiError::arguments("config use requires a profile name"));
+        }
+        if matches!(options.command, Some(CliCommand::PairRevoke)) && !options.yes {
+            return Err(ZenpiError::arguments(
+                "pair revoke requires --yes confirmation",
+            ));
         }
         return Ok(options);
     }
@@ -1250,8 +1329,10 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
 
 fn print_help() {
     println!("zenpi [--mode tui|headless] [--session PATH] [--backend openai] [--model NAME]");
-    println!("zenpi config import-codex|doctor");
-    println!("zenpi pair import-codex|status");
+    println!("zenpi config import-codex [--profile NAME]");
+    println!("zenpi config doctor [--profile NAME] [--json]");
+    println!("zenpi config list [--json] | config use NAME");
+    println!("zenpi pair import-codex|status|revoke --yes [--profile NAME]");
     println!(
         "default provider: ~/.zenpi (or read-only ~/.codex fallback); echo exists only in dev-fixtures builds"
     );
@@ -1267,14 +1348,75 @@ pub fn run() -> Result<(), ZenpiError> {
     if let Some(command) = options.command {
         return match command {
             CliCommand::ConfigImportCodex | CliCommand::PairImportCodex => {
-                let summary = crate::config::import_codex()?;
+                let summary = match options.command_value.as_deref() {
+                    Some(profile) => crate::config::import_codex_profile(profile)?,
+                    None => crate::config::import_codex()?,
+                };
                 println!("{}", summary.display());
                 Ok(())
             }
             CliCommand::ConfigDoctor | CliCommand::PairStatus => {
                 let paths = crate::config::ConfigPaths::discover()?;
-                let report = crate::config::status(&paths)?;
-                print_config_status(&report);
+                let report =
+                    crate::config::status_for_profile(&paths, options.command_value.as_deref())?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&report)
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else {
+                    print_config_status(&report);
+                }
+                Ok(())
+            }
+            CliCommand::ConfigList => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let profiles = crate::config::list_profiles(&paths)?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&profiles)
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else if profiles.is_empty() {
+                    println!(
+                        "no named profiles (legacy default configuration may still be active)"
+                    );
+                } else {
+                    for profile in profiles {
+                        println!(
+                            "{}{} provider={} model={} base_url={} wire_api={} api_key={}",
+                            if profile.active { "* " } else { "  " },
+                            profile.name,
+                            display_option(profile.provider.as_deref()),
+                            display_option(profile.model.as_deref()),
+                            display_option(profile.base_url.as_deref()),
+                            display_option(profile.wire_api.as_deref()),
+                            if profile.api_key_present {
+                                "present"
+                            } else {
+                                "missing"
+                            },
+                        );
+                    }
+                }
+                Ok(())
+            }
+            CliCommand::ConfigUse => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let profile = options
+                    .command_value
+                    .as_deref()
+                    .ok_or_else(|| ZenpiError::arguments("config use requires a profile name"))?;
+                let changed = crate::config::use_profile(&paths, profile)?;
+                println!("profile={profile} changed={changed}");
+                Ok(())
+            }
+            CliCommand::PairRevoke => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let changed = crate::config::revoke(&paths, options.command_value.as_deref())?;
+                println!("revoked={changed}");
                 Ok(())
             }
         };
@@ -1302,6 +1444,11 @@ pub fn run() -> Result<(), ZenpiError> {
         mode: approval_mode,
         ..crate::approval::ApprovalPolicy::default()
     });
+    let paths = crate::config::ConfigPaths::discover()?;
+    let project_skills = env::current_dir()?.join(".zenpi").join("skills");
+    let skills = crate::skills::SkillSet::load(&paths.skills, &project_skills)
+        .map_err(|error| ZenpiError::Message(format!("skill loading: {error}")))?;
+    agent.set_skills(skills);
     if let Some(model) = options.model {
         agent.set_model(Some(model))?;
     }
@@ -1317,9 +1464,12 @@ fn display_option(value: Option<&str>) -> &str {
 }
 
 fn print_config_status(report: &crate::config::ConfigStatus) {
+    println!("profile={}", display_option(report.profile.as_deref()));
     println!(
         "ready={}",
-        report.api_key_present && report.base_url.is_some() && report.model.is_some()
+        (!report.requires_openai_auth || report.api_key_present)
+            && report.base_url.is_some()
+            && report.model.is_some()
     );
     println!("backend={}", report.backend);
     println!("provider={}", display_option(report.provider.as_deref()));

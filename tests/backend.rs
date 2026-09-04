@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 use tempfile::tempdir;
-use zenpi::backend::{OpenAiCompatibleBackend, OpenAiWireApi};
+use zenpi::backend::{OpenAiCompatibleBackend, OpenAiWireApi, ProviderCapabilities};
 use zenpi::core::{Agent, TurnInputRequest};
 use zenpi::session::SessionStore;
 
@@ -173,5 +173,93 @@ fn responses_backend_works_against_local_fixture() {
     let assistant = result.assistant.unwrap();
     assert_eq!(assistant.content, "responses answer");
     assert_eq!(assistant.metadata.unwrap()["usage"]["total_tokens"], 9);
+    server.join().unwrap().unwrap();
+}
+
+#[test]
+fn capabilities_are_explicit_per_adapter() {
+    let responses = ProviderCapabilities::for_wire_api(OpenAiWireApi::Responses);
+    assert!(responses.text && responses.tools && responses.streaming && responses.reasoning);
+    let chat = ProviderCapabilities::for_wire_api(OpenAiWireApi::ChatCompletions);
+    assert!(chat.text && chat.tools);
+    assert!(!chat.streaming);
+    assert!(!chat.reasoning);
+}
+
+#[test]
+fn retry_reuses_a_stable_idempotency_key() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || -> Result<(), String> {
+        let mut keys = Vec::new();
+        for attempt in 0..2 {
+            let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 4096];
+            loop {
+                let count = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if count == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..count]);
+                if request.windows(4).any(|part| part == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let headers = String::from_utf8_lossy(&request);
+            let key = headers
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':')
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("x-idempotency-key"))
+                        .map(|(_, value)| value.trim().to_owned())
+                })
+                .ok_or_else(|| "missing idempotency key".to_owned())?;
+            keys.push(key);
+            if attempt == 0 {
+                write!(
+                    stream,
+                    "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+                .map_err(|error| error.to_string())?;
+            } else {
+                let payload = "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"retried\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"retry-id\"}}\n\n";
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    payload.len(),
+                    payload
+                )
+                .map_err(|error| error.to_string())?;
+            }
+        }
+        if keys.len() != 2 || keys[0] != keys[1] {
+            return Err(format!("idempotency key changed across retry: {keys:?}"));
+        }
+        Ok(())
+    });
+    let backend = OpenAiCompatibleBackend::new_with_wire_api(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+    )
+    .unwrap()
+    .with_max_retries(1)
+    .unwrap();
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(dir.path().join("retry.jsonl")).unwrap(),
+        Box::new(backend),
+    );
+    assert_eq!(
+        agent
+            .process(TurnInputRequest::new("retry this"))
+            .unwrap()
+            .assistant
+            .unwrap()
+            .content,
+        "retried"
+    );
     server.join().unwrap().unwrap();
 }

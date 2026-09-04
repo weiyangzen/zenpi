@@ -2,8 +2,9 @@ use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 use tempfile::tempdir;
 use zenpi::config::{
-    AuthFile, ConfigFile, ConfigOverrides, ConfigPaths, CredentialSource, load_auth, load_config,
-    pair_from_codex, resolve, status,
+    AuthFile, ConfigFile, ConfigOverrides, ConfigPaths, CredentialSource, ProviderProfile,
+    list_profiles, load_auth, load_config, pair_from_codex, resolve, revoke, save_auth,
+    save_config, status, use_profile,
 };
 
 fn write_codex_fixture(home: &Path, key: &str) {
@@ -240,4 +241,162 @@ wire_api = "responses"
     let report = pair_from_codex(&paths).unwrap();
     assert!(!report.key_imported);
     assert_eq!(load_auth(&paths).unwrap().openai_api_key(), None);
+}
+
+#[test]
+fn named_profiles_select_list_and_revoke_without_touching_other_credentials() {
+    let home = tempdir().unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+    let mut profiles = BTreeMap::new();
+    profiles.insert(
+        "first".into(),
+        ProviderProfile {
+            backend: Some("openai".into()),
+            provider: Some("First".into()),
+            model: Some("model-1".into()),
+            base_url: Some("http://first.example/v1".into()),
+            wire_api: Some("responses".into()),
+            requires_openai_auth: Some(true),
+            ..ProviderProfile::default()
+        },
+    );
+    profiles.insert(
+        "second".into(),
+        ProviderProfile {
+            backend: Some("openai".into()),
+            provider: Some("Second".into()),
+            model: Some("model-2".into()),
+            base_url: Some("http://second.example/v1".into()),
+            wire_api: Some("chat".into()),
+            requires_openai_auth: Some(true),
+            ..ProviderProfile::default()
+        },
+    );
+    save_config(
+        &paths,
+        &ConfigFile {
+            default_profile: Some("first".into()),
+            profiles,
+            ..ConfigFile::default()
+        },
+    )
+    .unwrap();
+    let mut auth = AuthFile::default();
+    auth.set_profile_api_key("first", "secret-first").unwrap();
+    auth.set_profile_api_key("second", "secret-second").unwrap();
+    auth.0.insert("unrelated".into(), serde_json::json!("keep"));
+    save_auth(&paths, &auth).unwrap();
+
+    let selected = resolve(
+        &ConfigOverrides::default(),
+        &load_config(&paths).unwrap(),
+        &load_auth(&paths).unwrap(),
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    assert_eq!(selected.profile.as_deref(), Some("first"));
+    assert_eq!(selected.model.as_deref(), Some("model-1"));
+    assert_eq!(selected.api_key.as_deref(), Some("secret-first"));
+
+    assert!(use_profile(&paths, "second").unwrap());
+    let listed = list_profiles(&paths).unwrap();
+    assert_eq!(listed.len(), 2);
+    assert!(
+        listed
+            .iter()
+            .any(|profile| profile.name == "second" && profile.active)
+    );
+    assert!(!format!("{listed:?}").contains("secret-"));
+
+    assert!(revoke(&paths, Some("second")).unwrap());
+    let auth = load_auth(&paths).unwrap();
+    assert_eq!(auth.api_key_for_profile(Some("second")), None);
+    assert_eq!(
+        auth.api_key_for_profile(Some("first")),
+        Some("secret-first")
+    );
+    assert_eq!(auth.0.get("unrelated"), Some(&serde_json::json!("keep")));
+}
+
+#[test]
+fn config_cli_supports_profile_json_list_use_and_confirmed_revoke() {
+    let temp = tempdir().unwrap();
+    let codex_home = temp.path().join("codex");
+    let zenpi_home = temp.path().join("zenpi");
+    fs::create_dir_all(&codex_home).unwrap();
+    fs::write(
+        codex_home.join("config.toml"),
+        r#"model_provider = "OpenAI"
+model = "profile-model"
+[model_providers.OpenAI]
+base_url = "http://127.0.0.1:9991"
+wire_api = "responses"
+requires_openai_auth = true
+"#,
+    )
+    .unwrap();
+    fs::write(
+        codex_home.join("auth.json"),
+        r#"{"OPENAI_API_KEY":"profile-secret"}"#,
+    )
+    .unwrap();
+    let base = || {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_zenpi"));
+        command
+            .env("CODEX_HOME", &codex_home)
+            .env("ZENPI_HOME", &zenpi_home)
+            .env_remove("OPENAI_API_KEY")
+            .env_remove("ZENPI_API_KEY");
+        command
+    };
+    let imported = base()
+        .args(["config", "import-codex", "--profile", "codex"])
+        .output()
+        .unwrap();
+    assert!(
+        imported.status.success(),
+        "{}",
+        String::from_utf8_lossy(&imported.stderr)
+    );
+    assert!(!String::from_utf8_lossy(&imported.stdout).contains("profile-secret"));
+
+    let doctor = base()
+        .args(["config", "doctor", "--profile", "codex", "--json"])
+        .output()
+        .unwrap();
+    assert!(doctor.status.success());
+    let doctor: serde_json::Value = serde_json::from_slice(&doctor.stdout).unwrap();
+    assert_eq!(doctor["profile"], "codex");
+    assert_eq!(doctor["api_key_present"], true);
+    assert!(!String::from_utf8_lossy(&doctor.to_string().into_bytes()).contains("profile-secret"));
+
+    let listed = base().args(["config", "list", "--json"]).output().unwrap();
+    assert!(listed.status.success());
+    let profiles: serde_json::Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(profiles[0]["name"], "codex");
+    assert_eq!(profiles[0]["active"], true);
+
+    let unconfirmed = base()
+        .args(["pair", "revoke", "--profile", "codex"])
+        .output()
+        .unwrap();
+    assert!(!unconfirmed.status.success());
+    let revoked = base()
+        .args(["pair", "revoke", "--profile", "codex", "--yes"])
+        .output()
+        .unwrap();
+    assert!(revoked.status.success());
+    assert_eq!(
+        load_auth(&ConfigPaths {
+            root: zenpi_home.clone(),
+            config: zenpi_home.join("config.toml"),
+            auth: zenpi_home.join("auth.json"),
+            sessions: zenpi_home.join("sessions"),
+            skills: zenpi_home.join("skills"),
+            extensions: zenpi_home.join("extensions"),
+        })
+        .unwrap()
+        .api_key_for_profile(Some("codex")),
+        None
+    );
 }

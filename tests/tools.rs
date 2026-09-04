@@ -332,3 +332,72 @@ fn command_tool_is_bounded_and_scrubs_environment() {
     );
     assert_eq!(error_code(timed_out), ToolErrorCode::CommandTimeout);
 }
+
+#[cfg(unix)]
+#[test]
+fn timed_out_command_reaps_its_descendant_process_group() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let marker = directory.path().join("descendant-ran");
+    let arguments = json!({
+        "command": "(sleep 0.3; printf leaked > descendant-ran) & wait",
+        "timeout_ms": 20
+    });
+    let error = tools::RunCommandTool::invoke_with_cancel(
+        &context,
+        arguments.as_object().unwrap(),
+        &|| false,
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), ToolErrorCode::CommandTimeout);
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    assert!(!marker.exists(), "descendant survived command timeout");
+}
+
+#[derive(Clone, Copy)]
+struct LargeOutputTool;
+
+impl Tool for LargeOutputTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "large_output".into(),
+            description: "Return a large deterministic payload.".into(),
+            input_schema: json!({"type":"object","additionalProperties":false}),
+            side_effect: ToolSideEffect::ReadOnly,
+        }
+    }
+
+    fn invoke(&self, _: &ToolContext, _: &Map<String, Value>) -> Result<Value, ToolError> {
+        Ok(json!({"text": "x".repeat(tools::MAX_INLINE_TOOL_RESULT_BYTES + 1024)}))
+    }
+}
+
+#[test]
+fn large_tool_results_become_private_retrievable_artifacts() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let mut registry = ToolRegistry::new();
+    registry.register(LargeOutputTool).unwrap();
+    let output = successful_output(registry.execute_compact(
+        &context,
+        SideEffectPolicy::read_only(),
+        call("large_output", json!({})),
+    ));
+    assert_eq!(output["compacted"], true);
+    let artifact = output["artifact"].as_str().unwrap();
+    assert!(artifact.starts_with(".zenpi/artifacts/"));
+    let path = directory.path().join(artifact);
+    assert!(path.is_file());
+    assert_eq!(
+        output["bytes"].as_u64().unwrap(),
+        fs::metadata(&path).unwrap().len()
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}

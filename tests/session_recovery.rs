@@ -64,3 +64,57 @@ fn session_journal_is_private_to_the_current_user() {
     let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
 }
+
+#[test]
+fn fork_preserves_events_with_a_new_session_identity() {
+    let dir = tempdir().unwrap();
+    let source_path = dir.path().join("source.jsonl");
+    let fork_path = dir.path().join("fork.jsonl");
+    let mut source = SessionStore::open(&source_path).unwrap();
+    source
+        .append_event(serde_json::json!({"type":"checkpoint","value":1}))
+        .unwrap();
+    let fork = source.fork_to(&fork_path).unwrap();
+    assert_ne!(source.session_id(), fork.session_id());
+    assert_eq!(fork.events(), source.events());
+    assert!(source_path.exists());
+}
+
+#[test]
+fn session_list_import_and_explicit_gc_are_safe() {
+    use zenpi::session::{
+        GarbageCollectionPolicy, garbage_collect_sessions, import_session, list_sessions,
+    };
+
+    let dir = tempdir().unwrap();
+    let sessions = dir.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    let source = sessions.join("source.jsonl");
+    let export = dir.path().join("imported.jsonl");
+    let store = SessionStore::open(&source).unwrap();
+    let imported = import_session(&source, &export).unwrap();
+    assert_eq!(store.session_id(), imported.session_id());
+    assert_eq!(list_sessions(&sessions).unwrap().len(), 1);
+    assert!(
+        garbage_collect_sessions(
+            &sessions,
+            GarbageCollectionPolicy {
+                retain_newest: 0,
+                older_than_ms: 0,
+            },
+            u64::MAX,
+        )
+        .is_err()
+    );
+    let removed = garbage_collect_sessions(
+        &sessions,
+        GarbageCollectionPolicy {
+            retain_newest: 0,
+            older_than_ms: 1,
+        },
+        u64::MAX,
+    )
+    .unwrap();
+    assert_eq!(removed, vec![source]);
+    assert!(export.exists());
+}

@@ -33,7 +33,12 @@ def main() -> int:
     if "tui" not in help_text or "headless" not in help_text:
         print("mode check: help does not advertise both public modes", file=sys.stderr)
         return 1
-    if any(token in help_text for token in FORBIDDEN):
+    # `--json` is a config-output flag, not a runtime mode. Reject only mode
+    # spellings/commands rather than arbitrary substrings in option names.
+    advertised_modes = set(re.findall(r"--mode\s+([a-z|]+)", help_text))
+    if any(token in advertised_modes for token in FORBIDDEN) or any(
+        re.search(rf"\bzenpi\s+{re.escape(token)}\b", help_text) for token in FORBIDDEN
+    ):
         print("mode check: help advertises a forbidden mode", file=sys.stderr)
         return 1
     print("mode check: exactly tui/headless")

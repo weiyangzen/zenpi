@@ -87,6 +87,7 @@ pub struct SessionStore {
     handoffs: Vec<Handoff>,
     handoff_records: Vec<HandoffRecord>,
     events: usize,
+    event_values: Vec<Value>,
     warnings: Vec<RecoveryWarning>,
     needs_separator: bool,
     next_seq: u64,
@@ -137,6 +138,7 @@ impl SessionStore {
         let mut handoffs = Vec::new();
         let mut handoff_records = Vec::new();
         let mut events = 0;
+        let mut event_values = Vec::new();
         let mut warnings = Vec::new();
         let mut next_seq = 0_u64;
         let mut last_seq = None;
@@ -263,7 +265,7 @@ impl SessionStore {
                     }
                 }
                 DecodedRecord::Event { event } => {
-                    let _ = event;
+                    event_values.push(event);
                     events += 1;
                 }
             }
@@ -285,6 +287,7 @@ impl SessionStore {
             handoffs,
             handoff_records,
             events,
+            event_values,
             warnings,
             needs_separator,
             next_seq,
@@ -389,9 +392,14 @@ impl SessionStore {
     /// Persist a normalized event.  Events are intentionally opaque to the
     /// session layer so extensions can add fields without migrations.
     pub fn append_event(&mut self, event: Value) -> Result<(), SessionError> {
-        self.append_json(&json!({ "kind": "event", "event": event }))?;
+        self.append_json(&json!({ "kind": "event", "event": &event }))?;
+        self.event_values.push(event);
         self.events += 1;
         Ok(())
+    }
+
+    pub fn events(&self) -> &[Value] {
+        &self.event_values
     }
 
     pub fn latest_assistant(&self) -> Option<&Turn> {
@@ -423,6 +431,12 @@ impl SessionStore {
         }
         fs::copy(&self.path, destination)?;
         restrict_session_permissions(destination)?;
+        if file_sha256(&self.path)? != file_sha256(destination)? {
+            let _ = fs::remove_file(destination);
+            return Err(SessionError::InvalidRecord(
+                "export digest does not match source".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -444,6 +458,9 @@ impl SessionStore {
         }
         for record in &self.handoff_records {
             fork.append_handoff_record(record.clone())?;
+        }
+        for event in &self.event_values {
+            fork.append_event(event.clone())?;
         }
         Ok(fork)
     }
@@ -522,4 +539,97 @@ fn generate_id(prefix: &str) -> String {
 /// Exposed for callers that need a clock-compatible session timestamp.
 pub fn unix_time_ms() -> u64 {
     now_ms()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GarbageCollectionPolicy {
+    pub retain_newest: usize,
+    pub older_than_ms: u64,
+}
+
+pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>, SessionError> {
+    let directory = directory.as_ref();
+    if !directory.exists() {
+        return Ok(Vec::new());
+    }
+    if !directory.is_dir() {
+        return Err(SessionError::Directory(directory.to_owned()));
+    }
+    let mut paths = fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| SessionStore::open(path).map(|store| store.summary()))
+        .collect()
+}
+
+pub fn import_session(
+    source: impl AsRef<Path>,
+    destination: impl AsRef<Path>,
+) -> Result<SessionStore, SessionError> {
+    if !source.as_ref().is_file() {
+        return Err(SessionError::InvalidRecord(
+            "import source is not an existing session file".into(),
+        ));
+    }
+    let source = SessionStore::open(source)?;
+    source.export_to(&destination)?;
+    let imported = SessionStore::open(destination)?;
+    if imported.session_id() != source.session_id()
+        || imported.summary().next_seq != source.summary().next_seq
+    {
+        return Err(SessionError::InvalidRecord(
+            "imported journal identity or sequence differs from source".into(),
+        ));
+    }
+    Ok(imported)
+}
+
+fn file_sha256(path: &Path) -> Result<String, SessionError> {
+    use sha2::{Digest, Sha256};
+
+    let bytes = fs::read(path)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+pub fn garbage_collect_sessions(
+    directory: impl AsRef<Path>,
+    policy: GarbageCollectionPolicy,
+    now_ms: u64,
+) -> Result<Vec<PathBuf>, SessionError> {
+    if policy.retain_newest == 0 && policy.older_than_ms == 0 {
+        return Err(SessionError::InvalidRecord(
+            "garbage collection requires an explicit retention policy".into(),
+        ));
+    }
+    let directory = directory.as_ref();
+    if !directory.exists() {
+        return Ok(Vec::new());
+    }
+    let mut candidates = fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
+        .filter_map(|path| {
+            fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|modified| (path, modified.as_millis().min(u128::from(u64::MAX)) as u64))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    let mut removed = Vec::new();
+    for (index, (path, modified)) in candidates.into_iter().enumerate() {
+        if index < policy.retain_newest || now_ms.saturating_sub(modified) < policy.older_than_ms {
+            continue;
+        }
+        fs::remove_file(&path)?;
+        removed.push(path);
+    }
+    Ok(removed)
 }

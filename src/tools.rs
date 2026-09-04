@@ -22,6 +22,8 @@ use thiserror::Error;
 
 pub const MAX_TOOL_CALL_BYTES: usize = 64 * 1024;
 pub const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
+pub const MAX_INLINE_TOOL_RESULT_BYTES: usize = 64 * 1024;
+pub const TOOL_ARTIFACT_DIRECTORY: &str = ".zenpi/artifacts";
 pub const MAX_TOOL_NAME_BYTES: usize = 64;
 pub const MAX_TOOL_ID_BYTES: usize = 128;
 // Leave room for the path/flags wrapper in the one-megabyte serialized result
@@ -299,19 +301,21 @@ impl ToolContext {
             }
             return Ok(canonical);
         }
-        let parent = candidate
+        let mut existing = candidate
             .parent()
             .ok_or_else(|| ToolError::PathDenied(requested.to_owned()))?;
-        let canonical_parent = parent
+        while !existing.exists() {
+            existing = existing
+                .parent()
+                .ok_or_else(|| ToolError::PathDenied(requested.to_owned()))?;
+        }
+        let canonical_existing = existing
             .canonicalize()
-            .map_err(|error| map_path_io(parent, error))?;
-        if !canonical_parent.starts_with(&self.workspace_root) {
+            .map_err(|error| map_path_io(existing, error))?;
+        if !canonical_existing.starts_with(&self.workspace_root) {
             return Err(ToolError::PathDenied(requested.to_owned()));
         }
-        let file_name = candidate
-            .file_name()
-            .ok_or_else(|| ToolError::PathDenied(requested.to_owned()))?;
-        Ok(canonical_parent.join(file_name))
+        Ok(candidate)
     }
 
     fn resolve_existing(&self, requested: &str) -> Result<ResolvedPath, ToolError> {
@@ -447,6 +451,26 @@ impl ToolRegistry {
         }
     }
 
+    /// Execute a call and move an oversized successful payload into a private,
+    /// repository-relative artifact. The model receives a small reference and
+    /// preview rather than an unbounded tool response.
+    pub fn execute_compact(
+        &self,
+        context: &ToolContext,
+        policy: SideEffectPolicy,
+        call: ToolCall,
+    ) -> ToolResult {
+        let result = self.execute(context, policy, call);
+        compact_tool_result(context, result).unwrap_or_else(|error| ToolResult::Error {
+            call_id: "artifact".into(),
+            tool: "artifact".into(),
+            error: ToolFailure {
+                code: error.code(),
+                message: error.to_string(),
+            },
+        })
+    }
+
     fn execute_inner(
         &self,
         context: &ToolContext,
@@ -476,6 +500,53 @@ impl ToolRegistry {
         }
         Ok(output)
     }
+}
+
+pub fn compact_tool_result(
+    context: &ToolContext,
+    result: ToolResult,
+) -> Result<ToolResult, ToolError> {
+    let ToolResult::Success {
+        call_id,
+        tool,
+        output,
+    } = result
+    else {
+        return Ok(result);
+    };
+    let encoded = serde_json::to_vec(&output).map_err(ToolError::Json)?;
+    if encoded.len() <= MAX_INLINE_TOOL_RESULT_BYTES {
+        return Ok(ToolResult::Success {
+            call_id,
+            tool,
+            output,
+        });
+    }
+    use sha2::{Digest, Sha256};
+    let digest = format!("{:x}", Sha256::digest(&encoded));
+    let relative = format!("{TOOL_ARTIFACT_DIRECTORY}/{digest}.json");
+    let path = context.resolve_for_write(&relative)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    atomic_write_text(&path, &encoded)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+    }
+    let preview = truncate_utf8(&String::from_utf8_lossy(&encoded), 4096);
+    Ok(ToolResult::Success {
+        call_id,
+        tool,
+        output: json!({
+            "artifact": relative,
+            "sha256": digest,
+            "bytes": encoded.len(),
+            "preview": preview,
+            "compacted": true,
+        }),
+    })
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -902,6 +973,13 @@ impl RunCommandTool {
         } else {
             builder.args(["-c", command]);
         }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            // Create a fresh process group so timeout/cancellation can reap
+            // descendants launched by the shell, not just the shell itself.
+            builder.process_group(0);
+        }
         let mut child = builder
             .current_dir(context.workspace_root())
             .stdin(Stdio::null())
@@ -926,7 +1004,7 @@ impl RunCommandTool {
         let deadline = Instant::now() + Duration::from_millis(timeout_ms);
         loop {
             if cancelled() {
-                let _ = child.kill();
+                terminate_process_tree(&mut child);
                 let _ = child.wait();
                 let _ = stdout_thread.join();
                 let _ = stderr_thread.join();
@@ -955,7 +1033,7 @@ impl RunCommandTool {
                 }));
             }
             if Instant::now() >= deadline {
-                let _ = child.kill();
+                terminate_process_tree(&mut child);
                 let _ = child.wait();
                 let _ = stdout_thread.join();
                 let _ = stderr_thread.join();
@@ -963,6 +1041,33 @@ impl RunCommandTool {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+}
+
+fn terminate_process_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        if let Ok(pid) = i32::try_from(child.id()) {
+            // Negative PID addresses the process group created above.
+            // SAFETY: `pid` is the live child ID returned by `std::process`;
+            // the child was placed in its own process group before spawning.
+            // `kill` borrows no Rust memory and errors are intentionally
+            // tolerated because the process may have exited concurrently.
+            unsafe {
+                libc::kill(-pid, libc::SIGTERM);
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            if child.try_wait().ok().flatten().is_none() {
+                // SAFETY: same process-group invariant as the SIGTERM call.
+                unsafe {
+                    libc::kill(-pid, libc::SIGKILL);
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = child.kill();
     }
 }
 
