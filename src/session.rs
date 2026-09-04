@@ -26,6 +26,10 @@ use crate::{
 
 pub const SESSION_VERSION: u32 = 1;
 pub const MAX_SESSION_RECORD_BYTES: usize = 1024 * 1024;
+/// Maximum journal bytes recovered into one process at startup. This is large
+/// enough for long interactive histories while keeping untrusted paths from
+/// causing an unbounded allocation before JSON validation begins.
+pub const MAX_SESSION_BYTES: usize = 256 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SessionHeader {
@@ -74,6 +78,8 @@ pub enum SessionError {
     Directory(PathBuf),
     #[error("session path is a symbolic link: {0}")]
     Symlink(PathBuf),
+    #[error("session exceeds the {max} byte startup limit (found {actual} bytes)")]
+    LimitExceeded { max: usize, actual: u64 },
     #[error("session I/O: {0}")]
     Io(#[from] io::Error),
     #[error("session JSON: {0}")]
@@ -209,9 +215,6 @@ impl SessionStore {
         if existing.as_ref().is_some_and(|metadata| metadata.is_dir()) {
             return Err(SessionError::Directory(path));
         }
-        if writable && existing.is_some() {
-            restrict_session_permissions(&path)?;
-        }
         if writable
             && let Some(parent) = path
                 .parent()
@@ -227,9 +230,20 @@ impl SessionStore {
         let _ = session_path_metadata(&path)?;
         let bytes = match read_session_bytes(&path) {
             Ok(bytes) => bytes,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
-            Err(error) => return Err(error.into()),
+            Err(ReadSessionError::Io(error)) if error.kind() == io::ErrorKind::NotFound => {
+                Vec::new()
+            }
+            Err(ReadSessionError::Io(error)) => return Err(error.into()),
+            Err(ReadSessionError::LimitExceeded { actual }) => {
+                return Err(SessionError::LimitExceeded {
+                    max: MAX_SESSION_BYTES,
+                    actual,
+                });
+            }
         };
+        if writable && existing.is_some() {
+            restrict_session_permissions(&path)?;
+        }
         let had_content = !bytes.is_empty();
         let needs_separator = had_content && !bytes.ends_with(b"\n");
         let text = String::from_utf8(bytes)
@@ -861,14 +875,32 @@ fn reject_session_symlink(path: &Path) -> Result<(), SessionError> {
     }
 }
 
-fn read_session_bytes(path: &Path) -> io::Result<Vec<u8>> {
+enum ReadSessionError {
+    Io(io::Error),
+    LimitExceeded { actual: u64 },
+}
+
+fn read_session_bytes(path: &Path) -> Result<Vec<u8>, ReadSessionError> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
     options.custom_flags(libc::O_NOFOLLOW);
-    let mut file = options.open(path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
+    let file = options.open(path).map_err(ReadSessionError::Io)?;
+    let metadata = file.metadata().map_err(ReadSessionError::Io)?;
+    if metadata.len() > MAX_SESSION_BYTES as u64 {
+        return Err(ReadSessionError::LimitExceeded {
+            actual: metadata.len(),
+        });
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take((MAX_SESSION_BYTES as u64).saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(ReadSessionError::Io)?;
+    if bytes.len() > MAX_SESSION_BYTES {
+        return Err(ReadSessionError::LimitExceeded {
+            actual: bytes.len() as u64,
+        });
+    }
     Ok(bytes)
 }
 

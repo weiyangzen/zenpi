@@ -4,7 +4,10 @@ use std::os::unix::fs::PermissionsExt;
 use tempfile::tempdir;
 use zenpi::{
     core::{Turn, TurnRole},
-    session::{InterruptedOperation, OperationKind, OperationOutcome, SessionError, SessionStore},
+    session::{
+        InterruptedOperation, MAX_SESSION_BYTES, OperationKind, OperationOutcome, SessionError,
+        SessionStore,
+    },
 };
 
 #[test]
@@ -82,6 +85,54 @@ fn records_before_a_header_are_ignored_instead_of_binding_foreign_state() {
             .iter()
             .any(|warning| warning.reason.contains("before session header"))
     );
+}
+
+#[test]
+fn startup_rejects_an_oversized_journal_without_modifying_it() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("oversized.jsonl");
+    let file = fs::File::create(&path).unwrap();
+    file.set_len(MAX_SESSION_BYTES as u64 + 1).unwrap();
+    #[cfg(unix)]
+    {
+        let mut permissions = file.metadata().unwrap().permissions();
+        permissions.set_mode(0o644);
+        file.set_permissions(permissions).unwrap();
+    }
+    let before = file.metadata().unwrap();
+    drop(file);
+
+    let error = SessionStore::open(&path).unwrap_err();
+    assert!(matches!(
+        error,
+        SessionError::LimitExceeded { max, actual }
+            if max == MAX_SESSION_BYTES && actual == MAX_SESSION_BYTES as u64 + 1
+    ));
+    let after = fs::metadata(&path).unwrap();
+    assert_eq!(after.len(), before.len());
+    #[cfg(unix)]
+    assert_eq!(
+        after.permissions().mode() & 0o777,
+        before.permissions().mode() & 0o777
+    );
+}
+
+#[test]
+fn startup_accepts_a_journal_within_the_byte_limit() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("within-limit.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    store
+        .append_turn(Turn::new("u", TurnRole::User, "ordinary history"))
+        .unwrap();
+    drop(store);
+    let before = fs::read(&path).unwrap();
+    assert!(before.len() < MAX_SESSION_BYTES);
+
+    let store = SessionStore::open_existing(&path).unwrap();
+    assert_eq!(store.turns().len(), 1);
+    assert_eq!(store.turns()[0].content, "ordinary history");
+    assert_eq!(fs::read(path).unwrap(), before);
 }
 
 #[test]
