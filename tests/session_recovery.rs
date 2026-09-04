@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use tempfile::tempdir;
 use zenpi::{
     core::{Turn, TurnRole},
-    session::{InterruptedOperation, OperationKind, OperationOutcome, SessionStore},
+    session::{InterruptedOperation, OperationKind, OperationOutcome, SessionError, SessionStore},
 };
 
 #[test]
@@ -101,6 +101,29 @@ fn session_journal_is_private_to_the_current_user() {
     assert_eq!(mode, 0o600);
 }
 
+#[cfg(unix)]
+#[test]
+fn symlinked_session_is_rejected_without_touching_target() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().unwrap();
+    let target = dir.path().join("outside.jsonl");
+    let link = dir.path().join("session.jsonl");
+    fs::write(&target, b"keep this file\n").unwrap();
+    let mut permissions = fs::metadata(&target).unwrap().permissions();
+    permissions.set_mode(0o644);
+    fs::set_permissions(&target, permissions).unwrap();
+    symlink(&target, &link).unwrap();
+
+    let error = SessionStore::open(&link).unwrap_err();
+    assert!(matches!(error, SessionError::Symlink(path) if path == link));
+    assert_eq!(fs::read(&target).unwrap(), b"keep this file\n");
+    assert_eq!(
+        fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+        0o644
+    );
+}
+
 #[test]
 fn fork_preserves_events_with_a_new_session_identity() {
     let dir = tempdir().unwrap();
@@ -153,4 +176,119 @@ fn session_list_import_and_explicit_gc_are_safe() {
     .unwrap();
     assert_eq!(removed, vec![source]);
     assert!(export.exists());
+}
+
+#[test]
+fn session_gc_skips_domain_store_and_non_owned_links() {
+    use zenpi::session::{GarbageCollectionPolicy, garbage_collect_sessions};
+
+    let dir = tempdir().unwrap();
+    let sessions = dir.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    let session_path = sessions.join("old.jsonl");
+    SessionStore::open(&session_path).unwrap();
+    let domain_path = sessions.join(zenpi::domain_store::DOMAIN_STORE_FILE_NAME);
+    zenpi::domain_store::DomainStore::open(&domain_path).unwrap();
+    let domain_before = fs::read(&domain_path).unwrap();
+
+    #[cfg(unix)]
+    let (link_path, external_path) = {
+        let external_path = dir.path().join("external.jsonl");
+        fs::write(&external_path, b"must remain untouched\n").unwrap();
+        let link_path = sessions.join("alias.jsonl");
+        std::os::unix::fs::symlink(&external_path, &link_path).unwrap();
+        (Some(link_path), Some(external_path))
+    };
+    #[cfg(not(unix))]
+    let external_path: Option<std::path::PathBuf> = None;
+
+    #[cfg(unix)]
+    {
+        let result = garbage_collect_sessions(
+            &sessions,
+            GarbageCollectionPolicy {
+                retain_newest: 0,
+                older_than_ms: 1,
+            },
+            u64::MAX,
+        );
+        assert!(matches!(
+            result,
+            Err(zenpi::session::SessionError::Symlink(_))
+        ));
+        assert!(session_path.exists());
+        assert_eq!(fs::read(&domain_path).unwrap(), domain_before);
+    }
+
+    #[cfg(unix)]
+    fs::remove_file(link_path.as_ref().unwrap()).unwrap();
+
+    let removed = garbage_collect_sessions(
+        &sessions,
+        GarbageCollectionPolicy {
+            retain_newest: 0,
+            older_than_ms: 1,
+        },
+        u64::MAX,
+    )
+    .unwrap();
+    assert_eq!(removed, vec![session_path]);
+    assert_eq!(fs::read(&domain_path).unwrap(), domain_before);
+    assert!(zenpi::domain_store::DomainStore::open_existing(&domain_path).is_ok());
+    if let Some(external_path) = external_path {
+        assert_eq!(fs::read(external_path).unwrap(), b"must remain untouched\n");
+    }
+}
+
+#[test]
+fn session_listing_skips_sibling_domain_store_without_mutating_it() {
+    let dir = tempdir().unwrap();
+    let sessions = dir.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    let session_path = sessions.join("conversation.jsonl");
+    let domain_path = sessions.join(zenpi::domain_store::DOMAIN_STORE_FILE_NAME);
+    SessionStore::open(&session_path).unwrap();
+    zenpi::domain_store::DomainStore::open(&domain_path).unwrap();
+    let before = fs::read(&domain_path).unwrap();
+
+    let listed = zenpi::session::list_sessions(&sessions).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].path, session_path.display().to_string());
+    assert_eq!(fs::read(&domain_path).unwrap(), before);
+    assert!(zenpi::domain_store::DomainStore::open_existing(&domain_path).is_ok());
+}
+
+#[test]
+fn session_listing_includes_legacy_default_journal_without_moving_it() {
+    use zenpi::session::list_sessions_with_fallback;
+
+    let dir = tempdir().unwrap();
+    let sessions = dir.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    let fallback = dir.path().join("session.jsonl");
+    let store = SessionStore::open(&fallback).unwrap();
+    let before = fs::read(&fallback).unwrap();
+
+    let listed = list_sessions_with_fallback(&sessions, &fallback).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].session_id, store.session_id());
+    assert_eq!(fs::read(&fallback).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn session_listing_rejects_a_symlinked_directory() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().unwrap();
+    let outside = dir.path().join("outside");
+    let alias = dir.path().join("sessions");
+    fs::create_dir_all(&outside).unwrap();
+    let session_path = outside.join("external.jsonl");
+    SessionStore::open(&session_path).unwrap();
+    symlink(&outside, &alias).unwrap();
+
+    let error = zenpi::session::list_sessions(&alias).unwrap_err();
+    assert!(matches!(error, SessionError::Symlink(path) if path == alias));
+    assert!(session_path.is_file());
 }

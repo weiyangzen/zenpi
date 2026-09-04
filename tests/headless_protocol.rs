@@ -3,14 +3,22 @@ use std::io::Cursor;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    },
     thread,
     time::Duration,
 };
 use tempfile::tempdir;
 use zenpi::{
-    approval::ApprovalDecision, core::Agent, headless::run_headless, protocol::parse_line,
-    session::SessionStore,
+    approval::ApprovalDecision,
+    backend::{Backend, BackendError, Completion, CompletionRequest, ProviderEvent},
+    core::{Agent, Turn, TurnRole},
+    headless::run_headless,
+    protocol::parse_line,
+    session::{InterruptedOperation, OperationKind, SessionStore},
 };
 
 fn json_lines(bytes: &[u8]) -> Vec<Value> {
@@ -19,6 +27,55 @@ fn json_lines(bytes: &[u8]) -> Vec<Value> {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()
+}
+
+/// Keep the first provider call open until the host sends a cancellation. The
+/// deterministic boundary lets the burst shutdown regression prove that an
+/// already-admitted steer is promoted before runtime shutdown is submitted.
+struct BurstSteerBackend {
+    calls: AtomicUsize,
+    first_started: mpsc::SyncSender<()>,
+    cancellation_seen: mpsc::SyncSender<()>,
+}
+
+impl Backend for BurstSteerBackend {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        Ok(Completion::text("unused"))
+    }
+
+    fn complete_with_control(
+        &self,
+        _: CompletionRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+    ) -> Result<Completion, BackendError> {
+        let call = self.calls.fetch_add(1, Ordering::AcqRel);
+        if call == 0 {
+            let _ = self.first_started.send(());
+            loop {
+                if cancelled() {
+                    let _ = self.cancellation_seen.send(());
+                    return Err(BackendError::Cancelled);
+                }
+                thread::yield_now();
+            }
+        }
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        sink(ProviderEvent::TextDelta {
+            delta: "steered answer".into(),
+        })?;
+        sink(ProviderEvent::Completed {
+            response_id: None,
+            model: None,
+        })?;
+        Ok(Completion::text("steered answer"))
+    }
+
+    fn name(&self) -> &str {
+        "burst-steer-fixture"
+    }
 }
 
 #[test]
@@ -42,6 +99,210 @@ fn malformed_frame_isolated_from_all_commands() {
     assert!(journal.iter().any(|v| v["kind"] == "handoff_record"));
     let seq: Vec<u64> = journal.iter().map(|v| v["seq"].as_u64().unwrap()).collect();
     assert!(seq.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+fn status_snapshots_redact_session_paths_in_sync_and_async_hosts() {
+    let dir = tempdir().unwrap();
+
+    let sync_path = dir.path().join("sync-status.jsonl");
+    let mut sync_agent = Agent::with_echo(SessionStore::open(&sync_path).unwrap());
+    let mut sync_output = Vec::new();
+    run_headless(
+        &mut sync_agent,
+        Cursor::new(
+            b"{\"type\":\"status\",\"id\":\"sync-status\"}\n{\"type\":\"shutdown\",\"id\":\"sync-stop\"}\n",
+        ),
+        &mut sync_output,
+    )
+    .unwrap();
+    let sync_records = json_lines(&sync_output);
+    let sync_status = sync_records
+        .iter()
+        .find(|record| record["id"] == "sync-status")
+        .unwrap();
+    assert_eq!(
+        sync_status["data"]["session"]["path"],
+        "<session:sync-status.jsonl>"
+    );
+    assert!(
+        !sync_status
+            .to_string()
+            .contains(dir.path().to_string_lossy().as_ref())
+    );
+
+    let async_path = dir.path().join("async-status.jsonl");
+    let async_agent = Agent::with_echo(SessionStore::open(&async_path).unwrap());
+    let async_input = Cursor::new(
+        b"{\"type\":\"status\",\"id\":\"async-status\"}\n{\"type\":\"shutdown\",\"id\":\"async-stop\"}\n",
+    );
+    let async_output = SharedWriter::default();
+    let captured = async_output.clone();
+    zenpi::headless::run_async_streams(async_agent, async_input, async_output).unwrap();
+    let async_records = json_lines(&captured.0.lock().unwrap());
+    let async_status = async_records
+        .iter()
+        .find(|record| record["id"] == "async-status")
+        .unwrap();
+    assert_eq!(
+        async_status["data"]["session"]["path"],
+        "<session:async-status.jsonl>"
+    );
+    assert!(
+        !async_status
+            .to_string()
+            .contains(dir.path().to_string_lossy().as_ref())
+    );
+}
+
+#[test]
+fn resume_path_rejects_missing_journals_without_creating_them() {
+    let dir = tempdir().unwrap();
+    let missing_sync = dir.path().join("missing-sync.jsonl");
+    let active_sync = dir.path().join("active-sync.jsonl");
+    let mut sync_agent = Agent::with_echo(SessionStore::open(&active_sync).unwrap());
+    let sync_input = format!(
+        "{}\n{}\n",
+        serde_json::json!({
+            "type": "resume",
+            "id": "resume-sync",
+            "path": missing_sync.display().to_string(),
+        }),
+        serde_json::json!({"type":"shutdown","id":"shutdown-sync"}),
+    );
+    let mut sync_output = Vec::new();
+    run_headless(
+        &mut sync_agent,
+        Cursor::new(sync_input.into_bytes()),
+        &mut sync_output,
+    )
+    .unwrap();
+    let sync_records = json_lines(&sync_output);
+    let sync_resume = sync_records
+        .iter()
+        .find(|record| record["id"] == "resume-sync")
+        .unwrap();
+    assert_eq!(sync_resume["success"], false);
+    assert_eq!(sync_resume["code"], "session_path_denied");
+    assert!(!missing_sync.exists());
+
+    let missing_async = dir.path().join("missing-async.jsonl");
+    let active_async = dir.path().join("active-async.jsonl");
+    let async_agent = Agent::with_echo(SessionStore::open(&active_async).unwrap());
+    let async_input = format!(
+        "{}\n{}\n",
+        serde_json::json!({
+            "type": "resume",
+            "id": "resume-async",
+            "path": missing_async.display().to_string(),
+        }),
+        serde_json::json!({"type":"shutdown","id":"shutdown-async"}),
+    );
+    let async_output = SharedWriter::default();
+    let captured = async_output.clone();
+    zenpi::headless::run_async_streams(
+        async_agent,
+        Cursor::new(async_input.into_bytes()),
+        async_output,
+    )
+    .unwrap();
+    let async_records = json_lines(&captured.0.lock().unwrap());
+    let async_resume = async_records
+        .iter()
+        .find(|record| record["id"] == "resume-async")
+        .unwrap();
+    assert_eq!(async_resume["success"], false);
+    assert_eq!(async_resume["code"], "session_path_denied");
+    assert!(!missing_async.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn shutdown_promotes_a_steer_admitted_before_the_shutdown_frame() {
+    let (first_started_tx, first_started_rx) = mpsc::sync_channel(1);
+    let (cancellation_seen_tx, cancellation_seen_rx) = mpsc::sync_channel(1);
+    let backend = BurstSteerBackend {
+        calls: AtomicUsize::new(0),
+        first_started: first_started_tx,
+        cancellation_seen: cancellation_seen_tx,
+    };
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("burst-steer.jsonl");
+    let agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(backend));
+    let (mut input_writer, input_reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host = thread::spawn(move || {
+        zenpi::headless::run_async_streams(agent, input_reader, output).unwrap();
+    });
+
+    writeln!(
+        input_writer,
+        "{}",
+        serde_json::json!({"type":"prompt","id":"burst-prompt","text":"first"})
+    )
+    .unwrap();
+    first_started_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("first provider call did not start");
+    // These frames intentionally arrive back-to-back. The steer is accepted
+    // into the host's deferred queue, then shutdown establishes its boundary
+    // before the scheduler can finish the cancel/reissue pair.
+    writeln!(
+        input_writer,
+        "{}",
+        serde_json::json!({"type":"steer","id":"burst-steer","text":"second"})
+    )
+    .unwrap();
+    writeln!(
+        input_writer,
+        "{}",
+        serde_json::json!({"type":"shutdown","id":"burst-shutdown"})
+    )
+    .unwrap();
+    cancellation_seen_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("accepted steer never cancelled the active request");
+    drop(input_writer);
+    host.join().unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    let prompt = records
+        .iter()
+        .find(|record| record["id"] == "burst-prompt" && record["type"] == "response")
+        .unwrap();
+    assert_eq!(prompt["success"], false);
+    assert_eq!(prompt["code"], "backend_cancelled");
+    let steer = records
+        .iter()
+        .find(|record| record["id"] == "burst-steer" && record["type"] == "response")
+        .unwrap();
+    assert_eq!(steer["success"], true);
+    assert_eq!(steer["data"]["assistant"]["content"], "steered answer");
+    assert!(
+        !records
+            .iter()
+            .any(|record| { record["id"] == "burst-steer" && record["code"] == "runtime_closed" })
+    );
+    let shutdown = records
+        .iter()
+        .find(|record| record["id"] == "burst-shutdown" && record["type"] == "response")
+        .unwrap();
+    assert_eq!(shutdown["success"], true);
+    assert_eq!(shutdown["data"]["drained"], true);
+
+    let session = SessionStore::open(path).unwrap();
+    assert_eq!(
+        session
+            .turns()
+            .iter()
+            .filter(|turn| turn.role == zenpi::core::TurnRole::User)
+            .count(),
+        2
+    );
+    assert!(session.turns().iter().any(|turn| {
+        turn.role == zenpi::core::TurnRole::Assistant && turn.content == "steered answer"
+    }));
 }
 
 #[test]
@@ -98,6 +359,65 @@ fn async_reader_bounds_overlong_and_invalid_frames_without_stopping() {
         records.iter().any(|record| {
             record["id"] == "shutdown-after-invalid" && record["success"] == true
         })
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn async_recovery_event_does_not_overtake_turn_admission() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("recovery-order.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    store
+        .begin_operation(&InterruptedOperation {
+            operation_id: "tool-recovery-order".into(),
+            kind: OperationKind::Tool,
+            turn_id: "turn-recovery-order".into(),
+            retry_requires_confirmation: true,
+        })
+        .unwrap();
+    drop(store);
+    // Agent construction queues a recovery warning before the first request's
+    // TurnAccepted marker. The host must still emit both before provider data.
+    let agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host = thread::spawn(move || {
+        zenpi::headless::run_async_streams(agent, reader, output).unwrap();
+    });
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"prompt","id":"recovery-prompt","text":"hello"})
+    )
+    .unwrap();
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"shutdown","id":"recovery-shutdown"})
+    )
+    .unwrap();
+    drop(writer);
+    host.join().unwrap();
+
+    let records = json_lines(&captured.0.lock().unwrap());
+    let accepted = records
+        .iter()
+        .position(|record| record["type"] == "event" && record["event"]["type"] == "turn_accepted")
+        .expect("missing turn admission event");
+    let provider = records
+        .iter()
+        .position(|record| record["type"] == "event" && record["event"]["type"] == "text_delta")
+        .expect("missing provider event");
+    assert!(
+        accepted < provider,
+        "provider event overtook admission: {records:?}"
+    );
+    assert!(
+        records
+            .iter()
+            .any(|record| { record["type"] == "event" && record["event"]["type"] == "error" })
     );
 }
 
@@ -198,6 +518,7 @@ fn headless_slash_commands_are_control_plane_only() {
         "{\"type\":\"command\",\"id\":\"c\",\"text\":\"/clear\"}\n",
         "{\"type\":\"command\",\"id\":\"r\",\"text\":\"/compete run-a\"}\n",
         "{\"type\":\"command\",\"id\":\"l\",\"text\":\"/loop --budget 1\"}\n",
+        "{\"type\":\"command\",\"id\":\"e\",\"text\":\"/session export /private/secret.jsonl\"}\n",
         "{\"type\":\"command\",\"id\":\"bad\",\"text\":\"/does-not-exist\"}\n",
         "{\"type\":\"status\",\"id\":\"after\"}\n",
         "{\"type\":\"shutdown\",\"id\":\"q\"}\n",
@@ -205,7 +526,7 @@ fn headless_slash_commands_are_control_plane_only() {
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for id in ["m", "g", "s", "h", "c", "r", "l", "after", "q"] {
+    for id in ["m", "s", "h", "c", "after", "q"] {
         assert!(
             records.iter().any(|record| {
                 record["id"] == id && record["type"] == "response" && record["success"] == true
@@ -213,15 +534,169 @@ fn headless_slash_commands_are_control_plane_only() {
             "missing successful response for {id}"
         );
     }
+    for id in ["g", "r", "l", "e"] {
+        let response = records.iter().find(|record| record["id"] == id).unwrap();
+        assert_eq!(
+            response["success"], false,
+            "unsupported {id} was reported as success"
+        );
+        assert_eq!(response["code"], "unsupported_command");
+    }
     assert!(records.iter().any(|record| {
         record["id"] == "bad"
             && record["type"] == "response"
             && record["success"] == false
             && record["code"] == "slash_invalid"
     }));
+    let unsupported_session = records.iter().find(|record| record["id"] == "e").unwrap();
+    assert!(
+        unsupported_session["error"]
+            .as_str()
+            .unwrap()
+            .contains("session export")
+    );
+    assert!(
+        !unsupported_session
+            .to_string()
+            .contains("/private/secret.jsonl")
+    );
     assert_eq!(agent.history().len(), 0, "slash input reached the model");
     let status = records.iter().find(|record| record["id"] == "s").unwrap();
     assert_eq!(status["data"]["model"], "fixture");
+}
+
+#[test]
+fn session_slash_list_and_open_use_real_session_owner_paths() {
+    let dir = tempdir().unwrap();
+    let source_path = dir.path().join("source.jsonl");
+    let mut source = SessionStore::open(&source_path).unwrap();
+    source
+        .append_turn(Turn::new("source-user", TurnRole::User, "persisted"))
+        .unwrap();
+    drop(source);
+
+    let active_path = dir.path().join("active.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&active_path).unwrap());
+    let input = [
+        serde_json::json!({"type":"command","id":"list","text":"/session list"}),
+        serde_json::json!({
+            "type":"command",
+            "id":"open",
+            "text":format!("/session open {}", source_path.display()),
+        }),
+        serde_json::json!({"type":"status","id":"status"}),
+        serde_json::json!({"type":"shutdown","id":"shutdown"}),
+    ]
+    .into_iter()
+    .map(|value| serde_json::to_string(&value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n")
+        + "\n";
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.into_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+
+    let listed = records
+        .iter()
+        .find(|record| record["id"] == "list")
+        .unwrap();
+    assert_eq!(listed["success"], true);
+    assert_eq!(listed["data"]["action"], "list");
+    assert!(listed["data"]["sessions"].is_array());
+
+    let opened = records
+        .iter()
+        .find(|record| record["id"] == "open")
+        .unwrap();
+    assert_eq!(opened["success"], true);
+    assert_eq!(opened["data"]["action"], "open");
+    assert_eq!(opened["data"]["session"]["path"], "<session:source.jsonl>");
+    assert!(
+        !opened
+            .to_string()
+            .contains(dir.path().to_string_lossy().as_ref())
+    );
+    assert!(
+        agent
+            .history()
+            .iter()
+            .any(|turn| turn.content == "persisted")
+    );
+}
+
+#[test]
+fn inspection_responses_redact_paths_and_reject_domain_escape() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("inspection.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let input = concat!(
+        "{\"type\":\"command\",\"id\":\"bp\",\"text\":\"/blueprint show\"}\n",
+        "{\"type\":\"resources\",\"id\":\"res\",\"path\":\"src\"}\n",
+        "{\"type\":\"command\",\"id\":\"escape\",\"text\":\"/blueprint put ../outside.json\"}\n",
+        "{\"type\":\"shutdown\",\"id\":\"stop\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+
+    let blueprint = records.iter().find(|record| record["id"] == "bp").unwrap();
+    assert_eq!(blueprint["success"], true);
+    assert_eq!(blueprint["data"]["store"]["path"], "<domain-store>");
+
+    let resources = records.iter().find(|record| record["id"] == "res").unwrap();
+    assert_eq!(resources["success"], true);
+    assert_eq!(resources["data"]["workspace"]["root"], ".");
+
+    let escape = records
+        .iter()
+        .find(|record| record["id"] == "escape")
+        .unwrap();
+    assert_eq!(escape["success"], false);
+    assert_eq!(escape["code"], "domain_input_path_denied");
+}
+
+#[cfg(unix)]
+#[test]
+fn async_shutdown_acknowledges_only_after_prior_turn_terminal_response() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("shutdown-order.jsonl");
+    let agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host = thread::spawn(move || {
+        zenpi::headless::run_async_streams(agent, reader, output).unwrap();
+    });
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"prompt","id":"prompt","text":"hello"})
+    )
+    .unwrap();
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"type":"shutdown","id":"shutdown"})
+    )
+    .unwrap();
+    drop(writer);
+    host.join().unwrap();
+    let records = json_lines(&captured.0.lock().unwrap());
+    let prompt_terminal = records
+        .iter()
+        .position(|record| record["id"] == "prompt" && record["type"] == "response")
+        .unwrap();
+    let shutdown_terminal = records
+        .iter()
+        .position(|record| record["id"] == "shutdown" && record["type"] == "response")
+        .unwrap();
+    assert!(prompt_terminal < shutdown_terminal);
+    assert_eq!(records[shutdown_terminal]["data"]["drained"], true);
+    let accepted = records
+        .iter()
+        .position(|record| record["event"]["type"] == "turn_accepted")
+        .unwrap();
+    assert!(accepted < prompt_terminal);
 }
 
 #[test]

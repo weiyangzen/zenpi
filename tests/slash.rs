@@ -1,9 +1,9 @@
 use tempfile::tempdir;
-use zenpi::core::Agent;
+use zenpi::core::{Agent, Turn, TurnRole};
 use zenpi::session::SessionStore;
 use zenpi::slash::{
-    BlueprintAction, InputRoute, SlashCommand, SlashError, SlashRoute, complete, help, parse,
-    route_input, spec,
+    ApproveDecision, BlueprintAction, InputRoute, SessionAction, SlashCommand, SlashError,
+    SlashRoute, complete, help, parse, route_input, spec,
 };
 use zenpi::tui::{SlashDispatchAction, TuiState, dispatch_slash_command};
 
@@ -115,6 +115,101 @@ fn route_input_keeps_slash_commands_out_of_prompt_path() {
 }
 
 #[test]
+fn common_workflow_commands_have_typed_arguments_and_metadata() {
+    assert_eq!(
+        parse("/plan sketch a safe migration").unwrap(),
+        Some(SlashCommand::Plan {
+            instruction: Some("sketch a safe migration".into()),
+        })
+    );
+    assert_eq!(
+        parse("/session fork").unwrap(),
+        Some(SlashCommand::Session {
+            action: SessionAction::Fork { path: None },
+        })
+    );
+    assert_eq!(
+        parse("/session export 'tmp/session.jsonl'").unwrap(),
+        Some(SlashCommand::Session {
+            action: SessionAction::Export {
+                path: "tmp/session.jsonl".into(),
+            },
+        })
+    );
+    assert_eq!(
+        parse("/resume 42").unwrap(),
+        Some(SlashCommand::Resume { sequence: Some(42) })
+    );
+    assert_eq!(parse("/compact").unwrap(), Some(SlashCommand::Compact));
+    assert_eq!(
+        parse("/diff src/main.rs").unwrap(),
+        Some(SlashCommand::Diff {
+            path: Some("src/main.rs".into()),
+        })
+    );
+    assert_eq!(
+        parse("/attach assets/input.png").unwrap(),
+        Some(SlashCommand::Attach {
+            path: "assets/input.png".into(),
+        })
+    );
+    assert_eq!(
+        parse("/approve req-1 always").unwrap(),
+        Some(SlashCommand::Approve {
+            id: "req-1".into(),
+            decision: ApproveDecision::Always,
+        })
+    );
+    assert_eq!(
+        parse("/approve req-1 once").unwrap(),
+        Some(SlashCommand::Approve {
+            id: "req-1".into(),
+            decision: ApproveDecision::Once,
+        })
+    );
+    assert_eq!(
+        parse("/approve req-1 deny").unwrap(),
+        Some(SlashCommand::Approve {
+            id: "req-1".into(),
+            decision: ApproveDecision::Deny,
+        })
+    );
+    for command in [
+        "plan", "session", "resume", "compact", "diff", "attach", "approve",
+    ] {
+        assert!(spec(command).is_some(), "missing /{command} metadata");
+    }
+}
+
+#[test]
+fn common_workflow_commands_fail_closed_on_invalid_arguments() {
+    assert!(matches!(
+        parse("/resume nope").unwrap_err(),
+        SlashError::InvalidResumeSequence
+    ));
+    assert!(matches!(
+        parse("/session open").unwrap_err(),
+        SlashError::MissingSessionPath { .. }
+    ));
+    assert!(matches!(
+        parse("/session what").unwrap_err(),
+        SlashError::UnknownSessionAction { .. }
+    ));
+    assert!(matches!(
+        parse("/attach").unwrap_err(),
+        SlashError::MissingArgument { .. }
+    ));
+    assert!(matches!(
+        parse("/approve req-1 maybe").unwrap_err(),
+        SlashError::InvalidApproveDecision
+    ));
+    assert!(matches!(
+        parse("/approve req-1 once extra").unwrap_err(),
+        SlashError::UnexpectedArgument { .. }
+    ));
+}
+
+#[test]
 fn local_dispatch_updates_view_without_creating_a_turn() {
     let directory = tempdir().unwrap();
     let session = SessionStore::open(directory.path().join("session.jsonl")).unwrap();
@@ -140,11 +235,11 @@ fn local_dispatch_updates_view_without_creating_a_turn() {
         SlashDispatchAction::Continue
     );
     assert_eq!(agent.history().len(), 0);
-    assert!(
-        state
-            .messages()
-            .any(|message| { message.text.contains("goal command acknowledged") })
-    );
+    assert!(state.messages().any(|message| {
+        message
+            .text
+            .contains("goal creation/execution requires an external b3ehive owner")
+    }));
 }
 
 #[test]
@@ -157,5 +252,87 @@ fn dispatch_cancel_and_exit_are_control_actions() {
     assert_eq!(
         dispatch_slash_command(SlashCommand::Exit, &mut state, None),
         SlashDispatchAction::Quit
+    );
+}
+
+#[test]
+fn session_open_replaces_tui_transcript_from_existing_journal() {
+    let directory = tempdir().unwrap();
+    let source_path = directory.path().join("source.jsonl");
+    let mut source = SessionStore::open(&source_path).unwrap();
+    source
+        .append_turn(Turn::new("source-user", TurnRole::User, "remember this"))
+        .unwrap();
+    source
+        .append_turn(Turn::with_parent(
+            "source-assistant",
+            "source-user",
+            TurnRole::Assistant,
+            "loaded from session",
+        ))
+        .unwrap();
+
+    let active = SessionStore::open(directory.path().join("active.jsonl")).unwrap();
+    let mut agent = Agent::with_echo(active);
+    let mut state = TuiState::default();
+    state.push_message(zenpi::tui::MessageRole::User, "old transcript");
+
+    let action = dispatch_slash_command(
+        SlashCommand::Session {
+            action: SessionAction::Open {
+                path: source_path.display().to_string(),
+            },
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+
+    assert_eq!(action, SlashDispatchAction::Continue);
+    assert_eq!(agent.session().path(), source_path.canonicalize().unwrap());
+    assert!(
+        agent
+            .history()
+            .iter()
+            .any(|turn| turn.content == "loaded from session")
+    );
+    assert!(
+        !state
+            .messages()
+            .any(|message| message.text == "old transcript")
+    );
+    assert!(
+        state
+            .messages()
+            .any(|message| message.text.contains("loaded from session"))
+    );
+}
+
+#[test]
+fn session_open_rejects_missing_target_without_creating_a_journal() {
+    let directory = tempdir().unwrap();
+    let missing = directory.path().join("missing.jsonl");
+    let active = SessionStore::open(directory.path().join("active.jsonl")).unwrap();
+    let mut agent = Agent::with_echo(active);
+    let mut state = TuiState::default();
+
+    dispatch_slash_command(
+        SlashCommand::Session {
+            action: SessionAction::Open {
+                path: missing.display().to_string(),
+            },
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+
+    assert!(!missing.exists());
+    assert!(
+        state
+            .messages()
+            .any(|message| message.text.contains("session open failed"))
+    );
+    assert_eq!(
+        agent.session().path(),
+        directory.path().join("active.jsonl")
     );
 }

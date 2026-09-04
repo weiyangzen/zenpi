@@ -117,6 +117,12 @@ pub enum Command {
         target_id: String,
     },
     Status,
+    /// Collect a bounded workspace/resource snapshot without invoking the
+    /// provider. The optional path is interpreted by the host as the
+    /// workspace root; omitted means the host's current workspace.
+    Resources {
+        path: Option<String>,
+    },
     Handoff {
         to: Option<String>,
         summary: String,
@@ -176,6 +182,7 @@ impl StdioRequest {
                 Ok(Command::Cancel { target_id })
             }
             "status" => Ok(Command::Status),
+            "resources" | "resource" => Ok(Command::Resources { path: self.path }),
             "handoff" => {
                 let summary = bounded_text(self.summary.or(self.text), "handoff summary")?;
                 if summary.contains(['\r', '\n']) {
@@ -523,6 +530,7 @@ pub fn command_name(command: &Command) -> &'static str {
         Command::Steer { .. } => "steer",
         Command::Cancel { .. } => "cancel",
         Command::Status => "status",
+        Command::Resources { .. } => "resources",
         Command::Handoff { .. } => "handoff",
         Command::Resume { .. } => "resume",
         Command::Approve { .. } => "approve",

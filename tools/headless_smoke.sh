@@ -176,14 +176,17 @@ for index, response in enumerate(responses, 1):
         raise AssertionError(f"line {index} has no typed protocol record")
 
 by_id: dict[str, dict] = {}
-duplicate_terminals: list[dict] = []
+responses_by_id: dict[str, list[dict]] = {}
+duplicate_responses: list[dict] = []
 for response in responses:
     if response.get("type") != "response":
         continue
     request_id = response.get("id")
     if request_id is not None:
+        responses_by_id.setdefault(request_id, []).append(response)
+        if response.get("code") == "duplicate_request_in_flight":
+            duplicate_responses.append(response)
         if request_id in by_id:
-            duplicate_terminals.append(response)
             if response.get("success") is True:
                 by_id[request_id] = response
             continue
@@ -211,11 +214,32 @@ if by_id["bad-1"].get("success") is not False:
 invalid_frames = [response for response in responses if response.get("command") == "invalid"]
 if not invalid_frames or any(response.get("success") is not False for response in invalid_frames):
     raise AssertionError("malformed JSON frame was not rejected without terminating the loop")
-if len(duplicate_terminals) != 1:
-    raise AssertionError(f"in-flight duplicate request was not suppressed: {duplicate_terminals!r}")
-for request_id in ("p-1", "s-1", "t-1", "r-1", "h-1", "q-1"):
+if len(duplicate_responses) != 1:
+    raise AssertionError(f"in-flight duplicate request was not suppressed exactly once: {duplicate_responses!r}")
+# The duplicate p-1 frame is intentionally sent while the first prompt is
+# active. Depending on whether the fast echo turn finishes before the reader
+# handles the following steer, the original p-1 request can therefore finish
+# successfully or be cancelled and replaced by t-1. Validate all responses
+# for that ID instead of treating the expected duplicate error as its terminal
+# result. A cancellation may happen after the user turn is durable but before
+# its assistant turn is written, so the journal can contain three turns
+# (cancelled p-1 user, then t-1 user/assistant) as well as the two- or
+# four-turn variants.
+p1_responses = responses_by_id["p-1"]
+p1_terminals = [
+    response
+    for response in p1_responses
+    if response.get("success") is True or response.get("code") == "backend_cancelled"
+]
+if len(p1_terminals) != 1:
+    raise AssertionError(f"p-1 did not have exactly one original terminal response: {p1_responses!r}")
+if p1_terminals[0].get("success") is not True and by_id["t-1"].get("success") is not True:
+    raise AssertionError(f"cancelled p-1 was not replaced by a successful steer: {responses_by_id!r}")
+for request_id in ("s-1", "t-1", "r-1", "h-1", "q-1"):
     if by_id[request_id].get("success") is not True:
         raise AssertionError(f"command {request_id} did not succeed: {by_id[request_id]}")
+if by_id["t-1"].get("code") == "runtime_closed":
+    raise AssertionError("accepted steer was discarded when shutdown followed it")
 
 session_records = read_jsonl(session_path)
 if len(session_records) < 3:
@@ -235,8 +259,16 @@ if "session" not in kinds:
     raise AssertionError("session journal has no session record")
 if "handoff" not in kinds and "handoff_record" not in kinds:
     raise AssertionError("session journal has no handoff record")
-if kinds.count("turn") != 2:
-    raise AssertionError(f"invalid command changed turn count: {kinds.count('turn')}")
+turn_count = kinds.count("turn")
+# Depending on whether the fast echo turn finishes before the reader handles
+# the steer, the request is either a typed no-active submission (two durable
+# turns), a cancellation after only the user record (three turns), or a full
+# cancel/reissue pair (four turns). All three are valid; neither may be
+# reported as a shutdown discard.
+if turn_count not in (2, 3, 4):
+    raise AssertionError(f"unexpected durable turn count: {turn_count}")
+if p1_terminals[0].get("code") == "backend_cancelled" and turn_count < 3:
+    raise AssertionError("a cancelled p-1 request must leave its durable user turn and steer trace")
 
 # Invalid modes must fail before opening a session or backend.
 for mode in ("print", "json", "rpc", "server", "daemon"):

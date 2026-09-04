@@ -6,12 +6,15 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    io::{self, BufRead, Write},
+    fs::{self, File},
+    io::{self, BufRead, Read, Write},
+    path::{Component, Path, PathBuf},
     sync::{Arc, Mutex, mpsc},
     thread,
     time::{Duration, Instant},
 };
 
+use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -20,8 +23,9 @@ use crate::{
     b3::{HandoffRecord, unix_ms_to_rfc3339},
     backend::ProviderEvent,
     core::{Agent, AgentError, AgentEvent, ProcessResult, TurnInputRequest},
+    domain_store::{self, DomainStore},
     protocol::{Command, StdioEvent, StdioRequest, StdioResponse, encode_line, parse_line},
-    session::unix_time_ms,
+    session::{SessionSummary, unix_time_ms},
 };
 
 const MAX_REPLAY_EVENTS: usize = 4096;
@@ -39,6 +43,14 @@ const MAX_PENDING_STEERS: usize = 128;
 const MAX_ASYNC_PROVIDER_EVENTS: usize = 4096;
 const MAX_ASYNC_AGENT_EVENTS: usize = 4096;
 const SHUTDOWN_GRACE: Duration = Duration::from_millis(250);
+/// Explicit paths accepted by host-side inspection commands are workspace
+/// relative. Keep the same byte bound as the protocol path field even when a
+/// caller reaches these helpers directly.
+const MAX_WORKSPACE_PATH_BYTES: usize = 4096;
+/// A domain listing is a terminal response, not a file transfer. Keep it well
+/// below the replay/cache budget so one `/blueprint show` can always be
+/// replayed by request ID.
+const MAX_DOMAIN_VIEW_BYTES: usize = 512 * 1024;
 
 #[derive(Debug, Clone)]
 struct TerminalRecord {
@@ -506,6 +518,25 @@ struct AsyncEventBuffer {
     agent_dropped: u64,
 }
 
+fn admission_prefix_len(events: &[AgentEvent]) -> Option<usize> {
+    let first_admission = events.iter().position(|event| {
+        matches!(
+            event,
+            AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
+        )
+    })?;
+    let admission_count = events[first_admission..]
+        .iter()
+        .take_while(|event| {
+            matches!(
+                event,
+                AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
+            )
+        })
+        .count();
+    Some(first_admission.saturating_add(admission_count))
+}
+
 impl AsyncEventBuffer {
     fn push_provider(&mut self, event: ProviderEvent) {
         if self.provider.len() < MAX_ASYNC_PROVIDER_EVENTS {
@@ -533,6 +564,20 @@ impl AsyncEventBuffer {
         let events = std::mem::take(&mut self.agent);
         let dropped = std::mem::take(&mut self.agent_dropped);
         (events, dropped)
+    }
+
+    /// Admission markers are produced immediately after `Agent::submit`,
+    /// before the provider starts. Keep them ahead of streamed provider
+    /// events even when the host polls the request before it completes. Agent
+    /// construction may also preload recovery errors, so include any prefix
+    /// before the first admission marker rather than requiring the marker to
+    /// be the first queued event. Any later AgentEvents remain buffered until
+    /// the provider trace is drained.
+    fn take_admission(&mut self) -> Vec<AgentEvent> {
+        let Some(admission_end) = admission_prefix_len(&self.agent) else {
+            return Vec::new();
+        };
+        self.agent.drain(..admission_end).collect()
     }
 }
 
@@ -572,6 +617,667 @@ fn enqueue_pending_steer<W: Write>(
         pending_steers.push_back(pending);
     }
     Ok(())
+}
+
+/// Collect one bounded resource snapshot for a host command.  This helper is
+/// intentionally provider-independent: a malformed or expensive workspace
+/// walk must never acquire the agent lock or submit a model turn.
+pub fn collect_resource_snapshot(
+    path: Option<&str>,
+) -> Result<crate::resources::ResourceSnapshot, crate::resources::ResourceError> {
+    let root = match path {
+        Some(path) => resolve_workspace_path(path)
+            .map_err(|_| crate::resources::ResourceError::PathDenied(PathBuf::from(path)))?,
+        None => std::env::current_dir()
+            .map_err(crate::resources::ResourceError::Io)?
+            .canonicalize()
+            .map_err(crate::resources::ResourceError::Io)?,
+    };
+    crate::resources::ResourceCollector::new(root)?.collect()
+}
+
+/// Resolve an explicit host inspection path beneath the process workspace.
+/// This is intentionally stricter than the public tool path resolver: absolute
+/// paths, parent traversal, and symlink components are rejected before any
+/// file is opened. The returned path is canonical so a later collector can
+/// enforce the same boundary even if the caller supplied `.` components.
+fn resolve_workspace_path(raw: &str) -> Result<PathBuf, String> {
+    if raw.trim().is_empty()
+        || raw.len() > MAX_WORKSPACE_PATH_BYTES
+        || raw.chars().any(char::is_control)
+    {
+        return Err("workspace path is empty, too long, or contains control characters".into());
+    }
+    let relative = Path::new(raw);
+    if relative.is_absolute()
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err("workspace path must be relative and stay inside the current workspace".into());
+    }
+    let workspace = std::env::current_dir()
+        .map_err(|error| error.to_string())?
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    let candidate = workspace.join(relative);
+    // Reject links in every existing component, including a final link. This
+    // avoids silently accepting an alias that happens to point back inside the
+    // workspace and makes the no-symlink policy deterministic.
+    let mut cursor = workspace.clone();
+    for component in relative.components() {
+        let Component::Normal(part) = component else {
+            continue;
+        };
+        cursor.push(part);
+        match fs::symlink_metadata(&cursor) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err("workspace path contains a symbolic link".into());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => break,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    let canonical = candidate
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    if !canonical.starts_with(&workspace) {
+        return Err("workspace path escapes the current workspace".into());
+    }
+    Ok(canonical)
+}
+
+fn domain_store_for_agent(
+    agent: Option<&Agent>,
+    read_only: bool,
+) -> Result<DomainStore, SlashDispatchError> {
+    let Some(agent) = agent else {
+        // A busy host must not fall back to the process-global default store:
+        // that would both create a file as a read-only side effect and expose
+        // records belonging to a different session.
+        return Err(SlashDispatchError {
+            code: "agent_busy",
+            message: "domain store is temporarily unavailable while the agent is busy".into(),
+        });
+    };
+    let path = domain_store::path_for_session(agent.session().path());
+    let result = if read_only {
+        DomainStore::open_read_only(path)
+    } else {
+        DomainStore::open(path)
+    };
+    result.map_err(|error| SlashDispatchError {
+        code: "domain_store_error",
+        message: error.to_string(),
+    })
+}
+
+fn serialized_store_summary(store: &DomainStore) -> Result<serde_json::Value, SlashDispatchError> {
+    let summary = store.summary().map_err(|error| SlashDispatchError {
+        code: "domain_store_error",
+        message: error.to_string(),
+    })?;
+    // Do not expose a user's absolute home/session path in a control-plane
+    // response. The store digest and counts still identify the snapshot.
+    let mut summary = serde_json::to_value(summary).map_err(|error| SlashDispatchError {
+        code: "serialization_error",
+        message: error.to_string(),
+    })?;
+    if let Some(fields) = summary.as_object_mut() {
+        fields.insert(
+            "path".into(),
+            serde_json::Value::String("<domain-store>".into()),
+        );
+    }
+    Ok(summary)
+}
+
+fn serialized_domain_store(store: &DomainStore) -> Result<serde_json::Value, SlashDispatchError> {
+    let summary = serialized_store_summary(store)?;
+    let mut result = json!({
+        "store": summary,
+        "blueprints": [],
+        "goals": [],
+        "learns": [],
+        "truncated": false,
+    });
+    let mut used = serde_json::to_vec(&result)
+        .map_err(|error| SlashDispatchError {
+            code: "serialization_error",
+            message: error.to_string(),
+        })?
+        .len();
+    let mut truncated = false;
+    append_bounded_domain_records(
+        &mut result,
+        "blueprints",
+        store.blueprints(),
+        &mut used,
+        &mut truncated,
+    )?;
+    append_bounded_domain_records(
+        &mut result,
+        "goals",
+        store.goals(),
+        &mut used,
+        &mut truncated,
+    )?;
+    append_bounded_domain_records(
+        &mut result,
+        "learns",
+        store.learns(),
+        &mut used,
+        &mut truncated,
+    )?;
+    result["truncated"] = serde_json::Value::Bool(truncated);
+    let encoded_len = serde_json::to_vec(&result)
+        .map_err(|error| SlashDispatchError {
+            code: "serialization_error",
+            message: error.to_string(),
+        })?
+        .len();
+    if encoded_len > MAX_DOMAIN_VIEW_BYTES {
+        // This should only be reachable if JSON structural overhead changes;
+        // retain a deterministic summary-only fallback rather than emitting a
+        // response that cannot fit the host's bounded replay cache.
+        return Ok(json!({
+            "store": result["store"].clone(),
+            "blueprints": [],
+            "goals": [],
+            "learns": [],
+            "truncated": true,
+        }));
+    }
+    Ok(result)
+}
+
+/// Convert a resource snapshot to a protocol-safe value. Workspace inventory
+/// is intentionally reported relative to the host rather than leaking the
+/// process' absolute checkout path into JSONL logs.
+pub fn serialized_resource_snapshot(
+    snapshot: crate::resources::ResourceSnapshot,
+) -> Result<serde_json::Value, serde_json::Error> {
+    let mut value = serde_json::to_value(snapshot)?;
+    if let Some(workspace) = value
+        .get_mut("workspace")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        workspace.insert("root".into(), serde_json::Value::String(".".into()));
+    }
+    Ok(value)
+}
+
+fn append_bounded_domain_records<T: serde::Serialize>(
+    value: &mut serde_json::Value,
+    key: &str,
+    records: Vec<&T>,
+    used: &mut usize,
+    truncated: &mut bool,
+) -> Result<(), SlashDispatchError> {
+    let Some(array) = value.get_mut(key).and_then(serde_json::Value::as_array_mut) else {
+        return Err(SlashDispatchError {
+            code: "serialization_error",
+            message: format!("domain projection field `{key}` is not an array"),
+        });
+    };
+    for record in records {
+        let encoded = serde_json::to_vec(record).map_err(|error| SlashDispatchError {
+            code: "serialization_error",
+            message: error.to_string(),
+        })?;
+        // Reserve one byte for a comma/new array element. Over-reserving keeps
+        // the final object below the hard cap even as keys are changed later.
+        let additional = encoded.len().saturating_add(1);
+        if used.saturating_add(additional) > MAX_DOMAIN_VIEW_BYTES {
+            *truncated = true;
+            break;
+        }
+        let record = serde_json::from_slice(&encoded).map_err(|error| SlashDispatchError {
+            code: "serialization_error",
+            message: error.to_string(),
+        })?;
+        array.push(record);
+        *used = used.saturating_add(additional);
+    }
+    Ok(())
+}
+
+/// Read a blueprint file with the same bounded record limit as the domain
+/// model. This helper is read-only: it never creates, chmods, or replaces the
+/// target. A domain-store JSONL file is recognized separately by
+/// [`validate_blueprint_target`].
+fn read_bounded_blueprint_bytes(path: &Path) -> Result<Vec<u8>, SlashDispatchError> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| SlashDispatchError {
+        code: "blueprint_io",
+        message: error.to_string(),
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(SlashDispatchError {
+            code: "blueprint_path_denied",
+            message: "blueprint path must not be a symbolic link".into(),
+        });
+    }
+    if !metadata.is_file() {
+        return Err(SlashDispatchError {
+            code: "blueprint_not_file",
+            message: "blueprint path is not a regular file".into(),
+        });
+    }
+    if metadata.len() > crate::domains::MAX_DOMAIN_RECORD_BYTES as u64 {
+        return Err(SlashDispatchError {
+            code: "blueprint_too_large",
+            message: format!(
+                "blueprint exceeds {} bytes",
+                crate::domains::MAX_DOMAIN_RECORD_BYTES
+            ),
+        });
+    }
+    let file = File::open(path).map_err(|error| SlashDispatchError {
+        code: "blueprint_io",
+        message: error.to_string(),
+    })?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take((crate::domains::MAX_DOMAIN_RECORD_BYTES as u64).saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| SlashDispatchError {
+            code: "blueprint_io",
+            message: error.to_string(),
+        })?;
+    if bytes.len() > crate::domains::MAX_DOMAIN_RECORD_BYTES {
+        return Err(SlashDispatchError {
+            code: "blueprint_too_large",
+            message: format!(
+                "blueprint exceeds {} bytes",
+                crate::domains::MAX_DOMAIN_RECORD_BYTES
+            ),
+        });
+    }
+    Ok(bytes)
+}
+
+fn decode_blueprint_bytes(bytes: &[u8]) -> Result<crate::domains::Blueprint, SlashDispatchError> {
+    let text = std::str::from_utf8(bytes).map_err(|_| SlashDispatchError {
+        code: "blueprint_invalid_utf8",
+        message: "blueprint is not valid UTF-8".into(),
+    })?;
+    crate::domains::Blueprint::decode_json(text).map_err(|error| SlashDispatchError {
+        code: "blueprint_invalid",
+        message: error.to_string(),
+    })
+}
+
+fn first_json_kind(bytes: &[u8]) -> Option<String> {
+    bytes
+        .split(|byte| *byte == b'\n')
+        .map(|line| line.strip_suffix(b"\r").unwrap_or(line))
+        .find(|line| !line.iter().all(u8::is_ascii_whitespace))
+        .and_then(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .and_then(|value| {
+            value
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        })
+}
+
+fn validate_blueprint_target(path: &str) -> Result<serde_json::Value, SlashDispatchError> {
+    let path = resolve_workspace_path(path).map_err(|message| SlashDispatchError {
+        code: "blueprint_path_denied",
+        message,
+    })?;
+    let bytes = read_bounded_blueprint_bytes(&path)?;
+    // Inspect the envelope without opening it first. Calling `DomainStore::open`
+    // on every candidate would create missing parents and tighten permissions
+    // on an ordinary Blueprint file. Existing domain stores use the explicit
+    // read-only loader so validation has no filesystem side effects.
+    if first_json_kind(&bytes).as_deref() == Some("domain_store") {
+        let store = DomainStore::open_existing(&path).map_err(|error| SlashDispatchError {
+            code: "domain_store_error",
+            message: error.to_string(),
+        })?;
+        let summary = serialized_store_summary(&store)?;
+        return Ok(json!({
+            "kind": "domain_store",
+            "valid": true,
+            "store": summary,
+        }));
+    }
+    let blueprint = decode_blueprint_bytes(&bytes)?;
+    Ok(json!({
+        "kind": "blueprint",
+        "valid": true,
+        "blueprint": blueprint,
+    }))
+}
+
+/// Read-only domain-store projection shared by the TUI and JSONL hosts. The
+/// returned value is already bounded by `DomainStore` validation and can be
+/// rendered directly without starting a worker.
+pub fn domain_store_view(agent: Option<&Agent>) -> Result<serde_json::Value, String> {
+    let store = domain_store_for_agent(agent, true).map_err(|error| error.message)?;
+    serialized_domain_store(&store).map_err(|error| error.message)
+}
+
+/// Validate a plain Blueprint JSON file or an existing domain-store snapshot
+/// for use by non-JSONL hosts (notably the interactive TUI).
+pub fn blueprint_validation_view(path: &str) -> Result<serde_json::Value, String> {
+    validate_blueprint_target(path).map_err(|error| error.message)
+}
+
+/// Return the sessions owned by the configured zenpi home. This is a
+/// read-only projection for slash-command hosts; it does not create the
+/// sessions directory and redacts absolute filesystem paths before crossing
+/// the JSONL boundary.
+pub fn list_session_summaries() -> Result<Vec<SessionSummary>, String> {
+    let paths = crate::config::ConfigPaths::discover().map_err(|error| error.to_string())?;
+    crate::session::list_sessions_with_fallback(&paths.sessions, paths.root.join("session.jsonl"))
+        .map_err(|error| error.to_string())
+}
+
+/// Serialize a bounded, secret-free session listing for TUI/headless hosts.
+pub fn session_list_view() -> Result<serde_json::Value, String> {
+    let sessions = list_session_summaries()?;
+    let values = sessions
+        .iter()
+        .map(serialized_session_summary)
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": "list",
+        "count": values.len(),
+        "sessions": values,
+    }))
+}
+
+/// Open an existing session for an idle agent. Unlike `Agent::resume_session`
+/// this host-facing helper validates the target first, so a typo cannot create
+/// a new journal and a symbolic-link target cannot redirect the final open
+/// outside the caller's intended path.
+pub fn open_session_path(agent: &mut Agent, raw_path: &str) -> Result<serde_json::Value, String> {
+    let path = validate_existing_session_path(raw_path)?;
+    agent
+        .resume_session(path)
+        .map_err(|error| error.to_string())?;
+    let summary = agent.snapshot().session;
+    Ok(json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": "open",
+        "session": serialized_session_summary(&summary),
+    }))
+}
+
+fn serialized_session_summary(summary: &SessionSummary) -> serde_json::Value {
+    json!({
+        "path": redact_session_path(&summary.path),
+        "session_id": summary.session_id,
+        "created_at_ms": summary.created_at_ms,
+        "turn_count": summary.turn_count,
+        "handoff_count": summary.handoff_count,
+        "handoff_record_count": summary.handoff_record_count,
+        "event_count": summary.event_count,
+        "recovery_warnings": summary.recovery_warnings,
+        "next_seq": summary.next_seq,
+    })
+}
+
+fn serialized_agent_snapshot(agent: &Agent) -> Result<serde_json::Value, serde_json::Error> {
+    let mut snapshot = agent.snapshot();
+    snapshot.session.path = redact_session_path(&snapshot.session.path);
+    serde_json::to_value(snapshot)
+}
+
+fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
+    match action {
+        crate::slash::SessionAction::List => "list",
+        crate::slash::SessionAction::Open { .. } => "open",
+        crate::slash::SessionAction::Fork { .. } => "fork",
+        crate::slash::SessionAction::Export { .. } => "export",
+        crate::slash::SessionAction::Import { .. } => "import",
+        crate::slash::SessionAction::Gc => "gc",
+    }
+}
+
+fn redact_session_path(raw: &str) -> String {
+    let path = Path::new(raw);
+    if let (Ok(cwd), Ok(canonical)) = (
+        std::env::current_dir().and_then(|path| path.canonicalize()),
+        path.canonicalize(),
+    ) && let Ok(relative) = canonical.strip_prefix(cwd)
+    {
+        let rendered = relative.display().to_string();
+        return if rendered.is_empty() {
+            ".".into()
+        } else {
+            format!("./{rendered}")
+        };
+    }
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| format!("<session:{name}>"))
+        .unwrap_or_else(|| "<session>".into())
+}
+
+fn validate_existing_session_path(raw_path: &str) -> Result<PathBuf, String> {
+    if raw_path.trim().is_empty()
+        || raw_path.len() > MAX_WORKSPACE_PATH_BYTES
+        || raw_path.chars().any(char::is_control)
+    {
+        return Err("session path is empty, too long, or contains control characters".into());
+    }
+    let path = Path::new(raw_path);
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err("session path must not contain parent traversal".into());
+    }
+    // Check the final component lexically. Parent directories may be platform
+    // aliases (for example macOS `/var` -> `/private/var`); the session store
+    // itself uses `O_NOFOLLOW` for the final open and rejects a final symlink.
+    // Rejecting every ancestor here would make ordinary temporary/session paths
+    // unusable on those systems.
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if !metadata.is_file() {
+        return Err("session path is not a regular file".into());
+    }
+    path.canonicalize().map_err(|error| error.to_string())
+}
+
+/// Read one bounded JSON domain record from a regular, non-symlink file.
+/// Domain records are intentionally supplied by path rather than embedded in
+/// a slash command: the command frame remains small and the JSON parser can
+/// enforce the same 64 KiB record limit as the durable store.
+fn read_domain_json<T: DeserializeOwned>(
+    path: &Path,
+    kind: &'static str,
+) -> Result<T, SlashDispatchError> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| SlashDispatchError {
+        code: "domain_input_io",
+        message: error.to_string(),
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(SlashDispatchError {
+            code: "domain_input_path_denied",
+            message: format!("{kind} input path must not be a symbolic link"),
+        });
+    }
+    if !metadata.is_file() {
+        return Err(SlashDispatchError {
+            code: "domain_input_not_file",
+            message: format!("{kind} input path is not a regular file"),
+        });
+    }
+    let limit = crate::domains::MAX_DOMAIN_RECORD_BYTES;
+    if metadata.len() > limit as u64 {
+        return Err(SlashDispatchError {
+            code: "domain_input_too_large",
+            message: format!("{kind} input exceeds {limit} bytes"),
+        });
+    }
+    let file = File::open(path).map_err(|error| SlashDispatchError {
+        code: "domain_input_io",
+        message: error.to_string(),
+    })?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take((limit as u64).saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| SlashDispatchError {
+            code: "domain_input_io",
+            message: error.to_string(),
+        })?;
+    if bytes.len() > limit {
+        return Err(SlashDispatchError {
+            code: "domain_input_too_large",
+            message: format!("{kind} input exceeds {limit} bytes"),
+        });
+    }
+    let text = std::str::from_utf8(&bytes).map_err(|_| SlashDispatchError {
+        code: "domain_input_invalid_utf8",
+        message: format!("{kind} input is not valid UTF-8"),
+    })?;
+    serde_json::from_str(text).map_err(|error| SlashDispatchError {
+        code: "domain_input_invalid",
+        message: format!("{kind} input is invalid JSON: {error}"),
+    })
+}
+
+fn persist_blueprint_from_path(
+    agent: Option<&mut Agent>,
+    path: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    let path = resolve_workspace_path(path).map_err(|message| SlashDispatchError {
+        code: "domain_input_path_denied",
+        message,
+    })?;
+    let blueprint: crate::domains::Blueprint = read_domain_json(&path, "blueprint")?;
+    blueprint.validate().map_err(|error| SlashDispatchError {
+        code: "blueprint_invalid",
+        message: error.to_string(),
+    })?;
+    let Some(agent) = agent else {
+        return Err(SlashDispatchError {
+            code: "agent_busy",
+            message: "blueprint persistence is unavailable while the agent is busy".into(),
+        });
+    };
+    let mut store = domain_store_for_agent(Some(agent), false)?;
+    let change = store
+        .put_blueprint(blueprint.clone())
+        .map_err(|error| SlashDispatchError {
+            code: "domain_store_error",
+            message: error.to_string(),
+        })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "blueprint",
+        "route": "local",
+        "accepted": true,
+        "action": "put",
+        "change": change,
+        "blueprint": blueprint,
+        "store": summary,
+    }))
+}
+
+fn persist_goal_from_path(
+    agent: Option<&mut Agent>,
+    path: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    let path = resolve_workspace_path(path).map_err(|message| SlashDispatchError {
+        code: "domain_input_path_denied",
+        message,
+    })?;
+    let goal: crate::domains::Goal = read_domain_json(&path, "goal")?;
+    goal.validate().map_err(|error| SlashDispatchError {
+        code: "goal_invalid",
+        message: error.to_string(),
+    })?;
+    let Some(agent) = agent else {
+        return Err(SlashDispatchError {
+            code: "agent_busy",
+            message: "goal persistence is unavailable while the agent is busy".into(),
+        });
+    };
+    let mut store = domain_store_for_agent(Some(agent), false)?;
+    let change = store
+        .put_goal(goal.clone())
+        .map_err(|error| SlashDispatchError {
+            code: "domain_store_error",
+            message: error.to_string(),
+        })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "goal",
+        "route": "local",
+        "accepted": true,
+        "action": "put",
+        "change": change,
+        "goal": goal,
+        "store": summary,
+    }))
+}
+
+fn persist_learn_from_path(
+    agent: Option<&mut Agent>,
+    path: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    let path = resolve_workspace_path(path).map_err(|message| SlashDispatchError {
+        code: "domain_input_path_denied",
+        message,
+    })?;
+    let learn: crate::domains::Learn = read_domain_json(&path, "learn")?;
+    learn.validate().map_err(|error| SlashDispatchError {
+        code: "learn_invalid",
+        message: error.to_string(),
+    })?;
+    let Some(agent) = agent else {
+        return Err(SlashDispatchError {
+            code: "agent_busy",
+            message: "learn persistence is unavailable while the agent is busy".into(),
+        });
+    };
+    let mut store = domain_store_for_agent(Some(agent), false)?;
+    let change = store
+        .put_learn(learn.clone())
+        .map_err(|error| SlashDispatchError {
+            code: "domain_store_error",
+            message: error.to_string(),
+        })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "learn",
+        "route": "local",
+        "accepted": true,
+        "action": "put",
+        "change": change,
+        "learn": learn,
+        "store": summary,
+    }))
+}
+
+/// Persist a validated Blueprint JSON document for an interactive host.
+/// Errors are returned as text so the TUI can render them without exposing
+/// the headless transport's private dispatch type.
+pub fn persist_blueprint_path(agent: &mut Agent, path: &str) -> Result<serde_json::Value, String> {
+    persist_blueprint_from_path(Some(agent), path).map_err(|error| error.message)
+}
+
+/// Persist a validated Goal JSON document for an interactive host.
+pub fn persist_goal_path(agent: &mut Agent, path: &str) -> Result<serde_json::Value, String> {
+    persist_goal_from_path(Some(agent), path).map_err(|error| error.message)
+}
+
+/// Persist a validated Learn JSON document for an interactive host.
+pub fn persist_learn_path(agent: &mut Agent, path: &str) -> Result<serde_json::Value, String> {
+    persist_learn_from_path(Some(agent), path).map_err(|error| error.message)
 }
 
 fn request_in_flight(
@@ -764,10 +1470,26 @@ fn drain_provider_events<W: Write>(
         // request owns the correlation captured from `TurnSubmission`, so
         // read it from `AsyncWork` rather than probing the event JSON.
         let work_turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
-        let Ok(mut events) = work.events.lock() else {
-            continue;
+        // Snapshot the mailbox before doing JSON encoding or writing to the
+        // client. A slow stdout consumer must not hold the request lock and
+        // stall the provider worker (or a future lifecycle callback).
+        let (agent_events, (provider_events, dropped)) = match work.events.lock() {
+            Ok(mut events) => {
+                // Admission markers must be observed before any provider delta
+                // for the same request. `Agent::submit` publishes them before
+                // it enters the provider, and the per-request buffer preserves
+                // that relationship.
+                (events.take_admission(), events.take_provider())
+            }
+            Err(_) => continue,
         };
-        let (provider_events, dropped) = events.take_provider();
+        write_buffered_events(
+            output,
+            sequence,
+            work.id.clone(),
+            agent_events,
+            Some(replay),
+        )?;
         for event in provider_events {
             let value = serde_json::to_value(event)?;
             let envelope = StdioEvent::new(*sequence, work.id.clone(), work_turn_id.clone(), value);
@@ -844,10 +1566,19 @@ fn drain_provider_events_for_job<W: Write>(
     // Raw provider events have no turn_id field; correlation is carried by
     // the request metadata captured when the submission was accepted.
     let work_turn_id = work.turn_id.lock().ok().and_then(|turn_id| turn_id.clone());
-    let Ok(mut events) = work.events.lock() else {
-        return Ok(());
+    // Detach all buffered data before serializing or writing. Holding this
+    // mutex across client I/O would let a slow consumer pause the worker.
+    let (admission_events, (provider_events, dropped)) = match work.events.lock() {
+        Ok(mut events) => (events.take_admission(), events.take_provider()),
+        Err(_) => return Ok(()),
     };
-    let (provider_events, dropped) = events.take_provider();
+    write_buffered_events(
+        output,
+        sequence,
+        work.id.clone(),
+        admission_events,
+        Some(replay),
+    )?;
     for event in provider_events {
         let value = serde_json::to_value(event)?;
         let envelope = StdioEvent::new(*sequence, work.id.clone(), work_turn_id.clone(), value);
@@ -954,6 +1685,11 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         if let Ok(mut active) = started_turn_id.lock() {
                             *active = submission.turn_id().map(str::to_owned);
                         }
+                        if let Ok(mut pending) = events.lock() {
+                            for event in agent.take_events() {
+                                pending.push_agent(event);
+                            }
+                        }
                         let assistant = if submission.accepted() {
                             agent.run_active_turn_cancelable_with_events(
                                 || token.is_cancelled(),
@@ -975,6 +1711,11 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         if let Ok(mut active) = started_turn_id.lock() {
                             *active = submission.turn_id().map(str::to_owned);
                         }
+                        if let Ok(mut pending) = events.lock() {
+                            for event in agent.take_events() {
+                                pending.push_agent(event);
+                            }
+                        }
                         let assistant = agent.run_active_turn_cancelable_with_events(
                             || token.is_cancelled(),
                             &mut sink,
@@ -992,14 +1733,12 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 }
             }
             let result = result?;
-            if token.is_cancelled() {
-                return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
-            }
-            // Publish completion before returning to the runtime.  Shutdown
-            // can arrive in the tiny window between this closure's return
-            // and the worker consuming its done message; without the marker
-            // the runtime would relabel an already-successful turn as
-            // cancelled.
+            // `Agent::run_active_turn_cancelable_with_events` has already
+            // crossed its durable completion boundary when it returns a
+            // successful ProcessResult. Publish that boundary before handing
+            // control back to the runtime: a late steer/shutdown may race
+            // this tiny gap, but must not relabel a persisted answer as a
+            // cancellation (or leave the journal and wire result divergent).
             token.mark_completed();
             Ok(result)
         },
@@ -1013,6 +1752,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     let mut stopping = false;
     let mut stopping_since: Option<Instant> = None;
     let mut shutdown_sent = false;
+    let mut pending_shutdown: Option<(Option<String>, String, u16)> = None;
     let loop_result = (|| -> Result<(), HeadlessError> {
         loop {
             drain_provider_events(&mut jobs, &mut output, &mut event_sequence, &mut replay)?;
@@ -1032,12 +1772,21 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                     &mut event_sequence,
                     &mut replay,
                     &mut pending_steers,
+                    &mut pending_shutdown,
                     stopping,
                     shutdown_sent,
                 )? {
                     return Ok(());
                 }
             }
+            // A shutdown request is a stop boundary for *new* input, but a
+            // steer already admitted before that boundary still owns a
+            // terminal response. Give it a bounded window to complete its
+            // cancel/reissue promotion; once the grace period expires,
+            // `promote_pending_steers` reports an explicit runtime_closed
+            // error instead of silently dropping it.
+            let steer_grace_elapsed = stopping
+                && stopping_since.is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
             promote_pending_steers(
                 &runner,
                 &mut jobs,
@@ -1045,7 +1794,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 &mut pending_steers,
                 &mut output,
                 &mut replay,
-                stopping,
+                stopping && steer_grace_elapsed,
             )?;
             if stopping {
                 drain_provider_events(&mut jobs, &mut output, &mut event_sequence, &mut replay)?;
@@ -1055,7 +1804,9 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 // observed shutdown and emitted their terminal events.
                 let grace_elapsed =
                     stopping_since.is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
-                if !shutdown_sent && (jobs.is_empty() || grace_elapsed) {
+                if !shutdown_sent
+                    && ((jobs.is_empty() && pending_steers.is_empty()) || grace_elapsed)
+                {
                     match runner.try_shutdown() {
                         Ok(()) | Err(crate::runtime::SubmitError::Closed) => {
                             shutdown_sent = true;
@@ -1077,6 +1828,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                             &mut event_sequence,
                             &mut replay,
                             &mut pending_steers,
+                            &mut pending_shutdown,
                             true,
                             shutdown_sent,
                         )? {
@@ -1098,6 +1850,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         &mut jobs,
                         &mut request_to_job,
                         &mut pending_steers,
+                        &mut pending_shutdown,
                         &mut output,
                         &mut event_sequence,
                         &mut replay,
@@ -1106,6 +1859,9 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                     if stopping {
                         stopping_since.get_or_insert_with(Instant::now);
                     }
+                    let steer_grace_elapsed = stopping
+                        && stopping_since
+                            .is_some_and(|started| started.elapsed() >= SHUTDOWN_GRACE);
                     promote_pending_steers(
                         &runner,
                         &mut jobs,
@@ -1113,7 +1869,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         &mut pending_steers,
                         &mut output,
                         &mut replay,
-                        stopping,
+                        stopping && steer_grace_elapsed,
                     )?;
                 }
                 Ok(ReaderMessage::TooLong) => {
@@ -1193,6 +1949,7 @@ fn handle_runtime_event<W: Write>(
     event_sequence: &mut u64,
     replay: &mut ReplayState,
     pending_steers: &mut VecDeque<PendingSteer>,
+    pending_shutdown: &mut Option<(Option<String>, String, u16)>,
     stopping: bool,
     shutdown_sent: bool,
 ) -> Result<bool, HeadlessError> {
@@ -1220,9 +1977,45 @@ fn handle_runtime_event<W: Write>(
             if let Some(request_id) = meta.id.as_ref() {
                 request_to_job.remove(request_id);
             }
-            // Provider deltas precede the one terminal response, even when
-            // the worker and output loop become ready on the same tick.
+            // Snapshot all lifecycle events before writing the terminal
+            // response.  A client must be able to treat that response as a
+            // strict completion boundary: once it is observed, no progress
+            // event for the same request may still be waiting behind it.
+            let (agent_events, agent_dropped) = meta
+                .events
+                .lock()
+                .map(|mut events| events.take_agent())
+                .unwrap_or_default();
+            let mut agent_events = agent_events;
+            let admission_end = admission_prefix_len(&agent_events).unwrap_or(0);
+            let admission_events = agent_events.drain(..admission_end).collect::<Vec<_>>();
+            if agent_dropped > 0 {
+                agent_events.push(AgentEvent::Error {
+                    message: format!(
+                        "{} agent lifecycle event(s) dropped because the bounded mailbox was full",
+                        agent_dropped
+                    ),
+                });
+            }
+            // Provider deltas and lifecycle markers precede the one terminal
+            // response, even when the worker and output loop become ready on
+            // the same tick.  The two buffers are drained here (rather than
+            // from the global Agent) so queued jobs cannot be mis-correlated.
+            write_buffered_events(
+                output,
+                event_sequence,
+                event_request_id.clone(),
+                admission_events,
+                Some(replay),
+            )?;
             drain_provider_events_for_job(&meta, output, event_sequence, replay)?;
+            write_buffered_events(
+                output,
+                event_sequence,
+                event_request_id,
+                agent_events,
+                Some(replay),
+            )?;
             match outcome {
                 JobOutcome::Succeeded(result) => {
                     let data = json!({
@@ -1270,27 +2063,6 @@ fn handle_runtime_event<W: Write>(
                     replay,
                 )?,
             }
-            let (agent_events, agent_dropped) = meta
-                .events
-                .lock()
-                .map(|mut events| events.take_agent())
-                .unwrap_or_default();
-            let mut agent_events = agent_events;
-            if agent_dropped > 0 {
-                agent_events.push(AgentEvent::Error {
-                    message: format!(
-                        "{} agent lifecycle event(s) dropped because the bounded mailbox was full",
-                        agent_dropped
-                    ),
-                });
-            }
-            write_buffered_events(
-                output,
-                event_sequence,
-                event_request_id,
-                agent_events,
-                Some(replay),
-            )?;
             Ok(false)
         }
         RuntimeEvent::Rejected { id, reason } => {
@@ -1321,7 +2093,21 @@ fn handle_runtime_event<W: Write>(
             }
             Ok(false)
         }
-        RuntimeEvent::Closed => Ok(stopping && shutdown_sent && jobs.is_empty()),
+        RuntimeEvent::Closed => {
+            if let Some((id, command, version)) = pending_shutdown.take() {
+                write_cached_versioned_response(
+                    output,
+                    StdioResponse::success(
+                        id,
+                        command,
+                        Some(json!({"closing": true, "drained": true})),
+                    ),
+                    version,
+                    replay,
+                )?;
+            }
+            Ok(stopping && shutdown_sent && jobs.is_empty())
+        }
         _ => Ok(false),
     }
 }
@@ -1335,6 +2121,7 @@ fn process_async_line<W, F>(
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     pending_steers: &mut VecDeque<PendingSteer>,
+    pending_shutdown: &mut Option<(Option<String>, String, u16)>,
     output: &mut W,
     event_sequence: &mut u64,
     replay: &mut ReplayState,
@@ -1451,18 +2238,39 @@ where
                 }
             };
             let command_name = parsed.name();
+            let session_open = matches!(
+                &parsed,
+                crate::slash::SlashCommand::Session {
+                    action: crate::slash::SessionAction::Open { .. }
+                }
+            );
+            if session_open && (!jobs.is_empty() || !pending_steers.is_empty()) {
+                write_retryable_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        command_name,
+                        "agent_busy",
+                        "session cannot be opened while requests are queued or running",
+                    )
+                    .for_version(request_version),
+                    replay,
+                )?;
+                return Ok(());
+            }
             let execution = match shared.try_lock() {
                 Ok(mut agent) => execute_headless_slash(Some(&mut agent), parsed),
                 Err(_) => execute_headless_slash(None, parsed),
             };
             match execution {
                 Ok(SlashExecution::Response(data)) => {
-                    write_cached_response(
-                        output,
-                        StdioResponse::success(id, command_name, Some(data))
-                            .for_version(request_version),
-                        replay,
-                    )?;
+                    let response =
+                        slash_execution_response(id.clone(), command_name, data, request_version);
+                    if session_open && response.success {
+                        request_to_job.clear();
+                        replay.reset_for_session(id.as_deref(), *event_sequence);
+                    }
+                    write_cached_response(output, response, replay)?;
                 }
                 Ok(SlashExecution::Cancel) => {
                     let target = jobs
@@ -1519,12 +2327,11 @@ where
                     }
                 }
                 Ok(SlashExecution::Exit) => {
-                    write_cached_response(
-                        output,
-                        StdioResponse::success(id, command_name, Some(json!({"closing": true})))
-                            .for_version(request_version),
-                        replay,
-                    )?;
+                    // The shutdown acknowledgement is emitted after the
+                    // outer loop has drained admitted work. Emitting it here
+                    // would let a client close the pipe before the prompt's
+                    // terminal response arrives.
+                    pending_shutdown.replace((id, command_name.to_owned(), request_version));
                     *stopping = true;
                 }
                 Err(error) => {
@@ -1539,6 +2346,20 @@ where
                 }
             }
         }
+        Command::Resources { path } => match collect_resource_snapshot(path.as_deref()) {
+            Ok(snapshot) => write_cached_versioned_response(
+                output,
+                StdioResponse::success(id, name, Some(serialized_resource_snapshot(snapshot)?)),
+                request_version,
+                replay,
+            )?,
+            Err(error) => write_cached_versioned_response(
+                output,
+                StdioResponse::error_with_code(id, name, "resource_error", error.to_string()),
+                request_version,
+                replay,
+            )?,
+        },
         Command::Prompt {
             text,
             mode,
@@ -1756,7 +2577,7 @@ where
         Command::Status => match shared.try_lock() {
             Ok(agent) => write_cached_versioned_response(
                 output,
-                StdioResponse::success(id, name, Some(serde_json::to_value(agent.snapshot())?)),
+                StdioResponse::success(id, name, Some(serialized_agent_snapshot(&agent)?)),
                 request_version,
                 replay,
             )?,
@@ -1771,12 +2592,10 @@ where
             // Shutdown is an explicit cancellation boundary. Report that the
             // close was accepted; the outer loop then drains every admitted
             // job to a terminal response before the process exits.
-            write_cached_versioned_response(
-                output,
-                StdioResponse::success(id, name, Some(json!({"closing": true}))),
-                request_version,
-                replay,
-            )?;
+            // Keep the acknowledgement until `RuntimeEvent::Closed` so a
+            // client can safely treat it as proof that all prior requests
+            // have reached their terminal response.
+            pending_shutdown.replace((id, name, request_version));
             *stopping = true;
         }
         Command::Approve {
@@ -1880,6 +2699,19 @@ where
                 )?;
                 return Ok(());
             };
+            let path = match validate_existing_session_path(&path) {
+                Ok(path) => path,
+                Err(message) => {
+                    write_cached_versioned_response(
+                        output,
+                        StdioResponse::error_with_code(id, name, "session_path_denied", message)
+                            .for_version(request_version),
+                        request_version,
+                        replay,
+                    )?;
+                    return Ok(());
+                }
+            };
             match agent.resume_session(path) {
                 Ok(()) => {
                     agent.take_events();
@@ -1887,11 +2719,7 @@ where
                     replay.reset_for_session(id.as_deref(), *event_sequence);
                     write_cached_versioned_response(
                         output,
-                        StdioResponse::success(
-                            id,
-                            name,
-                            Some(serde_json::to_value(agent.snapshot())?),
-                        ),
+                        StdioResponse::success(id, name, Some(serialized_agent_snapshot(&agent)?)),
                         request_version,
                         replay,
                     )?;
@@ -2082,13 +2910,13 @@ where
             }
         } else {
             // If the original completed before its turn ID became visible,
-            // preserve the user's intent as a fresh start-or-steer request.
-            // This is preferable to losing the line or returning a false
-            // `no_active_turn` solely because of scheduler timing.
+            // retain explicit steer semantics. A steer must never silently
+            // become a new prompt after the active turn has gone idle; the
+            // agent will return a typed `no_active_turn` submission instead.
             let request = TurnInputRequest {
                 message: pending.text.clone(),
                 expected_turn_id: pending.expected_turn_id.clone(),
-                mode: crate::protocol::TurnMode::StartOrSteer,
+                mode: crate::protocol::TurnMode::Steer,
                 attachments: Vec::new(),
             };
             let (request, events, started_turn_id) = AsyncRequest::new(request);
@@ -2135,6 +2963,38 @@ enum SlashExecution {
     Response(serde_json::Value),
     Cancel,
     Exit,
+}
+
+/// Turn a slash dispatcher projection into a terminal wire response. A
+/// parsed-but-unowned command carries `accepted:false` in its local
+/// projection; that is an operation failure, not a successful command. Keep
+/// the action and owner message in the typed error while deliberately omitting
+/// arbitrary arguments (which may contain filesystem paths or secrets).
+fn slash_execution_response(
+    id: Option<String>,
+    command: impl Into<String>,
+    data: serde_json::Value,
+    version: u16,
+) -> StdioResponse {
+    let command = command.into();
+    if data.get("accepted").and_then(serde_json::Value::as_bool) == Some(false) {
+        let action = data
+            .get("action")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("request");
+        let message = data
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("command is not executable in this host");
+        return StdioResponse::error_with_code(
+            id,
+            command.clone(),
+            "unsupported_command",
+            format!("{command} {action}: {message}"),
+        )
+        .for_version(version);
+    }
+    StdioResponse::success(id, command, Some(data)).for_version(version)
 }
 
 #[derive(Debug)]
@@ -2190,9 +3050,8 @@ fn execute_headless_slash(
                     message: "status snapshot is temporarily unavailable".into(),
                 });
             };
-            let snapshot = agent.snapshot();
             Ok(SlashExecution::Response(
-                serde_json::to_value(snapshot).map_err(|error| SlashDispatchError {
+                serialized_agent_snapshot(agent).map_err(|error| SlashDispatchError {
                     code: "serialization_error",
                     message: error.to_string(),
                 })?,
@@ -2223,6 +3082,22 @@ fn execute_headless_slash(
                 "entries": entries,
             })))
         }
+        SlashCommand::Resources { path } => match collect_resource_snapshot(path.as_deref()) {
+            Ok(snapshot) => Ok(SlashExecution::Response(json!({
+                "command": "resources",
+                "accepted": true,
+                "snapshot": serialized_resource_snapshot(snapshot).map_err(|error| {
+                    SlashDispatchError {
+                        code: "serialization_error",
+                        message: error.to_string(),
+                    }
+                })?,
+            }))),
+            Err(error) => Err(SlashDispatchError {
+                code: "resource_error",
+                message: error.to_string(),
+            }),
+        },
         SlashCommand::Clear => Ok(SlashExecution::Response(json!({
             "command": "clear",
             "cleared": true,
@@ -2230,36 +3105,210 @@ fn execute_headless_slash(
         }))),
         SlashCommand::Cancel => Ok(SlashExecution::Cancel),
         SlashCommand::Exit => Ok(SlashExecution::Exit),
-        SlashCommand::Goal { instruction } => Ok(SlashExecution::Response(json!({
-            "command": "goal",
+        SlashCommand::Goal { instruction } => {
+            // `show` is a deliberately read-only owner operation. Other goal
+            // instructions still require an external b3ehive scheduler and
+            // must not be reported as accepted by this host.
+            if instruction.trim().eq_ignore_ascii_case("show")
+                || instruction.trim().eq_ignore_ascii_case("status")
+            {
+                let store = domain_store_for_agent(agent.as_deref(), true)?;
+                let data = serialized_domain_store(&store)?;
+                return Ok(SlashExecution::Response(json!({
+                    "command": "goal",
+                    "route": "local",
+                    "accepted": true,
+                    "action": "show",
+                    "store": data["store"].clone(),
+                    "goals": data["goals"].clone(),
+                })));
+            }
+            Ok(SlashExecution::Response(json!({
+                "command": "goal",
+                "route": "local",
+                "accepted": false,
+                "instruction": bound_slash_text(&instruction, 4096),
+                "message": "goal creation/execution requires an external b3ehive owner",
+            })))
+        }
+        SlashCommand::GoalPut { path } => Ok(SlashExecution::Response(persist_goal_from_path(
+            agent, &path,
+        )?)),
+        SlashCommand::Plan { instruction } => Ok(SlashExecution::Response(json!({
+            "command": "plan",
             "route": "local",
             "accepted": false,
-            "instruction": bound_slash_text(&instruction, 4096),
-            "message": "first-class b3ehive goal owner is not configured",
+            "instruction": instruction,
+            "message": "plan command is parsed but its blueprint owner is not configured",
+        }))),
+        SlashCommand::Session { action } => match action {
+            crate::slash::SessionAction::List => session_list_view()
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "session_list_failed",
+                    message,
+                }),
+            crate::slash::SessionAction::Open { path } => {
+                let Some(agent) = agent else {
+                    return Err(SlashDispatchError {
+                        code: "agent_busy",
+                        message: "session cannot be opened while the agent is busy".into(),
+                    });
+                };
+                open_session_path(agent, &path)
+                    .map(SlashExecution::Response)
+                    .map_err(|message| SlashDispatchError {
+                        code: "session_open_failed",
+                        message,
+                    })
+            }
+            action => Ok(SlashExecution::Response(json!({
+                "command": "session",
+                "route": "local",
+                "accepted": false,
+                "action": session_action_name(&action),
+                "message": "session action is parsed but not executable in this host",
+            }))),
+        },
+        SlashCommand::Resume { sequence } => Ok(SlashExecution::Response(json!({
+            "command": "resume",
+            "route": "local",
+            "accepted": false,
+            "sequence": sequence,
+            "message": "resume command is parsed but event replay is not configured",
+        }))),
+        SlashCommand::Compact => Ok(SlashExecution::Response(json!({
+            "command": "compact",
+            "route": "local",
+            "accepted": false,
+            "message": "compact command is parsed but context compaction is not configured",
+        }))),
+        SlashCommand::Diff { path } => Ok(SlashExecution::Response(json!({
+            "command": "diff",
+            "route": "local",
+            "accepted": false,
+            "path": path,
+            "message": "diff command is parsed but file review is not configured",
+        }))),
+        SlashCommand::Attach { path } => Ok(SlashExecution::Response(json!({
+            "command": "attach",
+            "route": "local",
+            "accepted": false,
+            "path": path,
+            "message": "attach command is parsed but attachment staging is not configured",
+        }))),
+        SlashCommand::Approve { id, decision } => Ok(SlashExecution::Response(json!({
+            "command": "approve",
+            "route": "local",
+            "accepted": false,
+            "id": id,
+            "decision": decision,
+            "message": "approve command is parsed but approval routing is not configured",
         }))),
         SlashCommand::Blueprint { action } => {
             let action_name = match &action {
                 BlueprintAction::Show => "show",
                 BlueprintAction::Status => "status",
                 BlueprintAction::Validate { .. } => "validate",
+                BlueprintAction::Put { .. } => "put",
                 BlueprintAction::Run { .. } => "run",
                 BlueprintAction::Open { .. } => "open",
             };
+            match action {
+                BlueprintAction::Show => {
+                    let store = domain_store_for_agent(agent.as_deref(), true)?;
+                    let data = serialized_domain_store(&store)?;
+                    Ok(SlashExecution::Response(json!({
+                        "command": "blueprint",
+                        "route": "local",
+                        "accepted": true,
+                        "action": action_name,
+                        "store": data["store"].clone(),
+                        "blueprints": data["blueprints"].clone(),
+                    })))
+                }
+                BlueprintAction::Status => {
+                    let store = domain_store_for_agent(agent.as_deref(), true)?;
+                    let summary = serialized_store_summary(&store)?;
+                    Ok(SlashExecution::Response(json!({
+                        "command": "blueprint",
+                        "route": "local",
+                        "accepted": true,
+                        "action": action_name,
+                        "store": summary,
+                    })))
+                }
+                BlueprintAction::Validate { path: Some(path) } => {
+                    let result = validate_blueprint_target(&path)?;
+                    Ok(SlashExecution::Response(json!({
+                        "command": "blueprint",
+                        "route": "local",
+                        "accepted": true,
+                        "action": action_name,
+                        "result": result,
+                    })))
+                }
+                BlueprintAction::Validate { path: None } => {
+                    let store = domain_store_for_agent(agent.as_deref(), true)?;
+                    store.validate().map_err(|error| SlashDispatchError {
+                        code: "domain_store_error",
+                        message: error.to_string(),
+                    })?;
+                    let summary = serialized_store_summary(&store)?;
+                    Ok(SlashExecution::Response(json!({
+                        "command": "blueprint",
+                        "route": "local",
+                        "accepted": true,
+                        "action": action_name,
+                        "valid": true,
+                        "store": summary,
+                    })))
+                }
+                BlueprintAction::Put { path } => Ok(SlashExecution::Response(
+                    persist_blueprint_from_path(agent, &path)?,
+                )),
+                BlueprintAction::Run { target } | BlueprintAction::Open { path: target } => {
+                    Ok(SlashExecution::Response(json!({
+                        "command": "blueprint",
+                        "route": "local",
+                        "accepted": false,
+                        "action": action_name,
+                        "target": target,
+                        "message": "blueprint execution or interactive opening requires a host adapter",
+                    })))
+                }
+            }
+        }
+        SlashCommand::Learn { target } => {
+            if target
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty() || value.eq_ignore_ascii_case("show"))
+                || target
+                    .as_deref()
+                    .is_some_and(|value| value.eq_ignore_ascii_case("status"))
+            {
+                let store = domain_store_for_agent(agent.as_deref(), true)?;
+                let data = serialized_domain_store(&store)?;
+                return Ok(SlashExecution::Response(json!({
+                    "command": "learn",
+                    "route": "local",
+                    "accepted": true,
+                    "action": "show",
+                    "store": data["store"].clone(),
+                    "learns": data["learns"].clone(),
+                })));
+            }
             Ok(SlashExecution::Response(json!({
-                "command": "blueprint",
+                "command": "learn",
                 "route": "local",
                 "accepted": false,
-                "action": action_name,
-                "message": "first-class blueprint owner is not configured",
+                "target": target,
+                "message": "learn execution requires an external owner; use /learn show or /learn put <json-path>",
             })))
         }
-        SlashCommand::Learn { target } => Ok(SlashExecution::Response(json!({
-            "command": "learn",
-            "route": "local",
-            "accepted": false,
-            "target": target,
-            "message": "first-class learn owner is not configured",
-        }))),
+        SlashCommand::LearnPut { path } => Ok(SlashExecution::Response(persist_learn_from_path(
+            agent, &path,
+        )?)),
         SlashCommand::Compete { args } => Ok(SlashExecution::Response(json!({
             "command": "compete",
             "route": "runtime",
@@ -2319,13 +3368,25 @@ fn handle_command<W: Write>(
             )?,
             Ok(crate::slash::InputRoute::Slash(command)) => {
                 let command_name = command.name();
+                let session_open = matches!(
+                    &command,
+                    crate::slash::SlashCommand::Session {
+                        action: crate::slash::SessionAction::Open { .. }
+                    }
+                );
                 match execute_headless_slash(Some(agent), command) {
-                    Ok(SlashExecution::Response(data)) => write_cached_versioned_response(
-                        output,
-                        StdioResponse::success(id, command_name, Some(data)),
-                        request_version,
-                        replay,
-                    )?,
+                    Ok(SlashExecution::Response(data)) => {
+                        let response = slash_execution_response(
+                            id.clone(),
+                            command_name,
+                            data,
+                            request_version,
+                        );
+                        if session_open && response.success {
+                            replay.reset_for_session(id.as_deref(), *event_sequence);
+                        }
+                        write_cached_response(output, response, replay)?
+                    }
                     Ok(SlashExecution::Cancel) => write_cached_versioned_response(
                         output,
                         StdioResponse::error_with_code(
@@ -2360,6 +3421,20 @@ fn handle_command<W: Write>(
                 }
             }
         },
+        Command::Resources { path } => match collect_resource_snapshot(path.as_deref()) {
+            Ok(snapshot) => write_cached_versioned_response(
+                output,
+                StdioResponse::success(id, name, Some(serialized_resource_snapshot(snapshot)?)),
+                request_version,
+                replay,
+            )?,
+            Err(error) => write_cached_versioned_response(
+                output,
+                StdioResponse::error_with_code(id, name, "resource_error", error.to_string()),
+                request_version,
+                replay,
+            )?,
+        },
         Command::Prompt {
             text,
             mode,
@@ -2378,15 +3453,21 @@ fn handle_command<W: Write>(
                         "submission": result.submission,
                         "assistant": result.assistant,
                     });
+                    // A turn's terminal response is the wire completion
+                    // boundary. Flush every lifecycle/provider event first.
+                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                     write_cached_versioned_response(
                         output,
                         StdioResponse::success(id.clone(), name, Some(data)),
                         request_version,
                         replay,
                     )?;
-                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                 }
                 Err(error) => {
+                    // Failed admission/provider calls can still leave a
+                    // TurnRejected or Error marker; never emit it after the
+                    // terminal error response.
+                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                     write_cached_versioned_response(
                         output,
                         StdioResponse::error_with_code(
@@ -2398,7 +3479,6 @@ fn handle_command<W: Write>(
                         request_version,
                         replay,
                     )?;
-                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                 }
             }
         }
@@ -2418,15 +3498,16 @@ fn handle_command<W: Write>(
                         "submission": result.submission,
                         "assistant": result.assistant,
                     });
+                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                     write_cached_versioned_response(
                         output,
                         StdioResponse::success(id.clone(), name, Some(data)),
                         request_version,
                         replay,
                     )?;
-                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                 }
                 Err(error) => {
+                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                     write_cached_versioned_response(
                         output,
                         StdioResponse::error_with_code(
@@ -2438,7 +3519,6 @@ fn handle_command<W: Write>(
                         request_version,
                         replay,
                     )?;
-                    write_events(agent, output, event_sequence, id.clone(), replay)?;
                 }
             }
         }
@@ -2456,7 +3536,7 @@ fn handle_command<W: Write>(
         Command::Status => {
             write_cached_versioned_response(
                 output,
-                StdioResponse::success(id, name, Some(serde_json::to_value(agent.snapshot())?)),
+                StdioResponse::success(id, name, Some(serialized_agent_snapshot(agent)?)),
                 request_version,
                 replay,
             )?;
@@ -2482,6 +3562,9 @@ fn handle_command<W: Write>(
             match handoff {
                 Ok(handoff) => match agent.append_handoff_record(handoff.clone()) {
                     Ok(()) => {
+                        // The handoff lifecycle marker belongs to this
+                        // operation and must precede its acknowledgement.
+                        write_events(agent, output, event_sequence, id.clone(), replay)?;
                         write_cached_versioned_response(
                             output,
                             StdioResponse::success(
@@ -2492,9 +3575,11 @@ fn handle_command<W: Write>(
                             request_version,
                             replay,
                         )?;
-                        write_events(agent, output, event_sequence, id.clone(), replay)?;
                     }
                     Err(error) => {
+                        // Drain any marker produced before a persistence
+                        // failure, then expose the terminal error.
+                        write_events(agent, output, event_sequence, id.clone(), replay)?;
                         write_cached_versioned_response(
                             output,
                             StdioResponse::error_with_code(
@@ -2520,32 +3605,52 @@ fn handle_command<W: Write>(
             path,
             from_sequence,
         } => match (path, from_sequence) {
-            (Some(path), None) => match agent.resume_session(path) {
-                Ok(()) => {
-                    // A session switch invalidates the old transport replay
-                    // namespace. Keep sequence monotonic while dropping old
-                    // events and terminal IDs before exposing the new
-                    // snapshot.
-                    agent.take_events();
-                    replay.reset_for_session(id.as_deref(), *event_sequence);
-                    write_cached_versioned_response(
+            (Some(path), None) => {
+                let path = match validate_existing_session_path(&path) {
+                    Ok(path) => path,
+                    Err(message) => {
+                        write_cached_versioned_response(
+                            output,
+                            StdioResponse::error_with_code(
+                                id,
+                                name,
+                                "session_path_denied",
+                                message,
+                            )
+                            .for_version(request_version),
+                            request_version,
+                            replay,
+                        )?;
+                        return Ok(false);
+                    }
+                };
+                match agent.resume_session(path) {
+                    Ok(()) => {
+                        // A session switch invalidates the old transport replay
+                        // namespace. Keep sequence monotonic while dropping old
+                        // events and terminal IDs before exposing the new
+                        // snapshot.
+                        agent.take_events();
+                        replay.reset_for_session(id.as_deref(), *event_sequence);
+                        write_cached_versioned_response(
+                            output,
+                            StdioResponse::success(
+                                id,
+                                name,
+                                Some(serialized_agent_snapshot(agent)?),
+                            ),
+                            request_version,
+                            replay,
+                        )?;
+                    }
+                    Err(error) => write_cached_versioned_response(
                         output,
-                        StdioResponse::success(
-                            id,
-                            name,
-                            Some(serde_json::to_value(agent.snapshot())?),
-                        ),
+                        StdioResponse::error_with_code(id, name, error.code(), error.to_string()),
                         request_version,
                         replay,
-                    )?;
+                    )?,
                 }
-                Err(error) => write_cached_versioned_response(
-                    output,
-                    StdioResponse::error_with_code(id, name, error.code(), error.to_string()),
-                    request_version,
-                    replay,
-                )?,
-            },
+            }
             (None, Some(from_sequence)) => {
                 let report = replay.replay_from(from_sequence, output)?;
                 write_response(
@@ -2568,7 +3673,7 @@ fn handle_command<W: Write>(
             }
             (None, None) => write_cached_versioned_response(
                 output,
-                StdioResponse::success(id, name, Some(serde_json::to_value(agent.snapshot())?)),
+                StdioResponse::success(id, name, Some(serialized_agent_snapshot(agent)?)),
                 request_version,
                 replay,
             )?,

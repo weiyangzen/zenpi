@@ -412,6 +412,24 @@ fn worker_loop<I, O, E, F>(
                 return;
             }
             if stopping {
+                // Preserve submission order during shutdown. The active job
+                // owns the oldest request, so its terminal event must be
+                // observable before queued follow-ups are cancelled. This is
+                // important to hosts that use terminal responses as an
+                // ordered completion stream rather than merely a set of IDs.
+                while let Some((id, _)) = pending.pop_front() {
+                    if !emit(&event_tx, RuntimeEvent::CancelRequested { id })
+                        || !emit(
+                            &event_tx,
+                            RuntimeEvent::Completed {
+                                id,
+                                outcome: JobOutcome::Cancelled,
+                            },
+                        )
+                    {
+                        return;
+                    }
+                }
                 let _ = emit(&event_tx, RuntimeEvent::Closed);
                 return;
             }
@@ -511,25 +529,25 @@ fn worker_loop<I, O, E, F>(
             }
             Command::Shutdown => {
                 stopping = true;
-                while let Some((id, _)) = pending.pop_front() {
-                    if !emit(&event_tx, RuntimeEvent::CancelRequested { id })
-                        || !emit(
-                            &event_tx,
-                            RuntimeEvent::Completed {
-                                id,
-                                outcome: JobOutcome::Cancelled,
-                            },
-                        )
-                    {
-                        return;
-                    }
-                }
                 if let Some(item) = active.as_ref() {
                     item.token.cancel();
                     if !emit(&event_tx, RuntimeEvent::CancelRequested { id: item.id }) {
                         return;
                     }
                 } else {
+                    while let Some((id, _)) = pending.pop_front() {
+                        if !emit(&event_tx, RuntimeEvent::CancelRequested { id })
+                            || !emit(
+                                &event_tx,
+                                RuntimeEvent::Completed {
+                                    id,
+                                    outcome: JobOutcome::Cancelled,
+                                },
+                            )
+                        {
+                            return;
+                        }
+                    }
                     let _ = emit(&event_tx, RuntimeEvent::Closed);
                     return;
                 }

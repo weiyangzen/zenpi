@@ -72,8 +72,22 @@ pub fn restrict_private_file(path: &Path) -> io::Result<()> {
     {
         use std::os::unix::fs::PermissionsExt;
 
-        if path.exists() {
-            let mut permissions = fs::metadata(path)?.permissions();
+        // `metadata` follows links. Refuse a link before changing mode so a
+        // caller cannot accidentally chmod a file outside its ownership
+        // boundary (session journals are opened from user-supplied paths).
+        let metadata = match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "refusing to change permissions on a symbolic link",
+                ));
+            }
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(metadata) = metadata {
+            let mut permissions = metadata.permissions();
             if permissions.mode() & 0o777 != 0o600 {
                 permissions.set_mode(0o600);
                 fs::set_permissions(path, permissions)?;

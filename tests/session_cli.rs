@@ -115,6 +115,22 @@ fn session_gc_requires_complete_confirmation_and_retention_policy() {
 }
 
 #[test]
+fn session_cli_lists_legacy_default_root_journal() {
+    let home = tempdir().unwrap();
+    let fallback = home.path().join(".zenpi/session.jsonl");
+    let store = SessionStore::open(&fallback).unwrap();
+
+    let output = zenpi(home.path())
+        .args(["session", "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let listed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+    assert_eq!(listed[0]["session_id"], store.session_id());
+}
+
+#[test]
 fn inspect_missing_path_does_not_create_a_session() {
     let home = tempdir().unwrap();
     let missing = home.path().join("missing.jsonl");

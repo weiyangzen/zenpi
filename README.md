@@ -111,7 +111,7 @@ contain U+2028 or U+2029; only LF frames a record. Diagnostics go to stderr so
 stdout remains machine-readable.
 
 Supported commands are `prompt`, typed slash `command`, `steer`, `cancel`, `approve`, `status`,
-`handoff`, `resume`, and `shutdown`. The `command` request carries a slash
+`resources`, `handoff`, `resume`, and `shutdown`. The `command` request carries a slash
 command such as `{"type":"command","id":"c1","text":"/status"}` and never
 enters the model turn. In the production owned/async headless
 path, accepted prompts emit typed v2 progress events and one v1-compatible
@@ -124,6 +124,19 @@ is retained (evicted or session-reset IDs may be retried), rather than repeating
 provider or tool work. A replay request
 re-emits its requested event suffix and is not
 treated as a response-only cache hit.
+Path-bearing JSONL `resume` requests, like `/session open PATH`, only switch to
+an existing regular journal; a missing or symbolic-link target is rejected
+without creating or modifying a file.
+When a `steer` arrives before `shutdown` but is still waiting for turn
+admission, the owned host gives that deferred request a bounded promotion
+window; if the window expires it returns an explicit `runtime_closed` error
+instead of silently dropping the request.
+
+The common local session routes are executable in both hosts: `/session list`
+lists configured journals (including the legacy `~/.zenpi/session.jsonl`), and
+`/session open PATH` switches an idle agent to an existing journal. Other
+session actions remain explicit host errors until their owner adapters are
+accepted.
 
 Example:
 
@@ -196,6 +209,12 @@ v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下�
 会话可用 `zenpi session list|inspect|fork|export|import|gc` 管理；扩展可用
 `zenpi extension install|list|disable|enable|upgrade|remove` 管理。headless v2
 的 `prompt.attachments` 可引用工作区内的图片或文件，二进制内容不会写入日志。
+两种运行模式都可执行 `/session list` 和 `/session open PATH`；切换只针对已有
+会话文件，旧版 `~/.zenpi/session.jsonl` 也会被列出。其余 session slash 动作
+在 owner adapter 完成前会明确返回错误，不伪造成功。
+JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
+会在不创建、不修改文件的情况下返回错误。
+如果 `steer` 已在 `shutdown` 前被接收但仍等待 turn admission，owned 路径会在有界窗口内先完成取消/重发；超时则明确返回 `runtime_closed`，不会静默丢弃请求。
 每个 Blueprint item 都为其实现/测试代码声明严格小于 5000 的 `Estimated LOC` 预估值；这里是每个 item 的
 预估，不是 5000 个 Blueprint item，也不是仓库 Rust 总行数上限。仓库 Rust 总行数只作信息性盘点。
 
@@ -236,6 +255,13 @@ Session は `zenpi session list|inspect|fork|export|import|gc`、extension は
 `zenpi extension install|list|disable|enable|upgrade|remove` で管理できます。
 headless v2 の `prompt.attachments` は workspace 内の画像・ファイルを参照し、
 binary data を journal に保存しません。
+両ホストで `/session list` と `/session open PATH` を実行でき、既存 journal のみを
+開きます。旧版 `~/.zenpi/session.jsonl` も一覧に含まれます。その他の session
+slash 操作は owner adapter が受理されるまで明示的にエラーになります。
+パス付き JSONL `resume` も既存の通常 journal だけを開き、欠落またはシンボリック
+リンクの対象はファイルを作成・変更せずエラーにします。
+`shutdown` 前に受理された `steer` が turn admission 待ちの場合、owned 経路は
+限定時間内に cancel/reissue を試み、期限後は `runtime_closed` を明示して破棄を隠しません。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（各 item が 5000 未満）を記載します。
 これは 5000 個の item という意味でも、リポジトリ全体の Rust 行数上限でもありません。
 

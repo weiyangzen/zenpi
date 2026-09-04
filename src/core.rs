@@ -2005,7 +2005,10 @@ pub fn run() -> Result<(), ZenpiError> {
             }
             CliCommand::SessionList => {
                 let paths = crate::config::ConfigPaths::discover()?;
-                let sessions = crate::session::list_sessions(&paths.sessions)?;
+                let sessions = crate::session::list_sessions_with_fallback(
+                    &paths.sessions,
+                    paths.root.join("session.jsonl"),
+                )?;
                 if options.json {
                     println!(
                         "{}",

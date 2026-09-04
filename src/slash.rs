@@ -41,6 +41,16 @@ pub enum SlashCommand {
     Goal {
         instruction: String,
     },
+    /// Persist one validated Goal JSON document in the session's domain
+    /// store.  Keeping this as a distinct variant prevents an input such as
+    /// `putative migration` from being mistaken for a persistence request.
+    GoalPut {
+        path: String,
+    },
+    /// Propose a plan without pretending that it has been persisted or run.
+    Plan {
+        instruction: Option<String>,
+    },
     /// Query the active model when omitted, or request a model change.
     Model {
         name: Option<String>,
@@ -54,9 +64,44 @@ pub enum SlashCommand {
     Learn {
         target: Option<String>,
     },
+    /// Persist one validated Learn JSON document in the session's domain
+    /// store.  The source file is read with a bounded, symlink-free reader by
+    /// the host; it is never sent to the provider.
+    LearnPut {
+        path: String,
+    },
     /// Display recent session entries.
     History {
         limit: Option<usize>,
+    },
+    /// Collect a bounded workspace/resource snapshot without contacting the
+    /// provider. The optional path is resolved by the host.
+    Resources {
+        path: Option<String>,
+    },
+    /// Navigate the durable session owner. Parsing never touches the file
+    /// system; hosts must execute supported actions explicitly.
+    Session {
+        action: SessionAction,
+    },
+    /// Replay or recover a bounded event suffix.
+    Resume {
+        sequence: Option<u64>,
+    },
+    /// Compact the current context through the host's context manager.
+    Compact,
+    /// Inspect a bounded file diff. The path remains workspace-relative data.
+    Diff {
+        path: Option<String>,
+    },
+    /// Attach a workspace-relative file to the next provider turn.
+    Attach {
+        path: String,
+    },
+    /// Resolve a pending side-effect approval.
+    Approve {
+        id: String,
+        decision: ApproveDecision,
     },
     /// Display the current agent/runtime status.
     Status,
@@ -76,6 +121,28 @@ pub enum SlashCommand {
     },
 }
 
+/// Durable session operations exposed by `/session`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionAction {
+    List,
+    Open { path: String },
+    Fork { path: Option<String> },
+    Export { path: String },
+    Import { path: String },
+    Gc,
+}
+
+/// Slash-level approval intent. `Always` maps to an allow decision with the
+/// host's remember flag; `Once` maps to a one-shot allow; `Deny` refuses it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApproveDecision {
+    Once,
+    Always,
+    Deny,
+}
+
 /// Operations supported by `/blueprint`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -86,6 +153,10 @@ pub enum BlueprintAction {
     Status,
     /// Validate a blueprint file or the configured default.
     Validate { path: Option<String> },
+    /// Persist one validated Blueprint JSON document in the session's domain
+    /// store.  This is deliberately an explicit path-based operation rather
+    /// than an arbitrary inline payload, keeping command framing bounded.
+    Put { path: String },
     /// Ask the runtime host to execute one bounded blueprint target.
     Run { target: String },
     /// Open a blueprint path in the host's resource view.
@@ -106,10 +177,20 @@ impl SlashCommand {
         match self {
             Self::Help { .. } => "help",
             Self::Goal { .. } => "goal",
+            Self::GoalPut { .. } => "goal",
+            Self::Plan { .. } => "plan",
             Self::Model { .. } => "model",
             Self::Blueprint { .. } => "blueprint",
             Self::Learn { .. } => "learn",
+            Self::LearnPut { .. } => "learn",
             Self::History { .. } => "history",
+            Self::Resources { .. } => "resources",
+            Self::Session { .. } => "session",
+            Self::Resume { .. } => "resume",
+            Self::Compact => "compact",
+            Self::Diff { .. } => "diff",
+            Self::Attach { .. } => "attach",
+            Self::Approve { .. } => "approve",
             Self::Status => "status",
             Self::Clear => "clear",
             Self::Cancel => "cancel",
@@ -124,7 +205,13 @@ impl SlashCommand {
     pub const fn is_first_class(&self) -> bool {
         matches!(
             self,
-            Self::Goal { .. } | Self::Model { .. } | Self::Blueprint { .. } | Self::Learn { .. }
+            Self::Goal { .. }
+                | Self::GoalPut { .. }
+                | Self::Plan { .. }
+                | Self::Model { .. }
+                | Self::Blueprint { .. }
+                | Self::Learn { .. }
+                | Self::LearnPut { .. }
         )
     }
 
@@ -165,8 +252,15 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "goal",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/goal <instruction>",
-        summary: "create or update the active b3ehive goal",
+        usage: "/goal <instruction> | /goal put <json-path>",
+        summary: "inspect or persist a bounded b3ehive goal",
+    },
+    SlashCommandSpec {
+        name: "plan",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/plan [instruction]",
+        summary: "propose a plan for the first-class blueprint owner",
     },
     SlashCommandSpec {
         name: "model",
@@ -179,15 +273,15 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "blueprint",
         aliases: BLUEPRINT_ALIASES,
         route: SlashRoute::Local,
-        usage: "/blueprint [show|status|validate|run|open]",
+        usage: "/blueprint [show|status|validate|put|run|open]",
         summary: "inspect and control the first-class blueprint",
     },
     SlashCommandSpec {
         name: "learn",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/learn [target]",
-        summary: "inspect or run a first-class learn target",
+        usage: "/learn [target] | /learn put <json-path>",
+        summary: "inspect or persist a first-class learn target",
     },
     SlashCommandSpec {
         name: "history",
@@ -195,6 +289,55 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Local,
         usage: "/history [count]",
         summary: "show recent session history",
+    },
+    SlashCommandSpec {
+        name: "resources",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/resources [path]",
+        summary: "collect bounded workspace and host resource signals",
+    },
+    SlashCommandSpec {
+        name: "session",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/session [list|open|fork|export|import|gc]",
+        summary: "navigate durable sessions",
+    },
+    SlashCommandSpec {
+        name: "resume",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/resume [sequence]",
+        summary: "replay or recover a bounded event suffix",
+    },
+    SlashCommandSpec {
+        name: "compact",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/compact",
+        summary: "compact context with a durable marker",
+    },
+    SlashCommandSpec {
+        name: "diff",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/diff [path]",
+        summary: "inspect bounded pending file changes",
+    },
+    SlashCommandSpec {
+        name: "attach",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/attach <path>",
+        summary: "attach a bounded workspace file to the next turn",
+    },
+    SlashCommandSpec {
+        name: "approve",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/approve <id> once|always|deny",
+        summary: "answer a pending side-effect request",
     },
     SlashCommandSpec {
         name: "status",
@@ -273,6 +416,16 @@ pub enum SlashError {
     UnexpectedArgument { command: &'static str },
     #[error("/history count must be a positive integer")]
     InvalidHistoryLimit,
+    #[error("/resume sequence must be a non-negative integer")]
+    InvalidResumeSequence,
+    #[error("/session received an unknown action `/{action}`")]
+    UnknownSessionAction { action: String },
+    #[error("/session {action} requires a path")]
+    MissingSessionPath { action: &'static str },
+    #[error("/session {action} received an unexpected argument")]
+    UnexpectedSessionArgument { action: &'static str },
+    #[error("/approve decision must be once, always, or deny")]
+    InvalidApproveDecision,
     #[error("/blueprint has unknown action `/{action}`")]
     UnknownBlueprintAction { action: String },
 }
@@ -336,8 +489,9 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
                 topic: args.first().cloned(),
             }
         }
-        "goal" => SlashCommand::Goal {
-            instruction: required_join(args, "goal")?,
+        "goal" => parse_goal(args)?,
+        "plan" => SlashCommand::Plan {
+            instruction: optional_join(args),
         },
         "model" => {
             if args.len() > 1 {
@@ -350,9 +504,7 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         "blueprint" | "bp" => SlashCommand::Blueprint {
             action: parse_blueprint(args)?,
         },
-        "learn" => SlashCommand::Learn {
-            target: optional_join(args),
-        },
+        "learn" => parse_learn(args)?,
         "history" => {
             if args.len() > 1 {
                 return Err(SlashError::UnexpectedArgument { command: "history" });
@@ -371,6 +523,69 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
             };
             SlashCommand::History { limit }
         }
+        "resources" | "resource" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument {
+                    command: "resources",
+                });
+            }
+            SlashCommand::Resources {
+                path: args.first().cloned(),
+            }
+        }
+        "session" => SlashCommand::Session {
+            action: parse_session(args)?,
+        },
+        "resume" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument { command: "resume" });
+            }
+            let sequence = args.first().map(|value| {
+                value
+                    .parse::<u64>()
+                    .map_err(|_| SlashError::InvalidResumeSequence)
+            });
+            SlashCommand::Resume {
+                sequence: sequence.transpose()?,
+            }
+        }
+        "compact" => unit_command(args, "compact", SlashCommand::Compact)?,
+        "diff" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument { command: "diff" });
+            }
+            SlashCommand::Diff {
+                path: args.first().cloned(),
+            }
+        }
+        "attach" => {
+            if args.len() != 1 {
+                return if args.is_empty() {
+                    Err(SlashError::MissingArgument { command: "attach" })
+                } else {
+                    Err(SlashError::UnexpectedArgument { command: "attach" })
+                };
+            }
+            if args[0].trim().is_empty() {
+                return Err(SlashError::MissingArgument { command: "attach" });
+            }
+            SlashCommand::Attach {
+                path: args[0].clone(),
+            }
+        }
+        "approve" => SlashCommand::Approve {
+            id: {
+                let id = args
+                    .first()
+                    .cloned()
+                    .ok_or(SlashError::MissingArgument { command: "approve" })?;
+                if id.trim().is_empty() {
+                    return Err(SlashError::MissingArgument { command: "approve" });
+                }
+                id
+            },
+            decision: parse_approve(args.get(1), args.len())?,
+        },
         "status" => unit_command(args, "status", SlashCommand::Status)?,
         "clear" => unit_command(args, "clear", SlashCommand::Clear)?,
         "cancel" => unit_command(args, "cancel", SlashCommand::Cancel)?,
@@ -529,9 +744,136 @@ fn parse_blueprint(args: &[String]) -> Result<BlueprintAction, SlashError> {
                 path: args[1].clone(),
             })
         }
+        "put" | "save" | "import" => Ok(BlueprintAction::Put {
+            path: required_domain_path(args, "blueprint put")?,
+        }),
         _ => Err(SlashError::UnknownBlueprintAction {
             action: action.clone(),
         }),
+    }
+}
+
+fn parse_goal(args: &[String]) -> Result<SlashCommand, SlashError> {
+    let Some(action) = args.first() else {
+        return Err(SlashError::MissingArgument { command: "goal" });
+    };
+    if matches!(
+        action.to_ascii_lowercase().as_str(),
+        "put" | "new" | "import"
+    ) {
+        return Ok(SlashCommand::GoalPut {
+            path: required_domain_path(args, "goal put")?,
+        });
+    }
+    Ok(SlashCommand::Goal {
+        instruction: required_join(args, "goal")?,
+    })
+}
+
+fn parse_learn(args: &[String]) -> Result<SlashCommand, SlashError> {
+    let Some(action) = args.first() else {
+        return Ok(SlashCommand::Learn { target: None });
+    };
+    if matches!(
+        action.to_ascii_lowercase().as_str(),
+        "put" | "start" | "import"
+    ) {
+        return Ok(SlashCommand::LearnPut {
+            path: required_domain_path(args, "learn put")?,
+        });
+    }
+    Ok(SlashCommand::Learn {
+        target: optional_join(args),
+    })
+}
+
+fn required_domain_path(args: &[String], command: &'static str) -> Result<String, SlashError> {
+    if args.len() < 2 {
+        return Err(SlashError::MissingArgument { command });
+    }
+    if args.len() > 2 {
+        return Err(SlashError::UnexpectedArgument { command });
+    }
+    let path = &args[1];
+    if path.trim().is_empty() {
+        return Err(SlashError::MissingArgument { command });
+    }
+    Ok(path.clone())
+}
+
+fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
+    let Some(action) = args.first() else {
+        return Ok(SessionAction::List);
+    };
+    let action_lower = action.to_ascii_lowercase();
+    match action_lower.as_str() {
+        "list" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedSessionArgument { action: "list" });
+            }
+            Ok(SessionAction::List)
+        }
+        "open" => Ok(SessionAction::Open {
+            path: required_session_path(args, "open")?,
+        }),
+        "fork" => {
+            if args.len() > 2 {
+                return Err(SlashError::UnexpectedSessionArgument { action: "fork" });
+            }
+            Ok(SessionAction::Fork {
+                path: args.get(1).cloned(),
+            })
+        }
+        "export" => Ok(SessionAction::Export {
+            path: required_session_path(args, "export")?,
+        }),
+        "import" => Ok(SessionAction::Import {
+            path: required_session_path(args, "import")?,
+        }),
+        "gc" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedSessionArgument { action: "gc" });
+            }
+            Ok(SessionAction::Gc)
+        }
+        _ => Err(SlashError::UnknownSessionAction {
+            action: action.clone(),
+        }),
+    }
+}
+
+fn required_session_path(args: &[String], action: &'static str) -> Result<String, SlashError> {
+    if args.len() < 2 {
+        return Err(SlashError::MissingSessionPath { action });
+    }
+    if args.len() > 2 {
+        return Err(SlashError::UnexpectedSessionArgument { action });
+    }
+    if args[1].trim().is_empty() {
+        return Err(SlashError::MissingSessionPath { action });
+    }
+    Ok(args[1].clone())
+}
+
+fn parse_approve(
+    value: Option<&String>,
+    argument_count: usize,
+) -> Result<ApproveDecision, SlashError> {
+    if argument_count < 2 {
+        return Err(SlashError::MissingArgument { command: "approve" });
+    }
+    if argument_count > 2 {
+        return Err(SlashError::UnexpectedArgument { command: "approve" });
+    }
+    match value
+        .map(String::as_str)
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("once") => Ok(ApproveDecision::Once),
+        Some("always") => Ok(ApproveDecision::Always),
+        Some("deny") => Ok(ApproveDecision::Deny),
+        _ => Err(SlashError::InvalidApproveDecision),
     }
 }
 

@@ -140,12 +140,14 @@ by the caller.
 
 `src/protocol.rs` owns parsing/encoding and `src/headless.rs` owns the stdio
 loop. Supported request types include `prompt`, typed slash `command`, `steer`, `cancel`, `approve`,
-`status`, `handoff`, `resume`, and `shutdown`. Every request has an ID and
+`status`, `resources`, `handoff`, `resume`, and `shutdown`. Every request has an ID and
 receives one terminal response; unknown fields are tolerated only when they do
 not change semantics.
 Request IDs use the same bounded non-control Unicode identifier grammar (at
-most 128 UTF-8 bytes) for requests and cancellation targets. A `resume` request selects
-either a session `path` or an in-process `from_sequence`, never both. Ordinary
+most 128 UTF-8 bytes) for requests and cancellation targets. A path-bearing
+`resume` opens an existing regular journal only; it never creates a missing
+target. A `resume` request selects either a session `path` or an in-process
+`from_sequence`, never both. Ordinary
 terminal responses are replayable by ID; a sequence replay re-emits its event
 suffix on each retry.
 Event sequence numbers are process-global within one host; switching session

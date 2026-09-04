@@ -282,6 +282,87 @@ fn shutdown_cancels_active_job_and_closes_after_terminal_result() {
 }
 
 #[test]
+fn shutdown_emits_active_terminal_before_queued_cancellation() {
+    let (first_started_tx, first_started_rx) = mpsc::sync_channel(1);
+    let runner = BackgroundRunner::spawn(
+        move |request: u8, token| {
+            if request == 1 {
+                first_started_tx.send(()).unwrap();
+                while !token.is_cancelled() {
+                    thread::yield_now();
+                }
+            }
+            // The queued request must never be started once shutdown has
+            // begun; both requests receive explicit terminal events instead.
+            Ok::<_, String>(request)
+        },
+        RuntimeConfig::default(),
+    );
+    let active = runner.try_submit(1).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::Started { id } if *id == active),
+    );
+    first_started_rx
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap();
+
+    let queued = runner.try_submit(2).unwrap();
+    wait_event(
+        &runner,
+        |event| matches!(event, RuntimeEvent::Queued { id, .. } if *id == queued),
+    );
+    runner.try_shutdown().unwrap();
+
+    let mut events = Vec::new();
+    loop {
+        let event = runner.next_event().unwrap();
+        let closed = matches!(event, RuntimeEvent::Closed);
+        events.push(event);
+        if closed {
+            break;
+        }
+    }
+
+    let active_completed = events.iter().position(|event| {
+        matches!(
+            event,
+            RuntimeEvent::Completed { id, outcome: JobOutcome::Cancelled } if *id == active
+        )
+    });
+    let queued_cancel_requested = events
+        .iter()
+        .position(|event| matches!(event, RuntimeEvent::CancelRequested { id } if *id == queued));
+    let queued_completed = events.iter().position(|event| {
+        matches!(
+            event,
+            RuntimeEvent::Completed { id, outcome: JobOutcome::Cancelled } if *id == queued
+        )
+    });
+    assert!(
+        active_completed.is_some(),
+        "active request did not receive a cancelled terminal event: {events:?}"
+    );
+    assert!(
+        queued_cancel_requested.is_some(),
+        "queued request did not receive a cancellation event: {events:?}"
+    );
+    assert!(
+        queued_completed.is_some(),
+        "queued request did not receive a cancelled terminal event: {events:?}"
+    );
+    assert!(
+        active_completed.unwrap() < queued_cancel_requested.unwrap(),
+        "queued cancellation preceded active terminal: {events:?}"
+    );
+    assert!(
+        queued_cancel_requested.unwrap() < queued_completed.unwrap(),
+        "queued terminal did not follow its cancellation request: {events:?}"
+    );
+    runner.join().unwrap();
+}
+
+#[test]
 fn late_cancellation_after_completion_marker_preserves_success() {
     let completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let release = Arc::new(std::sync::atomic::AtomicBool::new(false));

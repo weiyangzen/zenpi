@@ -7,7 +7,7 @@
 use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -72,6 +72,8 @@ pub enum SessionError {
     EmptyPath,
     #[error("session path points to a directory: {0}")]
     Directory(PathBuf),
+    #[error("session path is a symbolic link: {0}")]
+    Symlink(PathBuf),
     #[error("session I/O: {0}")]
     Io(#[from] io::Error),
     #[error("session JSON: {0}")]
@@ -143,22 +145,49 @@ pub struct SessionInspection {
 impl SessionStore {
     /// Open or create a session at `path` and recover all valid records.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SessionError> {
+        Self::open_with_options(path, true)
+    }
+
+    /// Open an existing session without creating, chmodding, or appending to
+    /// it. Read-only hosts such as `session list` and `session inspect` use
+    /// this path so observation cannot mutate a journal as a side effect.
+    pub fn open_existing(path: impl AsRef<Path>) -> Result<Self, SessionError> {
+        let path = path.as_ref();
+        let metadata = session_path_metadata(path)?;
+        if !metadata.is_some_and(|metadata| metadata.is_file()) {
+            return Err(SessionError::InvalidRecord(
+                "inspection source is not an existing session file".into(),
+            ));
+        }
+        Self::open_with_options(path, false)
+    }
+
+    fn open_with_options(path: impl AsRef<Path>, writable: bool) -> Result<Self, SessionError> {
         let path = path.as_ref().to_path_buf();
         if path.as_os_str().is_empty() {
             return Err(SessionError::EmptyPath);
         }
-        if path.exists() && path.is_dir() {
+        let existing = session_path_metadata(&path)?;
+        if existing.as_ref().is_some_and(|metadata| metadata.is_dir()) {
             return Err(SessionError::Directory(path));
         }
-        restrict_session_permissions(&path)?;
-        if let Some(parent) = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
+        if writable && existing.is_some() {
+            restrict_session_permissions(&path)?;
+        }
+        if writable
+            && let Some(parent) = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
         {
             fs::create_dir_all(parent)?;
         }
 
-        let bytes = match fs::read(&path) {
+        // Re-check immediately before opening the file. The first metadata
+        // probe prevents a normal symlink from being chmodded; this second
+        // probe closes the common replacement race, while O_NOFOLLOW in
+        // `read_session_bytes` handles the final open atomically on Unix.
+        let _ = session_path_metadata(&path)?;
+        let bytes = match read_session_bytes(&path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
             Err(error) => return Err(error.into()),
@@ -326,7 +355,7 @@ impl SessionStore {
             needs_separator,
             next_seq,
         };
-        if !had_content || needs_header {
+        if writable && (!had_content || needs_header) {
             // A header is the only record whose absence changes the meaning of
             // subsequent records.  Append one, preserving all existing bytes.
             let header = store.header.clone();
@@ -499,6 +528,7 @@ impl SessionStore {
     /// incompatible input cannot silently become an exported session.
     pub fn export_to(&self, destination: impl AsRef<Path>) -> Result<(), SessionError> {
         let destination = destination.as_ref();
+        reject_session_symlink(destination)?;
         if destination == self.path {
             return Err(SessionError::InvalidRecord(
                 "cannot export a session over itself".into(),
@@ -529,6 +559,7 @@ impl SessionStore {
     /// remains untouched and the destination receives a fresh session header.
     pub fn fork_to(&self, destination: impl AsRef<Path>) -> Result<Self, SessionError> {
         let destination = destination.as_ref();
+        reject_session_symlink(destination)?;
         if destination.exists() {
             return Err(SessionError::InvalidRecord(
                 "fork destination already exists".into(),
@@ -572,10 +603,14 @@ impl SessionStore {
             )));
         }
         encoded.push(b'\n');
+        reject_session_symlink(&self.path)?;
         let mut options = OpenOptions::new();
         options.create(true).append(true);
         #[cfg(unix)]
-        options.mode(0o600);
+        {
+            options.mode(0o600);
+            options.custom_flags(libc::O_NOFOLLOW);
+        }
         let mut file = options.open(&self.path)?;
         if self.needs_separator {
             file.write_all(b"\n")?;
@@ -641,6 +676,42 @@ fn restrict_session_permissions(_path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Inspect the final session path without following a symbolic link. A
+/// missing path is represented by `None` so callers can create a new journal;
+/// an existing link is always rejected before any read, chmod, or append.
+fn session_path_metadata(path: &Path) -> Result<Option<fs::Metadata>, SessionError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err(SessionError::Symlink(path.to_owned()))
+        }
+        Ok(metadata) => Ok(Some(metadata)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn reject_session_symlink(path: &Path) -> Result<(), SessionError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err(SessionError::Symlink(path.to_owned()))
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn read_session_bytes(path: &Path) -> io::Result<Vec<u8>> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    let mut file = options.open(path)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -668,15 +739,27 @@ pub struct GarbageCollectionPolicy {
 
 pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>, SessionError> {
     let directory = directory.as_ref();
-    if !directory.exists() {
-        return Ok(Vec::new());
-    }
-    if !directory.is_dir() {
+    let metadata = match fs::symlink_metadata(directory) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(SessionError::Symlink(directory.to_owned()));
+        }
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    if !metadata.is_dir() {
         return Err(SessionError::Directory(directory.to_owned()));
     }
     let mut paths = fs::read_dir(directory)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
+        // A workspace-local domain store may live beside its session journal.
+        // It is JSONL too, but it is not a session and opening it through
+        // `SessionStore` would append a session header and corrupt the store.
+        .filter(|path| {
+            path.file_name().and_then(|name| name.to_str())
+                != Some(crate::domain_store::DOMAIN_STORE_FILE_NAME)
+        })
         .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
         .collect::<Vec<_>>();
     paths.sort();
@@ -686,17 +769,57 @@ pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>,
         .collect()
 }
 
+/// List sessions in a configured directory and include an optional legacy
+/// default journal. Older zenpi releases wrote `~/.zenpi/session.jsonl` while
+/// the session browser scans `~/.zenpi/sessions/`; keeping the fallback here
+/// makes both layouts discoverable without moving or rewriting either file.
+pub fn list_sessions_with_fallback(
+    directory: impl AsRef<Path>,
+    fallback: impl AsRef<Path>,
+) -> Result<Vec<SessionSummary>, SessionError> {
+    let fallback = fallback.as_ref();
+    let mut sessions = list_sessions(directory)?;
+    match fs::symlink_metadata(fallback) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(SessionError::Symlink(fallback.to_owned()));
+        }
+        Ok(metadata) if metadata.is_file() => {
+            let summary = inspect_session(fallback)?.summary;
+            let duplicate = sessions.iter().any(|item| {
+                Path::new(&item.path)
+                    .canonicalize()
+                    .ok()
+                    .zip(fallback.canonicalize().ok())
+                    .is_some_and(|(left, right)| left == right)
+            });
+            if !duplicate {
+                sessions.push(summary);
+            }
+        }
+        Ok(_) => {
+            return Err(SessionError::InvalidRecord(
+                "session fallback is not a regular file".into(),
+            ));
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    sessions.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(sessions)
+}
+
 /// Open an existing journal for inspection. Unlike `SessionStore::open`, this
 /// rejects a missing source, preventing a typo in a read-only CLI command from
 /// creating an empty session.
 pub fn inspect_session(path: impl AsRef<Path>) -> Result<SessionInspection, SessionError> {
     let path = path.as_ref();
-    if !path.is_file() {
+    let metadata = session_path_metadata(path)?;
+    if !metadata.is_some_and(|metadata| metadata.is_file()) {
         return Err(SessionError::InvalidRecord(
             "inspection source is not an existing session file".into(),
         ));
     }
-    let store = SessionStore::open(path)?;
+    let store = SessionStore::open_existing(path)?;
     Ok(SessionInspection {
         summary: store.summary(),
         turns: store.turns,
@@ -752,21 +875,50 @@ pub fn garbage_collect_sessions(
         ));
     }
     let directory = directory.as_ref();
-    if !directory.exists() {
-        return Ok(Vec::new());
+    let directory_metadata = match fs::symlink_metadata(directory) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    if directory_metadata.file_type().is_symlink() {
+        return Err(SessionError::Symlink(directory.to_owned()));
     }
-    let mut candidates = fs::read_dir(directory)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
-        .filter_map(|path| {
-            fs::metadata(&path)
-                .and_then(|metadata| metadata.modified())
-                .ok()
-                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-                .map(|modified| (path, modified.as_millis().min(u128::from(u64::MAX)) as u64))
-        })
-        .collect::<Vec<_>>();
+    if !directory_metadata.is_dir() {
+        return Err(SessionError::Directory(directory.to_owned()));
+    }
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(directory)? {
+        let path = entry?.path();
+        // Domain snapshots use JSONL too, but are not sessions. Never let a
+        // retention command remove the store that owns Blueprint/Goal/Learn
+        // records.
+        if path.file_name().and_then(|name| name.to_str())
+            == Some(crate::domain_store::DOMAIN_STORE_FILE_NAME)
+            || path.extension().and_then(|value| value.to_str()) != Some("jsonl")
+        {
+            continue;
+        }
+        // Fail closed for aliases and unexpected node types. In particular,
+        // do not follow a symlink while selecting an item for deletion.
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.file_type().is_symlink() {
+            return Err(SessionError::Symlink(path));
+        }
+        if !metadata.is_file() {
+            return Err(SessionError::InvalidRecord(
+                "garbage collection candidate is not a regular file".into(),
+            ));
+        }
+        let modified = metadata
+            .modified()?
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| {
+                SessionError::InvalidRecord(
+                    "garbage collection candidate has an invalid mtime".into(),
+                )
+            })?;
+        candidates.push((path, modified.as_millis().min(u128::from(u64::MAX)) as u64));
+    }
     candidates.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
     let mut removed = Vec::new();
     for (index, (path, modified)) in candidates.into_iter().enumerate() {

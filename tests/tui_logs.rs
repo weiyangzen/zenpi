@@ -76,6 +76,60 @@ fn unresolved_tool_entries_can_be_marked_cancelled() {
 }
 
 #[test]
+fn streamed_assistant_is_finalized_without_duplicate_transcript_entry() {
+    let mut state = TuiState::default();
+    state.append_stream(MessageRole::Assistant, "hel");
+    state.append_stream(MessageRole::Assistant, "lo");
+
+    // The runtime receives the complete assistant turn after the deltas. It
+    // must replace the provisional line rather than append a second answer.
+    state.finish_stream(MessageRole::Assistant, "hello");
+
+    let messages = state.messages().collect::<Vec<_>>();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].role, MessageRole::Assistant);
+    assert_eq!(messages[0].text, "hello");
+}
+
+#[test]
+fn finishing_without_deltas_adds_one_assistant_message() {
+    let mut state = TuiState::default();
+    state.finish_stream(MessageRole::Assistant, "complete");
+
+    let messages = state.messages().collect::<Vec<_>>();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].text, "complete");
+}
+
+#[test]
+fn job_owned_streams_ignore_stale_deltas_and_finalizers() {
+    let mut state = TuiState::default();
+    state.begin_stream_for_job(1);
+    state.append_stream_for_job(1, MessageRole::Assistant, "old partial");
+
+    // A steer replaces the old stream. Its partial text remains visible, but
+    // old provider data must never merge into or finalize the new answer.
+    state.discard_stream();
+    state.begin_stream_for_job(2);
+    state.append_stream_for_job(1, MessageRole::Assistant, " stale");
+    state.append_stream_for_job(2, MessageRole::Assistant, "new");
+    state.finish_stream_for_job(1, MessageRole::Assistant, "wrong answer");
+    state.finish_stream_for_job(2, MessageRole::Assistant, "new answer");
+
+    let messages = state
+        .messages()
+        .map(|message| (message.role, message.text.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        messages,
+        vec![
+            (MessageRole::Assistant, "old partial".into()),
+            (MessageRole::Assistant, "new answer".into()),
+        ]
+    );
+}
+
+#[test]
 fn tool_ids_with_brackets_do_not_update_a_prefix_collision() {
     let mut state = TuiState::default();
     state.tool_call_started("a", "first");

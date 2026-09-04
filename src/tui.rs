@@ -7,7 +7,7 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -146,6 +146,16 @@ pub struct TuiState {
     /// line in the transcript.  Tool entries remain in the bounded message
     /// queue, so toggling this flag never loses history.
     fold_tool_logs: bool,
+    /// Role of the message currently being assembled from provider deltas.
+    /// Keeping this marker separate from the transcript lets the terminal
+    /// replace the provisional streamed text with the authoritative final
+    /// assistant turn instead of appending the same answer a second time.
+    streaming_role: Option<MessageRole>,
+    /// Runtime job that owns the provisional stream. Provider events are
+    /// buffered per job in the async host; this second guard prevents a late
+    /// event/finalizer from an interrupted job rewriting the replacement turn.
+    streaming_job_id: Option<u64>,
+    streaming_message_started: bool,
     /// The active lightweight workspace layout.  The legacy `render` method
     /// intentionally remains available for embedders; the production async
     /// loop opts into [`Self::render_bentobox`] below.
@@ -178,6 +188,9 @@ impl TuiState {
             input_scroll: 0,
             preferred_column: None,
             fold_tool_logs: false,
+            streaming_role: None,
+            streaming_job_id: None,
+            streaming_message_started: false,
             workspace_layout: LayoutModel::new(TabId::Project),
             max_messages: max_messages.max(1),
             max_history: 100,
@@ -385,8 +398,14 @@ impl TuiState {
     }
 
     pub fn clear_messages(&mut self) {
-        if !self.messages.is_empty() {
+        if !self.messages.is_empty()
+            || self.streaming_role.is_some()
+            || self.streaming_job_id.is_some()
+        {
             self.messages.clear();
+            self.streaming_role = None;
+            self.streaming_job_id = None;
+            self.streaming_message_started = false;
             self.cached_transcript = None;
             self.scroll = 0;
             self.dirty = true;
@@ -405,7 +424,12 @@ impl TuiState {
 
     /// Merge adjacent stream chunks to avoid one allocation per token.
     pub fn append_stream(&mut self, role: MessageRole, chunk: impl AsRef<str>) {
-        let chunk = chunk.as_ref();
+        self.streaming_job_id = None;
+        self.streaming_message_started = false;
+        self.append_stream_content(role, chunk.as_ref());
+    }
+
+    fn append_stream_content(&mut self, role: MessageRole, chunk: &str) {
         if chunk.is_empty() {
             return;
         }
@@ -414,12 +438,111 @@ impl TuiState {
             && last.text.len().saturating_add(chunk.len()) <= MAX_MESSAGE_BYTES
         {
             last.text.push_str(chunk);
+            self.streaming_role = Some(role);
             self.cached_transcript = None;
             self.scroll = 0;
             self.dirty = true;
             return;
         }
         self.push_message(role, chunk.to_owned());
+        self.streaming_role = Some(role);
+    }
+
+    /// Start a stream owned by one runtime job. The first delta always starts
+    /// a fresh transcript entry, even if the previous message has the same
+    /// role; this prevents a replacement turn from being merged into a prior
+    /// answer while an interrupted provider is still winding down.
+    pub fn begin_stream_for_job(&mut self, job_id: u64) {
+        self.streaming_role = None;
+        self.streaming_job_id = Some(job_id);
+        self.streaming_message_started = false;
+    }
+
+    /// Append a provider delta only when it belongs to the currently active
+    /// job. A stale job event is intentionally ignored rather than rendered
+    /// into the replacement turn.
+    pub fn append_stream_for_job(
+        &mut self,
+        job_id: u64,
+        role: MessageRole,
+        chunk: impl AsRef<str>,
+    ) {
+        if self.streaming_job_id != Some(job_id) || chunk.as_ref().is_empty() {
+            return;
+        }
+        if !self.streaming_message_started {
+            self.push_message(role, chunk.as_ref().to_owned());
+            self.streaming_role = Some(role);
+            self.streaming_message_started = true;
+            return;
+        }
+        self.append_stream_content(role, chunk.as_ref());
+    }
+
+    /// Replace the provisional streamed message with the final provider
+    /// content.  A provider may emit no deltas (for example a compatibility
+    /// backend or a stream that was coalesced), in which case this appends one
+    /// normal message.  The role marker prevents a later turn from rewriting
+    /// an older assistant message.
+    pub fn finish_stream(&mut self, role: MessageRole, content: impl Into<String>) {
+        self.finish_stream_impl(role, content.into());
+        self.streaming_job_id = None;
+        self.streaming_message_started = false;
+    }
+
+    fn finish_stream_impl(&mut self, role: MessageRole, content: String) {
+        let content = bound_text(content);
+        if self.streaming_role == Some(role)
+            && let Some(index) = self
+                .messages
+                .iter()
+                .rposition(|message| message.role == role)
+            && let Some(message) = self.messages.get_mut(index)
+        {
+            if message.text != content {
+                message.text = content;
+                self.cached_transcript = None;
+                self.scroll = 0;
+                self.dirty = true;
+            }
+            self.streaming_role = None;
+            return;
+        }
+        self.streaming_role = None;
+        self.push_message(role, content);
+    }
+
+    /// Finalize a stream only if the supplied runtime job still owns the
+    /// provisional entry. A stale completion is discarded without changing
+    /// the visible replacement answer.
+    pub fn finish_stream_for_job(
+        &mut self,
+        job_id: u64,
+        role: MessageRole,
+        content: impl Into<String>,
+    ) {
+        if self.streaming_job_id != Some(job_id) {
+            return;
+        }
+        let content = content.into();
+        if self.streaming_message_started {
+            self.finish_stream_impl(role, content);
+        } else {
+            self.streaming_role = None;
+            self.push_message(role, content);
+        }
+        self.streaming_job_id = None;
+        self.streaming_message_started = false;
+    }
+
+    /// Stop tracking a provisional stream while retaining any text already
+    /// shown.  This is used for cancellation, refusal, and provider errors;
+    /// dropping the marker ensures the next turn cannot rewrite the partial
+    /// message.
+    pub fn discard_stream(&mut self) {
+        self.streaming_role = None;
+        self.streaming_job_id = None;
+        self.streaming_message_started = false;
     }
 
     pub fn set_input(&mut self, input: impl Into<String>) {
@@ -1207,9 +1330,8 @@ pub enum SlashDispatchAction {
 ///
 /// The function is intentionally side-effect-light: it updates the visible
 /// transcript and, when an agent is supplied, reads or changes only local
-/// agent state.  `/compete` and `/loop` are acknowledged as runtime routes but
-/// are not silently converted into model prompts; a future b3ehive adapter
-/// can replace that acknowledgement without changing the parser boundary.
+/// agent state.  `/compete` and `/loop` are rendered as explicit pending
+/// runtime-adapter errors, not success acknowledgements or model prompts.
 /// `Cancel` returns [`SlashDispatchAction::Interrupt`] so the owning runtime
 /// can issue its typed cancellation request.
 pub fn dispatch_slash_command(
@@ -1226,10 +1348,12 @@ pub fn dispatch_slash_command(
             ),
         },
         SlashCommand::Model { name } => {
+            let host_available = agent.is_some();
+            let requested_change = name.is_some();
             let message = if let Some(agent) = agent.as_deref_mut() {
-                match name {
+                match name.as_ref() {
                     Some(name) => match agent.set_model(Some(name.clone())) {
-                        Ok(()) => format!("model selected: {}", inline_token(&name, 160)),
+                        Ok(()) => format!("model selected: {}", inline_token(name, 160)),
                         Err(error) => format!("model change failed: {error}"),
                     },
                     None => format!(
@@ -1242,15 +1366,20 @@ pub fn dispatch_slash_command(
                     ),
                 }
             } else {
-                match name {
+                match name.as_ref() {
                     Some(name) => format!(
-                        "model command acknowledged: {} (agent host unavailable)",
-                        inline_token(&name, 160)
+                        "model change unavailable while the agent is busy: {}",
+                        inline_token(name, 160)
                     ),
-                    None => "model is managed by the agent host".into(),
+                    None => "model inspection unavailable while the agent is busy".into(),
                 }
             };
-            state.push_message(MessageRole::System, message);
+            let role = if host_available || !requested_change {
+                MessageRole::System
+            } else {
+                MessageRole::Error
+            };
+            state.push_message(role, message);
         }
         SlashCommand::Status => {
             let message = if let Some(agent) = agent.as_deref_mut() {
@@ -1264,6 +1393,27 @@ pub fn dispatch_slash_command(
             let message = format_history(agent.as_deref(), state, limit);
             state.push_message(MessageRole::System, message);
         }
+        SlashCommand::Resources { path } => {
+            match crate::headless::collect_resource_snapshot(path.as_deref()) {
+                Ok(snapshot) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "resources: files={} dirs={} bytes={} truncated={} cpu={} memory={} disk={}",
+                        snapshot.workspace.files,
+                        snapshot.workspace.directories,
+                        snapshot.workspace.bytes,
+                        snapshot.workspace.truncated,
+                        signal_status(snapshot.cpu.status),
+                        signal_status(snapshot.memory.status),
+                        signal_status(snapshot.disk.status),
+                    ),
+                ),
+                Err(error) => state.push_message(
+                    MessageRole::Error,
+                    format!("resource collection failed: {error}"),
+                ),
+            }
+        }
         SlashCommand::Clear => {
             state.clear_messages();
             state.set_status("Ready");
@@ -1274,49 +1424,329 @@ pub fn dispatch_slash_command(
         }
         SlashCommand::Exit => return SlashDispatchAction::Quit,
         SlashCommand::Goal { instruction } => {
+            if instruction.trim().eq_ignore_ascii_case("show")
+                || instruction.trim().eq_ignore_ascii_case("status")
+            {
+                match crate::headless::domain_store_view(agent.as_deref()) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "goal show:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data)
+                                    .unwrap_or_else(|_| { "{\"goals\":[]}".into() })
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("goal store unavailable: {error}"),
+                    ),
+                }
+            } else {
+                state.push_message(
+                    MessageRole::Error,
+                    format!(
+                        "goal creation/execution requires an external b3ehive owner: {}",
+                        bounded_display(&instruction)
+                    ),
+                );
+            }
+        }
+        SlashCommand::GoalPut { path } => {
+            let Some(agent) = agent.as_deref_mut() else {
+                state.push_message(
+                    MessageRole::Error,
+                    "goal persistence is unavailable while the agent is busy",
+                );
+                return SlashDispatchAction::Continue;
+            };
+            match crate::headless::persist_goal_path(agent, &path) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "goal persisted:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => state.push_message(
+                    MessageRole::Error,
+                    format!("goal persistence failed: {error}"),
+                ),
+            }
+        }
+        SlashCommand::Plan { instruction } => {
             state.push_message(
-                MessageRole::System,
+                MessageRole::Error,
                 format!(
-                    "goal command acknowledged (b3ehive owner pending): {}",
-                    bounded_display(&instruction)
+                    "plan command is parsed but not executable in this host: {}",
+                    instruction
+                        .as_deref()
+                        .map(bounded_display)
+                        .unwrap_or_else(|| "missing instruction".into())
+                ),
+            );
+        }
+        SlashCommand::Session { action } => match action {
+            crate::slash::SessionAction::List => match crate::headless::session_list_view() {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "sessions:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => state.push_message(
+                    MessageRole::Error,
+                    format!("session listing failed: {error}"),
+                ),
+            },
+            crate::slash::SessionAction::Open { path } => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::open_session_path(agent, &path) {
+                    Ok(data) => {
+                        // Opening a session changes the conversation owner;
+                        // discard the old visible transcript and render the
+                        // recovered turns from the replacement journal.
+                        reload_state_from_agent(state, agent);
+                        state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "session opened:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        );
+                    }
+                    Err(error) => state
+                        .push_message(MessageRole::Error, format!("session open failed: {error}")),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "session cannot be opened while the agent is busy",
+                ),
+            },
+            action => state.push_message(
+                MessageRole::Error,
+                format!(
+                    "session {} is not executable in this host",
+                    session_action_label(&action)
+                ),
+            ),
+        },
+        SlashCommand::Resume { sequence } => {
+            state.push_message(
+                MessageRole::Error,
+                format!(
+                    "resume command is parsed but not executable in this host: sequence={:?}",
+                    sequence
+                ),
+            );
+        }
+        SlashCommand::Compact => {
+            state.push_message(
+                MessageRole::Error,
+                "compact command is parsed but context compaction is not configured",
+            );
+        }
+        SlashCommand::Diff { path } => {
+            state.push_message(
+                MessageRole::Error,
+                format!(
+                    "diff command is parsed but file review is not configured: {}",
+                    path.as_deref()
+                        .map(bounded_display)
+                        .unwrap_or_else(|| "current workspace".into())
+                ),
+            );
+        }
+        SlashCommand::Attach { path } => {
+            state.push_message(
+                MessageRole::Error,
+                format!(
+                    "attach command is parsed but attachment staging is not configured: {}",
+                    bounded_display(&path)
+                ),
+            );
+        }
+        SlashCommand::Approve { id, decision } => {
+            state.push_message(
+                MessageRole::Error,
+                format!(
+                    "approve command is parsed but approval routing is not configured: id={} decision={:?}",
+                    bounded_display(&id),
+                    decision
                 ),
             );
         }
         SlashCommand::Blueprint { action } => {
-            state.push_message(
-                MessageRole::System,
-                format!(
-                    "blueprint command acknowledged (owner pending): {}",
-                    blueprint_action_display(&action)
-                ),
-            );
+            use crate::slash::BlueprintAction;
+            let action_display = blueprint_action_display(&action);
+            match action {
+                BlueprintAction::Show | BlueprintAction::Status => {
+                    match crate::headless::domain_store_view(agent.as_deref()) {
+                        Ok(data) => state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "blueprint {}:\n{}",
+                                if matches!(action, BlueprintAction::Show) {
+                                    "show"
+                                } else {
+                                    "status"
+                                },
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("blueprint store unavailable: {error}"),
+                        ),
+                    }
+                }
+                BlueprintAction::Validate { path: Some(path) } => {
+                    match crate::headless::blueprint_validation_view(&path) {
+                        Ok(data) => state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "blueprint validate:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("blueprint validation failed: {error}"),
+                        ),
+                    }
+                }
+                BlueprintAction::Validate { path: None } => {
+                    match crate::headless::domain_store_view(agent.as_deref()) {
+                        Ok(data) => state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "blueprint validate:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("blueprint validation failed: {error}"),
+                        ),
+                    }
+                }
+                BlueprintAction::Put { path } => match agent.as_deref_mut() {
+                    Some(agent) => match crate::headless::persist_blueprint_path(agent, &path) {
+                        Ok(data) => state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "blueprint persisted:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("blueprint persistence failed: {error}"),
+                        ),
+                    },
+                    None => state.push_message(
+                        MessageRole::Error,
+                        "blueprint persistence is unavailable while the agent is busy",
+                    ),
+                },
+                BlueprintAction::Run { target } | BlueprintAction::Open { path: target } => {
+                    state.push_message(
+                        MessageRole::Error,
+                        format!(
+                            "blueprint {} is not executable in this host: {}",
+                            action_display,
+                            bounded_display(&target)
+                        ),
+                    );
+                }
+            }
         }
         SlashCommand::Learn { target } => {
-            state.push_message(
-                MessageRole::System,
-                format!(
-                    "learn command acknowledged (owner pending): {}",
-                    target
-                        .as_deref()
-                        .map(bounded_display)
-                        .unwrap_or_else(|| "current target".into())
-                ),
-            );
+            if target
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty() || value.eq_ignore_ascii_case("show"))
+                || target
+                    .as_deref()
+                    .is_some_and(|value| value.eq_ignore_ascii_case("status"))
+            {
+                match crate::headless::domain_store_view(agent.as_deref()) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "learn show:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("learn store unavailable: {error}"),
+                    ),
+                }
+            } else {
+                state.push_message(
+                    MessageRole::Error,
+                    format!(
+                        "learn execution requires an external owner: {}",
+                        target
+                            .as_deref()
+                            .map(bounded_display)
+                            .unwrap_or_else(|| "current target".into())
+                    ),
+                );
+            }
         }
+        SlashCommand::LearnPut { path } => match agent {
+            Some(agent) => match crate::headless::persist_learn_path(agent, &path) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "learn persisted:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => state.push_message(
+                    MessageRole::Error,
+                    format!("learn persistence failed: {error}"),
+                ),
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "learn persistence is unavailable while the agent is busy",
+            ),
+        },
         SlashCommand::Compete { args } => {
             state.push_message(
-                MessageRole::System,
+                MessageRole::Error,
                 format!(
-                    "compete delegated to b3ehive runtime (adapter pending): {}",
+                    "compete is not executable in this host; b3ehive runtime adapter is pending: {}",
                     bounded_display(&args.join(" "))
                 ),
             );
         }
         SlashCommand::Loop { args } => {
             state.push_message(
-                MessageRole::System,
+                MessageRole::Error,
                 format!(
-                    "loop delegated to b3ehive runtime (adapter pending): {}",
+                    "loop is not executable in this host; b3ehive runtime adapter is pending: {}",
                     bounded_display(&args.join(" "))
                 ),
             );
@@ -1346,6 +1776,19 @@ fn format_agent_status(agent: &crate::core::Agent) -> String {
             .unwrap_or_else(|| "<none>".into()),
         snapshot.session.turn_count,
     )
+}
+
+fn reload_state_from_agent(state: &mut TuiState, agent: &crate::core::Agent) {
+    state.clear_messages();
+    for turn in agent.history() {
+        let role = match turn.role {
+            crate::core::TurnRole::User => MessageRole::User,
+            crate::core::TurnRole::Assistant => MessageRole::Assistant,
+            crate::core::TurnRole::Tool => MessageRole::Tool,
+            crate::core::TurnRole::System => MessageRole::System,
+        };
+        state.push_message(role, &turn.content);
+    }
 }
 
 fn format_history(
@@ -1402,13 +1845,32 @@ fn blueprint_action_display(action: &BlueprintAction) -> String {
                 .map(bounded_display)
                 .unwrap_or_else(|| "configured blueprint".into())
         ),
+        BlueprintAction::Put { path } => format!("put {}", bounded_display(path)),
         BlueprintAction::Run { target } => format!("run {}", bounded_display(target)),
         BlueprintAction::Open { path } => format!("open {}", bounded_display(path)),
     }
 }
 
+fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
+    match action {
+        crate::slash::SessionAction::List => "list",
+        crate::slash::SessionAction::Open { .. } => "open",
+        crate::slash::SessionAction::Fork { .. } => "fork",
+        crate::slash::SessionAction::Export { .. } => "export",
+        crate::slash::SessionAction::Import { .. } => "import",
+        crate::slash::SessionAction::Gc => "gc",
+    }
+}
+
 fn bounded_display(value: &str) -> String {
     inline_token(value, 512)
+}
+
+fn signal_status(status: crate::resources::SignalStatus) -> &'static str {
+    match status {
+        crate::resources::SignalStatus::Available => "available",
+        crate::resources::SignalStatus::Unavailable => "unavailable",
+    }
 }
 
 /// Run the interactive mode for zenpi's shared agent.
@@ -1442,6 +1904,24 @@ pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiErro
     .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))
 }
 
+struct TuiRequest {
+    text: String,
+    provider_events: Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
+}
+
+impl TuiRequest {
+    fn new(text: String) -> (Self, Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>) {
+        let provider_events = Arc::new(Mutex::new(VecDeque::new()));
+        (
+            Self {
+                text,
+                provider_events: Arc::clone(&provider_events),
+            },
+            provider_events,
+        )
+    }
+}
+
 /// Run the production TUI with provider work on the bounded runtime worker.
 /// The older callback-based `run_with_state` remains available for embedders
 /// and deterministic tests; the binary uses this owned form so a worker can
@@ -1459,10 +1939,8 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     // Keep provider events bounded independently of the transcript. A slow
     // terminal must not turn an unbounded stream into unbounded memory.
     const MAX_PROVIDER_EVENTS: usize = 4096;
-    let provider_events = Arc::new(Mutex::new(VecDeque::new()));
-    let worker_events = Arc::clone(&provider_events);
     let runner = BackgroundRunner::spawn(
-        move |text: String, token| -> Result<ProcessResult, AgentError> {
+        move |request: TuiRequest, token| -> Result<ProcessResult, AgentError> {
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
@@ -1470,10 +1948,10 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
             let result = agent.process_with_cancel_and_events(
-                crate::core::TurnInputRequest::new(text),
+                crate::core::TurnInputRequest::new(request.text),
                 || token.is_cancelled(),
                 &mut |event| {
-                    if let Ok(mut pending) = worker_events.lock()
+                    if let Ok(mut pending) = request.provider_events.lock()
                         && pending.len() < MAX_PROVIDER_EVENTS
                     {
                         pending.push_back(event);
@@ -1481,11 +1959,10 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                     Ok(())
                 },
             )?;
-            if token.is_cancelled() {
-                return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
-            }
-            // Prevent a shutdown that races the worker's done notification
-            // from rewriting a completed turn as a cancellation.
+            // The core has crossed its durable completion boundary when it
+            // returns a successful ProcessResult. Mark it before returning to
+            // the runtime so a late shutdown/cancel cannot report a persisted
+            // assistant answer as an interruption.
             token.mark_completed();
             Ok(result)
         },
@@ -1530,6 +2007,10 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     let mut resize_pending = false;
     let mut last_tick = Instant::now();
     let mut active_job = None;
+    let mut stream_buffers: HashMap<
+        crate::runtime::JobId,
+        Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
+    > = HashMap::new();
     let mut pending_approvals = VecDeque::new();
     let loop_result = (|| -> Result<(), crate::error::ZenpiError> {
         'outer: loop {
@@ -1537,33 +2018,14 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             // use a non-blocking drain so lifecycle events become visible as soon
             // as that mutex is released without freezing keyboard/render polling.
             drain_agent_tool_events(&shared, &mut state);
-            if let Ok(mut events) = provider_events.lock() {
-                for event in events.drain(..) {
-                    match event {
-                        crate::backend::ProviderEvent::TextDelta { delta } => {
-                            state.append_stream(MessageRole::Assistant, delta);
-                        }
-                        crate::backend::ProviderEvent::Refusal { text } => {
-                            state.append_stream(MessageRole::Error, text);
-                        }
-                        crate::backend::ProviderEvent::Warning { message } => {
-                            state.push_message(MessageRole::System, message);
-                        }
-                        crate::backend::ProviderEvent::ToolCallDelta { call_id, name, .. } => {
-                            if let Some(call_id) = call_id {
-                                state.tool_call_started(
-                                    call_id,
-                                    name.unwrap_or_else(|| "unknown".into()),
-                                );
-                            } else {
-                                state.set_status("Preparing tool call");
-                            }
-                        }
-                        crate::backend::ProviderEvent::ToolCallDone { call } => {
-                            state.tool_call_started(call.id, call.name);
-                        }
-                        _ => {}
-                    }
+            if let Some(id) = active_job {
+                // Drop buffers belonging to superseded jobs before draining
+                // the active one. This keeps a late cancelled stream from
+                // interleaving with the replacement turn.
+                stream_buffers.retain(|job_id, _| *job_id == id);
+                if let Some(events) = stream_buffers.get(&id)
+                    && drain_tui_provider_events(&mut state, id.get(), events)
+                {
                     scheduler.request();
                 }
             }
@@ -1590,9 +2052,25 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             }
             while let Ok(event) = runner.try_next_event() {
                 match event {
-                    RuntimeEvent::Completed { id, outcome } if Some(id) == active_job => {
+                    RuntimeEvent::Completed { id, outcome } => {
+                        let events = stream_buffers.remove(&id);
+                        if Some(id) != active_job {
+                            // A superseded stream may still publish its
+                            // terminal event after the replacement was
+                            // admitted. Its buffered deltas are intentionally
+                            // discarded and must not alter the active turn.
+                            continue;
+                        }
+                        // A final provider delta can race the runtime
+                        // completion notification. Drain this job's buffer
+                        // once more before replacing its provisional line.
+                        if let Some(events) = events
+                            && drain_tui_provider_events(&mut state, id.get(), &events)
+                        {
+                            scheduler.request();
+                        }
                         // Approval prompts belong to the turn that just
-                        // reached a terminal state.  Drop any prompt that
+                        // reached a terminal state. Drop any prompt that
                         // raced with completion/cancellation; otherwise the
                         // next normal user message would be consumed as a
                         // stale y/n response.
@@ -1603,20 +2081,29 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                         match outcome {
                             JobOutcome::Succeeded(result) => {
                                 if let Some(assistant) = result.assistant {
-                                    state.push_message(MessageRole::Assistant, assistant.content);
+                                    state.finish_stream_for_job(
+                                        id.get(),
+                                        MessageRole::Assistant,
+                                        assistant.content,
+                                    );
+                                } else {
+                                    state.discard_stream();
                                 }
                                 state.set_status("Ready");
                             }
                             JobOutcome::Failed(error) => {
+                                state.discard_stream();
                                 state.finish_running_tools(ToolRunStatus::Failed);
                                 state.push_message(MessageRole::Error, error.to_string());
                                 state.set_status("Request failed");
                             }
                             JobOutcome::Cancelled => {
+                                state.discard_stream();
                                 state.finish_running_tools(ToolRunStatus::Cancelled);
                                 state.set_status("Interrupted");
                             }
                             JobOutcome::Panicked => {
+                                state.discard_stream();
                                 state.finish_running_tools(ToolRunStatus::Failed);
                                 state.push_message(MessageRole::Error, "background job panicked");
                                 state.set_status("Request failed");
@@ -1624,12 +2111,17 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                         }
                         scheduler.request();
                     }
-                    RuntimeEvent::Rejected { id, reason } if Some(id) == active_job => {
+                    RuntimeEvent::Rejected { id, reason } => {
+                        let _ = stream_buffers.remove(&id);
+                        if Some(id) != active_job {
+                            continue;
+                        }
                         // A rejected active request cannot produce a valid
-                        // approval response.  Do not let its prompt swallow
+                        // approval response. Do not let its prompt swallow
                         // the next user turn.
                         pending_approvals.clear();
                         active_job = None;
+                        state.discard_stream();
                         state.set_busy(false);
                         state.push_message(MessageRole::Error, reason.to_string());
                         state.set_status("Request rejected");
@@ -1796,8 +2288,12 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                                     ) {
                                         pending_approvals.clear();
                                     }
-                                    match runner.try_submit(text) {
+                                    let (request, events) = TuiRequest::new(text);
+                                    match runner.try_submit(request) {
                                         Ok(id) => {
+                                            stream_buffers.insert(id, events);
+                                            state.discard_stream();
+                                            state.begin_stream_for_job(id.get());
                                             active_job = Some(id);
                                             state.set_busy(true);
                                             state.set_status("Steering");
@@ -1811,8 +2307,11 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                                         }
                                     }
                                 } else {
-                                    match runner.try_submit(text) {
+                                    let (request, events) = TuiRequest::new(text);
+                                    match runner.try_submit(request) {
                                         Ok(id) => {
+                                            stream_buffers.insert(id, events);
+                                            state.begin_stream_for_job(id.get());
                                             active_job = Some(id);
                                             state.set_busy(true);
                                             state.set_status("Working");
@@ -2053,6 +2552,43 @@ fn apply_agent_tool_event(state: &mut TuiState, event: crate::core::AgentEvent) 
         ),
         _ => {}
     }
+}
+
+fn drain_tui_provider_events(
+    state: &mut TuiState,
+    job_id: u64,
+    events: &Arc<Mutex<VecDeque<crate::backend::ProviderEvent>>>,
+) -> bool {
+    let Ok(mut events) = events.lock() else {
+        return false;
+    };
+    let mut changed = false;
+    for event in events.drain(..) {
+        changed = true;
+        match event {
+            crate::backend::ProviderEvent::TextDelta { delta } => {
+                state.append_stream_for_job(job_id, MessageRole::Assistant, delta);
+            }
+            crate::backend::ProviderEvent::Refusal { text } => {
+                state.append_stream_for_job(job_id, MessageRole::Error, text);
+            }
+            crate::backend::ProviderEvent::Warning { message } => {
+                state.push_message(MessageRole::System, message);
+            }
+            crate::backend::ProviderEvent::ToolCallDelta { call_id, name, .. } => {
+                if let Some(call_id) = call_id {
+                    state.tool_call_started(call_id, name.unwrap_or_else(|| "unknown".into()));
+                } else {
+                    state.set_status("Preparing tool call");
+                }
+            }
+            crate::backend::ProviderEvent::ToolCallDone { call } => {
+                state.tool_call_started(call.id, call.name);
+            }
+            _ => {}
+        }
+    }
+    changed
 }
 
 fn bound_text(text: String) -> String {
