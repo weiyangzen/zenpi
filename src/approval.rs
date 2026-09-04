@@ -91,6 +91,16 @@ struct CoordinatorState {
     pending: BTreeMap<String, ApprovalRequest>,
     visible: BTreeMap<String, ApprovalRequest>,
     decisions: BTreeMap<String, ApprovalResponse>,
+    accepted: Vec<AcceptedApproval>,
+}
+
+/// One host response accepted by the coordinator.  The worker drains these
+/// records into the session journal while it already owns the mutable agent,
+/// before it may consume the matching decision or execute a side effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptedApproval {
+    pub request: ApprovalRequest,
+    pub response: ApprovalResponse,
 }
 
 impl Default for ApprovalCoordinator {
@@ -115,12 +125,43 @@ impl ApprovalCoordinator {
         policy: &mut ApprovalPolicy,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<ApprovalDecision, ApprovalError> {
+        self.request_inner(request, policy, cancelled, false)
+            .map(|response| response.decision)
+    }
+
+    /// Register a request and return the complete host response.  The richer
+    /// form lets the core durably audit both the decision and whether it was
+    /// remembered before a permitted side effect starts.  The response stays
+    /// in [`Self::accepted`] until the caller writes that record and invokes
+    /// [`Self::mark_persisted`].
+    pub fn request_response(
+        &self,
+        request: ApprovalRequest,
+        policy: &mut ApprovalPolicy,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ApprovalResponse, ApprovalError> {
+        self.request_inner(request, policy, cancelled, true)
+    }
+
+    fn request_inner(
+        &self,
+        request: ApprovalRequest,
+        policy: &mut ApprovalPolicy,
+        cancelled: &dyn Fn() -> bool,
+        retain_accepted: bool,
+    ) -> Result<ApprovalResponse, ApprovalError> {
         request.validate()?;
         let id = request.request_id.clone();
         let (lock, wake) = &*self.inner;
         let mut state = lock
             .lock()
             .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        if state.pending.contains_key(&id) || state.decisions.contains_key(&id) {
+            return Err(ApprovalError::Invalid(
+                "request_id is already pending".into(),
+            ));
+        }
+        state.visible.remove(&id);
         state.pending.insert(id.clone(), request);
         loop {
             if cancelled() {
@@ -129,11 +170,16 @@ impl ApprovalCoordinator {
                 state.decisions.remove(&id);
                 return Err(ApprovalError::Cancelled);
             }
-            if let Some(response) = state.decisions.remove(&id) {
+            if let Some(response) = state.decisions.get(&id).cloned() {
+                if !retain_accepted {
+                    state
+                        .accepted
+                        .retain(|accepted| accepted.response.request_id != id);
+                }
+                state.decisions.remove(&id);
                 let tool = state
-                    .pending
+                    .visible
                     .get(&id)
-                    .or_else(|| state.visible.get(&id))
                     .map(|request| request.tool.clone())
                     .unwrap_or_else(|| "unknown".into());
                 state.pending.remove(&id);
@@ -143,7 +189,7 @@ impl ApprovalCoordinator {
                     // never persists credentials or mutates global state.
                     policy.remember(tool, response.decision);
                 }
-                return Ok(response.decision);
+                return Ok(response);
             }
             let (next, _) = wake
                 .wait_timeout(state, Duration::from_millis(50))
@@ -174,6 +220,29 @@ impl ApprovalCoordinator {
         result
     }
 
+    /// Mark one request as visible and return it without consuming unrelated
+    /// pending prompts.  Slash owners use this before responding so their
+    /// behavior matches hosts that first emitted the request to a client.
+    pub fn reveal(&self, request_id: &str) -> Result<ApprovalRequest, ApprovalError> {
+        if request_id.trim().is_empty()
+            || request_id.len() > MAX_APPROVAL_ID_BYTES
+            || request_id.chars().any(char::is_control)
+        {
+            return Err(ApprovalError::Invalid("request_id is invalid".into()));
+        }
+        let (lock, _) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        let request = state
+            .pending
+            .get(request_id)
+            .cloned()
+            .ok_or(ApprovalError::UnknownRequest)?;
+        state.visible.insert(request_id.to_owned(), request.clone());
+        Ok(request)
+    }
+
     /// Answer one visible request. A response for an unknown request is
     /// rejected instead of being buffered for a future tool call.
     pub fn respond(&self, response: ApprovalResponse) -> Result<(), ApprovalError> {
@@ -187,12 +256,65 @@ impl ApprovalCoordinator {
         let mut state = lock
             .lock()
             .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
-        if !state.pending.contains_key(&response.request_id) {
+        if !state.pending.contains_key(&response.request_id)
+            || state.decisions.contains_key(&response.request_id)
+        {
             return Err(ApprovalError::UnknownRequest);
         }
+        // An answered request is no longer host-actionable even if the worker
+        // has not woken up yet.  Removing it here makes duplicate responses
+        // fail closed instead of allowing a later command to overwrite the
+        // first decision.
+        let request = state
+            .pending
+            .remove(&response.request_id)
+            .ok_or(ApprovalError::UnknownRequest)?;
+        state.accepted.push(AcceptedApproval {
+            request,
+            response: response.clone(),
+        });
         state
             .decisions
             .insert(response.request_id.clone(), response);
+        wake.notify_all();
+        Ok(())
+    }
+
+    /// Whether a request still needs a host decision.  This is intentionally
+    /// narrower than worker completion: once a response is accepted, another
+    /// `/approve` must not be able to replace it.
+    pub fn is_pending(&self, request_id: &str) -> bool {
+        let (lock, _) = &*self.inner;
+        lock.lock()
+            .is_ok_and(|state| state.pending.contains_key(request_id))
+    }
+
+    /// Snapshot the accepted response for the currently waiting request.  The
+    /// core uses this after the condition-variable wait returns to durably
+    /// record the exact decision before entering a side effect.
+    pub fn accepted(&self, request_id: &str) -> Option<AcceptedApproval> {
+        let (lock, _) = &*self.inner;
+        lock.lock().ok().and_then(|state| {
+            state
+                .accepted
+                .iter()
+                .find(|accepted| accepted.response.request_id == request_id)
+                .cloned()
+        })
+    }
+
+    pub fn mark_persisted(&self, request_id: &str) -> Result<(), ApprovalError> {
+        let (lock, wake) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        let before = state.accepted.len();
+        state
+            .accepted
+            .retain(|accepted| accepted.response.request_id != request_id);
+        if state.accepted.len() == before {
+            return Err(ApprovalError::UnknownRequest);
+        }
         wake.notify_all();
         Ok(())
     }
@@ -201,6 +323,17 @@ impl ApprovalCoordinator {
         let (lock, wake) = &*self.inner;
         if let Ok(mut state) = lock.lock() {
             for request_id in state.pending.keys().cloned().collect::<Vec<_>>() {
+                state.pending.remove(&request_id);
+                if let Some(request) = state.visible.get(&request_id).cloned() {
+                    state.accepted.push(AcceptedApproval {
+                        request,
+                        response: ApprovalResponse {
+                            request_id: request_id.clone(),
+                            decision: ApprovalDecision::Deny,
+                            remember: false,
+                        },
+                    });
+                }
                 state.decisions.insert(
                     request_id.clone(),
                     ApprovalResponse {
@@ -212,6 +345,27 @@ impl ApprovalCoordinator {
             }
             wake.notify_all();
         }
+    }
+
+    /// Remove an accepted-but-not-yet-consumed response when its durable host
+    /// record could not be written.  This keeps a storage failure fail-closed:
+    /// the waiting worker remains blocked and cannot enter the side effect.
+    pub fn retract_response(&self, request_id: &str) -> Result<(), ApprovalError> {
+        let (lock, wake) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        if state.decisions.remove(request_id).is_none() {
+            return Err(ApprovalError::UnknownRequest);
+        }
+        state
+            .accepted
+            .retain(|accepted| accepted.response.request_id != request_id);
+        if let Some(request) = state.visible.get(request_id).cloned() {
+            state.pending.insert(request_id.to_owned(), request);
+        }
+        wake.notify_all();
+        Ok(())
     }
 }
 
@@ -273,8 +427,8 @@ mod tests {
     use std::{thread, time::Duration};
 
     use super::{
-        ApprovalCoordinator, ApprovalDecision, ApprovalMode, ApprovalPolicy, ApprovalRequest,
-        ApprovalResponse,
+        ApprovalCoordinator, ApprovalDecision, ApprovalError, ApprovalMode, ApprovalPolicy,
+        ApprovalRequest, ApprovalResponse,
     };
     use crate::tools::ToolSideEffect;
 
@@ -324,11 +478,60 @@ mod tests {
         assert!(coordinator.drain_pending().is_empty());
         coordinator
             .respond(ApprovalResponse {
-                request_id: request.request_id,
+                request_id: request.request_id.clone(),
                 decision: ApprovalDecision::Allow,
                 remember: false,
             })
             .unwrap();
+        coordinator.mark_persisted(&request.request_id).unwrap();
         assert_eq!(join.join().unwrap().unwrap(), ApprovalDecision::Allow);
+    }
+
+    #[test]
+    fn accepted_response_is_retained_for_durable_ack_and_first_decision_wins() {
+        let coordinator = ApprovalCoordinator::new();
+        let worker = coordinator.clone();
+        let join = thread::spawn(move || {
+            let mut policy = ApprovalPolicy::default();
+            worker.request_response(
+                ApprovalRequest {
+                    request_id: "approval-call-2".into(),
+                    turn_id: "turn-2".into(),
+                    call_id: "call-2".into(),
+                    tool: "write_file".into(),
+                    side_effect: ToolSideEffect::WorkspaceWrite,
+                    arguments: serde_json::json!({"path":"x"}),
+                },
+                &mut policy,
+                &|| false,
+            )
+        });
+        let request = loop {
+            if let Some(request) = coordinator.drain_pending().pop() {
+                break request;
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        coordinator
+            .respond(ApprovalResponse {
+                request_id: request.request_id.clone(),
+                decision: ApprovalDecision::Allow,
+                remember: true,
+            })
+            .unwrap();
+        assert!(matches!(
+            coordinator.respond(ApprovalResponse {
+                request_id: request.request_id.clone(),
+                decision: ApprovalDecision::Deny,
+                remember: false,
+            }),
+            Err(ApprovalError::UnknownRequest)
+        ));
+        let accepted = coordinator.accepted(&request.request_id).unwrap();
+        assert_eq!(accepted.response.decision, ApprovalDecision::Allow);
+        coordinator.mark_persisted(&request.request_id).unwrap();
+        let response = join.join().unwrap().unwrap();
+        assert_eq!(response.decision, ApprovalDecision::Allow);
+        assert!(response.remember);
     }
 }
