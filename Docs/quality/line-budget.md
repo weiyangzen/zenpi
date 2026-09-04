@@ -34,3 +34,9 @@ for safe layout, ureq for one blocking OpenAI-compatible adapter, sha2 for
 content digests, and tempfile only in tests. No async runtime, second UI,
 server framework, broker, scheduler, or plugin host is linked. `Cargo.toml`
 declares Rust 1.88, matching Ratatui 0.30's published MSRV.
+
+The broader dependency/feature, release-size, startup/RSS, runtime-queue,
+render, and layout budgets are executable in `tools/bench_runtime.py` and
+documented in `Docs/quality/runtime-budget-v2.md`. Those measured limits are
+regression gates; they do not change the per-item `Estimated LOC < 5000` rule
+and do not claim a statistically unsupported p95.
