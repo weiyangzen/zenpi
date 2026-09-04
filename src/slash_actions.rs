@@ -29,6 +29,7 @@ use crate::{
 pub const MAX_SLASH_DIFF_BYTES: usize = 64 * 1024;
 /// `git status` is metadata only, but it can still contain one line per file.
 pub const MAX_STATUS_BYTES: usize = 32 * 1024;
+const MAX_UNTRACKED_DIFF_FILES: usize = 32;
 const MAX_WORKSPACE_PATH_BYTES: usize = 4096;
 const DIFF_TRUNCATION_MARKER: &str = "[diff truncated]";
 
@@ -102,7 +103,7 @@ pub fn diff_value_at(
                 .any(|line| line.starts_with("?? ") || line.starts_with("??\t"))
     });
 
-    let (diff, exit_status, process_truncated) = if untracked {
+    let (mut diff, mut exit_status, mut process_truncated) = if untracked {
         let target = relative
             .as_deref()
             .ok_or_else(|| SlashActionError::PathDenied("missing diff path".into()))?;
@@ -116,10 +117,32 @@ pub fn diff_value_at(
         );
         git_diff_process(
             &workspace,
-            &["diff", "--no-index", "--no-color", "/dev/null"],
+            &[
+                "diff",
+                "--no-index",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-color",
+                "/dev/null",
+            ],
             Some(Path::new(&target_name)),
         )?
     } else {
+        let owned_path = relative
+            .as_deref()
+            .map(|relative| {
+                let mut path = relative
+                    .strip_prefix(&workspace)
+                    .map_err(|_| SlashActionError::PathDenied(path_display(relative)))
+                    .map(path_display)?;
+                // `Path::strip_prefix` returns an empty path for `/diff .`,
+                // but Git treats an empty pathspec as invalid.
+                if path.is_empty() {
+                    path.push('.');
+                }
+                Ok::<String, SlashActionError>(path)
+            })
+            .transpose()?;
         let mut args = vec![
             "diff",
             "HEAD",
@@ -131,21 +154,94 @@ pub fn diff_value_at(
         ];
         // Keep the path as a separate argument.  It is never interpreted by a
         // shell, and the preceding `--` prevents option injection.
-        let mut owned_path;
-        if let Some(relative) = relative.as_deref() {
-            owned_path = relative
-                .strip_prefix(&workspace)
-                .map_err(|_| SlashActionError::PathDenied(path_display(relative)))
-                .map(path_display)?;
-            // `Path::strip_prefix` returns an empty path for `/diff .`, but
-            // Git treats an empty pathspec as invalid; normalize it to `.`.
-            if owned_path.is_empty() {
-                owned_path.push('.');
-            }
-            args.push(&owned_path);
+        if let Some(path) = owned_path.as_deref() {
+            args.push(path);
         }
-        git_diff_process(&workspace, &args, None)?
+        let first = git_diff_process(&workspace, &args, None)?;
+        if first.1 == 128 && !first.2 {
+            // A repository without a commit has no `HEAD`. Include both the
+            // index and worktree diffs in that case instead of turning a
+            // perfectly usable new checkout into a hard command error.
+            let mut unstaged_args = vec![
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--no-color",
+                "--unified=3",
+                "--",
+            ];
+            if let Some(path) = owned_path.as_deref() {
+                unstaged_args.push(path);
+            }
+            let unstaged = git_diff_process(&workspace, &unstaged_args, None)?;
+            if unstaged.1 == 0 && !unstaged.2 && unstaged.0.is_empty() {
+                let mut cached_args = vec![
+                    "diff",
+                    "--cached",
+                    "--no-ext-diff",
+                    "--no-textconv",
+                    "--no-color",
+                    "--unified=3",
+                    "--",
+                ];
+                if let Some(path) = owned_path.as_deref() {
+                    cached_args.push(path);
+                }
+                git_diff_process(&workspace, &cached_args, None)?
+            } else {
+                unstaged
+            }
+        } else {
+            first
+        }
     };
+
+    // A repository-wide (or directory-wide) review should not silently omit
+    // untracked files. Git's normal `diff HEAD` intentionally ignores them,
+    // so add a bounded synthetic `/dev/null` section for a small prefix of
+    // ordinary untracked files. Explicit file reviews use the fast branch
+    // above and are not duplicated here.
+    if !untracked && relative.as_deref().is_none_or(|target| target.is_dir()) && !process_truncated
+    {
+        for target in untracked_paths(&workspace, &status, relative.as_deref()) {
+            let target_name = format!(
+                "./{}",
+                path_display(
+                    target
+                        .strip_prefix(&workspace)
+                        .map_err(|_| SlashActionError::PathDenied(path_display(&target)))?,
+                )
+            );
+            let (section, section_status, section_truncated) = git_diff_process(
+                &workspace,
+                &[
+                    "diff",
+                    "--no-index",
+                    "--no-ext-diff",
+                    "--no-textconv",
+                    "--no-color",
+                    "/dev/null",
+                ],
+                Some(Path::new(&target_name)),
+            )?;
+            if section_status != 1 && !section_truncated {
+                return Err(SlashActionError::Git(format!(
+                    "git diff exited with status {section_status}"
+                )));
+            }
+            if !diff.is_empty() {
+                diff.push('\n');
+            }
+            diff.push_str(&section);
+            if section_truncated || diff.len() > MAX_SLASH_DIFF_BYTES {
+                let (bounded, _) = bound_text(diff);
+                diff = bounded;
+                process_truncated = true;
+                break;
+            }
+            exit_status = 0;
+        }
+    }
 
     // `git diff --no-index` exits 1 when differences exist.  All other
     // non-zero statuses are genuine failures and should be visible to the
@@ -455,6 +551,33 @@ fn git_status(workspace: &Path, path: Option<&Path>) -> Result<String, SlashActi
         )));
     }
     Ok(bound_status(String::from_utf8_lossy(&bytes).into_owned()))
+}
+
+fn untracked_paths(workspace: &Path, status: &str, scope: Option<&Path>) -> Vec<PathBuf> {
+    status
+        .lines()
+        .filter_map(|line| {
+            // Porcelain v1 quotes paths containing control characters. Skip
+            // those here rather than trying to decode an ambiguous escape;
+            // callers can still request such a file explicitly after a safe
+            // path has been supplied by the host UI.
+            let raw = line.strip_prefix("?? ")?;
+            if raw.starts_with('"') || raw.contains(['\r', '\n', '\0']) {
+                return None;
+            }
+            let target = resolve_relative(workspace, raw, false).ok()?;
+            if !target.is_file() {
+                return None;
+            }
+            if let Some(scope) = scope
+                && !target.starts_with(scope)
+            {
+                return None;
+            }
+            Some(target)
+        })
+        .take(MAX_UNTRACKED_DIFF_FILES)
+        .collect()
 }
 
 /// Run a git process with a hard stdout read bound.  The child is killed as

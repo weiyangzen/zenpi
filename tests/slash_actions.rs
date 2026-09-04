@@ -56,6 +56,7 @@ fn diff_owner_reports_tracked_and_untracked_changes_with_bounds() {
 
     let all = slash_actions::diff_value_at(root, None).unwrap();
     assert!(all["diff"].as_str().unwrap().contains("+after"));
+    assert!(all["diff"].as_str().unwrap().contains("+new file"));
     assert!(all["diff"].as_str().unwrap().len() <= MAX_SLASH_DIFF_BYTES);
 
     let dot = slash_actions::diff_value_at(root, Some(".")).unwrap();
@@ -218,4 +219,17 @@ fn diff_owner_marks_process_output_truncated_instead_of_failing() {
     assert_eq!(value["changed"], true);
     assert_eq!(value["truncated"], true);
     assert!(value["diff"].as_str().unwrap().len() <= MAX_SLASH_DIFF_BYTES);
+}
+
+#[test]
+fn diff_owner_supports_a_new_repository_without_head() {
+    let directory = tempdir().unwrap();
+    let root = directory.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("first.txt"), "initial\n").unwrap();
+    git(root, &["add", "first.txt"]);
+
+    let value = slash_actions::diff_value_at(root, Some("first.txt")).unwrap();
+    assert_eq!(value["changed"], true);
+    assert!(value["diff"].as_str().unwrap().contains("+initial"));
 }
