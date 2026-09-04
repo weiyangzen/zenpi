@@ -42,6 +42,12 @@ const MAX_PENDING_STEERS: usize = 128;
 /// rather than allowing a long-lived process to grow without limit.
 const MAX_ASYNC_PROVIDER_EVENTS: usize = 4096;
 const MAX_ASYNC_AGENT_EVENTS: usize = 4096;
+/// Per-request aggregate limits for events waiting behind a slow stdout
+/// consumer. Counts alone are insufficient because one provider delta or
+/// agent error can contain substantially more data than thousands of normal
+/// lifecycle markers.
+const MAX_ASYNC_PROVIDER_BYTES: usize = 1024 * 1024;
+const MAX_ASYNC_AGENT_BYTES: usize = 1024 * 1024;
 const SHUTDOWN_GRACE: Duration = Duration::from_millis(250);
 /// Explicit paths accepted by host-side inspection commands are workspace
 /// relative. Keep the same byte bound as the protocol path field even when a
@@ -516,12 +522,79 @@ struct AsyncWork {
 /// The runtime may start a queued replacement before the host has consumed
 /// the previous `Completed` event; storing only a global `Agent` event vector
 /// would then correlate the replacement's lifecycle to the wrong request.
+struct BufferedEvent<T> {
+    event: T,
+    serialized_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct DroppedEvents {
+    count: u64,
+    bytes: u64,
+}
+
+impl DroppedEvents {
+    fn record(&mut self, bytes: usize) {
+        self.count = self.count.saturating_add(1);
+        self.bytes = self
+            .bytes
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
+    }
+
+    fn is_empty(self) -> bool {
+        self.count == 0
+    }
+}
+
 #[derive(Default)]
 struct AsyncEventBuffer {
-    provider: Vec<ProviderEvent>,
-    agent: Vec<AgentEvent>,
-    provider_dropped: u64,
-    agent_dropped: u64,
+    provider: Vec<BufferedEvent<ProviderEvent>>,
+    agent: Vec<BufferedEvent<AgentEvent>>,
+    provider_bytes: usize,
+    agent_bytes: usize,
+    provider_dropped: DroppedEvents,
+    agent_dropped: DroppedEvents,
+}
+
+fn serialized_event_len<T: serde::Serialize>(event: &T) -> usize {
+    #[derive(Default)]
+    struct ByteCounter(usize);
+
+    impl Write for ByteCounter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0 = self.0.saturating_add(bytes.len());
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut counter = ByteCounter::default();
+    // These two event enums and every nested value use derived serializers
+    // that cannot fail with the counting writer. Treat an unexpected error as
+    // an over-limit event rather than retaining an unaccounted value.
+    serde_json::to_writer(&mut counter, event).map_or(usize::MAX, |()| counter.0)
+}
+
+fn buffered_admission_prefix_len(events: &[BufferedEvent<AgentEvent>]) -> Option<usize> {
+    let first_admission = events.iter().position(|event| {
+        matches!(
+            event.event,
+            AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
+        )
+    })?;
+    let admission_count = events[first_admission..]
+        .iter()
+        .take_while(|event| {
+            matches!(
+                event.event,
+                AgentEvent::TurnAccepted { .. } | AgentEvent::TurnRejected { .. }
+            )
+        })
+        .count();
+    Some(first_admission.saturating_add(admission_count))
 }
 
 fn admission_prefix_len(events: &[AgentEvent]) -> Option<usize> {
@@ -545,29 +618,53 @@ fn admission_prefix_len(events: &[AgentEvent]) -> Option<usize> {
 
 impl AsyncEventBuffer {
     fn push_provider(&mut self, event: ProviderEvent) {
-        if self.provider.len() < MAX_ASYNC_PROVIDER_EVENTS {
-            self.provider.push(event);
+        let serialized_bytes = serialized_event_len(&event);
+        let next_bytes = self.provider_bytes.checked_add(serialized_bytes);
+        if self.provider.len() < MAX_ASYNC_PROVIDER_EVENTS
+            && next_bytes.is_some_and(|bytes| bytes <= MAX_ASYNC_PROVIDER_BYTES)
+        {
+            self.provider_bytes = next_bytes.unwrap_or(self.provider_bytes);
+            self.provider.push(BufferedEvent {
+                event,
+                serialized_bytes,
+            });
         } else {
-            self.provider_dropped = self.provider_dropped.saturating_add(1);
+            self.provider_dropped.record(serialized_bytes);
         }
     }
 
     fn push_agent(&mut self, event: AgentEvent) {
-        if self.agent.len() < MAX_ASYNC_AGENT_EVENTS {
-            self.agent.push(event);
+        let serialized_bytes = serialized_event_len(&event);
+        let next_bytes = self.agent_bytes.checked_add(serialized_bytes);
+        if self.agent.len() < MAX_ASYNC_AGENT_EVENTS
+            && next_bytes.is_some_and(|bytes| bytes <= MAX_ASYNC_AGENT_BYTES)
+        {
+            self.agent_bytes = next_bytes.unwrap_or(self.agent_bytes);
+            self.agent.push(BufferedEvent {
+                event,
+                serialized_bytes,
+            });
         } else {
-            self.agent_dropped = self.agent_dropped.saturating_add(1);
+            self.agent_dropped.record(serialized_bytes);
         }
     }
 
-    fn take_provider(&mut self) -> (Vec<ProviderEvent>, u64) {
-        let events = std::mem::take(&mut self.provider);
+    fn take_provider(&mut self) -> (Vec<ProviderEvent>, DroppedEvents) {
+        let events = std::mem::take(&mut self.provider)
+            .into_iter()
+            .map(|buffered| buffered.event)
+            .collect();
+        self.provider_bytes = 0;
         let dropped = std::mem::take(&mut self.provider_dropped);
         (events, dropped)
     }
 
-    fn take_agent(&mut self) -> (Vec<AgentEvent>, u64) {
-        let events = std::mem::take(&mut self.agent);
+    fn take_agent(&mut self) -> (Vec<AgentEvent>, DroppedEvents) {
+        let events = std::mem::take(&mut self.agent)
+            .into_iter()
+            .map(|buffered| buffered.event)
+            .collect();
+        self.agent_bytes = 0;
         let dropped = std::mem::take(&mut self.agent_dropped);
         (events, dropped)
     }
@@ -580,10 +677,15 @@ impl AsyncEventBuffer {
     /// be the first queued event. Any later AgentEvents remain buffered until
     /// the provider trace is drained.
     fn take_admission(&mut self) -> Vec<AgentEvent> {
-        let Some(admission_end) = admission_prefix_len(&self.agent) else {
+        let Some(admission_end) = buffered_admission_prefix_len(&self.agent) else {
             return Vec::new();
         };
-        self.agent.drain(..admission_end).collect()
+        let drained = self.agent.drain(..admission_end).collect::<Vec<_>>();
+        let drained_bytes = drained.iter().fold(0_usize, |total, buffered| {
+            total.saturating_add(buffered.serialized_bytes)
+        });
+        self.agent_bytes = self.agent_bytes.saturating_sub(drained_bytes);
+        drained.into_iter().map(|buffered| buffered.event).collect()
     }
 }
 
@@ -1678,6 +1780,65 @@ impl AsyncRequest {
     }
 }
 
+#[derive(Clone, Copy)]
+enum EventMailboxStream {
+    Provider,
+    Agent,
+}
+
+impl EventMailboxStream {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Provider => "provider",
+            Self::Agent => "agent",
+        }
+    }
+
+    const fn max_events(self) -> usize {
+        match self {
+            Self::Provider => MAX_ASYNC_PROVIDER_EVENTS,
+            Self::Agent => MAX_ASYNC_AGENT_EVENTS,
+        }
+    }
+
+    const fn max_bytes(self) -> usize {
+        match self {
+            Self::Provider => MAX_ASYNC_PROVIDER_BYTES,
+            Self::Agent => MAX_ASYNC_AGENT_BYTES,
+        }
+    }
+}
+
+fn write_dropped_event<W: Write>(
+    output: &mut W,
+    sequence: &mut u64,
+    replay: &mut ReplayState,
+    request_id: Option<String>,
+    turn_id: Option<String>,
+    stream: EventMailboxStream,
+    dropped: DroppedEvents,
+) -> Result<(), HeadlessError> {
+    if dropped.is_empty() {
+        return Ok(());
+    }
+    let value = serde_json::json!({
+        "type": "event_dropped",
+        "stream": stream.name(),
+        "count": dropped.count,
+        "bytes": dropped.bytes,
+        "truncated": true,
+        "limit_events": stream.max_events(),
+        "limit_bytes": stream.max_bytes(),
+    });
+    let envelope = StdioEvent::new(*sequence, request_id, turn_id, value);
+    let current = *sequence;
+    *sequence = sequence.saturating_add(1);
+    let line = encode_line(&envelope)?;
+    replay.remember_event(current, line.clone());
+    output.write_all(line.as_bytes())?;
+    Ok(())
+}
+
 fn drain_provider_events<W: Write>(
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     output: &mut W,
@@ -1718,19 +1879,15 @@ fn drain_provider_events<W: Write>(
             replay.remember_event(current, line.clone());
             output.write_all(line.as_bytes())?;
         }
-        if dropped > 0 {
-            let value = serde_json::json!({
-                "type": "event_dropped",
-                "stream": "provider",
-                "count": dropped,
-            });
-            let envelope = StdioEvent::new(*sequence, work.id.clone(), work_turn_id.clone(), value);
-            let current = *sequence;
-            *sequence = sequence.saturating_add(1);
-            let line = encode_line(&envelope)?;
-            replay.remember_event(current, line.clone());
-            output.write_all(line.as_bytes())?;
-        }
+        write_dropped_event(
+            output,
+            sequence,
+            replay,
+            work.id.clone(),
+            work_turn_id,
+            EventMailboxStream::Provider,
+            dropped,
+        )?;
     }
     output.flush()?;
     Ok(())
@@ -1807,19 +1964,15 @@ fn drain_provider_events_for_job<W: Write>(
         replay.remember_event(current, line.clone());
         output.write_all(line.as_bytes())?;
     }
-    if dropped > 0 {
-        let value = serde_json::json!({
-            "type": "event_dropped",
-            "stream": "provider",
-            "count": dropped,
-        });
-        let envelope = StdioEvent::new(*sequence, work.id.clone(), work_turn_id, value);
-        let current = *sequence;
-        *sequence = sequence.saturating_add(1);
-        let line = encode_line(&envelope)?;
-        replay.remember_event(current, line.clone());
-        output.write_all(line.as_bytes())?;
-    }
+    write_dropped_event(
+        output,
+        sequence,
+        replay,
+        work.id.clone(),
+        work_turn_id,
+        EventMailboxStream::Provider,
+        dropped,
+    )?;
     Ok(())
 }
 
@@ -2299,14 +2452,6 @@ fn handle_runtime_event<W: Write>(
             let mut agent_events = agent_events;
             let admission_end = admission_prefix_len(&agent_events).unwrap_or(0);
             let admission_events = agent_events.drain(..admission_end).collect::<Vec<_>>();
-            if agent_dropped > 0 {
-                agent_events.push(AgentEvent::Error {
-                    message: format!(
-                        "{} agent lifecycle event(s) dropped because the bounded mailbox was full",
-                        agent_dropped
-                    ),
-                });
-            }
             // Provider deltas and lifecycle markers precede the one terminal
             // response, even when the worker and output loop become ready on
             // the same tick.  The two buffers are drained here (rather than
@@ -2322,9 +2467,18 @@ fn handle_runtime_event<W: Write>(
             write_buffered_events(
                 output,
                 event_sequence,
-                event_request_id,
+                event_request_id.clone(),
                 agent_events,
                 Some(replay),
+            )?;
+            write_dropped_event(
+                output,
+                event_sequence,
+                replay,
+                event_request_id,
+                completed_turn_id,
+                EventMailboxStream::Agent,
+                agent_dropped,
             )?;
             match outcome {
                 JobOutcome::Succeeded(result) => {
@@ -4501,4 +4655,106 @@ fn write_buffered_events<W: Write>(
     }
     output.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod async_event_buffer_tests {
+    use super::*;
+
+    #[test]
+    fn oversized_provider_event_is_counted_but_never_retained() {
+        let event = ProviderEvent::TextDelta {
+            delta: "x".repeat(MAX_ASYNC_PROVIDER_BYTES),
+        };
+        let expected_bytes = serialized_event_len(&event);
+        assert!(expected_bytes > MAX_ASYNC_PROVIDER_BYTES);
+
+        let mut buffer = AsyncEventBuffer::default();
+        buffer.push_provider(event);
+        assert!(buffer.provider.is_empty());
+        assert_eq!(buffer.provider_bytes, 0);
+
+        let (events, dropped) = buffer.take_provider();
+        assert!(events.is_empty());
+        assert_eq!(
+            dropped,
+            DroppedEvents {
+                count: 1,
+                bytes: expected_bytes as u64,
+            }
+        );
+        assert_eq!(buffer.provider_bytes, 0);
+        assert_eq!(buffer.provider_dropped, DroppedEvents::default());
+    }
+
+    #[test]
+    fn provider_byte_budget_and_take_reset_all_accounting() {
+        let first = ProviderEvent::TextDelta {
+            delta: "a".repeat(MAX_ASYNC_PROVIDER_BYTES / 2),
+        };
+        let second = ProviderEvent::TextDelta {
+            delta: "b".repeat(MAX_ASYNC_PROVIDER_BYTES / 2),
+        };
+        let first_bytes = serialized_event_len(&first);
+        let second_bytes = serialized_event_len(&second);
+        assert!(first_bytes.saturating_add(second_bytes) > MAX_ASYNC_PROVIDER_BYTES);
+
+        let mut buffer = AsyncEventBuffer::default();
+        buffer.push_provider(first);
+        buffer.push_provider(second);
+        assert_eq!(buffer.provider.len(), 1);
+        assert_eq!(buffer.provider_bytes, first_bytes);
+
+        let (events, dropped) = buffer.take_provider();
+        assert_eq!(events.len(), 1);
+        assert_eq!(dropped.count, 1);
+        assert_eq!(dropped.bytes, second_bytes as u64);
+        assert!(buffer.provider.is_empty());
+        assert_eq!(buffer.provider_bytes, 0);
+        assert_eq!(buffer.provider_dropped, DroppedEvents::default());
+
+        buffer.push_provider(ProviderEvent::Completed {
+            response_id: None,
+            model: None,
+        });
+        assert_eq!(buffer.take_provider().0.len(), 1);
+    }
+
+    #[test]
+    fn agent_admission_drain_and_oversize_drop_keep_exact_bytes() {
+        let recovery = AgentEvent::Error {
+            message: "recoverable".into(),
+        };
+        let accepted = AgentEvent::TurnAccepted {
+            turn_id: "turn-byte-accounting".into(),
+            mode: crate::protocol::TurnMode::StartIfIdle,
+        };
+        let recovery_bytes = serialized_event_len(&recovery);
+        let accepted_bytes = serialized_event_len(&accepted);
+        let mut buffer = AsyncEventBuffer::default();
+        buffer.push_agent(recovery);
+        buffer.push_agent(accepted);
+        assert_eq!(buffer.agent_bytes, recovery_bytes + accepted_bytes);
+
+        let admission = buffer.take_admission();
+        assert_eq!(admission.len(), 2);
+        assert!(buffer.agent.is_empty());
+        assert_eq!(buffer.agent_bytes, 0);
+
+        let oversized = AgentEvent::Error {
+            message: "z".repeat(MAX_ASYNC_AGENT_BYTES),
+        };
+        let oversized_bytes = serialized_event_len(&oversized);
+        assert!(oversized_bytes > MAX_ASYNC_AGENT_BYTES);
+        buffer.push_agent(oversized);
+        assert!(buffer.agent.is_empty());
+        assert_eq!(buffer.agent_bytes, 0);
+
+        let (events, dropped) = buffer.take_agent();
+        assert!(events.is_empty());
+        assert_eq!(dropped.count, 1);
+        assert_eq!(dropped.bytes, oversized_bytes as u64);
+        assert_eq!(buffer.agent_dropped, DroppedEvents::default());
+        assert_eq!(buffer.agent_bytes, 0);
+    }
 }
