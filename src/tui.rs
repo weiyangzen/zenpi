@@ -2931,7 +2931,7 @@ pub fn run_async_with_profile(
                                         }
                                     }
                                     scheduler.request();
-                                    continue;
+                                    break;
                                 }
                                 let action = match shared.try_lock() {
                                     Ok(mut agent) => dispatch_slash_command(
