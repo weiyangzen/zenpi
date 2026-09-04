@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pty
@@ -24,10 +25,17 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(command: list[str], *, input_text: str = "", env: dict[str, str] | None = None, timeout: float = 180) -> subprocess.CompletedProcess[str]:
+def run(
+    command: list[str],
+    *,
+    input_text: str = "",
+    env: dict[str, str] | None = None,
+    timeout: float = 180,
+    cwd: Path = ROOT,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
-        cwd=ROOT,
+        cwd=cwd,
         input=input_text,
         text=True,
         capture_output=True,
@@ -134,6 +142,265 @@ def assert_resume_reopens_process(binary: Path, session: Path, root: Path) -> No
     }
     if responses.get("status", {}).get("data", {}).get("session", {}).get("turn_count") != 2:
         raise AssertionError(f"second process did not recover turns: {responses!r}")
+
+
+def assert_headless_slash_owners(binary: Path, root: Path) -> None:
+    """Exercise durable slash owners through the installed binary in a git workspace."""
+    workspace = root / "slash-workspace"
+    workspace.mkdir()
+    for command in (
+        ["git", "init", "-q"],
+        ["git", "config", "user.email", "zenpi@example.test"],
+        ["git", "config", "user.name", "zenpi user smoke"],
+    ):
+        assert_success(run(command, cwd=workspace), "slash workspace setup")
+
+    tracked = workspace / "tracked.txt"
+    attachment = workspace / "note.md"
+    tracked.write_text("before\n", encoding="utf-8")
+    attachment_text = "installed slash attachment body\n"
+    attachment.write_text(attachment_text, encoding="utf-8")
+    assert_success(
+        run(["git", "add", "tracked.txt", "note.md"], cwd=workspace),
+        "slash workspace add",
+    )
+    assert_success(
+        run(["git", "commit", "-qm", "initial"], cwd=workspace),
+        "slash workspace commit",
+    )
+    tracked.write_text("before\nafter\n", encoding="utf-8")
+
+    session = root / "slash-owner-session.jsonl"
+    env = {
+        **os.environ,
+        "ZENPI_HOME": str(root / "slash-owner-home"),
+        "HOME": str(root / "slash-user-home"),
+    }
+    first_payload = "\n".join(
+        json.dumps(value, separators=(",", ":"))
+        for value in (
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "diff",
+                "text": "/diff tracked.txt",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "attach",
+                "text": "/attach note.md",
+            },
+            {
+                "schema_version": 2,
+                "type": "prompt",
+                "id": "prompt",
+                "text": "use the staged attachment",
+            },
+            {"schema_version": 2, "type": "shutdown", "id": "shutdown"},
+        )
+    ) + "\n"
+    first = run(
+        [
+            str(binary),
+            "--mode",
+            "headless",
+            "--backend",
+            "echo",
+            "--session",
+            str(session),
+        ],
+        input_text=first_payload,
+        env=env,
+        cwd=workspace,
+    )
+    assert_success(first, "installed headless diff/attach owners")
+    first_records = json_lines(first.stdout)
+    first_responses = {
+        record["id"]: record
+        for record in first_records
+        if record.get("type") == "response" and record.get("id")
+    }
+    for request_id in ("diff", "attach", "prompt", "shutdown"):
+        response = first_responses.get(request_id, {})
+        if response.get("schema_version") != 2 or response.get("success") is not True:
+            raise AssertionError(
+                f"missing successful v2 slash-owner response for {request_id}: {first_records!r}"
+            )
+
+    diff = first_responses["diff"].get("data", {})
+    if not (
+        first_responses["diff"].get("command") == "diff"
+        and diff.get("command") == "diff"
+        and diff.get("route") == "local"
+        and diff.get("accepted") is True
+        and diff.get("changed") is True
+        and diff.get("path") == "tracked.txt"
+        and diff.get("source") == "git"
+        and diff.get("truncated") is False
+        and "+after" in diff.get("diff", "")
+    ):
+        raise AssertionError(
+            f"installed /diff did not return its structured owner result: {diff!r}"
+        )
+    if str(workspace) in json.dumps(diff):
+        raise AssertionError(f"installed /diff leaked its absolute workspace: {diff!r}")
+
+    expected_digest = hashlib.sha256(attachment_text.encode("utf-8")).hexdigest()
+    attached = first_responses["attach"].get("data", {})
+    expected_attachment = {
+        "command": "attach",
+        "accepted": True,
+        "path": "note.md",
+        "kind": "file",
+        "mime_type": "text/plain",
+        "size_bytes": len(attachment_text.encode("utf-8")),
+        "sha256": expected_digest,
+        "pending": 1,
+    }
+    if any(attached.get(key) != value for key, value in expected_attachment.items()):
+        raise AssertionError(
+            f"installed /attach did not return its structured owner result: {attached!r}"
+        )
+    prompt = first_responses["prompt"].get("data", {})
+    if prompt.get("assistant", {}).get("content") != "use the staged attachment":
+        raise AssertionError(f"prompt after /attach did not complete: {prompt!r}")
+
+    second_payload = "\n".join(
+        json.dumps(value, separators=(",", ":"))
+        for value in (
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "compact",
+                "text": "/compact",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "resume",
+                "text": "/resume 0",
+            },
+            {"schema_version": 2, "type": "shutdown", "id": "shutdown-2"},
+        )
+    ) + "\n"
+    second = run(
+        [
+            str(binary),
+            "--mode",
+            "headless",
+            "--backend",
+            "echo",
+            "--session",
+            str(session),
+        ],
+        input_text=second_payload,
+        env=env,
+        cwd=workspace,
+    )
+    assert_success(second, "installed headless compact/resume owners")
+    second_records = json_lines(second.stdout)
+    second_responses = {
+        record["id"]: record
+        for record in second_records
+        if record.get("type") == "response" and record.get("id")
+    }
+    for request_id in ("compact", "resume", "shutdown-2"):
+        response = second_responses.get(request_id, {})
+        if response.get("schema_version") != 2 or response.get("success") is not True:
+            raise AssertionError(
+                f"missing successful durable slash response for {request_id}: {second_records!r}"
+            )
+
+    compact = second_responses["compact"].get("data", {})
+    if not (
+        second_responses["compact"].get("command") == "compact"
+        and compact.get("command") == "compact"
+        and compact.get("route") == "local"
+        and compact.get("accepted") is True
+        and compact.get("durable") is True
+        and compact.get("already_recorded") is False
+        and compact.get("source_turns") == 2
+        and compact.get("prepared_turns") == 2
+        and isinstance(compact.get("marker_sequence"), int)
+        and compact.get("next_sequence") == compact["marker_sequence"] + 1
+    ):
+        raise AssertionError(f"installed /compact did not persist a structured result: {compact!r}")
+
+    resumed = second_responses["resume"].get("data", {})
+    replay = resumed.get("records", [])
+    if not (
+        second_responses["resume"].get("command") == "resume"
+        and resumed.get("command") == "resume"
+        and resumed.get("route") == "local"
+        and resumed.get("accepted") is True
+        and resumed.get("durable") is True
+        and resumed.get("requested_sequence") == 0
+        and resumed.get("from_sequence") == 0
+        and resumed.get("replay_gap") is False
+        and resumed.get("truncated") is False
+        and resumed.get("replayed") == len(replay)
+        and resumed.get("marker_sequence") == compact.get("next_sequence")
+        and resumed.get("next_sequence") == resumed["marker_sequence"] + 1
+    ):
+        raise AssertionError(f"installed /resume did not return a durable replay: {resumed!r}")
+    if not any(
+        record.get("kind") == "turn"
+        and record.get("role") == "user"
+        and record.get("content") == "use the staged attachment"
+        for record in replay
+    ):
+        raise AssertionError(f"/resume did not replay the prior process turn: {replay!r}")
+    if not any(
+        record.get("kind") == "event"
+        and record.get("event", {}).get("trigger") == "manual_slash"
+        and record.get("event", {}).get("type")
+        in {"context_compacted", "context_compaction_skipped"}
+        for record in replay
+    ):
+        raise AssertionError(f"/resume did not replay the durable compact marker: {replay!r}")
+
+    journal_text = session.read_text(encoding="utf-8")
+    journal = json_lines(journal_text)
+    user_turns = [
+        record.get("turn", {})
+        for record in journal
+        if record.get("kind") == "turn" and record.get("turn", {}).get("role") == "user"
+    ]
+    if len(user_turns) != 1:
+        raise AssertionError(f"slash-owner session has unexpected user turns: {journal!r}")
+    attachment_metadata = user_turns[0].get("metadata", {}).get("attachments", [])
+    if len(attachment_metadata) != 1 or any(
+        attachment_metadata[0].get(key) != value
+        for key, value in {
+            "path": "note.md",
+            "kind": "file",
+            "mime_type": "text/plain",
+            "size_bytes": len(attachment_text.encode("utf-8")),
+            "sha256": expected_digest,
+        }.items()
+    ):
+        raise AssertionError(
+            f"staged attachment was not consumed by exactly the next durable turn: {user_turns!r}"
+        )
+    if attachment_text.strip() in journal_text:
+        raise AssertionError("attachment bytes were persisted instead of bounded metadata")
+    durable_events = [
+        record.get("event", {}) for record in journal if record.get("kind") == "event"
+    ]
+    if not any(
+        event.get("type") in {"context_compacted", "context_compaction_skipped"}
+        and event.get("trigger") == "manual_slash"
+        for event in durable_events
+    ):
+        raise AssertionError(f"/compact marker is absent from the durable journal: {journal!r}")
+    if not any(
+        event.get("type") == "session_resumed"
+        and event.get("trigger") == "manual_slash"
+        and event.get("requested_sequence") == 0
+        for event in durable_events
+    ):
+        raise AssertionError(f"/resume marker is absent from the durable journal: {journal!r}")
 
 
 def assert_invalid_inputs(binary: Path, root: Path) -> None:
@@ -492,13 +759,14 @@ def main() -> int:
         session = assert_headless_echo(binary, root)
         assert_resume(binary, session, root)
         assert_resume_reopens_process(binary, session, root)
+        assert_headless_slash_owners(binary, root)
         assert_invalid_inputs(binary, root)
         assert_openai_fixture(binary, root)
         assert_tui(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: release, install, echo fixture, resume, Responses fixture, "
-        "TUI resize, streaming interrupt, and terminal restoration"
+        "user smoke passed: release, install, echo fixture, durable slash owners, resume, "
+        "Responses fixture, TUI resize, streaming interrupt, and terminal restoration"
     )
     return 0
 
