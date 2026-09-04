@@ -303,6 +303,29 @@ impl ApprovalCoordinator {
         })
     }
 
+    /// Persist one accepted decision through the supplied journal callback and
+    /// only then release it to the waiting worker.  If persistence fails, the
+    /// response is retracted and the request becomes pending again, so a write
+    /// or command can never run on an unaudited host decision.
+    pub fn persist_accepted<E>(
+        &self,
+        request_id: &str,
+        persist: impl FnOnce(&AcceptedApproval) -> Result<(), E>,
+    ) -> Result<AcceptedApproval, PersistApprovalError<E>> {
+        let accepted = self
+            .accepted(request_id)
+            .ok_or(PersistApprovalError::Approval(
+                ApprovalError::UnknownRequest,
+            ))?;
+        if let Err(error) = persist(&accepted) {
+            let _ = self.retract_response(request_id);
+            return Err(PersistApprovalError::Persistence(error));
+        }
+        self.mark_persisted(request_id)
+            .map_err(PersistApprovalError::Approval)?;
+        Ok(accepted)
+    }
+
     pub fn mark_persisted(&self, request_id: &str) -> Result<(), ApprovalError> {
         let (lock, wake) = &*self.inner;
         let mut state = lock
@@ -420,6 +443,14 @@ pub enum ApprovalError {
     UnknownRequest,
     #[error("approval wait was cancelled")]
     Cancelled,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum PersistApprovalError<E> {
+    #[error("approval response failed: {0}")]
+    Approval(ApprovalError),
+    #[error("approval decision could not be persisted: {0}")]
+    Persistence(E),
 }
 
 #[cfg(test)]
