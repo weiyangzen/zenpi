@@ -431,6 +431,43 @@ impl GoalStatus {
     pub fn is_terminal(self) -> bool {
         matches!(self, Self::Cancelled | Self::Done)
     }
+
+    /// Parse the stable, wire-level spelling used by owner commands.
+    ///
+    /// Keeping this conversion next to the enum prevents each host from
+    /// inventing a subtly different status vocabulary.  The parser is
+    /// deliberately ASCII case-insensitive, while serialization remains the
+    /// canonical lower-case `snake_case` form provided by serde.
+    pub fn parse_token(value: &str) -> Option<Self> {
+        if value.eq_ignore_ascii_case("queued") {
+            Some(Self::Queued)
+        } else if value.eq_ignore_ascii_case("running") {
+            Some(Self::Running)
+        } else if value.eq_ignore_ascii_case("paused") {
+            Some(Self::Paused)
+        } else if value.eq_ignore_ascii_case("blocked") {
+            Some(Self::Blocked)
+        } else if value.eq_ignore_ascii_case("cancelled") || value.eq_ignore_ascii_case("canceled")
+        {
+            Some(Self::Cancelled)
+        } else if value.eq_ignore_ascii_case("done") {
+            Some(Self::Done)
+        } else {
+            None
+        }
+    }
+
+    /// Return the canonical lower-case spelling without allocating.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Paused => "paused",
+            Self::Blocked => "blocked",
+            Self::Cancelled => "cancelled",
+            Self::Done => "done",
+        }
+    }
 }
 
 /// A user-facing execution intent linked to one immutable Blueprint digest.

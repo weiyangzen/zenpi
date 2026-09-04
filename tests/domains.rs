@@ -112,6 +112,38 @@ fn goal_links_immutable_blueprint_and_tracks_bounded_status() {
 }
 
 #[test]
+fn goal_status_tokens_have_one_canonical_vocabulary() {
+    let cases = [
+        ("queued", GoalStatus::Queued),
+        ("RUNNING", GoalStatus::Running),
+        ("Paused", GoalStatus::Paused),
+        ("blocked", GoalStatus::Blocked),
+        ("cancelled", GoalStatus::Cancelled),
+        // Accept the common US spelling at the command boundary while
+        // retaining the canonical serde spelling `cancelled`.
+        ("canceled", GoalStatus::Cancelled),
+        ("DONE", GoalStatus::Done),
+    ];
+    for (token, expected) in cases {
+        assert_eq!(GoalStatus::parse_token(token), Some(expected));
+        assert_eq!(
+            expected.as_str(),
+            match expected {
+                GoalStatus::Queued => "queued",
+                GoalStatus::Running => "running",
+                GoalStatus::Paused => "paused",
+                GoalStatus::Blocked => "blocked",
+                GoalStatus::Cancelled => "cancelled",
+                GoalStatus::Done => "done",
+            }
+        );
+    }
+    for invalid in ["", "ready", "in-progress", "done now", "\n"] {
+        assert_eq!(GoalStatus::parse_token(invalid), None);
+    }
+}
+
+#[test]
 fn learn_keeps_bounded_source_target_and_evidence_refs() {
     let mut learn = Learn::new(
         "learn-1",

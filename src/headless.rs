@@ -3093,6 +3093,195 @@ struct SlashDispatchError {
     message: String,
 }
 
+/// The small owner grammar accepted inside the existing `/goal <instruction>`
+/// slash variant.  Keeping this interpretation here avoids widening the wire
+/// protocol while still giving headless clients a typed, durable status
+/// operation.  Ordinary goal prose continues to fall through to the explicit
+/// "external owner" refusal below.
+#[derive(Debug)]
+enum GoalOwnerAction {
+    ShowAll,
+    Show {
+        id: String,
+    },
+    Transition {
+        id: String,
+        status: crate::domains::GoalStatus,
+    },
+}
+
+fn parse_goal_owner_action(
+    instruction: &str,
+) -> Result<Option<GoalOwnerAction>, SlashDispatchError> {
+    let tokens = instruction.split_whitespace().collect::<Vec<_>>();
+    let Some(action) = tokens.first() else {
+        return Ok(None);
+    };
+    if !action.eq_ignore_ascii_case("show")
+        && !action.eq_ignore_ascii_case("list")
+        && !action.eq_ignore_ascii_case("status")
+        && !action.eq_ignore_ascii_case("transition")
+        && !action.eq_ignore_ascii_case("set-status")
+    {
+        return Ok(None);
+    }
+
+    let invalid_usage = || {
+        SlashDispatchError {
+        code: "goal_status_usage",
+        message: "use `/goal status`, `/goal status <goal-id>`, or `/goal status <goal-id> <queued|running|paused|blocked|cancelled|done>`".into(),
+    }
+    };
+    let validate_id = |raw: &str| {
+        if raw.is_empty()
+            || raw.len() > crate::domains::MAX_ID_BYTES
+            || raw.chars().any(char::is_control)
+            || !raw
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character))
+        {
+            return Err(SlashDispatchError {
+                code: "goal_invalid_id",
+                message: "goal id is not a valid bounded identifier".into(),
+            });
+        }
+        Ok(raw.to_owned())
+    };
+
+    if action.eq_ignore_ascii_case("show") || action.eq_ignore_ascii_case("list") {
+        return match tokens.len() {
+            1 => Ok(Some(GoalOwnerAction::ShowAll)),
+            2 => Ok(Some(GoalOwnerAction::Show {
+                id: validate_id(tokens[1])?,
+            })),
+            _ => Err(invalid_usage()),
+        };
+    }
+    if action.eq_ignore_ascii_case("status") {
+        return match tokens.len() {
+            1 => Ok(Some(GoalOwnerAction::ShowAll)),
+            2 => Ok(Some(GoalOwnerAction::Show {
+                id: validate_id(tokens[1])?,
+            })),
+            3 => {
+                let id = validate_id(tokens[1])?;
+                let status = crate::domains::GoalStatus::parse_token(tokens[2]).ok_or_else(|| {
+                    SlashDispatchError {
+                        code: "goal_invalid_status",
+                        message: "goal status must be queued, running, paused, blocked, cancelled, or done".into(),
+                    }
+                })?;
+                Ok(Some(GoalOwnerAction::Transition { id, status }))
+            }
+            _ => Err(invalid_usage()),
+        };
+    }
+
+    if tokens.len() != 3 {
+        return Err(invalid_usage());
+    }
+    let id = validate_id(tokens[1])?;
+    let status =
+        crate::domains::GoalStatus::parse_token(tokens[2]).ok_or_else(|| SlashDispatchError {
+            code: "goal_invalid_status",
+            message: "goal status must be queued, running, paused, blocked, cancelled, or done"
+                .into(),
+        })?;
+    Ok(Some(GoalOwnerAction::Transition { id, status }))
+}
+
+fn map_goal_store_error(
+    error: domain_store::DomainStoreError,
+    operation: &'static str,
+) -> SlashDispatchError {
+    match error {
+        domain_store::DomainStoreError::GoalNotFound(id) => SlashDispatchError {
+            code: "goal_not_found",
+            message: format!("goal `{id}` is not found"),
+        },
+        domain_store::DomainStoreError::InvalidGoalTransition { id, from, to } => {
+            SlashDispatchError {
+                code: "goal_invalid_transition",
+                message: format!(
+                    "goal `{id}` cannot transition from {} to {}",
+                    from.as_str(),
+                    to.as_str()
+                ),
+            }
+        }
+        // Do not forward path-bearing store diagnostics across the control
+        // plane.  The caller receives a stable operation code instead.
+        _ => SlashDispatchError {
+            code: "domain_store_error",
+            message: format!("{operation} failed"),
+        },
+    }
+}
+
+fn goal_status_response(
+    agent: &mut Agent,
+    id: &str,
+    next_status: crate::domains::GoalStatus,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    let path = domain_store::path_for_session(agent.session().path());
+    // Inspect first so a failed transition for a missing goal does not create
+    // a new sibling domain snapshot as a read-side effect.
+    let existing = DomainStore::open_read_only(&path)
+        .map_err(|error| map_goal_store_error(error, "goal status"))?;
+    if existing.goal(id).is_none() {
+        return Err(SlashDispatchError {
+            code: "goal_not_found",
+            message: format!("goal `{id}` is not found"),
+        });
+    }
+    drop(existing);
+
+    let mut store =
+        DomainStore::open(&path).map_err(|error| map_goal_store_error(error, "goal status"))?;
+    // Re-read after opening the mutable owner.  This keeps the response
+    // truthful if another process changed the bounded snapshot between the
+    // side-effect-free probe and the atomic update.
+    let from_status = store
+        .goal(id)
+        .map(|goal| goal.status)
+        .ok_or_else(|| SlashDispatchError {
+            code: "goal_not_found",
+            message: format!("goal `{id}` is not found"),
+        })?;
+    let change = store
+        .transition_goal(id, next_status)
+        .map_err(|error| map_goal_store_error(error, "goal status"))?;
+    let goal = store.goal(id).ok_or_else(|| SlashDispatchError {
+        code: "goal_not_found",
+        message: format!("goal `{id}` is not found"),
+    })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "goal",
+        "route": "local",
+        "accepted": true,
+        "action": "transition",
+        "goal_id": id,
+        "from_status": from_status,
+        "to_status": next_status,
+        "status": next_status,
+        "change": change,
+        "goal": goal,
+        "store": summary,
+    }))
+}
+
+/// Transition one persisted Goal through its domain state machine.  This
+/// public adapter is intentionally host-neutral so the TUI can adopt the same
+/// owner operation without duplicating persistence or validation rules.
+pub fn transition_goal_status(
+    agent: &mut Agent,
+    id: &str,
+    next_status: crate::domains::GoalStatus,
+) -> Result<serde_json::Value, String> {
+    goal_status_response(agent, id, next_status).map_err(|error| error.message)
+}
+
 /// Execute the transport-independent portion of a slash command.  Commands
 /// that inspect mutable agent state require a lock; view/runtime acknowledgements
 /// deliberately do not, so they remain usable while a provider turn is busy.
@@ -3196,22 +3385,50 @@ fn execute_headless_slash(
         SlashCommand::Cancel => Ok(SlashExecution::Cancel),
         SlashCommand::Exit => Ok(SlashExecution::Exit),
         SlashCommand::Goal { instruction } => {
-            // `show` is a deliberately read-only owner operation. Other goal
-            // instructions still require an external b3ehive scheduler and
-            // must not be reported as accepted by this host.
-            if instruction.trim().eq_ignore_ascii_case("show")
-                || instruction.trim().eq_ignore_ascii_case("status")
-            {
-                let store = domain_store_for_agent(agent.as_deref(), true)?;
-                let data = serialized_domain_store(&store)?;
-                return Ok(SlashExecution::Response(json!({
-                    "command": "goal",
-                    "route": "local",
-                    "accepted": true,
-                    "action": "show",
-                    "store": data["store"].clone(),
-                    "goals": data["goals"].clone(),
-                })));
+            match parse_goal_owner_action(&instruction)? {
+                Some(GoalOwnerAction::ShowAll) => {
+                    let store = domain_store_for_agent(agent.as_deref(), true)?;
+                    let data = serialized_domain_store(&store)?;
+                    return Ok(SlashExecution::Response(json!({
+                        "command": "goal",
+                        "route": "local",
+                        "accepted": true,
+                        "action": "show",
+                        "store": data["store"].clone(),
+                        "goals": data["goals"].clone(),
+                    })));
+                }
+                Some(GoalOwnerAction::Show { id }) => {
+                    let store = domain_store_for_agent(agent.as_deref(), true)?;
+                    let goal = store.goal(&id).ok_or_else(|| SlashDispatchError {
+                        code: "goal_not_found",
+                        message: format!("goal `{id}` is not found"),
+                    })?;
+                    let summary = serialized_store_summary(&store)?;
+                    return Ok(SlashExecution::Response(json!({
+                        "command": "goal",
+                        "route": "local",
+                        "accepted": true,
+                        "action": "show",
+                        "goal_id": id,
+                        "store": summary,
+                        "goal": goal,
+                    })));
+                }
+                Some(GoalOwnerAction::Transition { id, status }) => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message:
+                                "goal status is temporarily unavailable while the agent is busy"
+                                    .into(),
+                        });
+                    };
+                    return Ok(SlashExecution::Response(goal_status_response(
+                        agent, &id, status,
+                    )?));
+                }
+                None => {}
             }
             Ok(SlashExecution::Response(json!({
                 "command": "goal",
