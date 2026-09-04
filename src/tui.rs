@@ -1250,7 +1250,19 @@ impl TuiState {
                 }
                 return TuiAction::Redraw;
             }
-            KeyCode::Char(character) if !modifiers.contains(KeyModifiers::ALT) => {
+            // Most terminals report Shift-Tab as BackTab rather than Tab with
+            // a SHIFT modifier. Accept both spellings so reverse pane focus
+            // works outside synthetic key tests.
+            KeyCode::BackTab if self.input.is_empty() => {
+                self.focus_previous_workspace_pane();
+                return TuiAction::Redraw;
+            }
+            // An unbound control chord must never type its printable key name
+            // into the prompt. For example, Ctrl-D on a non-empty draft used
+            // to append `d`, and Ctrl-A appended `a` instead of being inert.
+            KeyCode::Char(character)
+                if !modifiers.intersects(KeyModifiers::ALT | KeyModifiers::CONTROL) =>
+            {
                 self.insert_text(&character.to_string())
             }
             KeyCode::Backspace => self.delete_previous_char(),

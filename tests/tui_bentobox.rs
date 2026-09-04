@@ -286,6 +286,23 @@ fn workspace_keyboard_controls_focus_and_split_without_touching_prompt() {
 }
 
 #[test]
+fn terminal_backtab_moves_workspace_focus_backwards() {
+    let mut state = TuiState::default();
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
+
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT)),
+        TuiAction::Redraw
+    );
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+}
+
+#[test]
 fn production_workspace_is_resize_safe_at_tiny_viewports() {
     let mut terminal = Terminal::new(TestBackend::new(4, 3)).unwrap();
     let mut state = TuiState::default();

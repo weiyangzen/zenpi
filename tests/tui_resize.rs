@@ -89,6 +89,22 @@ fn ctrl_c_interrupts_a_busy_turn_without_quitting_the_tui() {
 }
 
 #[test]
+fn unbound_control_keys_never_insert_printable_characters() {
+    let mut state = TuiState::default();
+    state.set_input("draft");
+
+    assert_eq!(
+        state.handle_key(key(KeyCode::Char('d'), KeyModifiers::CONTROL)),
+        TuiAction::None
+    );
+    assert_eq!(
+        state.handle_key(key(KeyCode::Char('a'), KeyModifiers::CONTROL)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "draft");
+}
+
+#[test]
 fn multiline_cursor_editing_stays_on_utf8_boundaries() {
     let mut state = TuiState::default();
     state.set_input("ab\n世界");
