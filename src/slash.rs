@@ -1269,7 +1269,9 @@ mod tests {
         assert_eq!(
             parse("/pane collapse gantt").unwrap(),
             Some(SlashCommand::Pane {
-                action: PaneAction::Collapse { pane: PaneId::Gantt },
+                action: PaneAction::Collapse {
+                    pane: PaneId::Gantt
+                },
             })
         );
         assert_eq!(
