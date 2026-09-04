@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
-use zenpi::layout::{LayoutModel, PaneCapabilities, PaneId, TabId, Visibility};
+use zenpi::layout::{FocusDirection, LayoutModel, PaneCapabilities, PaneId, TabId, Visibility};
 use zenpi::tui::{BentoBoxLayoutAdapter, MessageRole, TuiAction, TuiState};
 
 fn rendered(terminal: &Terminal<TestBackend>) -> String {
@@ -142,4 +142,53 @@ fn production_workspace_is_resize_safe_at_tiny_viewports() {
             .draw(|frame| state.render_bentobox(frame, "zenpi"))
             .unwrap();
     }
+}
+
+#[test]
+fn tab_switch_keeps_independent_layout_state_and_dirty_bit() {
+    let mut state = TuiState::default();
+    assert!(!state.layout_dirty());
+
+    assert!(state.adjust_workspace_split(FocusDirection::Right));
+    assert!(state.layout_dirty());
+    let project_ratios = state.workspace_layout().ratios;
+    state.clear_layout_dirty();
+    assert!(!state.layout_dirty());
+
+    state.set_workspace_tab(TabId::Goal);
+    assert_eq!(state.workspace_tab(), TabId::Goal);
+    assert_eq!(
+        state.workspace_layout().ratios,
+        LayoutModel::new(TabId::Goal).ratios
+    );
+    assert!(!state.layout_dirty());
+    assert!(state.adjust_workspace_split(FocusDirection::Right));
+    let goal_ratios = state.workspace_layout().ratios;
+    assert_ne!(goal_ratios, LayoutModel::new(TabId::Goal).ratios);
+
+    state.set_workspace_tab(TabId::Project);
+    assert_eq!(state.workspace_layout().ratios, project_ratios);
+    state.reset_workspace_layout();
+    assert!(state.layout_dirty());
+    assert_eq!(
+        state.workspace_layout().ratios,
+        LayoutModel::new(TabId::Project).ratios
+    );
+}
+
+#[test]
+fn restoring_tab_models_preserves_each_tab_and_clears_dirty_state() {
+    let mut project = LayoutModel::new(TabId::Project);
+    project.set_ratios(zenpi::layout::ColumnRatios::new(40, 35, 25));
+    let mut goal = LayoutModel::new(TabId::Goal);
+    goal.set_ratios(zenpi::layout::ColumnRatios::new(25, 50, 25));
+    let mut state = TuiState::default();
+    state.restore_workspace_layouts([project.clone(), goal.clone()]);
+
+    assert!(!state.layout_dirty());
+    assert_eq!(state.workspace_layout().ratios, project.ratios);
+    state.set_workspace_tab(TabId::Goal);
+    assert_eq!(state.workspace_layout().ratios, goal.ratios);
+    state.set_workspace_tab(TabId::Project);
+    assert_eq!(state.workspace_layout().ratios, project.ratios);
 }

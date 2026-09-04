@@ -7,7 +7,7 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt::Display;
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -170,6 +170,10 @@ pub struct TuiState {
     /// Set only when user-owned layout state changes. Hosts use this bit to
     /// persist layout changes without writing a file on every rendered frame.
     layout_dirty: bool,
+    /// Tabs whose saved state should be removed rather than replaced with a
+    /// serialized copy of the built-in preset. This preserves reset semantics
+    /// across future preset/schema migrations.
+    layout_resets: BTreeSet<TabId>,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -204,6 +208,7 @@ impl TuiState {
             workspace_layout: LayoutModel::new(TabId::Project),
             workspace_layouts: BTreeMap::new(),
             layout_dirty: false,
+            layout_resets: BTreeSet::new(),
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -286,6 +291,7 @@ impl TuiState {
             }
         }
         self.layout_dirty = false;
+        self.layout_resets.clear();
         self.dirty = true;
     }
 
@@ -298,6 +304,16 @@ impl TuiState {
     /// is intentionally independent and is not affected by this operation.
     pub fn clear_layout_dirty(&mut self) {
         self.layout_dirty = false;
+    }
+
+    /// Return tabs whose persisted state should be removed on the next save.
+    pub fn layout_reset_tabs(&self) -> Vec<TabId> {
+        self.layout_resets.iter().copied().collect()
+    }
+
+    /// Clear reset intents after a successful persistence checkpoint.
+    pub fn clear_layout_reset_tabs(&mut self) {
+        self.layout_resets.clear();
     }
 
     /// Return the currently focused BentoBox pane.
@@ -358,7 +374,9 @@ impl TuiState {
 
     /// Reset ratios, collapsed panes, and focus to the active tab preset.
     pub fn reset_workspace_layout(&mut self) {
+        let tab = self.workspace_layout.tab;
         self.workspace_layout.reset_layout();
+        self.layout_resets.insert(tab);
         self.layout_dirty = true;
         self.dirty = true;
     }
@@ -2272,6 +2290,98 @@ impl TuiProviderEventBuffer {
     }
 }
 
+/// Optional bridge between the production TUI and the bounded config-owned
+/// layout snapshot. Discovery and restore are best-effort: a malformed or
+/// stale preference file must not prevent the agent from starting with safe
+/// built-in presets. Once a write fails, persistence is disabled for this
+/// process so a broken path cannot spam the transcript on every keypress.
+#[derive(Debug, Default)]
+struct TuiLayoutPersistence {
+    paths: Option<crate::config::ConfigPaths>,
+    profile: Option<String>,
+    disabled: bool,
+}
+
+impl TuiLayoutPersistence {
+    fn discover() -> Self {
+        let Ok(paths) = crate::config::ConfigPaths::discover() else {
+            return Self::default();
+        };
+        Self {
+            profile: active_layout_profile(&paths),
+            paths: Some(paths),
+            disabled: false,
+        }
+    }
+
+    fn restore(&self, state: &mut TuiState) -> Result<(), String> {
+        let Some(paths) = self.paths.as_ref() else {
+            return Ok(());
+        };
+        let preferences =
+            crate::config::load_layout_preferences(paths).map_err(|error| error.to_string())?;
+        let layouts = crate::layout::TabId::ALL
+            .into_iter()
+            .map(|tab| {
+                preferences
+                    .model_for(self.profile.as_deref(), tab)
+                    .map_err(|error| error.to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        state.restore_workspace_layouts(layouts);
+        Ok(())
+    }
+
+    fn save(&mut self, state: &TuiState) -> Result<(), String> {
+        if self.disabled {
+            return Ok(());
+        }
+        let Some(paths) = self.paths.as_ref() else {
+            return Ok(());
+        };
+        let mut preferences =
+            crate::config::load_layout_preferences(paths).map_err(|error| error.to_string())?;
+        let mut changed = false;
+        let reset_tabs = state.layout_reset_tabs();
+        for tab in reset_tabs.iter().copied() {
+            changed |= preferences
+                .reset_tab(self.profile.as_deref(), tab)
+                .map_err(|error| error.to_string())?;
+        }
+        for layout in state.workspace_layout_states() {
+            if reset_tabs.contains(&layout.tab) {
+                continue;
+            }
+            changed |= preferences
+                .set_model(self.profile.as_deref(), &layout)
+                .map_err(|error| error.to_string())?;
+        }
+        if changed {
+            crate::config::save_layout_preferences(paths, &preferences)
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(())
+    }
+
+    fn disable(&mut self) {
+        self.disabled = true;
+    }
+}
+
+fn active_layout_profile(paths: &crate::config::ConfigPaths) -> Option<String> {
+    let candidate = std::env::var("ZENPI_PROFILE").ok().or_else(|| {
+        crate::config::load_config(paths)
+            .ok()
+            .and_then(|config| config.default_profile)
+    })?;
+    let valid = !candidate.is_empty()
+        && candidate.len() <= 128
+        && candidate
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'));
+    valid.then_some(candidate)
+}
+
 /// Run the production TUI with provider work on the bounded runtime worker.
 /// The older callback-based `run_with_state` remains available for embedders
 /// and deterministic tests; the binary uses this owned form so a worker can
@@ -2327,6 +2437,16 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             };
             state.push_message(role, &turn.content);
         }
+    }
+    let mut layout_persistence = TuiLayoutPersistence::discover();
+    if let Err(error) = layout_persistence.restore(&mut state) {
+        // Keep startup usable with a safe preset, but make a corrupt or stale
+        // preference visible instead of silently discarding the user's file.
+        state.push_message(
+            MessageRole::Error,
+            format!("layout preferences ignored; using presets: {error}"),
+        );
+        layout_persistence.disable();
     }
     let config = TuiConfig::default();
     // The runtime worker is spawned before terminal setup so it can own the
@@ -2692,6 +2812,25 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                     TuiAction::Quit => break 'outer,
                     TuiAction::Redraw | TuiAction::None => {}
                 }
+                if state.layout_dirty() && !layout_persistence.disabled {
+                    match layout_persistence.save(&state) {
+                        Ok(()) => {
+                            state.clear_layout_dirty();
+                            state.clear_layout_reset_tabs();
+                        }
+                        Err(error) => {
+                            state.push_message(
+                                MessageRole::Error,
+                                format!(
+                                    "layout preferences could not be saved; persistence disabled: {error}"
+                                ),
+                            );
+                            layout_persistence.disable();
+                            state.clear_layout_dirty();
+                            state.clear_layout_reset_tabs();
+                        }
+                    }
+                }
                 scheduler.request();
                 processed += 1;
                 if processed >= 256
@@ -2704,6 +2843,16 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
         }
         Ok(())
     })();
+    // Save any final layout mutation when the user quits before the next
+    // event-loop checkpoint. The operation is bounded and atomic; a failure
+    // must not mask the primary terminal/runtime result.
+    if state.layout_dirty()
+        && !layout_persistence.disabled
+        && layout_persistence.save(&state).is_ok()
+    {
+        state.clear_layout_dirty();
+        state.clear_layout_reset_tabs();
+    }
     // Terminal I/O can fail while a provider job is still active. Always
     // cancel and join the owned runtime before returning that error; relying
     // on `Drop` would detach a worker when its command queue is full.
