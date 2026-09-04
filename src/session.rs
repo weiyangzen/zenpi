@@ -181,6 +181,25 @@ impl SessionStore {
         Self::open_with_options(path, false)
     }
 
+    /// Open an existing, structurally valid journal for continued writes.
+    /// Unlike [`Self::open`], this never creates a header for an empty,
+    /// malformed, or unrelated regular file. Session-switch owners use this
+    /// boundary so probing a user path cannot mutate it into a zenpi journal.
+    pub fn open_existing_writable(path: impl AsRef<Path>) -> Result<Self, SessionError> {
+        let path = path.as_ref();
+        let inspected = Self::open_existing(path)?;
+        let valid_header = inspected
+            .records
+            .first()
+            .is_some_and(|record| record.kind == "session" && record.sequence == 0);
+        if !valid_header || !inspected.warnings.is_empty() {
+            return Err(SessionError::InvalidRecord(
+                "resume source is not a clean zenpi session journal".into(),
+            ));
+        }
+        Self::open_with_options(path, true)
+    }
+
     fn open_with_options(path: impl AsRef<Path>, writable: bool) -> Result<Self, SessionError> {
         let path = path.as_ref().to_path_buf();
         if path.as_os_str().is_empty() {

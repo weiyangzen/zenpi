@@ -243,6 +243,31 @@ fn resume_path_rejects_missing_journals_without_creating_them() {
     assert_eq!(async_resume["success"], false);
     assert_eq!(async_resume["code"], "session_path_denied");
     assert!(!missing_async.exists());
+
+    for (name, contents) in [("plain.txt", "not a zenpi journal\n"), ("empty.jsonl", "")] {
+        let path = dir.path().join(name);
+        fs::write(&path, contents).unwrap();
+        let before = fs::read(&path).unwrap();
+        let active = dir.path().join(format!("active-{name}.jsonl"));
+        let mut agent = Agent::with_echo(SessionStore::open(&active).unwrap());
+        let input = format!(
+            "{}\n{}\n",
+            serde_json::json!({"type":"resume","id":"bad-existing","path":path}),
+            serde_json::json!({"type":"shutdown","id":"done"}),
+        );
+        let mut output = Vec::new();
+        run_headless(&mut agent, Cursor::new(input.into_bytes()), &mut output).unwrap();
+        let response = json_lines(&output)
+            .into_iter()
+            .find(|record| record["id"] == "bad-existing")
+            .unwrap();
+        assert_eq!(response["success"], false);
+        assert!(matches!(
+            response["code"].as_str(),
+            Some("agent_error") | Some("session_error")
+        ));
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
 }
 
 #[cfg(unix)]

@@ -1811,7 +1811,7 @@ impl Agent {
         if self.phase == AgentPhase::Running {
             return Err(AgentError::NotIdle);
         }
-        let replacement = SessionStore::open(path.into())?;
+        let replacement = SessionStore::open_existing_writable(path.into())?;
         let replacement_governance = self
             .governance
             .as_ref()
