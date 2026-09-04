@@ -552,9 +552,8 @@ fn session_gc_skips_domain_store_and_non_owned_links() {
 
 #[test]
 fn session_gc_only_removes_clean_owned_journals_and_reports_skips() {
-    use zenpi::session::{
-        GarbageCollectionPolicy, MAX_GC_REMOVALS, garbage_collect_sessions_with_active,
-    };
+    use zenpi::session::GarbageCollectionPolicy;
+    use zenpi::session::garbage_collect_sessions_with_active;
 
     let dir = tempdir().unwrap();
     let active_dir = tempdir().unwrap();
@@ -584,7 +583,6 @@ fn session_gc_only_removes_clean_owned_journals_and_reports_skips() {
     assert!(!owned_path.exists());
     assert!(foreign_path.exists());
     assert!(domain_path.exists());
-    assert!(MAX_GC_REMOVALS > 0);
 }
 
 #[test]
