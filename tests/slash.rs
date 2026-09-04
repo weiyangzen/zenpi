@@ -143,16 +143,20 @@ fn common_workflow_commands_have_typed_arguments_and_metadata() {
         })
     );
     assert_eq!(
-        parse("/session fork").unwrap(),
+        parse("/session fork source.jsonl fork.jsonl").unwrap(),
         Some(SlashCommand::Session {
-            action: SessionAction::Fork { path: None },
+            action: SessionAction::Fork {
+                source: "source.jsonl".into(),
+                destination: "fork.jsonl".into(),
+            },
         })
     );
     assert_eq!(
-        parse("/session export 'tmp/session.jsonl'").unwrap(),
+        parse("/session export source.jsonl 'tmp/session.jsonl'").unwrap(),
         Some(SlashCommand::Session {
             action: SessionAction::Export {
-                path: "tmp/session.jsonl".into(),
+                source: "source.jsonl".into(),
+                destination: "tmp/session.jsonl".into(),
             },
         })
     );

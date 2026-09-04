@@ -515,6 +515,24 @@ impl DomainStore {
         Ok(change)
     }
 
+    /// Add one evidence reference to an existing Learn record and persist the
+    /// resulting snapshot atomically. Re-submitting an existing reference is
+    /// an idempotent no-op; a missing Learn ID is rejected before a store is
+    /// opened for mutation by the host owner.
+    pub fn add_learn_evidence(
+        &mut self,
+        id: &str,
+        reference: impl Into<String>,
+    ) -> Result<StoreChange, DomainStoreError> {
+        let current = self
+            .learns
+            .get(id)
+            .ok_or_else(|| DomainStoreError::LearnNotFound(id.to_owned()))?;
+        let mut learn = current.clone();
+        learn.add_evidence(reference)?;
+        self.put_learn(learn)
+    }
+
     pub fn remove_blueprint(
         &mut self,
         id: &str,

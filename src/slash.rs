@@ -70,6 +70,19 @@ pub enum SlashCommand {
     LearnPut {
         path: String,
     },
+    /// Attach one existing repository-relative artifact as durable Learn
+    /// evidence. The host validates the path before touching the domain
+    /// store; submitting the same reference again is idempotent.
+    LearnEvidence {
+        id: String,
+        reference: String,
+    },
+    /// Inspect a validated Learn checkpoint. This is deliberately a
+    /// read-only recovery projection until an external owner supplies a
+    /// worker; it never pretends to resume model execution locally.
+    LearnResume {
+        id: String,
+    },
     /// Display recent session entries.
     History {
         limit: Option<usize>,
@@ -183,6 +196,8 @@ impl SlashCommand {
             Self::Blueprint { .. } => "blueprint",
             Self::Learn { .. } => "learn",
             Self::LearnPut { .. } => "learn",
+            Self::LearnEvidence { .. } => "learn",
+            Self::LearnResume { .. } => "learn",
             Self::History { .. } => "history",
             Self::Resources { .. } => "resources",
             Self::Session { .. } => "session",
@@ -212,6 +227,8 @@ impl SlashCommand {
                 | Self::Blueprint { .. }
                 | Self::Learn { .. }
                 | Self::LearnPut { .. }
+                | Self::LearnEvidence { .. }
+                | Self::LearnResume { .. }
         )
     }
 
@@ -280,8 +297,8 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "learn",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/learn [target] | /learn put <json-path>",
-        summary: "inspect or persist a first-class learn target",
+        usage: "/learn [show] | /learn put <json-path> | /learn evidence <id> <ref> | /learn resume <id>",
+        summary: "inspect, evidence, or validate a first-class learn target",
     },
     SlashCommandSpec {
         name: "history",
@@ -301,7 +318,7 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "session",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/session [list|open|fork|export|import|gc]",
+        usage: "/session [list|open PATH|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|gc]",
         summary: "navigate durable sessions",
     },
     SlashCommandSpec {
@@ -414,6 +431,10 @@ pub enum SlashError {
     MissingArgument { command: &'static str },
     #[error("/{command} received an unexpected argument")]
     UnexpectedArgument { command: &'static str },
+    #[error("/learn {action} requires a learn id and repository-relative reference")]
+    MissingLearnArgument { action: &'static str },
+    #[error("/learn {action} received an unexpected argument")]
+    UnexpectedLearnArgument { action: &'static str },
     #[error("/history count must be a positive integer")]
     InvalidHistoryLimit,
     #[error("/resume sequence must be a non-negative integer")]
@@ -776,6 +797,35 @@ fn parse_learn(args: &[String]) -> Result<SlashCommand, SlashError> {
             path: required_domain_path(args, "learn put")?,
         });
     }
+    if action.eq_ignore_ascii_case("evidence") {
+        if args.len() < 3 {
+            return Err(SlashError::MissingLearnArgument { action: "evidence" });
+        }
+        if args.len() > 3 {
+            return Err(SlashError::UnexpectedLearnArgument { action: "evidence" });
+        }
+        if args[1].trim().is_empty() || args[2].trim().is_empty() {
+            return Err(SlashError::MissingLearnArgument { action: "evidence" });
+        }
+        return Ok(SlashCommand::LearnEvidence {
+            id: args[1].clone(),
+            reference: args[2].clone(),
+        });
+    }
+    if action.eq_ignore_ascii_case("resume") {
+        if args.len() < 2 {
+            return Err(SlashError::MissingLearnArgument { action: "resume" });
+        }
+        if args.len() > 2 {
+            return Err(SlashError::UnexpectedLearnArgument { action: "resume" });
+        }
+        if args[1].trim().is_empty() {
+            return Err(SlashError::MissingLearnArgument { action: "resume" });
+        }
+        return Ok(SlashCommand::LearnResume {
+            id: args[1].clone(),
+        });
+    }
     Ok(SlashCommand::Learn {
         target: optional_join(args),
     })
@@ -811,19 +861,26 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
             path: required_session_path(args, "open")?,
         }),
         "fork" => {
-            if args.len() > 2 {
-                return Err(SlashError::UnexpectedSessionArgument { action: "fork" });
-            }
+            let (source, destination) = required_session_pair(args, "fork")?;
             Ok(SessionAction::Fork {
-                path: args.get(1).cloned(),
+                source,
+                destination,
             })
         }
-        "export" => Ok(SessionAction::Export {
-            path: required_session_path(args, "export")?,
-        }),
-        "import" => Ok(SessionAction::Import {
-            path: required_session_path(args, "import")?,
-        }),
+        "export" => {
+            let (source, destination) = required_session_pair(args, "export")?;
+            Ok(SessionAction::Export {
+                source,
+                destination,
+            })
+        }
+        "import" => {
+            let (source, destination) = required_session_pair(args, "import")?;
+            Ok(SessionAction::Import {
+                source,
+                destination,
+            })
+        }
         "gc" => {
             if args.len() > 1 {
                 return Err(SlashError::UnexpectedSessionArgument { action: "gc" });

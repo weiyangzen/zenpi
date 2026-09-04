@@ -25,7 +25,7 @@ use crate::{
     core::{Agent, AgentError, AgentEvent, ProcessResult, TurnInputRequest},
     domain_store::{self, DomainStore},
     protocol::{Command, StdioEvent, StdioRequest, StdioResponse, encode_line, parse_line},
-    session::{SessionSummary, unix_time_ms},
+    session::{SessionStore, SessionSummary, unix_time_ms},
 };
 
 const MAX_REPLAY_EVENTS: usize = 4096;
@@ -63,6 +63,10 @@ const MAX_DOMAIN_VIEW_BYTES: usize = 512 * 1024;
 const MAX_SLASH_RESUME_RECORDS: usize = 128;
 const MAX_SLASH_RESUME_BYTES: usize = 128 * 1024;
 const MAX_SLASH_RESUME_EVENT_BYTES: usize = 8 * 1024;
+/// Learn evidence is a reference plus a small integrity receipt, not a file
+/// transfer. Hashing is bounded so a command cannot turn the owner into an
+/// unbounded workspace reader.
+const MAX_LEARN_EVIDENCE_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 struct TerminalRecord {
@@ -1122,6 +1126,114 @@ pub fn open_session_path(agent: &mut Agent, raw_path: &str) -> Result<serde_json
     }))
 }
 
+/// Execute a durable session maintenance action without borrowing or
+/// changing the active agent.  Fork/export/import deliberately take an
+/// explicit source and destination so a typo cannot be interpreted as an
+/// implicit active-session operation.  Sources must be clean, ordinary zenpi
+/// journals; destinations must not already exist and are never overwritten.
+/// All validation happens before a destination is opened or created.
+pub fn session_maintenance_view(
+    action: &crate::slash::SessionAction,
+) -> Result<serde_json::Value, String> {
+    use crate::slash::SessionAction;
+
+    let (operation, source_raw, destination_raw) = match action {
+        SessionAction::Fork {
+            source,
+            destination,
+        } => ("fork", source.as_str(), destination.as_str()),
+        SessionAction::Export {
+            source,
+            destination,
+        } => ("export", source.as_str(), destination.as_str()),
+        SessionAction::Import {
+            source,
+            destination,
+        } => ("import", source.as_str(), destination.as_str()),
+        _ => {
+            return Err("session maintenance requires fork, export, or import".into());
+        }
+    };
+    let source_path = validate_existing_session_path(source_raw)?;
+    let source = SessionStore::open_existing(&source_path).map_err(|error| {
+        format!("session {operation} source is not a readable journal: {error}")
+    })?;
+    validate_clean_session_source(&source, operation)?;
+    let destination = validate_session_destination_path(destination_raw)?;
+
+    // Keep the source immutable and let each structured SessionStore API own
+    // its atomic copy/validation behavior. No shell, external diff, or model
+    // call is involved in these local control-plane operations.
+    let summary = match operation {
+        "fork" => source
+            .fork_to(&destination)
+            .map(|store| store.summary())
+            .map_err(|error| format!("session fork failed: {error}"))?,
+        "export" => {
+            source
+                .export_to(&destination)
+                .map_err(|error| format!("session export failed: {error}"))?;
+            SessionStore::open_existing(&destination)
+                .map_err(|error| format!("session export verification failed: {error}"))?
+                .summary()
+        }
+        "import" => crate::session::import_session(&source_path, &destination)
+            .map(|store| store.summary())
+            .map_err(|error| format!("session import failed: {error}"))?,
+        _ => unreachable!("operation was constrained above"),
+    };
+
+    Ok(json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": operation,
+        "durable": true,
+        "source": redact_session_path(&source_path.display().to_string()),
+        "destination": redact_session_path(&destination.display().to_string()),
+        "session": serialized_session_summary(&summary),
+    }))
+}
+
+fn validate_clean_session_source(source: &SessionStore, operation: &str) -> Result<(), String> {
+    let valid_header = source
+        .records()
+        .first()
+        .is_some_and(|record| record.kind == "session" && record.sequence == 0);
+    if !valid_header || !source.recovery_warnings().is_empty() {
+        return Err(format!(
+            "session {operation} source must be a clean zenpi session journal"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_session_destination_path(raw_path: &str) -> Result<PathBuf, String> {
+    if raw_path.trim().is_empty()
+        || raw_path.len() > MAX_WORKSPACE_PATH_BYTES
+        || raw_path.chars().any(char::is_control)
+    {
+        return Err(
+            "session destination is empty, too long, or contains control characters".into(),
+        );
+    }
+    let path = Path::new(raw_path);
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err("session destination must not contain parent traversal".into());
+    }
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            Err("session destination must not be a symbolic link".into())
+        }
+        Ok(_) => Err("session destination already exists".into()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(path.to_owned()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 /// Replay a bounded suffix of the active durable journal for the local slash
 /// owner.  Unlike the transport-level `resume` command (which replays an
 /// in-memory event queue), this operation survives process restarts and writes
@@ -1584,6 +1696,198 @@ fn persist_learn_from_path(
     }))
 }
 
+/// Add one existing repository-relative artifact to a Learn record. The
+/// artifact is inspected only far enough to produce a bounded integrity
+/// receipt; its bytes never cross the command boundary or reach a provider.
+/// The domain snapshot is probed read-only before opening the mutable owner so
+/// missing IDs and invalid paths cannot create a sibling store.
+fn add_learn_evidence_from_ref(
+    agent: Option<&mut Agent>,
+    id: &str,
+    raw_reference: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    validate_domain_id(id, "learn_id")?;
+    let path = resolve_workspace_path(raw_reference).map_err(|message| SlashDispatchError {
+        code: "learn_evidence_path_denied",
+        message,
+    })?;
+    let receipt = learn_evidence_receipt(&path, raw_reference)?;
+    let Some(agent) = agent else {
+        return Err(SlashDispatchError {
+            code: "agent_busy",
+            message: "learn evidence is unavailable while the agent is busy".into(),
+        });
+    };
+    let store_path = domain_store::path_for_session(agent.session().path());
+    let existing =
+        DomainStore::open_read_only(&store_path).map_err(|error| SlashDispatchError {
+            code: "domain_store_error",
+            message: error.to_string(),
+        })?;
+    if existing.learn(id).is_none() {
+        return Err(SlashDispatchError {
+            code: "learn_not_found",
+            message: format!("learn `{id}` is not found"),
+        });
+    }
+    drop(existing);
+
+    let mut store = DomainStore::open(&store_path).map_err(|error| SlashDispatchError {
+        code: "domain_store_error",
+        message: error.to_string(),
+    })?;
+    let change = store
+        .add_learn_evidence(id, raw_reference.to_owned())
+        .map_err(|error| match error {
+            domain_store::DomainStoreError::LearnNotFound(id) => SlashDispatchError {
+                code: "learn_not_found",
+                message: format!("learn `{id}` is not found"),
+            },
+            other => SlashDispatchError {
+                code: "learn_evidence_error",
+                message: other.to_string(),
+            },
+        })?;
+    let learn = store.learn(id).ok_or_else(|| SlashDispatchError {
+        code: "learn_not_found",
+        message: format!("learn `{id}` is not found"),
+    })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "learn",
+        "route": "local",
+        "accepted": true,
+        "action": "evidence",
+        "learn_id": id,
+        "change": change,
+        "evidence": receipt,
+        "learn": learn,
+        "store": summary,
+    }))
+}
+
+/// Return a deterministic, secret-free checkpoint for a Learn record. This
+/// operation is intentionally read-only: until an external b3ehive owner is
+/// available, `resume` validates the durable checkpoint but does not start a
+/// model or worker execution.
+fn resume_learn_view(
+    agent: Option<&Agent>,
+    id: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    validate_domain_id(id, "learn_id")?;
+    let store = domain_store_for_agent(agent, true)?;
+    let learn = store.learn(id).ok_or_else(|| SlashDispatchError {
+        code: "learn_not_found",
+        message: format!("learn `{id}` is not found"),
+    })?;
+    let summary = serialized_store_summary(&store)?;
+    Ok(json!({
+        "command": "learn",
+        "route": "local",
+        "accepted": true,
+        "action": "resume",
+        "learn_id": id,
+        "checkpoint": {
+            "validated": true,
+            "evidence_count": learn.evidence.len(),
+            "execution_state": "untracked",
+            "delivery": "external_owner_required",
+            "zenpi_started": false,
+        },
+        "learn": learn,
+        "store": summary,
+    }))
+}
+
+fn validate_domain_id(value: &str, field: &'static str) -> Result<(), SlashDispatchError> {
+    if value.trim().is_empty()
+        || value.len() > crate::domains::MAX_ID_BYTES
+        || value.chars().any(char::is_control)
+        || !value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character))
+    {
+        return Err(SlashDispatchError {
+            code: "learn_invalid_id",
+            message: format!("{field} is not a valid bounded identifier"),
+        });
+    }
+    Ok(())
+}
+
+fn learn_evidence_receipt(
+    path: &Path,
+    requested: &str,
+) -> Result<serde_json::Value, SlashDispatchError> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| SlashDispatchError {
+        code: "learn_evidence_io",
+        message: error.to_string(),
+    })?;
+    let workspace = std::env::current_dir()
+        .map_err(|error| SlashDispatchError {
+            code: "learn_evidence_io",
+            message: error.to_string(),
+        })?
+        .canonicalize()
+        .map_err(|error| SlashDispatchError {
+            code: "learn_evidence_io",
+            message: error.to_string(),
+        })?;
+    let relative = path
+        .strip_prefix(&workspace)
+        .map(|value| value.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| requested.to_owned());
+    if metadata.is_dir() {
+        return Ok(json!({
+            "reference": relative,
+            "kind": "directory",
+            "bytes": 0,
+        }));
+    }
+    if !metadata.is_file() {
+        return Err(SlashDispatchError {
+            code: "learn_evidence_not_file",
+            message: "learn evidence reference is not a regular file or directory".into(),
+        });
+    }
+    if metadata.len() > MAX_LEARN_EVIDENCE_BYTES {
+        return Err(SlashDispatchError {
+            code: "learn_evidence_too_large",
+            message: format!("learn evidence exceeds {MAX_LEARN_EVIDENCE_BYTES} bytes"),
+        });
+    }
+    let mut file = File::open(path).map_err(|error| SlashDispatchError {
+        code: "learn_evidence_io",
+        message: error.to_string(),
+    })?;
+    let mut digest = Sha256::new();
+    let mut bytes = 0_u64;
+    let mut buffer = [0_u8; 8192];
+    loop {
+        let read = file.read(&mut buffer).map_err(|error| SlashDispatchError {
+            code: "learn_evidence_io",
+            message: error.to_string(),
+        })?;
+        if read == 0 {
+            break;
+        }
+        bytes = bytes.saturating_add(read as u64);
+        if bytes > MAX_LEARN_EVIDENCE_BYTES {
+            return Err(SlashDispatchError {
+                code: "learn_evidence_too_large",
+                message: format!("learn evidence exceeds {MAX_LEARN_EVIDENCE_BYTES} bytes"),
+            });
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(json!({
+        "reference": relative,
+        "kind": "file",
+        "bytes": bytes,
+        "sha256": format!("{:x}", digest.finalize()),
+    }))
+}
+
 /// Persist a validated Blueprint JSON document for an interactive host.
 /// Errors are returned as text so the TUI can render them without exposing
 /// the headless transport's private dispatch type.
@@ -1599,6 +1903,23 @@ pub fn persist_goal_path(agent: &mut Agent, path: &str) -> Result<serde_json::Va
 /// Persist a validated Learn JSON document for an interactive host.
 pub fn persist_learn_path(agent: &mut Agent, path: &str) -> Result<serde_json::Value, String> {
     persist_learn_from_path(Some(agent), path).map_err(|error| error.message)
+}
+
+/// Add a validated repository-relative artifact reference to a Learn record
+/// for interactive hosts. The returned receipt is bounded and never contains
+/// file contents.
+pub fn add_learn_evidence(
+    agent: &mut Agent,
+    id: &str,
+    reference: &str,
+) -> Result<serde_json::Value, String> {
+    add_learn_evidence_from_ref(Some(agent), id, reference).map_err(|error| error.message)
+}
+
+/// Inspect a durable Learn checkpoint for interactive hosts. This does not
+/// invoke a provider or external worker.
+pub fn resume_learn(agent: &Agent, id: &str) -> Result<serde_json::Value, String> {
+    resume_learn_view(Some(agent), id).map_err(|error| error.message)
 }
 
 fn request_in_flight(
@@ -2686,15 +3007,15 @@ where
                     return Ok(());
                 }
                 Err(error) => {
+                    let special = unsupported_session_maintenance_parse_error(&error);
+                    let code = special
+                        .as_ref()
+                        .map_or("command_error", |_| "unsupported_command");
+                    let message = special.unwrap_or_else(|| error.to_string());
                     write_cached_response(
                         output,
-                        StdioResponse::error_with_code(
-                            id,
-                            name,
-                            "command_error",
-                            error.to_string(),
-                        )
-                        .for_version(request_version),
+                        StdioResponse::error_with_code(id, name, code, message)
+                            .for_version(request_version),
                         replay,
                     )?;
                     return Ok(());
@@ -3535,6 +3856,23 @@ fn slash_execution_response(
     StdioResponse::success(id, command, Some(data)).for_version(version)
 }
 
+/// Preserve the control-plane classification used by older clients when a
+/// session maintenance command is syntactically recognized but lacks the
+/// explicit source/destination pair.  The parser remains strict (so a host
+/// cannot accidentally mutate the active session), while the transport
+/// reports this as an unowned/unsupported maintenance operation rather than
+/// leaking a path-bearing parser diagnostic.
+fn unsupported_session_maintenance_parse_error(error: &crate::slash::SlashError) -> Option<String> {
+    match error {
+        crate::slash::SlashError::MissingSessionPath { action }
+            if matches!(*action, "fork" | "export" | "import") =>
+        {
+            Some(format!("session {action} requires source and destination"))
+        }
+        _ => None,
+    }
+}
+
 #[derive(Debug)]
 struct SlashDispatchError {
     code: &'static str,
@@ -3952,6 +4290,14 @@ fn execute_headless_slash(
                         message,
                     })
             }
+            action @ (crate::slash::SessionAction::Fork { .. }
+            | crate::slash::SessionAction::Export { .. }
+            | crate::slash::SessionAction::Import { .. }) => session_maintenance_view(&action)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "session_maintenance_failed",
+                    message,
+                }),
             action => Ok(SlashExecution::Response(json!({
                 "command": "session",
                 "route": "local",
@@ -4138,6 +4484,13 @@ fn execute_headless_slash(
         SlashCommand::LearnPut { path } => Ok(SlashExecution::Response(persist_learn_from_path(
             agent, &path,
         )?)),
+        SlashCommand::LearnEvidence { id, reference } => Ok(SlashExecution::Response(
+            add_learn_evidence_from_ref(agent, &id, &reference)?,
+        )),
+        SlashCommand::LearnResume { id } => Ok(SlashExecution::Response(resume_learn_view(
+            agent.as_deref(),
+            &id,
+        )?)),
         SlashCommand::Compete { args } => {
             let Some(agent) = agent else {
                 return Err(SlashDispatchError {
@@ -4226,12 +4579,19 @@ fn handle_command<W: Write>(
     let name = crate::protocol::command_name(&command);
     match command {
         Command::Slash { input } => match crate::slash::route_input(&input) {
-            Err(error) => write_cached_versioned_response(
-                output,
-                StdioResponse::error_with_code(id, name, "slash_invalid", error.to_string()),
-                request_version,
-                replay,
-            )?,
+            Err(error) => {
+                let special = unsupported_session_maintenance_parse_error(&error);
+                let code = special
+                    .as_ref()
+                    .map_or("slash_invalid", |_| "unsupported_command");
+                let message = special.unwrap_or_else(|| error.to_string());
+                write_cached_versioned_response(
+                    output,
+                    StdioResponse::error_with_code(id, name, code, message),
+                    request_version,
+                    replay,
+                )?
+            }
             Ok(crate::slash::InputRoute::Prompt(_)) => write_cached_versioned_response(
                 output,
                 StdioResponse::error_with_code(

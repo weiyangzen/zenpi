@@ -2250,6 +2250,26 @@ pub fn dispatch_slash_command(
                     "session cannot be opened while the agent is busy",
                 ),
             },
+            action @ (crate::slash::SessionAction::Fork { .. }
+            | crate::slash::SessionAction::Export { .. }
+            | crate::slash::SessionAction::Import { .. }) => {
+                match crate::headless::session_maintenance_view(&action) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "session {}:\n{}",
+                            session_action_label(&action),
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("session {} failed: {error}", session_action_label(&action)),
+                    ),
+                }
+            }
             action => state.push_message(
                 MessageRole::Error,
                 format!(
@@ -2508,6 +2528,47 @@ pub fn dispatch_slash_command(
             None => state.push_message(
                 MessageRole::Error,
                 "learn persistence is unavailable while the agent is busy",
+            ),
+        },
+        SlashCommand::LearnEvidence { id, reference } => match agent {
+            Some(agent) => match crate::headless::add_learn_evidence(agent, &id, &reference) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "learn evidence added:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => state.push_message(
+                    MessageRole::Error,
+                    format!("learn evidence failed: {error}"),
+                ),
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "learn evidence is unavailable while the agent is busy",
+            ),
+        },
+        SlashCommand::LearnResume { id } => match agent.as_deref() {
+            Some(agent) => match crate::headless::resume_learn(agent, &id) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "learn resume checkpoint:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("learn resume failed: {error}"))
+                }
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "learn resume is unavailable while the agent is busy",
             ),
         },
         SlashCommand::Compete { args } => {
@@ -2822,7 +2883,7 @@ impl TuiProviderEventBuffer {
         max_bytes: usize,
     ) {
         let event_bytes = serialized_provider_event_bytes(&event);
-        let within_count = self.events.len() < max_events.max(1);
+        let within_count = max_events > 0 && self.events.len() < max_events;
         let within_bytes = self
             .bytes
             .checked_add(event_bytes)
