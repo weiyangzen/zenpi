@@ -1,11 +1,18 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
+use tempfile::tempdir;
+use zenpi::b3::ResourceBudget;
+use zenpi::domain_store::{DomainStore, path_for_session};
+use zenpi::domains::{Blueprint, BlueprintItem, Goal, GoalStatus, MAX_BLUEPRINT_ITEMS};
 use zenpi::layout::{FocusDirection, LayoutModel, PaneCapabilities, PaneId, TabId, Visibility};
 use zenpi::resources::{
     CpuSignal, DiskSignal, MemorySignal, ProcessSignal, ResourceSnapshot, SignalStatus,
     WorkspaceSummary,
 };
-use zenpi::tui::{BentoBoxLayoutAdapter, MessageRole, TuiAction, TuiState};
+use zenpi::tui::{
+    BentoBoxLayoutAdapter, MAX_GANTT_PANE_BYTES, MessageRole, TuiAction, TuiState,
+    collect_gantt_snapshot,
+};
 
 fn rendered(terminal: &Terminal<TestBackend>) -> String {
     terminal
@@ -125,6 +132,94 @@ fn production_resources_pane_renders_completed_snapshot() {
     assert!(output.contains("load 1.25"));
     assert!(output.contains("6.0 GiB"));
     assert!(output.contains("12.0 MiB"));
+}
+
+#[test]
+fn production_gantt_pane_renders_bounded_domain_projection() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let blueprint = Blueprint::new(
+        "release-plan",
+        "2",
+        vec![
+            BlueprintItem::new("build", 120),
+            BlueprintItem::new("verify", 80).with_dependencies(["build"]),
+        ],
+    )
+    .unwrap();
+    let mut goal = Goal::new("ship-release", &blueprint, ResourceBudget::default(), None).unwrap();
+    goal.transition_to(GoalStatus::Running).unwrap();
+    let mut store = DomainStore::open(path_for_session(&session_path)).unwrap();
+    store.put_blueprint(blueprint).unwrap();
+    store.put_goal(goal).unwrap();
+
+    let snapshot = collect_gantt_snapshot(&session_path).unwrap();
+    assert_eq!(snapshot.blueprint_count(), 1);
+    assert_eq!(snapshot.goal_count(), 1);
+    assert!(!snapshot.truncated());
+    assert!(snapshot.content().len() <= MAX_GANTT_PANE_BYTES);
+
+    let mut terminal = Terminal::new(TestBackend::new(180, 44)).unwrap();
+    let mut state = TuiState::default();
+    state.set_gantt_snapshot(snapshot);
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    let output = rendered(&terminal);
+    assert!(output.contains("Blueprints 1"));
+    assert!(output.contains("[running] ship-release"));
+    assert!(output.contains("release-plan@2"));
+    assert!(output.contains("verify"));
+    assert!(output.contains("after 1"));
+    assert!(!output.contains("No blueprint selected"));
+}
+
+#[test]
+fn gantt_refresh_failure_retains_last_valid_projection() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let blueprint = Blueprint::new(
+        "retained-plan",
+        "1",
+        vec![BlueprintItem::new("bounded-item", 4_999)],
+    )
+    .unwrap();
+    let mut store = DomainStore::open(path_for_session(&session_path)).unwrap();
+    store.put_blueprint(blueprint).unwrap();
+    let snapshot = collect_gantt_snapshot(&session_path).unwrap();
+
+    let mut terminal = Terminal::new(TestBackend::new(180, 44)).unwrap();
+    let mut state = TuiState::default();
+    state.set_gantt_snapshot(snapshot);
+    state.gantt_refresh_failed("mock store error\nwith control");
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    let output = rendered(&terminal);
+    assert!(output.contains("retained-plan@1"));
+    assert!(output.contains("refresh failed: mock store errorwith control"));
+}
+
+#[test]
+fn gantt_projection_truncates_maximal_valid_blueprint() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let items = (0..MAX_BLUEPRINT_ITEMS)
+        .map(|index| {
+            BlueprintItem::new(
+                format!("item-{index:03}-{}", "x".repeat(96)),
+                u32::try_from(index).unwrap(),
+            )
+        })
+        .collect();
+    let blueprint = Blueprint::new("large-plan", "1", items).unwrap();
+    let mut store = DomainStore::open(path_for_session(&session_path)).unwrap();
+    store.put_blueprint(blueprint).unwrap();
+
+    let snapshot = collect_gantt_snapshot(&session_path).unwrap();
+    assert!(snapshot.truncated());
+    assert!(snapshot.content().len() <= MAX_GANTT_PANE_BYTES);
+    assert!(snapshot.content().contains("Gantt projection truncated"));
 }
 
 #[test]

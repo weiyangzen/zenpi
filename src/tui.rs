@@ -41,6 +41,11 @@ use crate::slash::{self, BlueprintAction, InputRoute, SlashCommand};
 pub const DEFAULT_MAX_MESSAGES: usize = 2_048;
 pub const MAX_MESSAGE_BYTES: usize = 256 * 1024;
 pub const MAX_RENDER_LINES: usize = 8_192;
+/// The Gantt pane is a compact projection, not another copy of the domain
+/// store. Bound both retained text and rows so even the largest valid store is
+/// cheap to clone and render on every frame.
+pub const MAX_GANTT_PANE_BYTES: usize = 32 * 1024;
+pub const MAX_GANTT_PANE_ROWS: usize = 96;
 /// Maximum number of visual rows reserved for the editable prompt.  Longer
 /// prompts remain editable; the input viewport scrolls to keep the cursor
 /// visible instead of growing without bound and starving the transcript.
@@ -93,6 +98,173 @@ enum ResourcePaneStatus {
     Collecting,
     Ready,
     Failed(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GanttPaneStatus {
+    Idle,
+    Refreshing,
+    Ready,
+    Failed(String),
+}
+
+/// Immutable, bounded projection consumed by the Gantt pane. Domain JSONL is
+/// opened and validated off the terminal thread; rendering only reads this
+/// already formatted snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GanttPaneSnapshot {
+    content: String,
+    blueprint_count: usize,
+    goal_count: usize,
+    truncated: bool,
+}
+
+impl GanttPaneSnapshot {
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    pub const fn blueprint_count(&self) -> usize {
+        self.blueprint_count
+    }
+
+    pub const fn goal_count(&self) -> usize {
+        self.goal_count
+    }
+
+    pub const fn truncated(&self) -> bool {
+        self.truncated
+    }
+}
+
+/// Read and validate the domain store associated with `session_path`, then
+/// build the small projection displayed by the production Gantt pane. This is
+/// public for host adapters and focused mock-terminal tests; callers should run
+/// it outside their render/input thread because opening the snapshot performs
+/// bounded filesystem I/O.
+pub fn collect_gantt_snapshot(
+    session_path: impl AsRef<std::path::Path>,
+) -> Result<GanttPaneSnapshot, String> {
+    let path = crate::domain_store::path_for_session(session_path);
+    let store = crate::domain_store::DomainStore::open_read_only(path)
+        .map_err(|error| format!("domain snapshot unavailable: {error}"))?;
+    Ok(project_gantt_store(&store))
+}
+
+fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSnapshot {
+    use std::fmt::Write as _;
+
+    let blueprints = store.blueprints();
+    let goals = store.goals();
+    let mut content = String::new();
+    let mut rows = 0usize;
+    let mut truncated = false;
+    let _ = writeln!(
+        content,
+        "Blueprints {}  Goals {}  gen {}",
+        blueprints.len(),
+        goals.len(),
+        store.generation()
+    );
+    rows = rows.saturating_add(1);
+
+    if blueprints.is_empty() && goals.is_empty() {
+        let _ = write!(content, "No persisted Blueprint or Goal");
+        rows = rows.saturating_add(1);
+    }
+
+    for goal in &goals {
+        let line = format!(
+            "[{}] {} -> {}@{}\n",
+            goal.status.as_str(),
+            inline_token(&goal.id, crate::domains::MAX_ID_BYTES),
+            inline_token(&goal.blueprint_id, crate::domains::MAX_ID_BYTES),
+            inline_token(&goal.blueprint_version, crate::domains::MAX_VERSION_BYTES),
+        );
+        if !append_gantt_line(&mut content, &line, &mut rows) {
+            truncated = true;
+            break;
+        }
+    }
+
+    if !truncated {
+        for blueprint in &blueprints {
+            let total_loc = blueprint.items.iter().fold(0_u64, |total, item| {
+                total.saturating_add(u64::from(item.estimated_loc))
+            });
+            let linked_goals = goals
+                .iter()
+                .filter(|goal| {
+                    goal.blueprint_id == blueprint.id && goal.blueprint_version == blueprint.version
+                })
+                .count();
+            let header = format!(
+                "\n{}@{}  items {}  est {} LOC  goals {}\n",
+                inline_token(&blueprint.id, crate::domains::MAX_ID_BYTES),
+                inline_token(&blueprint.version, crate::domains::MAX_VERSION_BYTES),
+                blueprint.items.len(),
+                total_loc,
+                linked_goals,
+            );
+            if !append_gantt_line(&mut content, &header, &mut rows) {
+                truncated = true;
+                break;
+            }
+            for item in &blueprint.items {
+                let dependency = if item.depends_on.is_empty() {
+                    "ready".to_owned()
+                } else {
+                    format!("after {}", item.depends_on.len())
+                };
+                let line = format!(
+                    "  - {}  {}  {} LOC\n",
+                    inline_token(&item.id, crate::domains::MAX_ID_BYTES),
+                    dependency,
+                    item.estimated_loc,
+                );
+                if !append_gantt_line(&mut content, &line, &mut rows) {
+                    truncated = true;
+                    break;
+                }
+            }
+            if truncated {
+                break;
+            }
+        }
+    }
+
+    if truncated {
+        append_gantt_marker(&mut content);
+    }
+    while content.ends_with('\n') {
+        content.pop();
+    }
+    GanttPaneSnapshot {
+        content,
+        blueprint_count: blueprints.len(),
+        goal_count: goals.len(),
+        truncated,
+    }
+}
+
+fn append_gantt_line(content: &mut String, line: &str, rows: &mut usize) -> bool {
+    if *rows >= MAX_GANTT_PANE_ROWS
+        || content.len().saturating_add(line.len()) > MAX_GANTT_PANE_BYTES
+    {
+        return false;
+    }
+    content.push_str(line);
+    *rows = rows.saturating_add(1);
+    true
+}
+
+fn append_gantt_marker(content: &mut String) {
+    const MARKER: &str = "\n... Gantt projection truncated";
+    let keep = MAX_GANTT_PANE_BYTES.saturating_sub(MARKER.len());
+    if content.len() > keep {
+        content.truncate(truncate_bytes(content, keep).len());
+    }
+    content.push_str(MARKER);
 }
 
 impl TuiMessage {
@@ -187,6 +359,10 @@ pub struct TuiState {
     /// rendering only reads this small value and therefore never walks disk.
     resource_snapshot: Option<crate::resources::ResourceSnapshot>,
     resource_status: ResourcePaneStatus,
+    /// Last valid Blueprint/Goal projection. Collection and store validation
+    /// happen on a dedicated bounded worker in the production host.
+    gantt_snapshot: Option<GanttPaneSnapshot>,
+    gantt_status: GanttPaneStatus,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -224,6 +400,8 @@ impl TuiState {
             layout_resets: BTreeSet::new(),
             resource_snapshot: None,
             resource_status: ResourcePaneStatus::Idle,
+            gantt_snapshot: None,
+            gantt_status: GanttPaneStatus::Idle,
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -356,6 +534,29 @@ impl TuiState {
     /// that a refresh reached the UI without coupling to rendered text.
     pub fn resource_snapshot(&self) -> Option<&crate::resources::ResourceSnapshot> {
         self.resource_snapshot.as_ref()
+    }
+
+    /// Mark a Gantt refresh as admitted by the production host.
+    pub fn gantt_refresh_started(&mut self) {
+        self.gantt_status = GanttPaneStatus::Refreshing;
+        self.dirty = true;
+    }
+
+    /// Publish one completed, bounded domain projection.
+    pub fn set_gantt_snapshot(&mut self, snapshot: GanttPaneSnapshot) {
+        self.gantt_snapshot = Some(snapshot);
+        self.gantt_status = GanttPaneStatus::Ready;
+        self.dirty = true;
+    }
+
+    /// Keep the last valid Gantt snapshot visible when a later refresh fails.
+    pub fn gantt_refresh_failed(&mut self, error: impl AsRef<str>) {
+        self.gantt_status = GanttPaneStatus::Failed(inline_token(error.as_ref(), 256));
+        self.dirty = true;
+    }
+
+    pub fn gantt_snapshot(&self) -> Option<&GanttPaneSnapshot> {
+        self.gantt_snapshot.as_ref()
     }
 
     /// Return the currently focused BentoBox pane.
@@ -1339,7 +1540,7 @@ impl TuiState {
         }
         let title = workspace_pane_title(id);
         let content = match id {
-            PaneId::Gantt => "No blueprint selected".into(),
+            PaneId::Gantt => self.gantt_pane_content(),
             PaneId::Resources => self.resource_pane_content(),
             PaneId::GoalConversation
             | PaneId::ProjectConversation
@@ -1411,6 +1612,24 @@ impl TuiState {
                 .map(|value| format!("{value:.2}"))
                 .unwrap_or_else(|| "unavailable".into()),
         )
+    }
+
+    fn gantt_pane_content(&self) -> String {
+        let Some(snapshot) = self.gantt_snapshot.as_ref() else {
+            return match &self.gantt_status {
+                GanttPaneStatus::Idle => "Waiting for Blueprint/Goal snapshot".into(),
+                GanttPaneStatus::Refreshing => "Loading Blueprint/Goal snapshot...".into(),
+                GanttPaneStatus::Failed(error) => format!("Gantt refresh failed\n{error}"),
+                GanttPaneStatus::Ready => "Blueprint/Goal snapshot unavailable".into(),
+            };
+        };
+        match &self.gantt_status {
+            GanttPaneStatus::Refreshing => format!("{}\nrefreshing...", snapshot.content),
+            GanttPaneStatus::Failed(error) => {
+                format!("{}\nrefresh failed: {error}", snapshot.content)
+            }
+            GanttPaneStatus::Idle | GanttPaneStatus::Ready => snapshot.content.clone(),
+        }
     }
 }
 
@@ -2569,6 +2788,13 @@ fn active_layout_profile(paths: &crate::config::ConfigPaths) -> Option<String> {
     valid.then_some(candidate)
 }
 
+fn command_refreshes_gantt(command: &SlashCommand) -> bool {
+    matches!(
+        command,
+        SlashCommand::Goal { .. } | SlashCommand::GoalPut { .. } | SlashCommand::Blueprint { .. }
+    )
+}
+
 /// Run the production TUI with provider work on the bounded runtime worker.
 /// The older callback-based `run_with_state` remains available for embedders
 /// and deterministic tests; the binary uses this owned form so a worker can
@@ -2647,6 +2873,34 @@ pub fn run_async_with_profile(
             poll_interval: Duration::from_millis(10),
         },
     );
+    // The Gantt projection owns a separate single-slot worker. Domain snapshot
+    // validation is bounded but still performs filesystem I/O, so it must not
+    // run on the terminal thread or wait for the provider-owned agent mutex.
+    let gantt_session_path = shared
+        .lock()
+        .map_err(|_| crate::error::ZenpiError::Message("agent lock poisoned".into()))?
+        .session()
+        .path()
+        .to_path_buf();
+    let gantt_runner = BackgroundRunner::spawn(
+        |session_path: std::path::PathBuf, token| -> Result<GanttPaneSnapshot, String> {
+            if token.is_cancelled() {
+                return Err("Gantt refresh cancelled".into());
+            }
+            let snapshot = collect_gantt_snapshot(session_path)?;
+            if token.is_cancelled() {
+                return Err("Gantt refresh cancelled".into());
+            }
+            token.mark_completed();
+            Ok(snapshot)
+        },
+        RuntimeConfig {
+            command_capacity: 1,
+            event_capacity: 8,
+            max_pending: 1,
+            poll_interval: Duration::from_millis(10),
+        },
+    );
     let mut state = TuiState::default();
     if let Ok(agent) = shared.lock() {
         for turn in agent.history() {
@@ -2673,6 +2927,10 @@ pub fn run_async_with_profile(
         Ok(_) => state.resource_refresh_started(),
         Err(error) => state.resource_refresh_failed(error.to_string()),
     }
+    match gantt_runner.try_submit(gantt_session_path.clone()) {
+        Ok(_) => state.gantt_refresh_started(),
+        Err(error) => state.gantt_refresh_failed(error.to_string()),
+    }
     let config = TuiConfig::default();
     // The runtime worker is spawned before terminal setup so it can own the
     // agent independently of the terminal.  Terminal setup can still fail
@@ -2683,6 +2941,7 @@ pub fn run_async_with_profile(
         Err(error) => {
             let _ = runner.shutdown_and_join();
             let _ = resource_runner.shutdown_and_join();
+            let _ = gantt_runner.shutdown_and_join();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
     };
@@ -2692,6 +2951,7 @@ pub fn run_async_with_profile(
         Err(error) => {
             let _ = runner.shutdown_and_join();
             let _ = resource_runner.shutdown_and_join();
+            let _ = gantt_runner.shutdown_and_join();
             guard.leave();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
@@ -2734,6 +2994,32 @@ pub fn run_async_with_profile(
                     }
                     RuntimeEvent::Closed => {
                         state.resource_refresh_failed("resource worker closed");
+                        scheduler.request();
+                    }
+                    _ => {}
+                }
+            }
+            while let Ok(event) = gantt_runner.try_next_event() {
+                match event {
+                    RuntimeEvent::Completed { outcome, .. } => {
+                        match outcome {
+                            JobOutcome::Succeeded(snapshot) => state.set_gantt_snapshot(snapshot),
+                            JobOutcome::Failed(error) => state.gantt_refresh_failed(error),
+                            JobOutcome::Cancelled => {
+                                state.gantt_refresh_failed("Gantt refresh cancelled")
+                            }
+                            JobOutcome::Panicked => {
+                                state.gantt_refresh_failed("Gantt worker panicked")
+                            }
+                        }
+                        scheduler.request();
+                    }
+                    RuntimeEvent::Rejected { reason, .. } => {
+                        state.gantt_refresh_failed(reason.to_string());
+                        scheduler.request();
+                    }
+                    RuntimeEvent::Closed => {
+                        state.gantt_refresh_failed("Gantt worker closed");
                         scheduler.request();
                     }
                     _ => {}
@@ -2913,6 +3199,7 @@ pub fn run_async_with_profile(
                             }
                             Ok(InputRoute::Slash(command)) => {
                                 state.push_message(MessageRole::User, &text);
+                                let refresh_gantt = command_refreshes_gantt(&command);
                                 if let SlashCommand::Resources { path } = command {
                                     match resource_runner.try_submit(path) {
                                         Ok(_) => {
@@ -3011,6 +3298,12 @@ pub fn run_async_with_profile(
                                     }
                                     SlashDispatchAction::Quit => break 'outer,
                                     SlashDispatchAction::Continue => {}
+                                }
+                                if refresh_gantt {
+                                    match gantt_runner.try_submit(gantt_session_path.clone()) {
+                                        Ok(_) => state.gantt_refresh_started(),
+                                        Err(error) => state.gantt_refresh_failed(error.to_string()),
+                                    }
                                 }
                             }
                             Ok(InputRoute::Prompt(text)) => {
@@ -3186,6 +3479,7 @@ pub fn run_async_with_profile(
     // on `Drop` would detach a worker when its command queue is full.
     let join_result = runner.shutdown_and_join();
     let resource_join_result = resource_runner.shutdown_and_join();
+    let gantt_join_result = gantt_runner.shutdown_and_join();
     if let Ok(mut agent) = shared.lock() {
         agent.close();
     }
@@ -3197,6 +3491,7 @@ pub fn run_async_with_profile(
         }
         Ok(()) => join_result
             .and(resource_join_result)
+            .and(gantt_join_result)
             .map_err(|_| crate::error::ZenpiError::Message("runtime worker panicked".into())),
     }
 }
