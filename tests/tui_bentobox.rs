@@ -1,6 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use zenpi::layout::{FocusDirection, LayoutModel, PaneCapabilities, PaneId, TabId, Visibility};
+use zenpi::resources::{
+    CpuSignal, DiskSignal, MemorySignal, ProcessSignal, ResourceSnapshot, SignalStatus,
+    WorkspaceSummary,
+};
 use zenpi::tui::{BentoBoxLayoutAdapter, MessageRole, TuiAction, TuiState};
 
 fn rendered(terminal: &Terminal<TestBackend>) -> String {
@@ -11,6 +15,40 @@ fn rendered(terminal: &Terminal<TestBackend>) -> String {
         .iter()
         .map(|cell| cell.symbol())
         .collect()
+}
+
+fn resource_snapshot() -> ResourceSnapshot {
+    ResourceSnapshot {
+        collected_at_ms: 42,
+        workspace: WorkspaceSummary {
+            root: "/workspace".into(),
+            files: 23,
+            directories: 7,
+            nodes: 30,
+            bytes: 3 * 1024 * 1024,
+            truncated: false,
+        },
+        cpu: CpuSignal {
+            logical_cpus: 8,
+            load_one_minute: Some(1.25),
+            status: SignalStatus::Available,
+        },
+        memory: MemorySignal {
+            total_bytes: Some(16 * 1024 * 1024 * 1024),
+            available_bytes: Some(6 * 1024 * 1024 * 1024),
+            status: SignalStatus::Available,
+        },
+        disk: DiskSignal {
+            total_bytes: None,
+            available_bytes: None,
+            status: SignalStatus::Unavailable,
+        },
+        process: ProcessSignal {
+            pid: 123,
+            resident_bytes: Some(12 * 1024 * 1024),
+            status: SignalStatus::Available,
+        },
+    }
 }
 
 #[test]
@@ -67,6 +105,26 @@ fn production_workspace_renders_tabs_and_existing_transcript_prompt() {
     assert!(output.contains("Gantt"));
     assert!(output.contains("answer"));
     assert!(output.contains("Prompt"));
+}
+
+#[test]
+fn production_resources_pane_renders_completed_snapshot() {
+    let mut terminal = Terminal::new(TestBackend::new(160, 44)).unwrap();
+    let mut state = TuiState::default();
+    state.set_resource_snapshot(resource_snapshot());
+
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+
+    let output = rendered(&terminal);
+    assert!(output.contains("files 23"));
+    assert!(output.contains("dirs 7"));
+    assert!(output.contains("3.0 MiB"));
+    assert!(output.contains("cpu 8"));
+    assert!(output.contains("load 1.25"));
+    assert!(output.contains("6.0 GiB"));
+    assert!(output.contains("12.0 MiB"));
 }
 
 #[test]

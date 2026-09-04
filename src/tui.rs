@@ -87,6 +87,14 @@ pub struct TuiMessage {
     pub text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ResourcePaneStatus {
+    Idle,
+    Collecting,
+    Ready,
+    Failed(String),
+}
+
 impl TuiMessage {
     pub fn new(role: MessageRole, text: impl Into<String>) -> Self {
         Self {
@@ -174,6 +182,11 @@ pub struct TuiState {
     /// serialized copy of the built-in preset. This preserves reset semantics
     /// across future preset/schema migrations.
     layout_resets: BTreeSet<TabId>,
+    /// Latest completed workspace/host snapshot shown by the Resources pane.
+    /// Collection is owned by the production host's bounded background runner;
+    /// rendering only reads this small value and therefore never walks disk.
+    resource_snapshot: Option<crate::resources::ResourceSnapshot>,
+    resource_status: ResourcePaneStatus,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -209,6 +222,8 @@ impl TuiState {
             workspace_layouts: BTreeMap::new(),
             layout_dirty: false,
             layout_resets: BTreeSet::new(),
+            resource_snapshot: None,
+            resource_status: ResourcePaneStatus::Idle,
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -314,6 +329,33 @@ impl TuiState {
     /// Clear reset intents after a successful persistence checkpoint.
     pub fn clear_layout_reset_tabs(&mut self) {
         self.layout_resets.clear();
+    }
+
+    /// Mark a bounded resource refresh as admitted by the host. The actual
+    /// filesystem walk runs outside the terminal thread in production.
+    pub fn resource_refresh_started(&mut self) {
+        self.resource_status = ResourcePaneStatus::Collecting;
+        self.dirty = true;
+    }
+
+    /// Publish a completed resource snapshot for the Resources pane.
+    pub fn set_resource_snapshot(&mut self, snapshot: crate::resources::ResourceSnapshot) {
+        self.resource_snapshot = Some(snapshot);
+        self.resource_status = ResourcePaneStatus::Ready;
+        self.dirty = true;
+    }
+
+    /// Publish a bounded collection failure while retaining the last good
+    /// snapshot, when one exists.
+    pub fn resource_refresh_failed(&mut self, error: impl AsRef<str>) {
+        self.resource_status = ResourcePaneStatus::Failed(inline_token(error.as_ref(), 256));
+        self.dirty = true;
+    }
+
+    /// Borrow the last completed snapshot. Embedders can use this to confirm
+    /// that a refresh reached the UI without coupling to rendered text.
+    pub fn resource_snapshot(&self) -> Option<&crate::resources::ResourceSnapshot> {
+        self.resource_snapshot.as_ref()
     }
 
     /// Return the currently focused BentoBox pane.
@@ -1297,13 +1339,13 @@ impl TuiState {
         }
         let title = workspace_pane_title(id);
         let content = match id {
-            PaneId::Gantt => "No blueprint selected",
-            PaneId::Resources => "-",
+            PaneId::Gantt => "No blueprint selected".into(),
+            PaneId::Resources => self.resource_pane_content(),
             PaneId::GoalConversation
             | PaneId::ProjectConversation
             | PaneId::LearnConversation
             | PaneId::ReviewConversation
-            | PaneId::SessionConversation => "-",
+            | PaneId::SessionConversation => "-".into(),
             PaneId::LearnResources
             | PaneId::LearnQueue
             | PaneId::LearnMapping
@@ -1315,7 +1357,7 @@ impl TuiState {
             | PaneId::ReplayControls
             | PaneId::EventTimeline
             | PaneId::Browser
-            | PaneId::Terminal => "-",
+            | PaneId::Terminal => "-".into(),
         };
         let block = Block::default()
             .borders(Borders::ALL)
@@ -1328,6 +1370,47 @@ impl TuiState {
                 .wrap(Wrap { trim: true }),
             area,
         );
+    }
+
+    fn resource_pane_content(&self) -> String {
+        let Some(snapshot) = self.resource_snapshot.as_ref() else {
+            return match &self.resource_status {
+                ResourcePaneStatus::Idle => "Waiting for workspace snapshot".into(),
+                ResourcePaneStatus::Collecting => "Collecting workspace snapshot...".into(),
+                ResourcePaneStatus::Failed(error) => format!("Snapshot failed\n{error}"),
+                ResourcePaneStatus::Ready => "Workspace snapshot unavailable".into(),
+            };
+        };
+        let workspace = &snapshot.workspace;
+        let memory = snapshot
+            .memory
+            .available_bytes
+            .map(format_byte_count)
+            .unwrap_or_else(|| "unavailable".into());
+        let process = snapshot
+            .process
+            .resident_bytes
+            .map(format_byte_count)
+            .unwrap_or_else(|| "unavailable".into());
+        let suffix = match &self.resource_status {
+            ResourcePaneStatus::Collecting => "\nrefreshing...".into(),
+            ResourcePaneStatus::Failed(error) => format!("\nrefresh failed: {error}"),
+            ResourcePaneStatus::Idle | ResourcePaneStatus::Ready => String::new(),
+        };
+        format!(
+            "workspace\nfiles {files}  dirs {directories}\nsize {bytes}  nodes {nodes}\ntruncated {truncated}\nhost\ncpu {cpus}  load {load}\nmem free {memory}\nprocess {process}{suffix}",
+            files = workspace.files,
+            directories = workspace.directories,
+            bytes = format_byte_count(workspace.bytes),
+            nodes = workspace.nodes,
+            truncated = workspace.truncated,
+            cpus = snapshot.cpu.logical_cpus,
+            load = snapshot
+                .cpu
+                .load_one_minute
+                .map(|value| format!("{value:.2}"))
+                .unwrap_or_else(|| "unavailable".into()),
+        )
     }
 }
 
@@ -1667,23 +1750,18 @@ pub fn dispatch_slash_command(
         }
         SlashCommand::Resources { path } => {
             match crate::headless::collect_resource_snapshot(path.as_deref()) {
-                Ok(snapshot) => state.push_message(
-                    MessageRole::System,
-                    format!(
-                        "resources: files={} dirs={} bytes={} truncated={} cpu={} memory={} disk={}",
-                        snapshot.workspace.files,
-                        snapshot.workspace.directories,
-                        snapshot.workspace.bytes,
-                        snapshot.workspace.truncated,
-                        signal_status(snapshot.cpu.status),
-                        signal_status(snapshot.memory.status),
-                        signal_status(snapshot.disk.status),
-                    ),
-                ),
-                Err(error) => state.push_message(
-                    MessageRole::Error,
-                    format!("resource collection failed: {error}"),
-                ),
+                Ok(snapshot) => {
+                    let summary = format_resource_summary(&snapshot);
+                    state.set_resource_snapshot(snapshot);
+                    state.push_message(MessageRole::System, summary);
+                }
+                Err(error) => {
+                    state.resource_refresh_failed(error.to_string());
+                    state.push_message(
+                        MessageRole::Error,
+                        format!("resource collection failed: {error}"),
+                    );
+                }
             }
         }
         SlashCommand::Clear => {
@@ -1863,19 +1941,58 @@ pub fn dispatch_slash_command(
             ),
         },
         SlashCommand::Resume { sequence } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "resume command is parsed but not executable in this host: sequence={:?}",
-                    sequence
-                ),
-            );
+            let Some(agent) = agent.as_deref_mut() else {
+                state.push_message(
+                    MessageRole::Error,
+                    "session replay is unavailable while the agent is busy",
+                );
+                return SlashDispatchAction::Continue;
+            };
+            match crate::headless::resume_session_view(agent, sequence) {
+                Ok(data) => {
+                    // A no-argument resume is the recovery action users reach
+                    // for after `/clear`; restore the bounded durable turns
+                    // before showing the replay cursor/marker details.
+                    if sequence.is_none() {
+                        reload_state_from_agent(state, agent);
+                    }
+                    state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "resume:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    );
+                }
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("resume failed: {error}"))
+                }
+            }
         }
         SlashCommand::Compact => {
-            state.push_message(
-                MessageRole::Error,
-                "compact command is parsed but context compaction is not configured",
-            );
+            let Some(agent) = agent.as_deref_mut() else {
+                state.push_message(
+                    MessageRole::Error,
+                    "context compaction is unavailable while the agent is busy",
+                );
+                return SlashDispatchAction::Continue;
+            };
+            match crate::headless::compact_context_view(agent) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "compact:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("compact failed: {error}"))
+                }
+            }
         }
         SlashCommand::Diff { path } => {
             match crate::slash_actions::diff_value_for_agent(agent.as_deref(), path.as_deref()) {
@@ -1905,16 +2022,26 @@ pub fn dispatch_slash_command(
                 "attachment staging is unavailable while the agent is busy",
             ),
         },
-        SlashCommand::Approve { id, decision } => {
-            state.push_message(
-                MessageRole::Error,
-                format!(
-                    "approve command is parsed but approval routing is not configured: id={} decision={:?}",
-                    bounded_display(&id),
-                    decision
+        SlashCommand::Approve { id, decision } => match agent.as_deref_mut() {
+            Some(agent) => match crate::headless::respond_to_slash_approval(agent, &id, decision) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "approval resolved:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
                 ),
-            );
-        }
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("approval failed: {error}"))
+                }
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "approval response is unavailable while the agent is busy",
+            ),
+        },
         SlashCommand::Blueprint { action } => {
             use crate::slash::BlueprintAction;
             let action_display = blueprint_action_display(&action);
@@ -2245,6 +2372,34 @@ fn signal_status(status: crate::resources::SignalStatus) -> &'static str {
     }
 }
 
+fn format_resource_summary(snapshot: &crate::resources::ResourceSnapshot) -> String {
+    format!(
+        "resources: files={} dirs={} bytes={} truncated={} cpu={} memory={} disk={}",
+        snapshot.workspace.files,
+        snapshot.workspace.directories,
+        snapshot.workspace.bytes,
+        snapshot.workspace.truncated,
+        signal_status(snapshot.cpu.status),
+        signal_status(snapshot.memory.status),
+        signal_status(snapshot.disk.status),
+    )
+}
+
+fn format_byte_count(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut value = bytes as f64;
+    let mut unit = 0usize;
+    while value >= 1024.0 && unit + 1 < UNITS.len() {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} {}", UNITS[unit])
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
 /// Run the interactive mode for zenpi's shared agent.
 pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiError> {
     let mut state = TuiState::default();
@@ -2469,6 +2624,29 @@ pub fn run_async_with_profile(
         },
         RuntimeConfig::default(),
     );
+    // Workspace accounting can touch thousands of directory entries, so it
+    // has a separate single-slot worker. This keeps startup and `/resources`
+    // refreshes off the terminal thread without adding an async runtime.
+    let resource_runner = BackgroundRunner::spawn(
+        |path: Option<String>, token| -> Result<crate::resources::ResourceSnapshot, String> {
+            if token.is_cancelled() {
+                return Err("resource refresh cancelled".into());
+            }
+            let snapshot = crate::headless::collect_resource_snapshot(path.as_deref())
+                .map_err(|error| error.to_string())?;
+            if token.is_cancelled() {
+                return Err("resource refresh cancelled".into());
+            }
+            token.mark_completed();
+            Ok(snapshot)
+        },
+        RuntimeConfig {
+            command_capacity: 1,
+            event_capacity: 8,
+            max_pending: 1,
+            poll_interval: Duration::from_millis(10),
+        },
+    );
     let mut state = TuiState::default();
     if let Ok(agent) = shared.lock() {
         for turn in agent.history() {
@@ -2491,6 +2669,10 @@ pub fn run_async_with_profile(
         );
         layout_persistence.disable();
     }
+    match resource_runner.try_submit(None) {
+        Ok(_) => state.resource_refresh_started(),
+        Err(error) => state.resource_refresh_failed(error.to_string()),
+    }
     let config = TuiConfig::default();
     // The runtime worker is spawned before terminal setup so it can own the
     // agent independently of the terminal.  Terminal setup can still fail
@@ -2500,6 +2682,7 @@ pub fn run_async_with_profile(
         Ok(guard) => guard,
         Err(error) => {
             let _ = runner.shutdown_and_join();
+            let _ = resource_runner.shutdown_and_join();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
     };
@@ -2508,6 +2691,7 @@ pub fn run_async_with_profile(
         Ok(terminal) => terminal,
         Err(error) => {
             let _ = runner.shutdown_and_join();
+            let _ = resource_runner.shutdown_and_join();
             guard.leave();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
@@ -2527,6 +2711,34 @@ pub fn run_async_with_profile(
             // use a non-blocking drain so lifecycle events become visible as soon
             // as that mutex is released without freezing keyboard/render polling.
             drain_agent_tool_events(&shared, &mut state);
+            while let Ok(event) = resource_runner.try_next_event() {
+                match event {
+                    RuntimeEvent::Completed { outcome, .. } => {
+                        match outcome {
+                            JobOutcome::Succeeded(snapshot) => {
+                                state.set_resource_snapshot(snapshot);
+                            }
+                            JobOutcome::Failed(error) => state.resource_refresh_failed(error),
+                            JobOutcome::Cancelled => {
+                                state.resource_refresh_failed("resource refresh cancelled")
+                            }
+                            JobOutcome::Panicked => {
+                                state.resource_refresh_failed("resource worker panicked")
+                            }
+                        }
+                        scheduler.request();
+                    }
+                    RuntimeEvent::Rejected { reason, .. } => {
+                        state.resource_refresh_failed(reason.to_string());
+                        scheduler.request();
+                    }
+                    RuntimeEvent::Closed => {
+                        state.resource_refresh_failed("resource worker closed");
+                        scheduler.request();
+                    }
+                    _ => {}
+                }
+            }
             if let Some(id) = active_job {
                 // Drop buffers belonging to superseded jobs before draining
                 // the active one. This keeps a late cancelled stream from
@@ -2701,6 +2913,26 @@ pub fn run_async_with_profile(
                             }
                             Ok(InputRoute::Slash(command)) => {
                                 state.push_message(MessageRole::User, &text);
+                                if let SlashCommand::Resources { path } = command {
+                                    match resource_runner.try_submit(path) {
+                                        Ok(_) => {
+                                            state.resource_refresh_started();
+                                            state.push_message(
+                                                MessageRole::System,
+                                                "resource refresh started",
+                                            );
+                                        }
+                                        Err(error) => {
+                                            state.resource_refresh_failed(error.to_string());
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                format!("resource refresh rejected: {error}"),
+                                            );
+                                        }
+                                    }
+                                    scheduler.request();
+                                    continue;
+                                }
                                 let action = match shared.try_lock() {
                                     Ok(mut agent) => dispatch_slash_command(
                                         command,
@@ -2900,6 +3132,7 @@ pub fn run_async_with_profile(
     // cancel and join the owned runtime before returning that error; relying
     // on `Drop` would detach a worker when its command queue is full.
     let join_result = runner.shutdown_and_join();
+    let resource_join_result = resource_runner.shutdown_and_join();
     if let Ok(mut agent) = shared.lock() {
         agent.close();
     }
@@ -2910,6 +3143,7 @@ pub fn run_async_with_profile(
             Err(error)
         }
         Ok(()) => join_result
+            .and(resource_join_result)
             .map_err(|_| crate::error::ZenpiError::Message("runtime worker panicked".into())),
     }
 }
