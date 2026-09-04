@@ -629,6 +629,51 @@ fn headless_slash_commands_are_control_plane_only() {
 }
 
 #[test]
+fn headless_common_model_and_doctor_commands_are_redacted_and_local() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("common-slash.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let input = concat!(
+        "{\"type\":\"command\",\"id\":\"models\",\"text\":\"/models\"}\n",
+        "{\"type\":\"command\",\"id\":\"doctor\",\"text\":\"/doctor\"}\n",
+        "{\"type\":\"command\",\"id\":\"help\",\"text\":\"/help model\"}\n",
+        "{\"type\":\"shutdown\",\"id\":\"shutdown\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    let models = records
+        .iter()
+        .find(|record| record["id"] == "models")
+        .unwrap();
+    assert_eq!(models["success"], true);
+    assert_eq!(models["data"]["command"], "models");
+    assert_eq!(models["data"]["route"], "local");
+    assert!(models["data"]["models"].is_array());
+    let doctor = records
+        .iter()
+        .find(|record| record["id"] == "doctor")
+        .unwrap();
+    assert_eq!(doctor["success"], true);
+    assert_eq!(doctor["data"]["command"], "doctor");
+    assert_eq!(doctor["data"]["accepted"], true);
+    assert!(doctor["data"]["checks"].is_object());
+    assert!(!doctor.to_string().contains("OPENAI_API_KEY"));
+    assert!(!doctor.to_string().contains("sk-"));
+    let help = records
+        .iter()
+        .find(|record| record["id"] == "help")
+        .unwrap();
+    assert_eq!(help["success"], true);
+    assert!(help["data"]["text"].as_str().unwrap().contains("/model"));
+    assert_eq!(
+        agent.history().len(),
+        0,
+        "common slash commands reached model"
+    );
+}
+
+#[test]
 fn session_slash_list_and_open_use_real_session_owner_paths() {
     let dir = tempdir().unwrap();
     let source_path = dir.path().join("source.jsonl");
