@@ -127,9 +127,9 @@ pub enum SlashCommand {
 pub enum SessionAction {
     List,
     Open { path: String },
-    Fork { path: Option<String> },
-    Export { path: String },
-    Import { path: String },
+    Fork { source: String, destination: String },
+    Export { source: String, destination: String },
+    Import { source: String, destination: String },
     Gc,
 }
 
@@ -847,6 +847,22 @@ fn required_session_path(args: &[String], action: &'static str) -> Result<String
         return Err(SlashError::MissingSessionPath { action });
     }
     Ok(args[1].clone())
+}
+
+fn required_session_pair(
+    args: &[String],
+    action: &'static str,
+) -> Result<(String, String), SlashError> {
+    if args.len() < 3 {
+        return Err(SlashError::MissingSessionPath { action });
+    }
+    if args.len() > 3 {
+        return Err(SlashError::UnexpectedSessionArgument { action });
+    }
+    if args[1].trim().is_empty() || args[2].trim().is_empty() {
+        return Err(SlashError::MissingSessionPath { action });
+    }
+    Ok((args[1].clone(), args[2].clone()))
 }
 
 fn parse_approve(
