@@ -80,6 +80,12 @@ pub struct StdioRequest {
     pub artifacts: Vec<String>,
     #[serde(default)]
     pub path: Option<String>,
+    #[serde(default, alias = "approval_request_id")]
+    pub approval_id: Option<String>,
+    #[serde(default)]
+    pub decision: Option<crate::approval::ApprovalDecision>,
+    #[serde(default)]
+    pub remember: bool,
 }
 
 /// A validated command.  The command owns its payload so admission can move
@@ -106,6 +112,11 @@ pub enum Command {
     },
     Resume {
         path: Option<String>,
+    },
+    Approve {
+        approval_id: String,
+        decision: crate::approval::ApprovalDecision,
+        remember: bool,
     },
     Shutdown,
 }
@@ -173,6 +184,20 @@ impl StdioRequest {
                 })
             }
             "resume" => Ok(Command::Resume { path: self.path }),
+            "approve" | "approval" => {
+                let approval_id = self.approval_id.ok_or(ProtocolError::MissingField {
+                    field: "approval_id",
+                })?;
+                validate_identifier(&approval_id, "approval_id")?;
+                let decision = self
+                    .decision
+                    .ok_or(ProtocolError::MissingField { field: "decision" })?;
+                Ok(Command::Approve {
+                    approval_id,
+                    decision,
+                    remember: self.remember,
+                })
+            }
             "shutdown" => Ok(Command::Shutdown),
             other => Err(ProtocolError::UnknownCommand(other.to_owned())),
         }
@@ -357,6 +382,10 @@ pub struct StdioResponse {
 pub struct StdioEvent {
     pub schema_version: u16,
     pub sequence: u64,
+    /// Every stdout record has a discriminator so a client can safely mix
+    /// terminal responses and progress events on one JSONL stream.
+    #[serde(rename = "type")]
+    pub kind: &'static str,
     #[serde(rename = "request_id", skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
     #[serde(rename = "turn_id", skip_serializing_if = "Option::is_none")]
@@ -374,6 +403,7 @@ impl StdioEvent {
         Self {
             schema_version: ASYNC_PROTOCOL_VERSION,
             sequence,
+            kind: "event",
             request_id,
             turn_id,
             event,
@@ -438,6 +468,7 @@ pub fn command_name(command: &Command) -> &'static str {
         Command::Status => "status",
         Command::Handoff { .. } => "handoff",
         Command::Resume { .. } => "resume",
+        Command::Approve { .. } => "approve",
         Command::Shutdown => "shutdown",
     }
 }

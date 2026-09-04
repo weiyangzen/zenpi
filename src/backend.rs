@@ -319,6 +319,7 @@ pub struct OpenAiCompatibleBackend {
     wire_api: OpenAiWireApi,
     reasoning_effort: Option<String>,
     verbosity: Option<String>,
+    max_retries: u32,
 }
 
 impl std::fmt::Debug for OpenAiCompatibleBackend {
@@ -331,6 +332,7 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("wire_api", &self.wire_api)
             .field("reasoning_effort", &self.reasoning_effort)
             .field("verbosity", &self.verbosity)
+            .field("max_retries", &self.max_retries)
             .finish()
     }
 }
@@ -415,7 +417,11 @@ impl OpenAiCompatibleBackend {
         }
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
-            .timeout_recv_body(Some(Duration::from_millis(250)))
+            // Keep the per-read deadline aligned with the caller's overall
+            // budget. A short fixed read timeout would reject legitimate
+            // providers that pause between SSE heartbeats; cancellation is
+            // still checked after every received frame.
+            .timeout_recv_body(Some(timeout))
             .build();
         Ok(Self {
             client: ureq::Agent::new_with_config(config),
@@ -425,6 +431,7 @@ impl OpenAiCompatibleBackend {
             wire_api,
             reasoning_effort,
             verbosity,
+            max_retries: 0,
         })
     }
 
@@ -516,6 +523,16 @@ impl OpenAiCompatibleBackend {
     pub const fn wire_api(&self) -> OpenAiWireApi {
         self.wire_api
     }
+
+    pub fn with_max_retries(mut self, max_retries: u32) -> Result<Self, BackendError> {
+        if max_retries > 10 {
+            return Err(BackendError::Configuration(
+                "max retries must be at most 10".into(),
+            ));
+        }
+        self.max_retries = max_retries;
+        Ok(self)
+    }
 }
 
 fn normalize_endpoint(
@@ -598,7 +615,7 @@ impl OpenAiCompatibleBackend {
         }
         let body = match self.wire_api {
             OpenAiWireApi::ChatCompletions => {
-                let messages: Vec<Value> = request.turns.iter().map(chat_message).collect();
+                let mut messages: Vec<Value> = request.turns.iter().map(chat_message).collect();
                 let mut body = json!({
                     "model": model,
                     "messages": messages,
@@ -624,7 +641,8 @@ impl OpenAiCompatibleBackend {
                     body["tool_choice"] = json!("auto");
                 }
                 if let Some(instructions) = request.instructions {
-                    body["instructions"] = json!(instructions);
+                    messages.insert(0, json!({"role":"system", "content": instructions}));
+                    body["messages"] = Value::Array(messages);
                 }
                 if let Some(metadata) = request.metadata {
                     body["metadata"] = metadata.clone();
@@ -736,7 +754,41 @@ impl Backend for OpenAiCompatibleBackend {
         cancelled: &dyn Fn() -> bool,
         sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
     ) -> Result<Completion, BackendError> {
-        self.complete_openai(request, cancelled, sink)
+        let mut attempt = 0_u32;
+        loop {
+            let result = self.complete_openai(
+                CompletionRequest {
+                    turn_id: request.turn_id,
+                    turns: request.turns,
+                    model: request.model,
+                    tools: request.tools,
+                    instructions: request.instructions,
+                    metadata: request.metadata,
+                },
+                cancelled,
+                sink,
+            );
+            let should_retry = result
+                .as_ref()
+                .is_err_and(|error| error.is_retryable() && attempt < self.max_retries);
+            if !should_retry {
+                return result;
+            }
+            attempt = attempt.saturating_add(1);
+            sink(ProviderEvent::Warning {
+                message: format!("provider request retry {attempt}/{}", self.max_retries),
+            })?;
+            // Capped exponential backoff. Polling the cancellation predicate
+            // avoids making an interrupt wait for the whole sleep.
+            let delay = Duration::from_millis(100_u64.saturating_mul(1_u64 << attempt.min(5)));
+            let deadline = std::time::Instant::now() + delay;
+            while std::time::Instant::now() < deadline {
+                if cancelled() {
+                    return Err(BackendError::Cancelled);
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
     }
 
     fn name(&self) -> &str {

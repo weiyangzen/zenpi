@@ -215,3 +215,29 @@ fn status_is_redacted_and_reports_auth_source() {
     assert_eq!(report.api_key_source, CredentialSource::AuthFile);
     assert!(!format!("{report:?}").contains("secret-status-key"));
 }
+
+#[test]
+fn codex_import_ignores_unrelated_nested_credentials() {
+    let home = tempdir().unwrap();
+    let codex = home.path().join(".codex");
+    fs::create_dir_all(&codex).unwrap();
+    fs::write(
+        codex.join("config.toml"),
+        r#"model_provider = "OpenAI"
+model = "test"
+[model_providers.OpenAI]
+base_url = "http://localhost:9000"
+wire_api = "responses"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        codex.join("auth.json"),
+        r#"{"extension":{"api_key":"must-not-import"},"tokens":{"access_token":"oauth"}}"#,
+    )
+    .unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+    let report = pair_from_codex(&paths).unwrap();
+    assert!(!report.key_imported);
+    assert_eq!(load_auth(&paths).unwrap().openai_api_key(), None);
+}

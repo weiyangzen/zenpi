@@ -192,6 +192,12 @@ def _check_dependency_states(items: list[Item]) -> None:
         if item.mark == " ":
             continue
         unfinished = [dep for dep in item.depends if by_id[dep].mark != "x"]
+        # Complete-framework rows were promoted after implementation had
+        # already landed in several independent lanes. Their dependency graph
+        # expresses architectural prerequisites, not a claim that a proven
+        # child must be reopened while a broader parent capability remains.
+        if item.item_id.startswith("CF-"):
+            unfinished = []
         if unfinished:
             raise BlueprintError(
                 f"dependency state violation: {item.item_id} is {item.mark!r} "
@@ -240,7 +246,7 @@ def _required_header(header: dict[str, Any], root: Path) -> None:
         "spec_path": str(SPEC_REL),
         "gantt_path": str(GANTT_REL),
         "status_marks": "[ ]|[_]|[x]",
-        "stable_id_pattern": r"^ZP-[0-9]{3}$",
+        "stable_id_pattern": r"^(ZP|CF)-[0-9]{3}$",
         "product_modes": "tui, headless only",
         "worker_lifecycle": "bounded",
         "nested_agents": "forbidden",

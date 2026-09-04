@@ -136,6 +136,10 @@ pub struct ConfigFile {
     pub timeout_seconds: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_retries: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_openai_auth: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_websockets: Option<bool>,
 }
 
 impl ConfigFile {
@@ -267,6 +271,8 @@ pub struct EffectiveConfig {
     pub model_verbosity: Option<String>,
     pub timeout_seconds: Option<u64>,
     pub max_retries: Option<u32>,
+    pub requires_openai_auth: bool,
+    pub supports_websockets: bool,
 }
 
 impl std::fmt::Debug for EffectiveConfig {
@@ -284,6 +290,8 @@ impl std::fmt::Debug for EffectiveConfig {
             .field("model_verbosity", &self.model_verbosity)
             .field("timeout_seconds", &self.timeout_seconds)
             .field("max_retries", &self.max_retries)
+            .field("requires_openai_auth", &self.requires_openai_auth)
+            .field("supports_websockets", &self.supports_websockets)
             .finish()
     }
 }
@@ -358,6 +366,8 @@ pub fn resolve(
                 .and_then(|value| value.parse().ok())
         })
         .or(config.max_retries);
+    let requires_openai_auth = config.requires_openai_auth.unwrap_or(true);
+    let supports_websockets = config.supports_websockets.unwrap_or(false);
     let (api_key, credential_source) = if let Some(key) = overrides.api_key.clone() {
         (Some(key), CredentialSource::CommandLine)
     } else if let Some(key) = environment
@@ -398,6 +408,8 @@ pub fn resolve(
         model_verbosity,
         timeout_seconds,
         max_retries,
+        requires_openai_auth,
+        supports_websockets,
     })
 }
 
@@ -433,6 +445,12 @@ pub fn resolve_default(overrides: &ConfigOverrides) -> Result<EffectiveConfig, C
         }
         if config.backend.is_none() {
             config.backend = import.config.backend;
+        }
+        if config.requires_openai_auth.is_none() {
+            config.requires_openai_auth = import.config.requires_openai_auth;
+        }
+        if config.supports_websockets.is_none() {
+            config.supports_websockets = import.config.supports_websockets;
         }
         if auth.openai_api_key().is_none()
             && let Some(key) = import.api_key
@@ -530,6 +548,12 @@ fn import_codex_from_root(codex_root: impl AsRef<Path>) -> Result<CodexImport, C
         .get("max_retries")
         .and_then(toml::Value::as_integer)
         .and_then(|value| u32::try_from(value).ok());
+    let requires_openai_auth = provider_table
+        .and_then(|table| table.get("requires_openai_auth"))
+        .and_then(toml::Value::as_bool);
+    let supports_websockets = provider_table
+        .and_then(|table| table.get("supports_websockets"))
+        .and_then(toml::Value::as_bool);
     let provider = provider_name.or_else(|| {
         provider_table
             .and_then(|table| table.get("name"))
@@ -547,12 +571,14 @@ fn import_codex_from_root(codex_root: impl AsRef<Path>) -> Result<CodexImport, C
         model_verbosity,
         timeout_seconds,
         max_retries,
+        requires_openai_auth,
+        supports_websockets,
     };
     config.validate()?;
     let api_key = match fs::read_to_string(&source_auth) {
         Ok(auth_text) => {
             let value: Value = serde_json::from_str(&auth_text)?;
-            find_api_key(&value)
+            find_api_key(&value, config.provider.as_deref())
                 .filter(|key| !key.trim().is_empty())
                 .map(str::to_owned)
         }
@@ -637,6 +663,12 @@ fn pair_from_codex_with_root(
     }
     if import.config.max_retries.is_some() {
         config.max_retries = import.config.max_retries;
+    }
+    if import.config.requires_openai_auth.is_some() {
+        config.requires_openai_auth = import.config.requires_openai_auth;
+    }
+    if import.config.supports_websockets.is_some() {
+        config.supports_websockets = import.config.supports_websockets;
     }
     config.validate()?;
     let mut auth = load_auth(paths)?;
@@ -744,6 +776,8 @@ pub struct ConfigStatus {
     pub wire_api: Option<String>,
     pub api_key_present: bool,
     pub api_key_source: CredentialSource,
+    pub requires_openai_auth: bool,
+    pub supports_websockets: bool,
 }
 
 pub fn status(paths: &ConfigPaths) -> Result<ConfigStatus, ConfigError> {
@@ -770,6 +804,8 @@ pub fn status(paths: &ConfigPaths) -> Result<ConfigStatus, ConfigError> {
         wire_api: resolved.wire_api,
         api_key_present: resolved.api_key.is_some(),
         api_key_source: resolved.credential_source,
+        requires_openai_auth: resolved.requires_openai_auth,
+        supports_websockets: resolved.supports_websockets,
     })
 }
 
@@ -896,19 +932,33 @@ fn choose<'a>(
 /// Accept the direct Codex key field and the common nested/profile variants,
 /// while intentionally ignoring unrelated token fields.  Only string values
 /// under an exact key name are eligible for import.
-fn find_api_key(value: &Value) -> Option<&str> {
-    match value {
-        Value::Object(object) => {
-            for key in [OPENAI_API_KEY, "api_key"] {
-                if let Some(candidate) = object.get(key).and_then(Value::as_str) {
-                    return Some(candidate);
-                }
-            }
-            object.values().find_map(find_api_key)
-        }
-        Value::Array(values) => values.iter().find_map(find_api_key),
-        _ => None,
+fn find_api_key<'a>(value: &'a Value, provider: Option<&str>) -> Option<&'a str> {
+    let object = value.as_object()?;
+    if let Some(candidate) = object.get(OPENAI_API_KEY).and_then(Value::as_str) {
+        return Some(candidate);
     }
+    // Accept only explicit, provider-scoped credential maps. Recursing through
+    // arbitrary extension data could import an unrelated API key or OAuth
+    // access token as the model credential.
+    let profiles = object
+        .get("profiles")
+        .or_else(|| object.get("providers"))
+        .and_then(Value::as_object)?;
+    provider
+        .and_then(|name| {
+            profiles
+                .get(name)
+                .or_else(|| profiles.get(&name.to_ascii_lowercase()))
+        })
+        .or_else(|| profiles.get("OpenAI"))
+        .or_else(|| profiles.get("openai"))
+        .and_then(Value::as_object)
+        .and_then(|profile| {
+            profile
+                .get("api_key")
+                .or_else(|| profile.get(OPENAI_API_KEY))
+                .and_then(Value::as_str)
+        })
 }
 
 fn redacted_endpoint(endpoint: &str) -> String {

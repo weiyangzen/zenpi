@@ -1,7 +1,10 @@
 use serde_json::Value;
 use std::io::Cursor;
 use tempfile::tempdir;
-use zenpi::{core::Agent, headless::run_headless, protocol::parse_line, session::SessionStore};
+use zenpi::{
+    approval::ApprovalDecision, core::Agent, headless::run_headless, protocol::parse_line,
+    session::SessionStore,
+};
 
 fn json_lines(bytes: &[u8]) -> Vec<Value> {
     String::from_utf8(bytes.to_vec())
@@ -48,6 +51,24 @@ fn unsupported_version_and_missing_id_are_rejected() {
             .into_command()
             .is_err()
     );
+}
+
+#[test]
+fn approval_command_is_typed_and_bounded() {
+    let command = parse_line(
+        r#"{"type":"approve","id":"a","approval_id":"approval-call-1","decision":"allow","remember":true}"#,
+    )
+    .unwrap()
+    .into_command()
+    .unwrap();
+    assert!(matches!(
+        command,
+        zenpi::protocol::Command::Approve {
+            approval_id,
+            decision: ApprovalDecision::Allow,
+            remember: true,
+        } if approval_id == "approval-call-1"
+    ));
 }
 
 #[test]

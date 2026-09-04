@@ -17,6 +17,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
+    approval::{ApprovalCoordinator, ApprovalDecision, ApprovalPolicy, ApprovalRequest},
     b3::{B3Error, Handoff, HandoffRecord},
     backend::{
         Backend, BackendError, CompletionRequest, EchoBackend, OpenAiCompatibleBackend,
@@ -276,6 +277,8 @@ struct ToolRuntime {
     registry: ToolRegistry,
     context: ToolContext,
     policy: SideEffectPolicy,
+    approval: ApprovalCoordinator,
+    approval_policy: ApprovalPolicy,
 }
 
 impl std::fmt::Debug for Agent {
@@ -391,7 +394,21 @@ impl Agent {
             registry,
             context,
             policy,
+            approval: ApprovalCoordinator::new(),
+            approval_policy: ApprovalPolicy::default(),
         });
+    }
+
+    /// Configure the approval policy and return the coordinator used by a
+    /// host to surface/respond to pending side-effect requests.
+    pub fn set_approval_policy(&mut self, policy: ApprovalPolicy) -> Option<ApprovalCoordinator> {
+        let runtime = self.tools.as_mut()?;
+        runtime.approval_policy = policy;
+        Some(runtime.approval.clone())
+    }
+
+    pub fn approval_coordinator(&self) -> Option<ApprovalCoordinator> {
+        self.tools.as_ref().map(|runtime| runtime.approval.clone())
     }
 
     /// Admit a request without invoking the backend.  This named boundary is
@@ -543,24 +560,55 @@ impl Agent {
     where
         F: Fn() -> bool,
     {
+        let mut events = Vec::new();
+        let turn_id = self.active_turn_id.clone();
+        let result = self.run_active_turn_cancelable_with_events(is_cancelled, &mut |event| {
+            events.push(event);
+            Ok(())
+        });
+        for event in events {
+            self.events.push(AgentEvent::Provider {
+                // Capture the ID before the run clears the active marker on
+                // success/failure; provider events must remain correlated to
+                // the turn that produced them.
+                turn_id: turn_id.clone().unwrap_or_else(|| "unknown".into()),
+                event,
+            });
+        }
+        result
+    }
+
+    pub fn run_active_turn_cancelable_with_events<F, E>(
+        &mut self,
+        is_cancelled: F,
+        provider_sink: &mut E,
+    ) -> Result<Option<Turn>, AgentError>
+    where
+        F: Fn() -> bool,
+        E: FnMut(ProviderEvent) -> Result<(), BackendError>,
+    {
         let turn_id = self
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
         const MAX_TOOL_ITERATIONS: usize = 8;
-        let completion =
-            match self.complete_with_tools(&turn_id, MAX_TOOL_ITERATIONS, &is_cancelled) {
-                Ok(completion) => completion,
-                Err(error) => {
-                    self.last_error = Some(error.to_string());
-                    self.phase = AgentPhase::Idle;
-                    self.active_turn_id = None;
-                    self.events.push(AgentEvent::Error {
-                        message: error.to_string(),
-                    });
-                    return Err(error);
-                }
-            };
+        let completion = match self.complete_with_tools(
+            &turn_id,
+            MAX_TOOL_ITERATIONS,
+            &is_cancelled,
+            provider_sink,
+        ) {
+            Ok(completion) => completion,
+            Err(error) => {
+                self.last_error = Some(error.to_string());
+                self.phase = AgentPhase::Idle;
+                self.active_turn_id = None;
+                self.events.push(AgentEvent::Error {
+                    message: error.to_string(),
+                });
+                return Err(error);
+            }
+        };
         if is_cancelled() {
             let error = BackendError::Cancelled;
             self.last_error = Some(error.to_string());
@@ -628,14 +676,16 @@ impl Agent {
         Ok(Some(assistant))
     }
 
-    fn complete_with_tools<F>(
+    fn complete_with_tools<F, E>(
         &mut self,
         turn_id: &str,
         max_iterations: usize,
         is_cancelled: &F,
+        provider_sink: &mut E,
     ) -> Result<crate::backend::Completion, AgentError>
     where
         F: Fn() -> bool,
+        E: FnMut(ProviderEvent) -> Result<(), BackendError>,
     {
         for iteration in 0..=max_iterations {
             if is_cancelled() {
@@ -652,32 +702,13 @@ impl Agent {
                 self.model.as_deref(),
                 &definitions,
             );
-            let active_turn = turn_id.to_owned();
-            let mut provider_events = Vec::new();
             let completion =
                 self.backend
                     .complete_with_control(request, is_cancelled, &mut |event| {
-                        provider_events.push(event);
+                        provider_sink(event)?;
                         Ok(())
                     });
-            let completion = match completion {
-                Ok(completion) => completion,
-                Err(error) => {
-                    for event in provider_events.drain(..) {
-                        self.events.push(AgentEvent::Provider {
-                            turn_id: active_turn.clone(),
-                            event,
-                        });
-                    }
-                    return Err(error.into());
-                }
-            };
-            for event in provider_events.drain(..) {
-                self.events.push(AgentEvent::Provider {
-                    turn_id: active_turn.clone(),
-                    event,
-                });
-            }
+            let completion = completion.map_err(AgentError::from)?;
             if is_cancelled() {
                 return Err(BackendError::Cancelled.into());
             }
@@ -687,7 +718,7 @@ impl Agent {
             if iteration == max_iterations {
                 return Err(AgentError::ToolLoopLimit(max_iterations));
             }
-            let Some(runtime) = self.tools.as_ref() else {
+            let Some(runtime) = self.tools.as_mut() else {
                 return Err(AgentError::InvalidTurn(
                     "provider requested tools but no tool registry is configured".into(),
                 ));
@@ -716,15 +747,159 @@ impl Agent {
             assistant_call.metadata = Some(serde_json::json!({ "tool_calls": call_metadata }));
             self.session.append_turn(assistant_call)?;
             for call in calls {
+                if is_cancelled() {
+                    return Err(BackendError::Cancelled.into());
+                }
                 self.events.push(AgentEvent::ToolCall {
                     turn_id: turn_id.to_owned(),
                     call_id: call.id.clone(),
                     tool: call.name.clone(),
                 });
-                let result =
+                let definition = runtime.registry.definition(&call.name).cloned();
+                let approval = definition.as_ref().and_then(|definition| {
+                    if runtime.policy.allows(definition.side_effect) {
+                        runtime
+                            .approval_policy
+                            .decide(definition.side_effect, &call.name)
+                    } else {
+                        Some(ApprovalDecision::Deny)
+                    }
+                });
+                if approval == Some(ApprovalDecision::Deny) {
+                    let result = crate::tools::ToolResult::Error {
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                        error: crate::tools::ToolFailure {
+                            code: crate::tools::ToolErrorCode::PolicyDenied,
+                            message: "tool approval denied".into(),
+                        },
+                    };
+                    let serialized = serde_json::to_string(&result).map_err(|error| {
+                        AgentError::InvalidTurn(format!(
+                            "tool result serialization failed: {error}"
+                        ))
+                    })?;
+                    let mut tool_turn = Turn::with_parent(
+                        next_id("tool"),
+                        turn_id.to_owned(),
+                        TurnRole::Tool,
+                        serialized,
+                    );
+                    tool_turn.metadata = Some(serde_json::json!({
+                        "tool_call_id": call.id,
+                        "tool_name": call.name,
+                    }));
+                    self.session.append_turn(tool_turn)?;
+                    self.events.push(AgentEvent::ToolResult {
+                        turn_id: turn_id.to_owned(),
+                        call_id: call.id,
+                        success: false,
+                    });
+                    continue;
+                }
+                if approval.is_none() {
+                    let approval_request = ApprovalRequest {
+                        request_id: format!("approval-{}", call.id),
+                        turn_id: turn_id.to_owned(),
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                        side_effect: definition
+                            .as_ref()
+                            .map(|item| item.side_effect)
+                            .unwrap_or(crate::tools::ToolSideEffect::ReadOnly),
+                        arguments: call.arguments.clone(),
+                    };
+                    match runtime.approval.request(
+                        approval_request,
+                        &mut runtime.approval_policy,
+                        is_cancelled,
+                    ) {
+                        Ok(ApprovalDecision::Allow) => {}
+                        Ok(ApprovalDecision::Deny) | Err(_) => {
+                            // A denied/cancelled approval is represented as a
+                            // normal bounded tool result so the provider can
+                            // explain it without executing the side effect.
+                            let result = crate::tools::ToolResult::Error {
+                                call_id: call.id.clone(),
+                                tool: call.name.clone(),
+                                error: crate::tools::ToolFailure {
+                                    code: crate::tools::ToolErrorCode::PolicyDenied,
+                                    message: "tool approval denied or cancelled".into(),
+                                },
+                            };
+                            let serialized = serde_json::to_string(&result).map_err(|error| {
+                                AgentError::InvalidTurn(format!(
+                                    "tool result serialization failed: {error}"
+                                ))
+                            })?;
+                            let mut tool_turn = Turn::with_parent(
+                                next_id("tool"),
+                                turn_id.to_owned(),
+                                TurnRole::Tool,
+                                serialized,
+                            );
+                            tool_turn.metadata = Some(serde_json::json!({
+                                "tool_call_id": call.id,
+                                "tool_name": call.name,
+                            }));
+                            self.session.append_turn(tool_turn)?;
+                            self.events.push(AgentEvent::ToolResult {
+                                turn_id: turn_id.to_owned(),
+                                call_id: call.id,
+                                success: false,
+                            });
+                            continue;
+                        }
+                    }
+                }
+                let result = if call.name == "run_command"
+                    && runtime
+                        .policy
+                        .allows(crate::tools::ToolSideEffect::CommandExecution)
+                {
+                    match call.arguments.as_object() {
+                        Some(arguments) => match crate::tools::RunCommandTool::invoke_with_cancel(
+                            &runtime.context,
+                            arguments,
+                            is_cancelled,
+                        ) {
+                            Ok(output) => crate::tools::ToolResult::Success {
+                                call_id: call.id.clone(),
+                                tool: call.name.clone(),
+                                output,
+                            },
+                            Err(error) => crate::tools::ToolResult::Error {
+                                call_id: call.id.clone(),
+                                tool: call.name.clone(),
+                                error: crate::tools::ToolFailure {
+                                    code: error.code(),
+                                    message: error.to_string(),
+                                },
+                            },
+                        },
+                        None => {
+                            runtime
+                                .registry
+                                .execute(&runtime.context, runtime.policy, call.clone())
+                        }
+                    }
+                } else {
                     runtime
                         .registry
-                        .execute(&runtime.context, runtime.policy, call.clone());
+                        .execute(&runtime.context, runtime.policy, call.clone())
+                };
+                if matches!(
+                    &result,
+                    crate::tools::ToolResult::Error {
+                        error: crate::tools::ToolFailure {
+                            code: crate::tools::ToolErrorCode::Cancelled,
+                            ..
+                        },
+                        ..
+                    }
+                ) {
+                    return Err(BackendError::Cancelled.into());
+                }
                 let success = result.is_success();
                 let serialized = serde_json::to_string(&result).map_err(|error| {
                     AgentError::InvalidTurn(format!("tool result serialization failed: {error}"))
@@ -764,9 +939,23 @@ impl Agent {
     where
         F: Fn() -> bool,
     {
+        self.process_with_cancel_and_events(request, is_cancelled, &mut |_| Ok(()))
+    }
+
+    pub fn process_with_cancel_and_events<F, E>(
+        &mut self,
+        request: TurnInputRequest,
+        is_cancelled: F,
+        provider_sink: &mut E,
+    ) -> Result<ProcessResult, AgentError>
+    where
+        F: Fn() -> bool,
+        E: FnMut(ProviderEvent) -> Result<(), BackendError>,
+    {
         let submission = self.submit(request)?;
         if submission.accepted() {
-            let assistant = self.run_active_turn_cancelable(is_cancelled)?;
+            let assistant =
+                self.run_active_turn_cancelable_with_events(is_cancelled, provider_sink)?;
             Ok(ProcessResult {
                 submission,
                 assistant,
@@ -1005,9 +1194,11 @@ where
 
 fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
     match options.backend.as_str() {
-        "echo" if options.backend_explicit => Ok(Box::new(EchoBackend)),
+        "echo" if options.backend_explicit && cfg!(feature = "dev-fixtures") => {
+            Ok(Box::new(EchoBackend))
+        }
         "echo" => Err(ZenpiError::arguments(
-            "echo is a test fixture; configure a provider or pass --backend echo explicitly",
+            "echo is a test fixture; rebuild with --features dev-fixtures and pass --backend echo",
         )),
         "openai" => {
             let effective = crate::config::resolve_default(&crate::config::ConfigOverrides {
@@ -1020,11 +1211,15 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
                     "no provider URL configured; run `zenpi config import-codex` or set ZENPI_BASE_URL",
                 )
             })?;
-            let api_key = effective.api_key.ok_or_else(|| {
-                ZenpiError::arguments(
-                    "no provider API key configured; run `zenpi config import-codex` or set ZENPI_API_KEY",
-                )
-            })?;
+            let api_key = if effective.requires_openai_auth {
+                Some(effective.api_key.ok_or_else(|| {
+                    ZenpiError::arguments(
+                        "no provider API key configured; run `zenpi config import-codex` or set ZENPI_API_KEY",
+                    )
+                })?)
+            } else {
+                effective.api_key
+            };
             let model = effective.model.ok_or_else(|| {
                 ZenpiError::arguments(
                     "no provider model configured; run `zenpi config import-codex` or set ZENPI_MODEL",
@@ -1037,13 +1232,14 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
                 .parse::<OpenAiWireApi>()?;
             let backend = OpenAiCompatibleBackend::from_values_with_settings_and_timeout(
                 base_url,
-                Some(api_key),
+                api_key,
                 model,
                 wire_api,
                 effective.model_reasoning_effort,
                 effective.model_verbosity,
                 std::time::Duration::from_secs(effective.timeout_seconds.unwrap_or(120)),
-            )?;
+            )?
+            .with_max_retries(effective.max_retries.unwrap_or(2))?;
             Ok(Box::new(backend))
         }
         other => Err(ZenpiError::arguments(format!(
@@ -1053,11 +1249,11 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
 }
 
 fn print_help() {
-    println!("zenpi [--mode tui|headless] [--session PATH] [--backend openai|echo] [--model NAME]");
+    println!("zenpi [--mode tui|headless] [--session PATH] [--backend openai] [--model NAME]");
     println!("zenpi config import-codex|doctor");
     println!("zenpi pair import-codex|status");
     println!(
-        "default provider: ~/.zenpi (or read-only ~/.codex fallback); echo requires explicit --backend echo"
+        "default provider: ~/.zenpi (or read-only ~/.codex fallback); echo exists only in dev-fixtures builds"
     );
 }
 
@@ -1086,18 +1282,26 @@ pub fn run() -> Result<(), ZenpiError> {
     let backend = make_backend(&options)?;
     let session = SessionStore::open(&options.session)?;
     let mut agent = Agent::new(session, backend);
-    // Expose only the bounded, read-only workspace tools by default. Writes
-    // and command execution are never implicitly granted to a provider.
+    // Advertise the complete bounded tool set. Side effects still cannot run
+    // until the local approval policy grants the individual call.
     let workspace = env::current_dir()?;
-    let tools = crate::tools::ToolRegistry::with_read_only_builtins()
+    let tools = crate::tools::ToolRegistry::with_all_builtins()
         .map_err(|error| ZenpiError::Message(format!("tool registry: {error}")))?;
     let tool_context = crate::tools::ToolContext::new(workspace)
         .map_err(|error| ZenpiError::Message(format!("tool workspace: {error}")))?;
     agent.set_tools(
         tools,
         tool_context,
-        crate::tools::SideEffectPolicy::read_only(),
+        crate::tools::SideEffectPolicy::all_builtins(),
     );
+    let approval_mode = match options.mode {
+        RunMode::Headless => crate::approval::ApprovalMode::Always,
+        RunMode::Tui => crate::approval::ApprovalMode::ReadOnly,
+    };
+    let _ = agent.set_approval_policy(crate::approval::ApprovalPolicy {
+        mode: approval_mode,
+        ..crate::approval::ApprovalPolicy::default()
+    });
     if let Some(model) = options.model {
         agent.set_model(Some(model))?;
     }
@@ -1122,6 +1326,8 @@ fn print_config_status(report: &crate::config::ConfigStatus) {
     println!("base_url={}", display_option(report.base_url.as_deref()));
     println!("wire_api={}", display_option(report.wire_api.as_deref()));
     println!("model={}", display_option(report.model.as_deref()));
+    println!("requires_openai_auth={}", report.requires_openai_auth);
+    println!("supports_websockets={}", report.supports_websockets);
     println!(
         "api_key={}",
         if report.api_key_present {

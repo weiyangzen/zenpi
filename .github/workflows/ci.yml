@@ -47,10 +47,10 @@ jobs:
         run: python3 tools/check_modes.py
 
       - name: Exercise headless JSONL protocol
-        run: tools/headless_smoke.sh
+        run: cargo build --features dev-fixtures && ZENPI_BIN=target/debug/zenpi tools/headless_smoke.sh
 
       - name: Exercise the installed release user paths
-        run: python3 tools/user_smoke.py
+        run: ZENPI_SMOKE_FEATURES=dev-fixtures python3 tools/user_smoke.py
 
       - name: Exercise the release headless protocol
-        run: tools/headless_smoke.sh --release
+        run: cargo build --release --features dev-fixtures && ZENPI_BIN=target/release/zenpi tools/headless_smoke.sh --release

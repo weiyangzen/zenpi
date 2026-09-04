@@ -7,17 +7,17 @@
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-03T16:36:43Z
+generated_at: 2026-09-04T00:36:12Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: 2bf3310dacc57353d0c69fc0fed923e527f9d5b80e2bd7ebdae68249779c5c19
+source_sha256: 5b129322bc6b334e85ceea07049d4fec21ed196340de99cf971219c93cc2f768
 spec_path: Docs/Zenpi_Execution_Spec.md
-spec_sha256: 0afa53417f054cdb1d03130c528c99466ad4a6fbf04d414722fd68d2a195edf4
+spec_sha256: 772892a067481cd288089fda378f9f59bc632ee05a4b4d72ac37a09b71924f14
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:
-  unclaimed: 0
+  unclaimed: 26
   self_tested: 0
-  master_accepted: 25
+  master_accepted: 41
   pending_repair: 0
   pending_integration: 0
 ```
@@ -81,10 +81,52 @@ Blueprint and intentionally omitted from this relative-time projection.
 | ZP-302 | master_accepted | ZP-005,ZP-301 | Master/Execution | none | none | dependency |
 | ZP-303 | master_accepted | ZP-302 | Master/Release | none | none | dependency |
 | ZP-304 | master_accepted | ZP-303 | Master/Release | none | none | dependency |
+| CF-001 | master_accepted | ZP-005 | Architecture/Master | none | none | dependency |
+| CF-002 | master_accepted | CF-001 | Rust/Provider | none | none | dependency |
+| CF-003 | master_accepted | CF-001 | Rust/Release | none | none | dependency |
+| CF-101 | master_accepted | CF-001 | Rust/Config | none | none | dependency |
+| CF-102 | master_accepted | CF-101,CF-002 | Rust/Config | none | none | dependency |
+| CF-103 | master_accepted | CF-101,CF-102 | Rust/Config | none | none | dependency |
+| CF-104 | unclaimed | CF-102,CF-103 | Rust/CLI | none | none | dependency |
+| CF-105 | master_accepted | CF-003,CF-102 | Rust/Core | none | none | dependency |
+| CF-106 | unclaimed | CF-103,CF-104 | Rust/CLI | none | none | dependency |
+| CF-201 | unclaimed | CF-002,CF-102 | Rust/Provider | none | none | dependency |
+| CF-202 | master_accepted | CF-201 | Rust/Provider | none | none | dependency |
+| CF-203 | master_accepted | CF-202 | Rust/Provider | none | none | dependency |
+| CF-204 | master_accepted | CF-201 | Rust/Provider | none | none | dependency |
+| CF-205 | unclaimed | CF-202,CF-203 | Rust/Provider | none | none | dependency |
+| CF-206 | unclaimed | CF-202,CF-203 | Rust/Provider | none | none | dependency |
+| CF-301 | unclaimed | CF-201,CF-203 | Rust/Runtime | none | none | dependency |
+| CF-302 | master_accepted | CF-301 | Rust/Runtime | none | none | dependency |
+| CF-303 | master_accepted | CF-301,CF-302 | Rust/Runtime | none | none | dependency |
+| CF-304 | unclaimed | CF-302,CF-303 | Rust/Core | none | none | dependency |
+| CF-305 | unclaimed | CF-302,CF-303,CF-304 | Rust/TUI | none | none | dependency |
+| CF-306 | unclaimed | CF-302,CF-303,CF-304 | Rust/Headless | none | none | dependency |
+| CF-307 | unclaimed | CF-302,CF-306 | Rust/Headless | none | none | dependency |
+| CF-401 | master_accepted | CF-201,CF-302 | Rust/Tools | none | none | dependency |
+| CF-402 | master_accepted | CF-401,CF-303 | Rust/Core | none | none | dependency |
+| CF-403 | master_accepted | CF-401,CF-402 | Rust/Tools | none | none | dependency |
+| CF-404 | unclaimed | CF-401,CF-402 | Rust/Tools | none | none | dependency |
+| CF-405 | master_accepted | CF-303,CF-404 | Rust/Approval | none | none | dependency |
+| CF-406 | unclaimed | CF-402,CF-405 | Rust/Tools | none | none | dependency |
+| CF-407 | unclaimed | CF-401,CF-405 | Rust/Extensions | none | none | dependency |
+| CF-501 | unclaimed | CF-201,CF-302 | Rust/Context | none | none | dependency |
+| CF-502 | unclaimed | CF-501,CF-406 | Rust/Context | none | none | dependency |
+| CF-503 | unclaimed | CF-101,CF-502 | Rust/Session | none | none | dependency |
+| CF-504 | unclaimed | CF-302,CF-402,CF-502 | Rust/Session | none | none | dependency |
+| CF-601 | unclaimed | CF-101,CF-401 | Rust/Skills | none | none | dependency |
+| CF-602 | unclaimed | CF-601,CF-502 | Rust/Skills | none | none | dependency |
+| CF-603 | unclaimed | CF-407,CF-601 | Rust/Extensions | none | none | dependency |
+| CF-604 | unclaimed | CF-103,CF-603 | Rust/Extensions | none | none | dependency |
+| CF-701 | unclaimed | CF-101,CF-103,CF-404 | Rust/Security | none | none | dependency |
+| CF-702 | unclaimed | CF-302,CF-701 | Rust/Observability | none | none | dependency |
+| CF-703 | unclaimed | CF-205,CF-402,CF-406 | Rust/Governance | none | none | dependency |
+| CF-704 | unclaimed | CF-003,CF-701 | Release/CI | none | none | dependency |
+| CF-705 | unclaimed | CF-105,CF-305,CF-306,CF-402,CF-503,CF-704 | QA/Master | none | none | dependency |
 
 ## Unscheduled work
 
-All 25 rows are initially unscheduled in calendar time. No staffing calendar,
+All Blueprint rows are unscheduled in calendar time. No staffing calendar,
 provider route, or publication window is frozen; the relative estimates above
 must not be converted into dates without explicit operator capacity data. A
 controller must show a concrete dependency, path-conflict, startup,

@@ -658,7 +658,13 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     use crate::runtime::{BackgroundRunner, JobOutcome, RuntimeConfig, RuntimeEvent};
 
     let shared = Arc::new(Mutex::new(agent));
+    let approval = shared
+        .lock()
+        .ok()
+        .and_then(|agent| agent.approval_coordinator());
     let worker_state = Arc::clone(&shared);
+    let provider_events = Arc::new(Mutex::new(VecDeque::new()));
+    let worker_events = Arc::clone(&provider_events);
     let runner = BackgroundRunner::spawn(
         move |text: String, token| -> Result<ProcessResult, AgentError> {
             if token.is_cancelled() {
@@ -667,10 +673,16 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             let mut agent = worker_state
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
-            let result = agent
-                .process_with_cancel(crate::core::TurnInputRequest::new(text), || {
-                    token.is_cancelled()
-                })?;
+            let result = agent.process_with_cancel_and_events(
+                crate::core::TurnInputRequest::new(text),
+                || token.is_cancelled(),
+                &mut |event| {
+                    if let Ok(mut pending) = worker_events.lock() {
+                        pending.push_back(event);
+                    }
+                    Ok(())
+                },
+            )?;
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
@@ -702,7 +714,42 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
     let mut resize_pending = false;
     let mut last_tick = Instant::now();
     let mut active_job = None;
+    let mut pending_approvals = VecDeque::new();
     'outer: loop {
+        if let Ok(mut events) = provider_events.lock() {
+            for event in events.drain(..) {
+                match event {
+                    crate::backend::ProviderEvent::TextDelta { delta } => {
+                        state.append_stream(MessageRole::Assistant, delta);
+                    }
+                    crate::backend::ProviderEvent::Refusal { text } => {
+                        state.append_stream(MessageRole::Error, text);
+                    }
+                    crate::backend::ProviderEvent::Warning { message } => {
+                        state.push_message(MessageRole::System, message);
+                    }
+                    crate::backend::ProviderEvent::ToolCallDone { call } => {
+                        state.push_message(MessageRole::Tool, format!("Using {}", call.name));
+                    }
+                    _ => {}
+                }
+                scheduler.request();
+            }
+        }
+        if let Some(coordinator) = approval.as_ref() {
+            for request in coordinator.drain_pending() {
+                state.push_message(
+                    MessageRole::Tool,
+                    format!(
+                        "Approval required: {} {}\nType y to allow once, n to deny.",
+                        request.tool, request.arguments
+                    ),
+                );
+                pending_approvals.push_back(request);
+                state.set_status("Approval required");
+                scheduler.request();
+            }
+        }
         while let Ok(event) = runner.try_next_event() {
             match event {
                 RuntimeEvent::Completed { id, outcome } if Some(id) == active_job => {
@@ -710,7 +757,12 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
                     state.set_busy(false);
                     match outcome {
                         JobOutcome::Succeeded(result) => {
-                            if let Some(assistant) = result.assistant {
+                            if let Some(assistant) = result.assistant
+                                && !state.messages().any(|message| {
+                                    message.role == MessageRole::Assistant
+                                        && message.text == assistant.content
+                                })
+                            {
                                 state.push_message(MessageRole::Assistant, assistant.content);
                             }
                             state.set_status("Ready");
@@ -778,6 +830,40 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             }
             match state.handle_event(event) {
                 TuiAction::Submit(text) => {
+                    if let Some(request) = pending_approvals.pop_front() {
+                        let normalized = text.trim().to_ascii_lowercase();
+                        let decision = match normalized.as_str() {
+                            "y" | "yes" | "allow" => crate::approval::ApprovalDecision::Allow,
+                            "n" | "no" | "deny" => crate::approval::ApprovalDecision::Deny,
+                            _ => {
+                                pending_approvals.push_front(request);
+                                state.push_message(
+                                    MessageRole::Error,
+                                    "Type y to allow once or n to deny",
+                                );
+                                state.set_status("Approval required");
+                                scheduler.request();
+                                continue;
+                            }
+                        };
+                        if let Some(coordinator) = approval.as_ref() {
+                            let _ = coordinator.respond(crate::approval::ApprovalResponse {
+                                request_id: request.request_id,
+                                decision,
+                                remember: false,
+                            });
+                        }
+                        state.push_message(
+                            MessageRole::System,
+                            match decision {
+                                crate::approval::ApprovalDecision::Allow => "Tool allowed once",
+                                crate::approval::ApprovalDecision::Deny => "Tool denied",
+                            },
+                        );
+                        state.set_status("Working");
+                        scheduler.request();
+                        continue;
+                    }
                     state.push_message(MessageRole::User, &text);
                     if active_job.is_some() {
                         state.push_message(MessageRole::Error, "a request is already running");

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BLUEPRINT = ROOT / "Docs/Zenpi_Execution_Blueprint.md"
 GANTT = ROOT / "Docs/Zenpi_Execution_Gantt.md"
 STATES = {" ": "unclaimed", "_": "self_tested", "x": "master_accepted"}
-ROW = re.compile(r"^- \[([ _x])\] \*\*(ZP-[0-9]{3})\*\*")
+ROW = re.compile(r"^- \[([ _x])\] \*\*((?:ZP|CF)-[0-9]{3})\*\*")
 
 
 def main() -> int:
@@ -36,10 +36,24 @@ def main() -> int:
         text, changed = re.subn(rf"^(\s*{re.escape(key)}:) .*?$", rf"\1 {value}", text, count=1, flags=re.MULTILINE)
         if changed != 1:
             raise SystemExit(f"gantt generator: missing header field {key}")
+    # CF rows are regenerated from the authoritative Blueprint so removed or
+    # reordered items cannot leave stale monitoring entries behind.
+    text = re.sub(r"^\| CF-[0-9]{3} \|.*\n\n?", "", text, flags=re.MULTILINE)
     for item_id, state in state_by_id.items():
         text, changed = re.subn(rf"^(\| {re.escape(item_id)} \| )[^|]+( \|)", rf"\1{state}\2", text, count=1, flags=re.MULTILINE)
         if changed != 1:
-            raise SystemExit(f"gantt generator: missing monitoring row {item_id}")
+            blueprint_line = next(
+                line for line in blueprint.splitlines() if f"**{item_id}**" in line
+            )
+            depends_match = re.search(r"\| Depends:\s*(.*?)\s*\| Owner scope:", blueprint_line)
+            owner_match = re.search(r"\| Owner scope:\s*(.*?)\s*\| Owned paths:", blueprint_line)
+            depends = depends_match.group(1) if depends_match else "—"
+            owner = owner_match.group(1) if owner_match else "Master"
+            row = f"| {item_id} | {state} | {depends} | {owner} | none | none | dependency |\n"
+            anchor = "\n## Unscheduled work"
+            if anchor not in text:
+                raise SystemExit("gantt generator: missing Unscheduled work heading")
+            text = text.replace(anchor, f"{row}{anchor}", 1)
     fd, temporary = tempfile.mkstemp(prefix=".zenpi-gantt.", dir=GANTT.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:

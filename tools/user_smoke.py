@@ -373,14 +373,28 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="zenpi-user-smoke-") as directory:
         root = Path(directory)
         release = ROOT / "target" / "release" / "zenpi"
-        build = run(["cargo", "build", "--release", "--locked"])
+        features = os.environ.get("ZENPI_SMOKE_FEATURES", "dev-fixtures")
+        feature_args = ["--features", features] if features else []
+        build = run(["cargo", "build", "--release", "--locked", *feature_args])
         assert_success(build, "release build")
         if not release.is_file() or not os.access(release, os.X_OK):
             raise AssertionError(f"release binary missing: {release}")
 
         install_root = root / "install"
         install_root.mkdir()
-        install = run(["cargo", "install", "--path", ".", "--locked", "--root", str(install_root), "--force"])
+        install = run(
+            [
+                "cargo",
+                "install",
+                "--path",
+                ".",
+                "--locked",
+                "--root",
+                str(install_root),
+                "--force",
+                *feature_args,
+            ]
+        )
         assert_success(install, "isolated cargo install")
         binary = install_root / "bin" / "zenpi"
         if not binary.is_file() or not os.access(binary, os.X_OK):

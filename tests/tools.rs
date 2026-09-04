@@ -267,3 +267,68 @@ fn malformed_calls_and_unknown_arguments_are_typed_errors() {
         ToolErrorCode::UnknownTool
     );
 }
+
+#[test]
+fn write_and_edit_tools_are_atomic_and_policy_guarded() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let denied = registry.execute(
+        &context,
+        SideEffectPolicy::read_only(),
+        call("write_file", json!({"path":"new.txt","content":"one"})),
+    );
+    assert_eq!(error_code(denied), ToolErrorCode::PolicyDenied);
+    let policy = SideEffectPolicy::all_builtins();
+    let preview = tools::WriteFileTool::preview(
+        &context,
+        json!({"path":"new.txt","content":"one"})
+            .as_object()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(preview["changed"], true);
+    let created = successful_output(registry.execute(
+        &context,
+        policy,
+        call("write_file", json!({"path":"new.txt","content":"one"})),
+    ));
+    assert_eq!(created["bytes"], 3);
+    assert_eq!(
+        fs::read_to_string(directory.path().join("new.txt")).unwrap(),
+        "one"
+    );
+    let edited = successful_output(registry.execute(
+        &context,
+        policy,
+        call(
+            "edit_file",
+            json!({"path":"new.txt","old":"one","new":"two"}),
+        ),
+    ));
+    assert_eq!(edited["replacements"], 1);
+    assert_eq!(
+        fs::read_to_string(directory.path().join("new.txt")).unwrap(),
+        "two"
+    );
+}
+
+#[test]
+fn command_tool_is_bounded_and_scrubs_environment() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let policy = SideEffectPolicy::read_only().with_command_execution(true);
+    let output = successful_output(registry.execute(
+        &context,
+        policy,
+        call("run_command", json!({"command":"printf ok"})),
+    ));
+    assert_eq!(output["stdout"], "ok");
+    let timed_out = registry.execute(
+        &context,
+        policy,
+        call("run_command", json!({"command":"sleep 1","timeout_ms":10})),
+    );
+    assert_eq!(error_code(timed_out), ToolErrorCode::CommandTimeout);
+}

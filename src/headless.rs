@@ -17,6 +17,7 @@ use thiserror::Error;
 
 use crate::{
     b3::{HandoffRecord, unix_ms_to_rfc3339},
+    backend::ProviderEvent,
     core::{Agent, AgentError, ProcessResult, TurnInputRequest},
     protocol::{Command, StdioEvent, StdioResponse, encode_line, parse_line},
     session::unix_time_ms,
@@ -205,6 +206,97 @@ pub fn run_stdio_owned(agent: Agent) -> Result<(), HeadlessError> {
 struct AsyncWork {
     id: Option<String>,
     command: &'static str,
+    events: Arc<Mutex<Vec<ProviderEvent>>>,
+}
+
+struct AsyncRequest {
+    request: TurnInputRequest,
+    events: Arc<Mutex<Vec<ProviderEvent>>>,
+}
+
+impl AsyncRequest {
+    fn new(request: TurnInputRequest) -> (Self, Arc<Mutex<Vec<ProviderEvent>>>) {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        (
+            Self {
+                request,
+                events: Arc::clone(&events),
+            },
+            events,
+        )
+    }
+}
+
+fn drain_provider_events<W: Write>(
+    jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
+    output: &mut W,
+    sequence: &mut u64,
+) -> Result<(), HeadlessError> {
+    for work in jobs.values() {
+        let Ok(mut events) = work.events.lock() else {
+            continue;
+        };
+        for event in events.drain(..) {
+            let value = serde_json::to_value(event)?;
+            let turn_id = value
+                .get("turn_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, value);
+            *sequence = sequence.saturating_add(1);
+            output.write_all(encode_line(&envelope)?.as_bytes())?;
+        }
+    }
+    output.flush()?;
+    Ok(())
+}
+
+fn drain_approval_events<W: Write>(
+    approval: Option<&crate::approval::ApprovalCoordinator>,
+    jobs: &HashMap<crate::runtime::JobId, AsyncWork>,
+    output: &mut W,
+    sequence: &mut u64,
+) -> Result<(), HeadlessError> {
+    let Some(approval) = approval else {
+        return Ok(());
+    };
+    for request in approval.drain_pending() {
+        let request_id = jobs
+            .values()
+            .find(|work| work.command == "prompt" || work.command == "steer")
+            .and_then(|work| work.id.clone());
+        let turn_id = Some(request.turn_id.clone());
+        let value = serde_json::json!({
+            "type": "approval_request",
+            "approval": request,
+        });
+        let envelope = StdioEvent::new(*sequence, request_id, turn_id, value);
+        *sequence = sequence.saturating_add(1);
+        output.write_all(encode_line(&envelope)?.as_bytes())?;
+    }
+    output.flush()?;
+    Ok(())
+}
+
+fn drain_provider_events_for_job<W: Write>(
+    work: &AsyncWork,
+    output: &mut W,
+    sequence: &mut u64,
+) -> Result<(), HeadlessError> {
+    let Ok(mut events) = work.events.lock() else {
+        return Ok(());
+    };
+    for event in events.drain(..) {
+        let value = serde_json::to_value(event)?;
+        let turn_id = value
+            .get("turn_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        let envelope = StdioEvent::new(*sequence, work.id.clone(), turn_id, value);
+        *sequence = sequence.saturating_add(1);
+        output.write_all(encode_line(&envelope)?.as_bytes())?;
+    }
+    Ok(())
 }
 
 enum ReaderMessage {
@@ -247,16 +339,30 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
         .map_err(|error| HeadlessError::Io(io::Error::other(error)))?;
 
     let shared = Arc::new(Mutex::new(agent));
+    let approval = shared
+        .lock()
+        .ok()
+        .and_then(|agent| agent.approval_coordinator());
     let worker_state = Arc::clone(&shared);
     let runner = crate::runtime::BackgroundRunner::spawn(
-        move |request: TurnInputRequest, token| -> Result<ProcessResult, AgentError> {
+        move |request: AsyncRequest, token| -> Result<ProcessResult, AgentError> {
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
             let mut agent = worker_state
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
-            let result = agent.process_with_cancel(request, || token.is_cancelled())?;
+            let events = Arc::clone(&request.events);
+            let result = agent.process_with_cancel_and_events(
+                request.request,
+                || token.is_cancelled(),
+                &mut |event: ProviderEvent| {
+                    if let Ok(mut pending) = events.lock() {
+                        pending.push(event);
+                    }
+                    Ok(())
+                },
+            )?;
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
@@ -270,6 +376,8 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     let mut stopping = false;
     let mut shutdown_sent = false;
     loop {
+        drain_provider_events(&mut jobs, &mut output, &mut event_sequence)?;
+        drain_approval_events(approval.as_ref(), &jobs, &mut output, &mut event_sequence)?;
         while let Ok(event) = runner.try_next_event() {
             if handle_runtime_event(
                 event,
@@ -285,6 +393,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             }
         }
         if stopping {
+            drain_provider_events(&mut jobs, &mut output, &mut event_sequence)?;
             if jobs.is_empty() && !shutdown_sent {
                 let _ = runner.try_shutdown();
                 shutdown_sent = true;
@@ -313,6 +422,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             Ok(ReaderMessage::Line(line)) => process_async_line(
                 line,
                 &shared,
+                approval.as_ref(),
                 &runner,
                 &mut jobs,
                 &mut request_to_job,
@@ -324,9 +434,14 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                 stopping = true;
             }
             Ok(ReaderMessage::Error(error)) => {
+                let (code, message) = if error.kind() == io::ErrorKind::InvalidData {
+                    ("invalid_utf8", "input frame is not valid UTF-8".to_owned())
+                } else {
+                    ("io_error", error.to_string())
+                };
                 write_response(
                     &mut output,
-                    StdioResponse::error_with_code(None, "stdio", "io_error", error.to_string()),
+                    StdioResponse::error_with_code(None, "stdio", code, message),
                 )?;
                 stopping = true;
             }
@@ -359,6 +474,9 @@ fn handle_runtime_event<W: Write>(
             if let Some(request_id) = meta.id.as_ref() {
                 request_to_job.remove(request_id);
             }
+            // Provider deltas precede the one terminal response, even when
+            // the worker and output loop become ready on the same tick.
+            drain_provider_events_for_job(&meta, output, event_sequence)?;
             match outcome {
                 JobOutcome::Succeeded(result) => {
                     let data = json!({
@@ -412,7 +530,8 @@ fn handle_runtime_event<W: Write>(
 fn process_async_line<W, F>(
     line: String,
     shared: &Arc<Mutex<Agent>>,
-    runner: &crate::runtime::BackgroundRunner<TurnInputRequest, ProcessResult, AgentError, F>,
+    approval: Option<&crate::approval::ApprovalCoordinator>,
+    runner: &crate::runtime::BackgroundRunner<AsyncRequest, ProcessResult, AgentError, F>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     output: &mut W,
@@ -421,7 +540,7 @@ fn process_async_line<W, F>(
 ) -> Result<(), HeadlessError>
 where
     W: Write,
-    F: Fn(TurnInputRequest, crate::runtime::CancellationToken) -> Result<ProcessResult, AgentError>
+    F: Fn(AsyncRequest, crate::runtime::CancellationToken) -> Result<ProcessResult, AgentError>
         + Send
         + Sync
         + 'static,
@@ -462,6 +581,7 @@ where
                 expected_turn_id,
                 mode,
             };
+            let (request, events) = AsyncRequest::new(request);
             let job_id = runner.try_submit(request).map_err(|error| {
                 HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
             })?;
@@ -470,6 +590,7 @@ where
                 AsyncWork {
                     id: id.clone(),
                     command: "prompt",
+                    events,
                 },
             );
             if let Some(request_id) = id.clone() {
@@ -485,6 +606,7 @@ where
                 expected_turn_id,
                 mode: crate::protocol::TurnMode::Steer,
             };
+            let (request, events) = AsyncRequest::new(request);
             let job_id = runner.try_submit(request).map_err(|error| {
                 HeadlessError::Agent(AgentError::InvalidTurn(error.to_string()))
             })?;
@@ -493,6 +615,7 @@ where
                 AsyncWork {
                     id: id.clone(),
                     command: "steer",
+                    events,
                 },
             );
             if let Some(request_id) = id.clone() {
@@ -535,11 +658,50 @@ where
             )?,
         },
         Command::Shutdown => {
+            // Shutdown is an explicit cancellation boundary. Report that the
+            // close was accepted; the outer loop then drains every admitted
+            // job to a terminal response before the process exits.
             write_response(
                 output,
-                StdioResponse::success(id, name, Some(json!({"closed": true}))),
+                StdioResponse::success(id, name, Some(json!({"closing": true}))),
             )?;
             *stopping = true;
+        }
+        Command::Approve {
+            approval_id,
+            decision,
+            remember,
+        } => {
+            let Some(approval) = approval else {
+                write_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "approval_unavailable",
+                        "no approval coordinator is configured",
+                    ),
+                )?;
+                return Ok(());
+            };
+            match approval.respond(crate::approval::ApprovalResponse {
+                request_id: approval_id.clone(),
+                decision,
+                remember,
+            }) {
+                Ok(()) => write_response(
+                    output,
+                    StdioResponse::success(
+                        id,
+                        name,
+                        Some(json!({"approval_id": approval_id, "accepted": true})),
+                    ),
+                )?,
+                Err(error) => write_response(
+                    output,
+                    StdioResponse::error_with_code(id, name, "approval_error", error.to_string()),
+                )?,
+            }
         }
         other => match shared.try_lock() {
             Ok(mut agent) => {
@@ -550,7 +712,12 @@ where
             }
             Err(_) => write_response(
                 output,
-                StdioResponse::success(id, name, Some(json!({"phase": "running", "busy": true}))),
+                StdioResponse::error_with_code(
+                    id,
+                    name,
+                    "agent_busy",
+                    "command cannot run while a turn owns the session",
+                ),
             )?,
         },
     }
@@ -711,6 +878,15 @@ fn handle_command<W: Write>(
                 StdioResponse::success(id, name, Some(serde_json::to_value(agent.snapshot())?)),
             )?,
         },
+        Command::Approve { .. } => write_response(
+            output,
+            StdioResponse::error_with_code(
+                id,
+                name,
+                "approval_unavailable",
+                "approval responses require the asynchronous headless host",
+            ),
+        )?,
         Command::Shutdown => {
             agent.close();
             write_response(

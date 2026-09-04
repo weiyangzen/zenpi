@@ -4,13 +4,16 @@
 //! the definitions to a model and feed returned calls to [`ToolRegistry`], but
 //! every call is validated again locally. Read-only tools are enabled by the
 //! default policy; workspace writes and command execution require distinct,
-//! explicit policy grants and have no built-in implementation here.
+//! explicit policy grants and are guarded by the host approval boundary.
 
 use std::{
     collections::{BTreeMap, VecDeque},
-    fs::{self, File},
-    io::{self, Read},
+    fs::{self, File, OpenOptions},
+    io::{self, Read, Write},
     path::{Component, Path, PathBuf},
+    process::{Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -33,10 +36,16 @@ pub const MAX_SEARCH_MATCHES: usize = 100;
 pub const MAX_SEARCH_FILES: usize = 20_000;
 pub const MAX_SEARCH_NODES: usize = 50_000;
 pub const MAX_SEARCH_FILE_BYTES: usize = 1024 * 1024;
+pub const MAX_WRITE_BYTES: usize = 512 * 1024;
+pub const MAX_COMMAND_BYTES: usize = 16 * 1024;
+pub const MAX_COMMAND_OUTPUT_BYTES: usize = 256 * 1024;
+pub const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 30_000;
 
 const DEFAULT_READ_BYTES: usize = 256 * 1024;
 const DEFAULT_LIST_ENTRIES: usize = 64;
 const DEFAULT_SEARCH_MATCHES: usize = 100;
+
+static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(1);
 
 /// The kind of side effect a tool may perform. Policy decisions are based on
 /// this value, not on a tool's name or model-supplied arguments.
@@ -55,6 +64,15 @@ pub enum ToolSideEffect {
 pub struct SideEffectPolicy {
     allow_workspace_writes: bool,
     allow_command_execution: bool,
+}
+
+impl SideEffectPolicy {
+    pub const fn all_builtins() -> Self {
+        Self {
+            allow_workspace_writes: true,
+            allow_command_execution: true,
+        }
+    }
 }
 
 impl SideEffectPolicy {
@@ -149,6 +167,9 @@ pub enum ToolErrorCode {
     LimitExceeded,
     Io,
     Internal,
+    CommandFailed,
+    CommandTimeout,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -211,6 +232,12 @@ pub enum ToolError {
     Io(#[from] io::Error),
     #[error("tool JSON: {0}")]
     Json(serde_json::Error),
+    #[error("command failed: {0}")]
+    CommandFailed(String),
+    #[error("command timed out after {0} ms")]
+    CommandTimeout(u64),
+    #[error("tool execution was cancelled")]
+    Cancelled,
 }
 
 impl ToolError {
@@ -229,6 +256,9 @@ impl ToolError {
             Self::LimitExceeded(_) => ToolErrorCode::LimitExceeded,
             Self::Io(_) => ToolErrorCode::Io,
             Self::Json(_) => ToolErrorCode::Internal,
+            Self::CommandFailed(_) => ToolErrorCode::CommandFailed,
+            Self::CommandTimeout(_) => ToolErrorCode::CommandTimeout,
+            Self::Cancelled => ToolErrorCode::Cancelled,
         }
     }
 }
@@ -255,6 +285,33 @@ impl ToolContext {
 
     pub fn workspace_root(&self) -> &Path {
         &self.workspace_root
+    }
+
+    fn resolve_for_write(&self, requested: &str) -> Result<PathBuf, ToolError> {
+        validate_relative_path(requested)?;
+        let candidate = self.workspace_root.join(requested);
+        if candidate.exists() {
+            let canonical = candidate
+                .canonicalize()
+                .map_err(|error| map_path_io(&candidate, error))?;
+            if !canonical.starts_with(&self.workspace_root) {
+                return Err(ToolError::PathDenied(requested.to_owned()));
+            }
+            return Ok(canonical);
+        }
+        let parent = candidate
+            .parent()
+            .ok_or_else(|| ToolError::PathDenied(requested.to_owned()))?;
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|error| map_path_io(parent, error))?;
+        if !canonical_parent.starts_with(&self.workspace_root) {
+            return Err(ToolError::PathDenied(requested.to_owned()));
+        }
+        let file_name = candidate
+            .file_name()
+            .ok_or_else(|| ToolError::PathDenied(requested.to_owned()))?;
+        Ok(canonical_parent.join(file_name))
     }
 
     fn resolve_existing(&self, requested: &str) -> Result<ResolvedPath, ToolError> {
@@ -320,6 +377,14 @@ impl ToolRegistry {
         registry.register(ReadFileTool)?;
         registry.register(ListDirectoryTool)?;
         registry.register(SearchTextTool)?;
+        Ok(registry)
+    }
+
+    pub fn with_all_builtins() -> Result<Self, ToolError> {
+        let mut registry = Self::with_read_only_builtins()?;
+        registry.register(WriteFileTool)?;
+        registry.register(EditFileTool)?;
+        registry.register(RunCommandTool)?;
         Ok(registry)
     }
 
@@ -692,6 +757,306 @@ impl Tool for SearchTextTool {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WriteFileTool;
+
+impl WriteFileTool {
+    pub fn preview(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<Value, ToolError> {
+        reject_unknown(arguments, &["path", "content"])?;
+        let requested = required_string(arguments, "path", 4_096)?;
+        let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
+        let path = context.resolve_for_write(requested)?;
+        let before = fs::read_to_string(&path).unwrap_or_default();
+        Ok(json!({
+            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
+            "before_bytes": before.len(),
+            "after_bytes": content.len(),
+            "changed": before != content,
+        }))
+    }
+}
+
+impl Tool for WriteFileTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "write_file".into(),
+            description: "Atomically write UTF-8 text inside the workspace.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "content": { "type": "string", "maxLength": MAX_WRITE_BYTES }
+                },
+                "required": ["path", "content"],
+                "additionalProperties": false
+            }),
+            side_effect: ToolSideEffect::WorkspaceWrite,
+        }
+    }
+
+    fn invoke(
+        &self,
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<Value, ToolError> {
+        reject_unknown(arguments, &["path", "content"])?;
+        let requested = required_string(arguments, "path", 4_096)?;
+        let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
+        if content.as_bytes().contains(&0) {
+            return Err(ToolError::InvalidArguments("content contains NUL".into()));
+        }
+        let path = context.resolve_for_write(requested)?;
+        let created = !path.exists();
+        atomic_write_text(&path, content.as_bytes())?;
+        Ok(json!({
+            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
+            "bytes": content.len(),
+            "created": created
+        }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EditFileTool;
+
+impl Tool for EditFileTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "edit_file".into(),
+            description: "Replace one exact UTF-8 text occurrence atomically.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string" },
+                    "old": { "type": "string", "maxLength": MAX_WRITE_BYTES },
+                    "new": { "type": "string", "maxLength": MAX_WRITE_BYTES }
+                },
+                "required": ["path", "old", "new"],
+                "additionalProperties": false
+            }),
+            side_effect: ToolSideEffect::WorkspaceWrite,
+        }
+    }
+
+    fn invoke(
+        &self,
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<Value, ToolError> {
+        reject_unknown(arguments, &["path", "old", "new"])?;
+        let requested = required_string(arguments, "path", 4_096)?;
+        let old = required_string(arguments, "old", MAX_WRITE_BYTES)?;
+        let new = string_argument(arguments, "new", MAX_WRITE_BYTES, true)?;
+        if old.is_empty() {
+            return Err(ToolError::InvalidArguments("old must be non-empty".into()));
+        }
+        let path = context.resolve_existing(requested)?.canonical;
+        let original = fs::read_to_string(&path).map_err(|error| map_path_io(&path, error))?;
+        let occurrences = original.matches(old).count();
+        if occurrences != 1 {
+            return Err(ToolError::InvalidArguments(format!(
+                "old text must occur exactly once (found {occurrences})"
+            )));
+        }
+        let edited = original.replacen(old, new, 1);
+        if edited.len() > MAX_WRITE_BYTES {
+            return Err(ToolError::LimitExceeded(format!(
+                "edited content exceeds {MAX_WRITE_BYTES} bytes"
+            )));
+        }
+        atomic_write_text(&path, edited.as_bytes())?;
+        Ok(json!({
+            "path": relative_display(path.strip_prefix(context.workspace_root()).map_err(|_| ToolError::PathDenied(requested.to_owned()))?),
+            "replacements": 1,
+            "bytes": edited.len()
+        }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RunCommandTool;
+
+impl RunCommandTool {
+    /// Execute a command while polling a host cancellation predicate. This is
+    /// used by the agent loop so a cancelled turn also reaps its child.
+    pub fn invoke_with_cancel(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Value, ToolError> {
+        reject_unknown(arguments, &["command", "timeout_ms"])?;
+        let command = required_string(arguments, "command", MAX_COMMAND_BYTES)?;
+        let timeout_ms = bounded_usize(
+            arguments,
+            "timeout_ms",
+            DEFAULT_COMMAND_TIMEOUT_MS as usize,
+            1,
+            120_000,
+        )? as u64;
+        let mut builder = Command::new(if cfg!(windows) { "cmd" } else { "sh" });
+        if cfg!(windows) {
+            builder.args(["/C", command]);
+        } else {
+            builder.args(["-c", command]);
+        }
+        let mut child = builder
+            .current_dir(context.workspace_root())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .env_clear()
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .spawn()
+            .map_err(ToolError::Io)?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| ToolError::CommandFailed("command stdout pipe unavailable".into()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| ToolError::CommandFailed("command stderr pipe unavailable".into()))?;
+        let stdout_thread =
+            std::thread::spawn(move || read_limited_stream(stdout, MAX_COMMAND_OUTPUT_BYTES));
+        let stderr_thread =
+            std::thread::spawn(move || read_limited_stream(stderr, MAX_COMMAND_OUTPUT_BYTES));
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+        loop {
+            if cancelled() {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_thread.join();
+                let _ = stderr_thread.join();
+                return Err(ToolError::Cancelled);
+            }
+            if let Some(status) = child.try_wait().map_err(ToolError::Io)? {
+                let stdout = stdout_thread
+                    .join()
+                    .map_err(|_| ToolError::CommandFailed("stdout reader panicked".into()))??;
+                let stderr = stderr_thread
+                    .join()
+                    .map_err(|_| ToolError::CommandFailed("stderr reader panicked".into()))??;
+                let stdout = String::from_utf8_lossy(&stdout).into_owned();
+                let stderr = String::from_utf8_lossy(&stderr).into_owned();
+                if !status.success() {
+                    return Err(ToolError::CommandFailed(format!(
+                        "exit={status}; stderr={}",
+                        truncate_utf8(&stderr, MAX_COMMAND_OUTPUT_BYTES)
+                    )));
+                }
+                return Ok(json!({
+                    "status": "ok",
+                    "exit_code": status.code(),
+                    "stdout": truncate_utf8(&stdout, MAX_COMMAND_OUTPUT_BYTES),
+                    "stderr": truncate_utf8(&stderr, MAX_COMMAND_OUTPUT_BYTES)
+                }));
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_thread.join();
+                let _ = stderr_thread.join();
+                return Err(ToolError::CommandTimeout(timeout_ms));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+}
+
+impl Tool for RunCommandTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "run_command".into(),
+            description: "Run a bounded shell command in the workspace.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "command": { "type": "string", "maxLength": MAX_COMMAND_BYTES },
+                    "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 120000 }
+                },
+                "required": ["command"],
+                "additionalProperties": false
+            }),
+            side_effect: ToolSideEffect::CommandExecution,
+        }
+    }
+
+    fn invoke(
+        &self,
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+    ) -> Result<Value, ToolError> {
+        Self::invoke_with_cancel(context, arguments, &|| false)
+    }
+}
+
+fn atomic_write_text(path: &Path, bytes: &[u8]) -> Result<(), ToolError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| ToolError::PathDenied(path.display().to_string()))?;
+    fs::create_dir_all(parent)?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| ToolError::PathDenied(path.display().to_string()))?;
+    let temporary = parent.join(format!(
+        ".{name}.zenpi-{}-{}",
+        std::process::id(),
+        NEXT_TEMP_FILE.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    let mut file = options.open(&temporary).inspect_err(|_| {
+        let _ = fs::remove_file(&temporary);
+    })?;
+    if let Err(error) = file.write_all(bytes).and_then(|_| file.sync_all()) {
+        let _ = fs::remove_file(&temporary);
+        return Err(ToolError::Io(error));
+    }
+    drop(file);
+    fs::rename(&temporary, path).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+        ToolError::Io(error)
+    })
+}
+
+fn truncate_utf8(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_owned();
+    }
+    let mut end = max;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}\n[output truncated]", &text[..end])
+}
+
+fn read_limited_stream<R: Read>(mut reader: R, max: usize) -> Result<Vec<u8>, ToolError> {
+    let mut bytes = Vec::with_capacity(max.min(64 * 1024));
+    let mut buffer = [0_u8; 8192];
+    let mut truncated = false;
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        let remaining = max.saturating_sub(bytes.len());
+        if remaining > 0 {
+            bytes.extend_from_slice(&buffer[..count.min(remaining)]);
+        }
+        if count > remaining {
+            truncated = true;
+        }
+    }
+    if truncated {
+        bytes.extend_from_slice(b"\n[output truncated]");
+    }
+    Ok(bytes)
+}
+
 fn validate_call(call: &ToolCall) -> Result<(), ToolError> {
     validate_identifier(&call.id, "tool call id", MAX_TOOL_ID_BYTES)
         .map_err(|error| ToolError::InvalidCall(error.to_string()))?;
@@ -774,6 +1139,26 @@ fn optional_string<'a>(
         Some(_) => required_string(arguments, field, max),
         None => Ok(default),
     }
+}
+
+fn string_argument<'a>(
+    arguments: &'a Map<String, Value>,
+    field: &'static str,
+    max: usize,
+    allow_empty: bool,
+) -> Result<&'a str, ToolError> {
+    let value = arguments
+        .get(field)
+        .ok_or_else(|| ToolError::InvalidArguments(format!("missing `{field}`")))?
+        .as_str()
+        .ok_or_else(|| ToolError::InvalidArguments(format!("`{field}` must be a string")))?;
+    if (!allow_empty && value.is_empty()) || value.len() > max || value.contains('\0') {
+        return Err(ToolError::InvalidArguments(format!(
+            "`{field}` must be {}and at most {max} bytes",
+            if allow_empty { "" } else { "non-empty " }
+        )));
+    }
+    Ok(value)
 }
 
 fn optional_bool(

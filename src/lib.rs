@@ -1,5 +1,6 @@
 //! Shared zenpi library. The binary exposes only TUI and headless modes.
 
+pub mod approval;
 pub mod b3;
 pub mod backend;
 pub mod config;

@@ -12,7 +12,7 @@ authoritative_blueprint: Docs/Zenpi_Execution_Blueprint.md
 gantt_projection: Docs/Zenpi_Execution_Gantt.md
 gantt_naming: exact-prefix-Blueprint-to-Gantt
 checklist_marks: '[ ]|[_]|[x]'
-stable_id_pattern: '^ZP-[0-9]{3}$'
+stable_id_pattern: '^(ZP|CF)-[0-9]{3}$'
 worker_lifecycle: bounded
 desired_live_workers: 2
 hard_worker_cap: 2
@@ -55,6 +55,14 @@ The migration inventory is based on these read-only local evidence points:
 Research notes must preserve source revisions and distinguish observed facts
 from design decisions. Network access is not required for a local build; a
 missing remote or credential is a research blocker, never a reason to guess.
+
+The `CF-*` rows in the authoritative Blueprint supersede the original
+synchronous-MVP ceiling. They define the complete provider-backed framework:
+secure Codex-compatible profiles, Responses streaming, nonblocking control,
+approved write/shell tools, context/session recovery, skills/extensions, and
+packaged releases. A completed `ZP-*` foundation row does not implicitly close
+any `CF-*` row. The 5,000 LOC cap is evaluated independently for each item;
+there is neither a 5,000-item target nor an aggregate 5,000-line cap.
 
 ## 2. Lean b3ehive subset
 

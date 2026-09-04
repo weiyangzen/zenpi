@@ -1,11 +1,9 @@
 # zenpi Complete Feature Gap and Delivery Blueprint
 
-> **Proposal, not the authoritative execution checklist.**  This document
-> records the work required to turn zenpi from the current synchronous MVP into
-> a real, provider-backed coding agent.  It deliberately does not change
-> `Docs/Zenpi_Execution_Blueprint.md`, `Docs/Zenpi_Execution_Spec.md`, or the
-> generated Gantt projection.  A future specification revision must import
-> these items before any row can be marked complete.
+> **Archived planning input.** The `CF-*` scope in this document was promoted
+> on 2026-09-04 into the sole authoritative checklist,
+> `Docs/Zenpi_Execution_Blueprint.md`. Status marks here are intentionally
+> absent; use the Blueprint and its generated Gantt for current state.
 
 ## Why this gap exists
 
