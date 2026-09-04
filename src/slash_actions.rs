@@ -160,10 +160,15 @@ pub fn diff_value_at(
     let relative_display = relative
         .as_deref()
         .map(|absolute| {
-            absolute
+            let display = absolute
                 .strip_prefix(&workspace)
                 .map(path_display)
-                .unwrap_or_else(|_| path_display(absolute))
+                .unwrap_or_else(|_| path_display(absolute));
+            if display.is_empty() {
+                ".".into()
+            } else {
+                display
+            }
         })
         .unwrap_or_else(|| ".".into());
     Ok(json!({

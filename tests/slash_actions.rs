@@ -59,6 +59,7 @@ fn diff_owner_reports_tracked_and_untracked_changes_with_bounds() {
     assert!(all["diff"].as_str().unwrap().len() <= MAX_SLASH_DIFF_BYTES);
 
     let dot = slash_actions::diff_value_at(root, Some(".")).unwrap();
+    assert_eq!(dot["path"], ".");
     assert!(dot["diff"].as_str().unwrap().contains("+after"));
 }
 
@@ -103,6 +104,37 @@ fn attach_owner_stages_reference_and_consumes_it_on_next_turn() {
         !std::fs::read_to_string(agent.session().path())
             .unwrap()
             .contains("private attachment")
+    );
+}
+
+#[test]
+fn staged_attachment_is_carried_into_a_cancel_reissue_turn() {
+    let directory = tempdir().unwrap();
+    let root = directory.path();
+    std::fs::write(root.join("note.txt"), "reissue attachment\n").unwrap();
+    let session = SessionStore::open(root.join("session.jsonl")).unwrap();
+    let mut agent = Agent::with_echo(session);
+    agent.set_attachment_workspace(ToolContext::new(root).unwrap());
+
+    let first = slash_actions::attach_value_at(&mut agent, root, "note.txt").unwrap();
+    assert_eq!(first["accepted"], true);
+    agent.submit(TurnInputRequest::new("first turn")).unwrap();
+    agent.run_active_turn().unwrap();
+
+    slash_actions::attach_value_at(&mut agent, root, "note.txt").unwrap();
+    let submission = agent
+        .start_steer_reissue("retry with attachment".into(), "superseded-turn")
+        .unwrap();
+    assert!(submission.accepted());
+    assert!(agent.pending_attachments().is_empty());
+    let turn = agent.history().last().unwrap();
+    assert_eq!(
+        turn.metadata.as_ref().unwrap()["attachments"][0]["path"],
+        "note.txt"
+    );
+    assert_eq!(
+        turn.metadata.as_ref().unwrap()["steer"]["strategy"],
+        "cancel_reissue"
     );
 }
 

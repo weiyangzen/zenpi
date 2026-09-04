@@ -748,20 +748,51 @@ impl Agent {
             ));
         }
         let turn_id = next_id("turn");
+        let staged = std::mem::take(&mut self.pending_attachments);
+        if staged.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
+            self.pending_attachments = staged;
+            return Err(AgentError::InvalidTurn(format!(
+                "prompt exceeds {} attachments",
+                crate::backend::MAX_ATTACHMENTS_PER_TURN
+            )));
+        }
+        let materialized = match self.materialize_attachments(&turn_id, &staged) {
+            Ok(materialized) => materialized,
+            Err(error) => {
+                self.pending_attachments = staged;
+                return Err(error);
+            }
+        };
         let mut turn = Turn::with_parent(
             turn_id.clone(),
             superseded_turn_id.to_owned(),
             TurnRole::User,
             message,
         );
-        turn.metadata = Some(serde_json::json!({
-            "steer": {
+        let mut metadata = serde_json::Map::new();
+        metadata.insert(
+            "steer".into(),
+            serde_json::json!({
                 "strategy": "cancel_reissue",
                 "superseded_turn_id": superseded_turn_id,
-            }
-        }));
-        turn.validate()?;
-        self.session.append_turn(turn)?;
+            }),
+        );
+        if !materialized.is_empty() {
+            metadata.insert(
+                "attachments".into(),
+                serde_json::json!(attachment_journal_metadata(&materialized)),
+            );
+        }
+        turn.metadata = Some(Value::Object(metadata));
+        if let Err(error) = turn.validate() {
+            self.pending_attachments = staged;
+            return Err(error);
+        }
+        if let Err(error) = self.session.append_turn(turn) {
+            self.pending_attachments = staged;
+            return Err(error.into());
+        }
+        self.active_attachments = materialized;
         self.active_turn_id = Some(turn_id.clone());
         self.phase = AgentPhase::Running;
         self.active_steerable = true;
