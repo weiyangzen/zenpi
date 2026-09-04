@@ -227,6 +227,8 @@ JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失�
 如果 `steer` 已在 `shutdown` 前被接收但仍等待 turn admission，owned 路径会在有界窗口内先完成取消/重发；超时则明确返回 `runtime_closed`，不会静默丢弃请求。
 每个 Blueprint item 都为其实现/测试代码声明严格小于 5000 的 `Estimated LOC` 预估值；这里是每个 item 的
 预估，不是 5000 个 Blueprint item，也不是仓库 Rust 总行数上限。仓库 Rust 总行数只作信息性盘点。
+在会话中还可用 `/help`、`/model`、`/models` 和 `/doctor` 查看命令、模型配置
+与脱敏诊断；这些命令不会把 secret 写入输出。
 
 ## 日本語
 

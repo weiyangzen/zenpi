@@ -105,6 +105,16 @@ fn unbound_control_keys_never_insert_printable_characters() {
 }
 
 #[test]
+fn submit_preserves_prompt_whitespace() {
+    let mut state = TuiState::default();
+    state.set_input("  indented code  \n");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Enter, KeyModifiers::NONE)),
+        TuiAction::Submit("  indented code  \n".into())
+    );
+}
+
+#[test]
 fn multiline_cursor_editing_stays_on_utf8_boundaries() {
     let mut state = TuiState::default();
     state.set_input("ab\n世界");
