@@ -692,6 +692,85 @@ def assert_tui(binary: Path, root: Path) -> None:
         raise AssertionError(f"TUI did not persist the submitted prompt: {journal!r}")
 
 
+def assert_tui_multiline_paste(binary: Path, root: Path) -> None:
+    """Exercise bracketed paste and multiline submission through a real PTY.
+
+    Unit tests cover the key-level editing paths, but a terminal can deliver a
+    paste as one crossterm ``Event::Paste``.  This check makes sure the
+    installed binary keeps the embedded newlines, submits the complete text,
+    and still restores the alternate screen after the turn.
+    """
+    session = root / "tui-multiline-session.jsonl"
+    command = [str(binary), "--mode", "tui", "--backend", "echo", "--session", str(session)]
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execve(command[0], command, isolated_env(root / "tui-multiline-home"))
+    exited = False
+    output = bytearray()
+    expected = "first pasted line\nsecond pasted line\nthird pasted line"
+    try:
+        # Keep enough rows for all pasted lines while still exercising the
+        # responsive prompt layout rather than relying on the default PTY.
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 20, 80, 0, 0))
+        ready_deadline = time.monotonic() + 5
+        while time.monotonic() < ready_deadline and b"Prompt" not in output:
+            ready, _, _ = select.select([fd], [], [], 0.1)
+            if ready:
+                try:
+                    output.extend(os.read(fd, 65536))
+                except OSError:
+                    break
+        if b"Prompt" not in output:
+            raise AssertionError(f"multiline TUI did not reach prompt: {bytes(output)!r}")
+
+        # Crossterm's bracketed-paste protocol is enabled by TerminalGuard.
+        # Send the markers separately from Enter so the test also exercises
+        # the paste event boundary instead of depending on packet grouping.
+        os.write(
+            fd,
+            b"\x1b[200~first pasted line\nsecond pasted line\nthird pasted line\x1b[201~",
+        )
+        time.sleep(0.1)
+        os.write(fd, b"\r")
+        wait_for_tui_turn(session)
+
+        # Ctrl-D is the deterministic empty-prompt quit binding across PTY
+        # implementations; Ctrl-C is intentionally reserved for interrupt.
+        os.write(fd, b"\x04")
+        exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
+        exited = True
+        output.extend(trailing)
+    except BaseException:
+        if not exited:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                os.waitpid(pid, 0)
+            except (OSError, ChildProcessError):
+                pass
+        raise
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+    if exit_code != 0:
+        raise AssertionError(f"multiline TUI exited with {exit_code}: {output!r}")
+    if b"\x1b[?1049l" not in output:
+        raise AssertionError("multiline TUI did not restore the alternate screen")
+    if not session.is_file():
+        raise AssertionError("multiline TUI did not persist its session")
+    journal = json_lines(session.read_text(encoding="utf-8"))
+    user_turns = [
+        record.get("turn", {})
+        for record in journal
+        if record.get("kind") == "turn" and record.get("turn", {}).get("role") == "user"
+    ]
+    if not any(turn.get("content") == expected for turn in user_turns):
+        raise AssertionError(
+            f"bracketed paste did not preserve multiline prompt: {user_turns!r}"
+        )
+
+
 def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
     """Drive the production TUI against a deliberately slow Responses stream."""
     class SlowHandler(BaseHTTPRequestHandler):
@@ -815,10 +894,12 @@ def main() -> int:
         assert_invalid_inputs(binary, root)
         assert_openai_fixture(binary, root)
         assert_tui(binary, root)
+        assert_tui_multiline_paste(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
         "user smoke passed: release, install, echo fixture, durable slash/runtime intents, "
-        "resume, Responses fixture, TUI resize, streaming interrupt, and terminal restoration"
+        "resume, Responses fixture, TUI resize/multiline paste, streaming interrupt, "
+        "and terminal restoration"
     )
     return 0
 
