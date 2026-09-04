@@ -6,6 +6,7 @@ use zenpi::config::{
     list_profiles, load_auth, load_config, pair_from_codex, resolve, revoke, save_auth,
     save_config, status, use_profile,
 };
+use zenpi::core::parse_args;
 
 fn write_codex_fixture(home: &Path, key: &str) {
     let codex = home.join(".codex");
@@ -399,4 +400,25 @@ requires_openai_auth = true
         .api_key_for_profile(Some("codex")),
         None
     );
+}
+
+#[test]
+fn runtime_profile_is_a_validated_first_class_override() {
+    let options = parse_args([
+        "--mode",
+        "tui",
+        "--profile=codex_work",
+        "--model",
+        "gpt-test",
+    ])
+    .unwrap();
+    assert_eq!(options.profile.as_deref(), Some("codex_work"));
+    assert_eq!(options.model.as_deref(), Some("gpt-test"));
+
+    for invalid in ["", "has space", "../escape", "line\nbreak"] {
+        assert!(
+            parse_args(["--profile", invalid]).is_err(),
+            "accepted invalid profile {invalid:?}"
+        );
+    }
 }

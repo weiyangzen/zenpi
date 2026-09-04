@@ -33,7 +33,7 @@ zenpi config import-codex --profile codex
 zenpi config doctor
 
 # Interactive terminal mode, using the imported provider.
-zenpi --mode tui
+zenpi --mode tui --profile codex
 
 # Scriptable JSONL mode.
 printf '%s\n' '{"type":"prompt","id":"1","text":"Say hello"}' \
@@ -189,7 +189,7 @@ agent 之间传递有边界的 handoff；TUI 使用合并渲染和终端缓冲�
 `~/.codex/config.toml` 读取 URL、Responses API 和模型，从
 `~/.codex/auth.json` 读取 key，并将非 secret 配置写入
 `~/.zenpi/config.toml`、key 写入权限为 0600 的 `~/.zenpi/auth.json`。
-随后执行 `zenpi config doctor`，再运行 `zenpi --mode tui` 或不带
+随后执行 `zenpi config doctor`，再运行 `zenpi --mode tui --profile codex` 或不带
 `--backend` 的 headless。也可用 `ZENPI_BASE_URL`、`ZENPI_API_KEY`、
 `ZENPI_MODEL` 覆盖配置。`echo` 只存在于启用 `dev-fixtures` feature 的测试
 构建；正常 release 无法启用它。缺少 provider 时 zenpi 会在创建 session
@@ -232,7 +232,7 @@ TUI はフレームをまとめ、端末バッファ差分を使うため、リ�
 更新でも不要な全画面再描画を避けます。
 本番の既定 backend は設定済みの OpenAI-compatible provider です。暗黙の
 `echo` mock は使いません。最短手順は `zenpi config import-codex --profile codex`、
-`zenpi config doctor`、`zenpi --mode tui` です。最初のコマンドは
+`zenpi config doctor`、`zenpi --mode tui --profile codex` です。最初のコマンドは
 `~/.codex/config.toml` の URL、Responses API、モデルと
 `~/.codex/auth.json` の key を読み、`~/.zenpi/config.toml` と権限 0600 の
 `~/.zenpi/auth.json` に安全に保存します。環境変数

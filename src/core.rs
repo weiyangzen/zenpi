@@ -1629,6 +1629,7 @@ pub struct CliOptions {
     pub session: PathBuf,
     pub backend: String,
     pub backend_explicit: bool,
+    pub profile: Option<String>,
     pub model: Option<String>,
     pub command: Option<CliCommand>,
     pub command_value: Option<String>,
@@ -1670,6 +1671,7 @@ impl Default for CliOptions {
             session: SessionStore::default_path(),
             backend: "openai".into(),
             backend_explicit: false,
+            profile: None,
             model: None,
             command: None,
             command_value: None,
@@ -1944,6 +1946,23 @@ where
                 }
                 options.model = Some(model);
             }
+            "--profile" => {
+                let profile = inline
+                    .map(str::to_owned)
+                    .or_else(|| args.next())
+                    .ok_or_else(|| ZenpiError::arguments("--profile requires a name"))?;
+                if profile.trim().is_empty()
+                    || profile.len() > 128
+                    || !profile.chars().all(|character| {
+                        character.is_ascii_alphanumeric() || "_-".contains(character)
+                    })
+                {
+                    return Err(ZenpiError::arguments(
+                        "--profile must use only letters, digits, `_`, or `-` and be at most 128 bytes",
+                    ));
+                }
+                options.profile = Some(profile);
+            }
             other if other.starts_with('-') => {
                 return Err(ZenpiError::arguments(format!("unknown option `{other}`")));
             }
@@ -1967,6 +1986,7 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
         )),
         "openai" => {
             let effective = crate::config::resolve_default(&crate::config::ConfigOverrides {
+                profile: options.profile.clone(),
                 backend: options.backend_explicit.then(|| options.backend.clone()),
                 model: options.model.clone(),
                 ..crate::config::ConfigOverrides::default()
@@ -2014,7 +2034,9 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
 }
 
 fn print_help() {
-    println!("zenpi [--mode tui|headless] [--session PATH] [--backend openai] [--model NAME]");
+    println!(
+        "zenpi [--mode tui|headless] [--session PATH] [--backend openai] [--profile NAME] [--model NAME]"
+    );
     println!("zenpi config import-codex [--profile NAME]");
     println!("zenpi config doctor [--profile NAME] [--json]");
     println!("zenpi config list [--json] | config use NAME");
@@ -2295,7 +2317,7 @@ pub fn run() -> Result<(), ZenpiError> {
     match options.mode {
         RunMode::Headless => crate::headless::run_stdio_owned(agent)
             .map_err(|error| ZenpiError::Message(error.to_string())),
-        RunMode::Tui => crate::tui::run_async(agent),
+        RunMode::Tui => crate::tui::run_async_with_profile(agent, options.profile),
     }
 }
 

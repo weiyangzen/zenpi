@@ -2335,12 +2335,12 @@ struct TuiLayoutPersistence {
 }
 
 impl TuiLayoutPersistence {
-    fn discover() -> Self {
+    fn discover(requested_profile: Option<String>) -> Self {
         let Ok(paths) = crate::config::ConfigPaths::discover() else {
             return Self::default();
         };
         Self {
-            profile: active_layout_profile(&paths),
+            profile: requested_profile.or_else(|| active_layout_profile(&paths)),
             paths: Some(paths),
             disabled: false,
         }
@@ -2419,6 +2419,17 @@ fn active_layout_profile(paths: &crate::config::ConfigPaths) -> Option<String> {
 /// and deterministic tests; the binary uses this owned form so a worker can
 /// safely hold the agent for the duration of one request.
 pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiError> {
+    run_async_with_profile(agent, None)
+}
+
+/// Run the production TUI while keeping the provider/profile selected by the
+/// command line aligned with the profile that owns persisted BentoBox state.
+/// The optional value is already validated by the CLI; embedders may omit it
+/// and use the configured default profile.
+pub fn run_async_with_profile(
+    agent: crate::core::Agent,
+    profile: Option<String>,
+) -> Result<(), crate::error::ZenpiError> {
     use crate::core::{AgentError, ProcessResult};
     use crate::runtime::{BackgroundRunner, JobOutcome, RuntimeConfig, RuntimeEvent};
 
@@ -2470,7 +2481,7 @@ pub fn run_async(agent: crate::core::Agent) -> Result<(), crate::error::ZenpiErr
             state.push_message(role, &turn.content);
         }
     }
-    let mut layout_persistence = TuiLayoutPersistence::discover();
+    let mut layout_persistence = TuiLayoutPersistence::discover(profile);
     if let Err(error) = layout_persistence.restore(&mut state) {
         // Keep startup usable with a safe preset, but make a corrupt or stale
         // preference visible instead of silently discarding the user's file.
