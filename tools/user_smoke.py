@@ -200,6 +200,12 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
             {
                 "schema_version": 2,
                 "type": "command",
+                "id": "compete",
+                "text": "/compete submit --parent GOAL-1 audit owner boundaries",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
                 "id": "diff",
                 "text": "/diff tracked.txt",
             },
@@ -239,12 +245,23 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
         for record in first_records
         if record.get("type") == "response" and record.get("id")
     }
-    for request_id in ("diff", "attach", "prompt", "shutdown"):
+    for request_id in ("compete", "diff", "attach", "prompt", "shutdown"):
         response = first_responses.get(request_id, {})
         if response.get("schema_version") != 2 or response.get("success") is not True:
             raise AssertionError(
                 f"missing successful v2 slash-owner response for {request_id}: {first_records!r}"
             )
+
+    compete = first_responses["compete"].get("data", {})
+    if not (
+        compete.get("route") == "runtime_intent"
+        and compete.get("delivery") == "journal_only"
+        and compete.get("zenpi_started") is False
+        and compete.get("execution_state") == "untracked"
+        and compete.get("created") is True
+        and compete.get("idempotent_replay") is False
+    ):
+        raise AssertionError(f"installed /compete overstated its runtime result: {compete!r}")
 
     diff = first_responses["diff"].get("data", {})
     if not (
@@ -290,6 +307,12 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
             {
                 "schema_version": 2,
                 "type": "command",
+                "id": "compete",
+                "text": "/compete submit --parent GOAL-1 audit owner boundaries",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
                 "id": "compact",
                 "text": "/compact",
             },
@@ -323,12 +346,23 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
         for record in second_records
         if record.get("type") == "response" and record.get("id")
     }
-    for request_id in ("compact", "resume", "shutdown-2"):
+    for request_id in ("compete", "compact", "resume", "shutdown-2"):
         response = second_responses.get(request_id, {})
         if response.get("schema_version") != 2 or response.get("success") is not True:
             raise AssertionError(
                 f"missing successful durable slash response for {request_id}: {second_records!r}"
             )
+
+    compete_replay = second_responses["compete"].get("data", {})
+    if not (
+        compete_replay.get("created") is False
+        and compete_replay.get("idempotent_replay") is True
+        and compete_replay.get("intent", {}).get("intent_id")
+        == compete.get("intent", {}).get("intent_id")
+    ):
+        raise AssertionError(
+            f"installed runtime intent was not deduplicated across restart: {compete_replay!r}"
+        )
 
     compact = second_responses["compact"].get("data", {})
     if not (
@@ -419,6 +453,11 @@ def assert_headless_slash_owners(binary: Path, root: Path) -> None:
         for event in durable_events
     ):
         raise AssertionError(f"/resume marker is absent from the durable journal: {journal!r}")
+    runtime_intents = [
+        record for record in journal if record.get("kind") == "runtime_intent"
+    ]
+    if len(runtime_intents) != 1:
+        raise AssertionError(f"cross-process runtime intent was appended twice: {runtime_intents!r}")
 
 
 def assert_invalid_inputs(binary: Path, root: Path) -> None:
@@ -778,8 +817,8 @@ def main() -> int:
         assert_tui(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: release, install, echo fixture, durable slash owners, resume, "
-        "Responses fixture, TUI resize, streaming interrupt, and terminal restoration"
+        "user smoke passed: release, install, echo fixture, durable slash/runtime intents, "
+        "resume, Responses fixture, TUI resize, streaming interrupt, and terminal restoration"
     )
     return 0
 
