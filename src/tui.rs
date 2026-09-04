@@ -46,6 +46,11 @@ pub const MAX_RENDER_LINES: usize = 8_192;
 /// cheap to clone and render on every frame.
 pub const MAX_GANTT_PANE_BYTES: usize = 32 * 1024;
 pub const MAX_GANTT_PANE_ROWS: usize = 96;
+/// Keep provider events waiting for the renderer bounded by both count and
+/// their serialized UTF-8 size.  A stream can contain a small number of very
+/// large deltas, so a count-only mailbox is not a sufficient memory bound.
+pub const MAX_TUI_PROVIDER_EVENTS: usize = 4_096;
+pub const MAX_TUI_PROVIDER_BYTES: usize = 1024 * 1024;
 /// Maximum number of visual rows reserved for the editable prompt.  Longer
 /// prompts remain editable; the input viewport scrolls to keep the cursor
 /// visible instead of growing without bound and starving the transcript.
@@ -2798,12 +2803,32 @@ impl TuiRequest {
 #[derive(Debug, Default)]
 struct TuiProviderEventBuffer {
     events: VecDeque<crate::backend::ProviderEvent>,
+    bytes: usize,
     dropped: u64,
 }
 
 impl TuiProviderEventBuffer {
+    /// Enqueue an event using the production byte budget. The count argument
+    /// remains explicit because focused tests and embedders may use a smaller
+    /// mailbox while preserving the same aggregate-byte invariant.
     fn push(&mut self, event: crate::backend::ProviderEvent, limit: usize) {
-        if self.events.len() < limit.max(1) {
+        self.push_with_limits(event, limit, MAX_TUI_PROVIDER_BYTES);
+    }
+
+    fn push_with_limits(
+        &mut self,
+        event: crate::backend::ProviderEvent,
+        max_events: usize,
+        max_bytes: usize,
+    ) {
+        let event_bytes = serialized_provider_event_bytes(&event);
+        let within_count = self.events.len() < max_events.max(1);
+        let within_bytes = self
+            .bytes
+            .checked_add(event_bytes)
+            .is_some_and(|bytes| bytes <= max_bytes);
+        if within_count && within_bytes {
+            self.bytes = self.bytes.saturating_add(event_bytes);
             self.events.push_back(event);
         } else {
             self.dropped = self.dropped.saturating_add(1);
@@ -2811,11 +2836,36 @@ impl TuiProviderEventBuffer {
     }
 
     fn take(&mut self) -> (VecDeque<crate::backend::ProviderEvent>, u64) {
+        self.bytes = 0;
         (
             std::mem::take(&mut self.events),
             std::mem::take(&mut self.dropped),
         )
     }
+}
+
+/// Count the encoded event without allocating a second copy of its payload.
+/// JSON serialization is also the unit used by the headless mailbox, so a
+/// multi-byte UTF-8 delta and escaped control characters consume the same
+/// deterministic budget in both transports. ProviderEvent's derived
+/// serializer is infallible for its current fields; an unexpected failure is
+/// treated as an over-limit event rather than retaining unaccounted data.
+fn serialized_provider_event_bytes(event: &crate::backend::ProviderEvent) -> usize {
+    struct ByteCounter(usize);
+
+    impl io::Write for ByteCounter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0 = self.0.saturating_add(bytes.len());
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut counter = ByteCounter(0);
+    serde_json::to_writer(&mut counter, event).map_or(usize::MAX, |()| counter.0)
 }
 
 /// Optional bridge between the production TUI and the bounded config-owned
@@ -2944,7 +2994,6 @@ pub fn run_async_with_profile(
     let worker_state = Arc::clone(&shared);
     // Keep provider events bounded independently of the transcript. A slow
     // terminal must not turn an unbounded stream into unbounded memory.
-    const MAX_PROVIDER_EVENTS: usize = 4096;
     let runner = BackgroundRunner::spawn(
         move |request: TuiRequest, token| -> Result<ProcessResult, AgentError> {
             if token.is_cancelled() {
@@ -2958,7 +3007,7 @@ pub fn run_async_with_profile(
                 || token.is_cancelled(),
                 &mut |event| {
                     if let Ok(mut pending) = request.provider_events.lock() {
-                        pending.push(event, MAX_PROVIDER_EVENTS);
+                        pending.push(event, MAX_TUI_PROVIDER_EVENTS);
                     }
                     Ok(())
                 },
@@ -4299,5 +4348,34 @@ mod tests {
             .collect::<String>();
         assert!(rendered.contains("Provider stream truncated: 1"));
         assert!(!drain_tui_provider_events(&mut state, 7, &events));
+    }
+
+    #[test]
+    fn provider_event_buffer_enforces_bytes_and_resets_accounting() {
+        let first = crate::backend::ProviderEvent::TextDelta {
+            delta: "a".repeat(32),
+        };
+        let second = crate::backend::ProviderEvent::TextDelta {
+            delta: "b".repeat(32),
+        };
+        let first_bytes = serialized_provider_event_bytes(&first);
+        let second_bytes = serialized_provider_event_bytes(&second);
+        let mut buffer = TuiProviderEventBuffer::default();
+        buffer.push_with_limits(first, 8, first_bytes + second_bytes - 1);
+        buffer.push_with_limits(second, 8, first_bytes + second_bytes - 1);
+        assert_eq!(buffer.events.len(), 1);
+        assert_eq!(buffer.bytes, first_bytes);
+        assert_eq!(buffer.dropped, 1);
+        let (events, dropped) = buffer.take();
+        assert_eq!(events.len(), 1);
+        assert_eq!(dropped, 1);
+        assert_eq!(buffer.bytes, 0);
+
+        let oversized = crate::backend::ProviderEvent::TextDelta {
+            delta: "x".repeat(MAX_TUI_PROVIDER_BYTES),
+        };
+        buffer.push(oversized, MAX_TUI_PROVIDER_EVENTS);
+        assert!(buffer.events.is_empty());
+        assert_eq!(buffer.dropped, 1);
     }
 }

@@ -621,16 +621,22 @@ impl Learn {
     }
 
     pub fn add_evidence(&mut self, evidence: impl Into<String>) -> Result<(), DomainError> {
+        let evidence = evidence.into();
+        // Validate before mutating the record so a rejected evidence
+        // reference cannot leave an in-memory Learn entity invalid.
+        bounded_text(&evidence, "evidence_ref", MAX_TEXT_BYTES)?;
+        // Evidence submission is an idempotent owner operation.  A retry of
+        // the same validated reference must not consume another bounded slot
+        // (especially when the list is already at its limit).
+        if self.evidence.iter().any(|existing| existing == &evidence) {
+            return Ok(());
+        }
         if self.evidence.len() >= MAX_LEARN_EVIDENCE {
             return Err(DomainError::TooMany {
                 field: "evidence",
                 max: MAX_LEARN_EVIDENCE,
             });
         }
-        let evidence = evidence.into();
-        // Validate before mutating the record so a rejected evidence
-        // reference cannot leave an in-memory Learn entity invalid.
-        bounded_text(&evidence, "evidence_ref", MAX_TEXT_BYTES)?;
         let previous_len = self.evidence.len();
         self.evidence.push(evidence);
         if let Err(error) = self.validate() {
