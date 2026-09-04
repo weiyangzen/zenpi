@@ -35,7 +35,7 @@ use crate::domains::GoalStatus;
 use crate::layout::{
     Breakpoint, FocusDirection, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility,
 };
-use crate::slash::{self, BlueprintAction, InputRoute, SlashCommand};
+use crate::slash::{self, BlueprintAction, InputRoute, LayoutAction, PaneAction, SlashCommand};
 
 /// Bound retained transcript memory even when a provider streams forever.
 pub const DEFAULT_MAX_MESSAGES: usize = 2_048;
@@ -721,6 +721,115 @@ impl TuiState {
             self.workspace_layout.set_capabilities(capabilities);
             self.dirty = true;
         }
+    }
+
+    /// Select a pane in the active BentoBox tab. A pane that was collapsed is
+    /// expanded before focus is assigned; unavailable optional adapters are
+    /// rejected without mutating layout state.
+    pub fn focus_workspace_pane(&mut self, pane: PaneId) -> bool {
+        let valid = self
+            .workspace_layout
+            .preset()
+            .panes
+            .into_iter()
+            .find(|spec| spec.id == pane)
+            .is_some_and(|spec| {
+                !spec.optional || pane_available(pane, self.workspace_layout.capabilities)
+            });
+        if !valid {
+            return false;
+        }
+        let was_focused = self.workspace_layout.focused == Some(pane);
+        let was_collapsed = self.workspace_layout.collapsed.remove(&pane);
+        let changed = !was_focused || was_collapsed;
+        self.workspace_layout.focused = Some(pane);
+        if changed {
+            self.layout_dirty = true;
+            self.dirty = true;
+        }
+        true
+    }
+
+    /// Set the collapsed state of one pane in the active tab. The pane must be
+    /// part of the tab preset; unknown panes and unavailable optional panes
+    /// are rejected so a slash command cannot poison persisted preferences.
+    pub fn set_workspace_pane_collapsed(&mut self, pane: PaneId, collapsed: bool) -> bool {
+        let valid = self
+            .workspace_layout
+            .preset()
+            .panes
+            .into_iter()
+            .find(|spec| spec.id == pane)
+            .is_some_and(|spec| {
+                !spec.optional || pane_available(pane, self.workspace_layout.capabilities)
+            });
+        if !valid {
+            return false;
+        }
+        let was_collapsed = self.workspace_layout.collapsed.contains(&pane);
+        if was_collapsed == collapsed {
+            return true;
+        }
+        self.workspace_layout.set_collapsed(pane, collapsed);
+        if collapsed && self.workspace_layout.focused == Some(pane) {
+            let (width, height) = self.workspace_viewport();
+            let _ = self.workspace_layout.focus_next(width, height);
+            if self
+                .workspace_layout
+                .focused
+                .is_some_and(|focused| focused == pane)
+            {
+                self.workspace_layout.focused = None;
+            }
+        }
+        self.layout_dirty = true;
+        self.dirty = true;
+        true
+    }
+
+    /// Toggle one pane's collapsed state and return its new state. `None`
+    /// means the pane is not present/available in the active preset.
+    pub fn toggle_workspace_pane(&mut self, pane: PaneId) -> Option<bool> {
+        let valid = self
+            .workspace_layout
+            .preset()
+            .panes
+            .into_iter()
+            .find(|spec| spec.id == pane)
+            .is_some_and(|spec| {
+                !spec.optional || pane_available(pane, self.workspace_layout.capabilities)
+            });
+        if !valid {
+            return None;
+        }
+        let collapsed = !self.workspace_layout.collapsed.contains(&pane);
+        self.set_workspace_pane_collapsed(pane, collapsed);
+        Some(collapsed)
+    }
+
+    /// Request an explicit layout persistence checkpoint. Production TUI
+    /// persistence runs at the next event-loop checkpoint; this method keeps
+    /// `/layout save` deterministic without writing from the command parser.
+    pub fn request_layout_save(&mut self) {
+        self.layout_dirty = true;
+        self.dirty = true;
+    }
+
+    /// Return a small JSON-safe layout projection for slash responses and
+    /// diagnostics. Geometry remains computed from the terminal-independent
+    /// model and is bounded to the current viewport.
+    pub fn workspace_layout_summary(&self) -> serde_json::Value {
+        let (width, height) = self.workspace_viewport();
+        let snapshot = self.workspace_layout.compute(width, height);
+        serde_json::json!({
+            "tab": self.workspace_layout.tab,
+            "ratios": self.workspace_layout.ratios,
+            "focused": self.workspace_layout.focused,
+            "collapsed": self.workspace_layout.collapsed,
+            "breakpoint": snapshot.breakpoint,
+            "visible_panes": snapshot.visible_panes().map(|pane| pane.id).collect::<Vec<_>>(),
+            "layout_dirty": self.layout_dirty,
+        })
     }
 
     /// Set optional pane capabilities for a host that has an external adapter.
@@ -1827,6 +1936,14 @@ fn conversation_pane_for_tab(tab: TabId) -> PaneId {
     }
 }
 
+fn pane_available(pane: PaneId, capabilities: crate::layout::PaneCapabilities) -> bool {
+    match pane {
+        PaneId::Browser => capabilities.browser,
+        PaneId::Terminal => capabilities.terminal,
+        _ => true,
+    }
+}
+
 fn workspace_pane_title(id: PaneId) -> &'static str {
     match id {
         PaneId::ProjectConversation => "Project",
@@ -2088,6 +2205,12 @@ pub fn dispatch_slash_command(
                     );
                 }
             }
+        }
+        SlashCommand::Layout { action } => {
+            dispatch_layout_command(state, action);
+        }
+        SlashCommand::Pane { action } => {
+            dispatch_pane_command(state, action);
         }
         SlashCommand::Clear => {
             state.clear_messages();
@@ -2629,6 +2752,128 @@ fn dispatch_runtime_intent(
             format!("{} runtime intent failed: {error}", kind.as_str()),
         ),
     }
+}
+
+fn dispatch_layout_command(state: &mut TuiState, action: LayoutAction) {
+    match action {
+        LayoutAction::Show { tab } => {
+            let summary = layout_summary_for_tab(state, tab);
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "layout show:\n{}",
+                    bounded_display(
+                        &serde_json::to_string(&summary).unwrap_or_else(|_| "{}".into())
+                    )
+                ),
+            );
+        }
+        LayoutAction::Preset { tab } => {
+            let target = tab.unwrap_or_else(|| state.workspace_tab());
+            state.set_workspace_tab(target);
+            state.reset_workspace_layout();
+            state.push_message(
+                MessageRole::System,
+                format!("layout preset applied: {target}"),
+            );
+        }
+        LayoutAction::Reset { tab } => {
+            let target = tab.unwrap_or_else(|| state.workspace_tab());
+            state.set_workspace_tab(target);
+            state.reset_workspace_layout();
+            state.push_message(MessageRole::System, format!("layout reset: {target}"));
+        }
+        LayoutAction::Save => {
+            state.request_layout_save();
+            state.push_message(
+                MessageRole::System,
+                "layout save requested; preferences will be written at the next checkpoint",
+            );
+        }
+    }
+}
+
+fn dispatch_pane_command(state: &mut TuiState, action: PaneAction) {
+    match action {
+        PaneAction::Show => {
+            let summary = state.workspace_layout_summary();
+            state.push_message(
+                MessageRole::System,
+                format!(
+                    "pane state:\n{}",
+                    bounded_display(
+                        &serde_json::to_string(&summary).unwrap_or_else(|_| "{}".into())
+                    )
+                ),
+            );
+        }
+        PaneAction::Focus { pane } => {
+            if state.focus_workspace_pane(pane) {
+                state.push_message(MessageRole::System, format!("pane focused: {pane}"));
+            } else {
+                state.push_message(
+                    MessageRole::Error,
+                    format!("pane unavailable in the active tab: {pane}"),
+                );
+            }
+        }
+        PaneAction::Collapse { pane } => {
+            if state.set_workspace_pane_collapsed(pane, true) {
+                state.push_message(MessageRole::System, format!("pane collapsed: {pane}"));
+            } else {
+                state.push_message(
+                    MessageRole::Error,
+                    format!("pane unavailable in the active tab: {pane}"),
+                );
+            }
+        }
+        PaneAction::Expand { pane } => {
+            if state.set_workspace_pane_collapsed(pane, false) {
+                state.push_message(MessageRole::System, format!("pane expanded: {pane}"));
+            } else {
+                state.push_message(
+                    MessageRole::Error,
+                    format!("pane unavailable in the active tab: {pane}"),
+                );
+            }
+        }
+        PaneAction::Toggle { pane } => match state.toggle_workspace_pane(pane) {
+            Some(collapsed) => state.push_message(
+                MessageRole::System,
+                format!(
+                    "pane {}: {pane}",
+                    if collapsed { "collapsed" } else { "expanded" }
+                ),
+            ),
+            None => state.push_message(
+                MessageRole::Error,
+                format!("pane unavailable in the active tab: {pane}"),
+            ),
+        },
+    }
+}
+
+fn layout_summary_for_tab(state: &TuiState, tab: Option<TabId>) -> serde_json::Value {
+    let target = tab.unwrap_or_else(|| state.workspace_tab());
+    if target == state.workspace_tab() {
+        return state.workspace_layout_summary();
+    }
+    let model = state
+        .workspace_layout_states()
+        .into_iter()
+        .find(|layout| layout.tab == target)
+        .unwrap_or_else(|| LayoutModel::new(target));
+    let (width, height) = state.workspace_viewport();
+    let snapshot = model.compute(width, height);
+    serde_json::json!({
+        "tab": model.tab,
+        "ratios": model.ratios,
+        "focused": model.focused,
+        "collapsed": model.collapsed,
+        "breakpoint": snapshot.breakpoint,
+        "visible_panes": snapshot.visible_panes().map(|pane| pane.id).collect::<Vec<_>>(),
+        "layout_dirty": state.layout_dirty,
+    })
 }
 
 fn format_agent_status(agent: &crate::core::Agent) -> String {
