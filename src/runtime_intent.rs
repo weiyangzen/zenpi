@@ -42,10 +42,31 @@ pub enum RuntimeIntentError {
     InvalidNumber { option: String, value: String },
     #[error("runtime option `{0}` is not supported")]
     UnsupportedOption(String),
+    #[error("runtime request ID `{0}` was already stored for a different intent")]
+    RequestConflict(String),
     #[error("runtime intent failed: {0}")]
     Agent(#[from] AgentError),
     #[error("runtime intent failed: {0}")]
     B3(#[from] crate::b3::B3Error),
+}
+
+impl RuntimeIntentError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::RequestConflict(_) => "runtime_intent_conflict",
+            _ => "runtime_intent_error",
+        }
+    }
+}
+
+/// Durable request identity supplied by the headless transport. The
+/// fingerprint excludes the request ID, matching ordinary in-process replay
+/// semantics while allowing the same operation to be deduplicated after a
+/// process restart.
+#[derive(Debug, Clone, Copy)]
+pub struct RuntimeIntentSource<'a> {
+    pub request_id: &'a str,
+    pub fingerprint: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -86,15 +107,65 @@ pub fn runtime_intent_value(
     kind: RuntimeIntentKind,
     args: &[String],
 ) -> Result<Value, RuntimeIntentError> {
+    runtime_intent_value_with_source(agent, kind, args, None)
+}
+
+/// Execute a runtime-intent owner action with an optional durable headless
+/// idempotency key. A matching retry returns the existing record without an
+/// append; reusing the key for different normalized input fails closed.
+pub fn runtime_intent_value_with_source(
+    agent: &mut Agent,
+    kind: RuntimeIntentKind,
+    args: &[String],
+    source: Option<RuntimeIntentSource<'_>>,
+) -> Result<Value, RuntimeIntentError> {
     let (action, remaining) = split_action(args)?;
     if action == "status" {
         if !remaining.is_empty() {
             return Err(RuntimeIntentError::StatusArguments);
         }
+        if let Some(source) = source
+            && let Some(existing) = agent
+                .session()
+                .runtime_intents()
+                .iter()
+                .find(|intent| intent.source_request_id.as_deref() == Some(source.request_id))
+        {
+            if existing.request_fingerprint.as_deref() != Some(source.fingerprint) {
+                return Err(RuntimeIntentError::RequestConflict(
+                    source.request_id.to_owned(),
+                ));
+            }
+            return Err(RuntimeIntentError::RequestConflict(
+                source.request_id.to_owned(),
+            ));
+        }
         return Ok(status_value(agent, kind));
     }
 
     let options = parse_submit_options(kind, remaining)?;
+    if let Some(source) = source
+        && let Some(existing) = agent
+            .session()
+            .runtime_intents()
+            .iter()
+            .find(|intent| intent.source_request_id.as_deref() == Some(source.request_id))
+    {
+        if existing.request_fingerprint.as_deref() != Some(source.fingerprint) {
+            return Err(RuntimeIntentError::RequestConflict(
+                source.request_id.to_owned(),
+            ));
+        }
+        let estimator = estimator_for(existing)?;
+        return Ok(intent_value(
+            agent,
+            existing.clone(),
+            estimator,
+            action,
+            false,
+            true,
+        ));
+    }
     let ordinal = agent.session().next_sequence();
     let session_id = agent.session().session_id().to_owned();
     let id_prefix = kind.as_str();
@@ -124,7 +195,7 @@ pub fn runtime_intent_value(
         (None, None) => None,
         _ => return Err(RuntimeIntentError::IncompleteParentLease),
     };
-    let intent = RuntimeIntent::new(
+    let mut intent = RuntimeIntent::new(
         intent_id,
         kind,
         options.parent_ref,
@@ -135,18 +206,34 @@ pub fn runtime_intent_value(
         session_id,
         unix_time_ms(),
     )?;
+    if let Some(source) = source {
+        intent = intent.with_source_request(source.request_id, source.fingerprint)?;
+    }
 
     // Validate the companion estimate before mutating the journal. It is
     // returned with the intent so an external owner can retain or enrich it.
     let estimator = estimator_for(&intent)?;
     agent.append_runtime_intent(intent.clone())?;
-    Ok(json!({
-        "command": kind.as_str(),
+    Ok(intent_value(agent, intent, estimator, action, true, false))
+}
+
+fn intent_value(
+    agent: &Agent,
+    intent: RuntimeIntent,
+    estimator: EstimatorPolicy,
+    action: &str,
+    created: bool,
+    idempotent_replay: bool,
+) -> Value {
+    json!({
+        "command": intent.kind.as_str(),
         "route": "runtime_intent",
         "action": action,
         "accepted": true,
         "persisted": true,
         "durable": true,
+        "created": created,
+        "idempotent_replay": idempotent_replay,
         "delivery": "journal_only",
         "zenpi_started": false,
         "execution_state": "untracked",
@@ -154,7 +241,7 @@ pub fn runtime_intent_value(
         "estimator": estimator,
         "next_sequence": agent.session().next_sequence(),
         "message": "runtime intent stored locally; external delivery and execution are untracked",
-    }))
+    })
 }
 
 fn split_action(args: &[String]) -> Result<(&str, &[String]), RuntimeIntentError> {

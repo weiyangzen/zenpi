@@ -2633,9 +2633,18 @@ where
                 )?;
                 return Ok(());
             }
+            let durable_fingerprint = slash_runtime_fingerprint(&parsed)?;
+            let runtime_source = id.as_deref().and_then(|request_id| {
+                durable_fingerprint.as_deref().map(|fingerprint| {
+                    crate::runtime_intent::RuntimeIntentSource {
+                        request_id,
+                        fingerprint,
+                    }
+                })
+            });
             let execution = match shared.try_lock() {
-                Ok(mut agent) => execute_headless_slash(Some(&mut agent), parsed),
-                Err(_) => execute_headless_slash(None, parsed),
+                Ok(mut agent) => execute_headless_slash(Some(&mut agent), parsed, runtime_source),
+                Err(_) => execute_headless_slash(None, parsed, runtime_source),
             };
             match execution {
                 Ok(SlashExecution::Response(data)) => {
@@ -3607,6 +3616,7 @@ pub fn respond_to_slash_approval(
 fn execute_headless_slash(
     agent: Option<&mut Agent>,
     command: crate::slash::SlashCommand,
+    runtime_source: Option<crate::runtime_intent::RuntimeIntentSource<'_>>,
 ) -> Result<SlashExecution, SlashDispatchError> {
     use crate::slash::{BlueprintAction, SlashCommand};
 
@@ -3981,14 +3991,15 @@ fn execute_headless_slash(
                     message: "compete intent cannot be persisted while the agent is busy".into(),
                 });
             };
-            crate::runtime_intent::runtime_intent_value(
+            crate::runtime_intent::runtime_intent_value_with_source(
                 agent,
                 crate::b3::RuntimeIntentKind::Compete,
                 &args,
+                runtime_source,
             )
             .map(SlashExecution::Response)
             .map_err(|error| SlashDispatchError {
-                code: "runtime_intent_error",
+                code: error.code(),
                 message: error.to_string(),
             })
         }
@@ -3999,18 +4010,43 @@ fn execute_headless_slash(
                     message: "loop intent cannot be persisted while the agent is busy".into(),
                 });
             };
-            crate::runtime_intent::runtime_intent_value(
+            crate::runtime_intent::runtime_intent_value_with_source(
                 agent,
                 crate::b3::RuntimeIntentKind::Loop,
                 &args,
+                runtime_source,
             )
             .map(SlashExecution::Response)
             .map_err(|error| SlashDispatchError {
-                code: "runtime_intent_error",
+                code: error.code(),
                 message: error.to_string(),
             })
         }
     }
+}
+
+/// Fingerprint only the durable runtime intent semantics. Unlike the terminal
+/// replay fingerprint, this digest survives aliases and request-envelope
+/// version changes across process restarts.
+fn slash_runtime_fingerprint(
+    command: &crate::slash::SlashCommand,
+) -> Result<Option<String>, HeadlessError> {
+    use sha2::{Digest, Sha256};
+
+    let value = match command {
+        crate::slash::SlashCommand::Compete { args } => {
+            Some(json!({"kind": "compete", "args": args}))
+        }
+        crate::slash::SlashCommand::Loop { args } => Some(json!({"kind": "loop", "args": args})),
+        _ => None,
+    };
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    Ok(Some(format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&value)?)
+    )))
 }
 
 fn bound_slash_text(value: &str, max_bytes: usize) -> String {
@@ -4061,7 +4097,16 @@ fn handle_command<W: Write>(
                         action: crate::slash::SessionAction::Open { .. }
                     }
                 );
-                match execute_headless_slash(Some(agent), command) {
+                let durable_fingerprint = slash_runtime_fingerprint(&command)?;
+                let runtime_source = id.as_deref().and_then(|request_id| {
+                    durable_fingerprint.as_deref().map(|fingerprint| {
+                        crate::runtime_intent::RuntimeIntentSource {
+                            request_id,
+                            fingerprint,
+                        }
+                    })
+                });
+                match execute_headless_slash(Some(agent), command, runtime_source) {
                     Ok(SlashExecution::Response(data)) => {
                         let response = slash_execution_response(
                             id.clone(),

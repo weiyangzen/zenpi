@@ -168,6 +168,86 @@ fn session_fork_does_not_duplicate_pending_runtime_work() {
 }
 
 #[test]
+fn keyed_runtime_intent_replays_after_restart_without_a_second_append() {
+    use zenpi::runtime_intent::{RuntimeIntentSource, runtime_intent_value_with_source};
+
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("idempotent.jsonl");
+    let args = ["audit".into(), "owners".into()];
+    let fingerprint = "a".repeat(64);
+    let source = RuntimeIntentSource {
+        request_id: "wire-1",
+        fingerprint: &fingerprint,
+    };
+    let mut first = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let created = runtime_intent_value_with_source(
+        &mut first,
+        RuntimeIntentKind::Compete,
+        &args,
+        Some(source),
+    )
+    .unwrap();
+    assert_eq!(created["created"], true);
+    let sequence_after_create = first.session().next_sequence();
+    drop(first);
+
+    let mut reopened = Agent::with_echo(SessionStore::open_existing_writable(&path).unwrap());
+    assert_eq!(
+        reopened.session().runtime_intents()[0]
+            .request_fingerprint
+            .as_deref(),
+        Some(fingerprint.as_str())
+    );
+    let replayed = runtime_intent_value_with_source(
+        &mut reopened,
+        RuntimeIntentKind::Compete,
+        &args,
+        Some(source),
+    )
+    .unwrap();
+    assert_eq!(replayed["idempotent_replay"], true);
+    assert_eq!(replayed["created"], false);
+    assert_eq!(reopened.session().runtime_intents().len(), 1);
+    assert_eq!(reopened.session().next_sequence(), sequence_after_create);
+}
+
+#[test]
+fn keyed_runtime_intent_conflict_does_not_mutate_journal() {
+    use zenpi::runtime_intent::{
+        RuntimeIntentError, RuntimeIntentSource, runtime_intent_value_with_source,
+    };
+
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("conflict.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let first_fingerprint = "b".repeat(64);
+    let conflicting_fingerprint = "c".repeat(64);
+    runtime_intent_value_with_source(
+        &mut agent,
+        RuntimeIntentKind::Loop,
+        &["repair".into()],
+        Some(RuntimeIntentSource {
+            request_id: "wire-2",
+            fingerprint: &first_fingerprint,
+        }),
+    )
+    .unwrap();
+    let before = std::fs::read(&path).unwrap();
+    let error = runtime_intent_value_with_source(
+        &mut agent,
+        RuntimeIntentKind::Loop,
+        &["different".into()],
+        Some(RuntimeIntentSource {
+            request_id: "wire-2",
+            fingerprint: &conflicting_fingerprint,
+        }),
+    )
+    .unwrap_err();
+    assert!(matches!(error, RuntimeIntentError::RequestConflict(_)));
+    assert_eq!(std::fs::read(path).unwrap(), before);
+}
+
+#[test]
 fn excessive_runtime_budget_is_rejected_before_persistence() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("budget.jsonl");
@@ -211,4 +291,91 @@ fn runtime_task_can_preserve_double_dash_arguments_after_terminator() {
         agent.session().runtime_intents()[0].args,
         ["audit", "cargo", "--all-targets"]
     );
+}
+
+#[test]
+fn headless_runtime_intent_retry_is_deduplicated_across_restart() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("durable-idempotency.jsonl");
+    let request = concat!(
+        "{\"schema_version\":2,\"type\":\"command\",\"id\":\"intent-request-1\",",
+        "\"text\":\"/compete submit --parent GOAL-1 audit owners\"}\n",
+        "{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"first-stop\"}\n",
+    );
+
+    let mut first = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let mut first_output = Vec::new();
+    run_headless(
+        &mut first,
+        Cursor::new(request.as_bytes()),
+        &mut first_output,
+    )
+    .unwrap();
+    let first_response = json_lines(&first_output)
+        .into_iter()
+        .find(|record| record["id"] == "intent-request-1")
+        .unwrap();
+    assert_eq!(first_response["data"]["created"], true);
+    assert_eq!(first_response["data"]["idempotent_replay"], false);
+    let first_next_sequence = first.session().next_sequence();
+    assert_eq!(first.session().runtime_intents().len(), 1);
+
+    let retry = concat!(
+        "{\"schema_version\":1,\"type\":\"slash\",\"id\":\"intent-request-1\",",
+        "\"message\":\"/compete submit --parent GOAL-1 audit owners\"}\n",
+        "{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"second-stop\"}\n",
+    );
+    let mut second = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let mut second_output = Vec::new();
+    run_headless(
+        &mut second,
+        Cursor::new(retry.as_bytes()),
+        &mut second_output,
+    )
+    .unwrap();
+    let retry_response = json_lines(&second_output)
+        .into_iter()
+        .find(|record| record["id"] == "intent-request-1")
+        .unwrap();
+    assert_eq!(retry_response["success"], true);
+    assert_eq!(retry_response["data"]["created"], false);
+    assert_eq!(retry_response["data"]["idempotent_replay"], true);
+    assert_eq!(second.session().runtime_intents().len(), 1);
+    assert_eq!(second.session().next_sequence(), first_next_sequence);
+}
+
+#[test]
+fn headless_runtime_intent_request_id_conflict_is_durable_and_write_free() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("durable-conflict.jsonl");
+    let first_input = concat!(
+        "{\"schema_version\":2,\"type\":\"command\",\"id\":\"shared-intent\",",
+        "\"text\":\"/loop start repair ITEM-1\"}\n",
+        "{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"first-stop\"}\n",
+    );
+    let mut first = Agent::with_echo(SessionStore::open(&path).unwrap());
+    run_headless(&mut first, Cursor::new(first_input.as_bytes()), Vec::new()).unwrap();
+    let before = std::fs::read(&path).unwrap();
+
+    let conflict_input = concat!(
+        "{\"schema_version\":2,\"type\":\"command\",\"id\":\"shared-intent\",",
+        "\"text\":\"/loop start repair ITEM-2\"}\n",
+        "{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"second-stop\"}\n",
+    );
+    let mut second = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let mut output = Vec::new();
+    run_headless(
+        &mut second,
+        Cursor::new(conflict_input.as_bytes()),
+        &mut output,
+    )
+    .unwrap();
+    let response = json_lines(&output)
+        .into_iter()
+        .find(|record| record["id"] == "shared-intent")
+        .unwrap();
+    assert_eq!(response["success"], false);
+    assert_eq!(response["code"], "runtime_intent_conflict");
+    assert_eq!(second.session().runtime_intents().len(), 1);
+    assert_eq!(std::fs::read(path).unwrap(), before);
 }

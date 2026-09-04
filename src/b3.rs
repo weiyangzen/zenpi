@@ -898,6 +898,9 @@ pub const RUNTIME_INTENT_SCHEMA_VERSION: u16 = 1;
 pub const MAX_RUNTIME_INTENT_BYTES: usize = 64 * 1024;
 pub const MAX_RUNTIME_ARGUMENTS: usize = 64;
 pub const MAX_RUNTIME_ARGUMENT_BYTES: usize = 4096;
+/// Correlation IDs originate in the bounded headless protocol. Keeping the
+/// limit here avoids making durable b3 records depend on a transport module.
+pub const MAX_RUNTIME_SOURCE_REQUEST_ID_BYTES: usize = 128;
 pub const MAX_RUNTIME_TOKENS: u64 = 10_000_000;
 pub const MAX_RUNTIME_WALL_CLOCK_MS: u64 = 24 * 60 * 60 * 1_000;
 pub const MAX_RUNTIME_ATTEMPTS: u32 = 64;
@@ -1112,6 +1115,14 @@ pub struct RuntimeIntent {
     pub envelope: ResourceEnvelope,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_lease: Option<ParentLeaseRef>,
+    /// Optional durable idempotency key supplied by a composed headless
+    /// client. TUI-created intents have no transport request ID and leave both
+    /// source fields absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_request_id: Option<String>,
+    /// Lowercase SHA-256 of the normalized source request, excluding its ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_fingerprint: Option<String>,
     pub session_id: String,
     pub created_at_ms: u64,
 }
@@ -1138,11 +1149,27 @@ impl RuntimeIntent {
             route,
             envelope,
             parent_lease,
+            source_request_id: None,
+            request_fingerprint: None,
             session_id: session_id.into(),
             created_at_ms,
         };
         intent.validate()?;
         Ok(intent)
+    }
+
+    /// Associate this inert intent with one durable headless idempotency key.
+    /// Both values are validated together so a partially keyed record can
+    /// never enter a session journal.
+    pub fn with_source_request(
+        mut self,
+        request_id: impl Into<String>,
+        fingerprint: impl Into<String>,
+    ) -> Result<Self, B3Error> {
+        self.source_request_id = Some(request_id.into());
+        self.request_fingerprint = Some(fingerprint.into());
+        self.validate()?;
+        Ok(self)
     }
 
     pub fn validate(&self) -> Result<(), B3Error> {
@@ -1216,6 +1243,33 @@ impl RuntimeIntent {
             if parent.max_tokens == 0 || parent.max_tokens < budget.tokens {
                 return Err(B3Error::BudgetExceeded {
                     field: "parent lease",
+                });
+            }
+        }
+        match (&self.source_request_id, &self.request_fingerprint) {
+            (Some(request_id), Some(fingerprint)) => {
+                if request_id.trim().is_empty()
+                    || request_id.len() > MAX_RUNTIME_SOURCE_REQUEST_ID_BYTES
+                    || request_id.chars().any(char::is_control)
+                {
+                    return Err(B3Error::InvalidId {
+                        field: "runtime source request_id",
+                    });
+                }
+                if fingerprint.len() != 64
+                    || !fingerprint
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                {
+                    return Err(B3Error::InvalidId {
+                        field: "runtime request fingerprint",
+                    });
+                }
+            }
+            (None, None) => {}
+            _ => {
+                return Err(B3Error::InvalidId {
+                    field: "runtime request identity",
                 });
             }
         }

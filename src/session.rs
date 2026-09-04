@@ -565,6 +565,19 @@ impl SessionStore {
                 "runtime intent session does not match journal".into(),
             ));
         }
+        if let Some(source_request_id) = intent.source_request_id.as_deref()
+            && let Some(existing) = self
+                .runtime_intents
+                .iter()
+                .find(|existing| existing.source_request_id.as_deref() == Some(source_request_id))
+        {
+            if existing.request_fingerprint == intent.request_fingerprint {
+                return Ok(());
+            }
+            return Err(SessionError::InvalidRecord(format!(
+                "runtime request ID `{source_request_id}` conflicts with an existing intent"
+            )));
+        }
         self.append_json(&json!({ "kind": "runtime_intent", "intent": &intent }))?;
         self.runtime_intents.push(intent);
         Ok(())
