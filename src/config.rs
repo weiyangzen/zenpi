@@ -11,7 +11,7 @@ use std::{
     collections::BTreeMap,
     env,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     process,
     time::{SystemTime, UNIX_EPOCH},
@@ -21,6 +21,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+
+use crate::layout::{
+    LayoutError, LayoutModel, LayoutPreferences, MAX_LAYOUT_PREFERENCES_BYTES, TabId,
+};
+
 /// The directory name created below the user's home directory.
 pub const ZENPI_DIR: &str = ".zenpi";
 pub const CONFIG_FILE: &str = "config.toml";
@@ -28,6 +35,10 @@ pub const AUTH_FILE: &str = "auth.json";
 pub const SESSIONS_DIR: &str = "sessions";
 pub const SKILLS_DIR: &str = "skills";
 pub const EXTENSIONS_DIR: &str = "extensions";
+/// User-owned BentoBox state is kept separate from provider configuration and
+/// credentials. This lets a corrupt layout fail closed without making a
+/// working profile unusable.
+pub const LAYOUT_FILE: &str = "layout.json";
 pub const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
 /// A named provider profile. The legacy flat fields in [`ConfigFile`] remain
@@ -142,6 +153,18 @@ impl ConfigPaths {
             });
         }
         Ok(Self::for_home(home_dir()?))
+    }
+
+    /// Path of the bounded, non-secret BentoBox preference snapshot. It is a
+    /// method rather than another public struct field so existing callers that
+    /// construct `ConfigPaths` literals remain source-compatible.
+    pub fn layout_path(&self) -> PathBuf {
+        self.root.join(LAYOUT_FILE)
+    }
+
+    /// Short alias used by hosts that treat paths as named resources.
+    pub fn layout(&self) -> PathBuf {
+        self.layout_path()
     }
 
     /// Create the directory with owner-only permissions and tighten an
@@ -1113,6 +1136,142 @@ pub fn status_for_profile(
     })
 }
 
+/// Load the user-owned BentoBox preference document. A missing file is an
+/// empty preference set (all tabs use their built-in presets); an existing
+/// malformed, oversized, stale, or symlinked file is an error and is never
+/// rewritten as a side effect.
+pub fn load_layout_preferences(paths: &ConfigPaths) -> Result<LayoutPreferences, ConfigError> {
+    let path = paths.layout_path();
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(LayoutPreferences::default());
+        }
+        Err(error) => return Err(error.into()),
+        Ok(_) => {}
+    }
+    secure_regular_file(&path)?;
+    let bytes = read_layout_bytes(&path)?;
+    LayoutPreferences::from_json_bytes(&bytes).map_err(ConfigError::from)
+}
+
+/// Migrate a legacy single-`LayoutModel` document in place. The operation is
+/// explicit so a read-only status or startup path never rewrites user files;
+/// parsing and validation complete before the atomic replacement begins.
+pub fn migrate_layout_preferences(paths: &ConfigPaths) -> Result<bool, ConfigError> {
+    let path = paths.layout_path();
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+        Ok(_) => {}
+    }
+    secure_regular_file(&path)?;
+    let bytes = read_layout_bytes(&path)?;
+    let (preferences, migrated) =
+        LayoutPreferences::from_json_bytes_with_migration(&bytes).map_err(ConfigError::from)?;
+    if !migrated {
+        return Ok(false);
+    }
+    save_layout_preferences(paths, &preferences)
+}
+
+/// Atomically save a validated BentoBox preference document. Serialization and
+/// validation happen before any filesystem mutation, while the common config
+/// writer preserves the previous valid snapshot if a write or rename fails.
+pub fn save_layout_preferences(
+    paths: &ConfigPaths,
+    preferences: &LayoutPreferences,
+) -> Result<bool, ConfigError> {
+    let bytes = preferences.to_json_bytes().map_err(ConfigError::from)?;
+    paths.ensure_root()?;
+    atomic_write_if_changed(&paths.layout_path(), &bytes)
+}
+
+/// Resolve one profile/tab to a layout model, falling back to the tab preset
+/// when no customization has been saved.
+pub fn load_layout(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+    tab: TabId,
+) -> Result<LayoutModel, ConfigError> {
+    load_layout_preferences(paths).and_then(|preferences| {
+        preferences
+            .model_for(profile, tab)
+            .map_err(ConfigError::from)
+    })
+}
+
+/// Persist only user-owned state for one profile/tab. Capabilities remain a
+/// host concern and are intentionally not serialized.
+pub fn save_layout(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+    model: &LayoutModel,
+) -> Result<bool, ConfigError> {
+    let mut preferences = load_layout_preferences(paths)?;
+    let changed = preferences
+        .set_model(profile, model)
+        .map_err(ConfigError::from)?;
+    if !changed {
+        return Ok(false);
+    }
+    save_layout_preferences(paths, &preferences)
+}
+
+/// Reset one profile/tab to its built-in preset. Reset is idempotent and does
+/// not create a preference file when no customization exists.
+pub fn reset_layout(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+    tab: TabId,
+) -> Result<bool, ConfigError> {
+    let mut preferences = load_layout_preferences(paths)?;
+    let changed = preferences
+        .reset_tab(profile, tab)
+        .map_err(ConfigError::from)?;
+    if !changed {
+        return Ok(false);
+    }
+    save_layout_preferences(paths, &preferences)
+}
+
+/// Reset every saved tab for one profile. This is useful for a profile-level
+/// `/layout reset` command while retaining other profiles' preferences.
+pub fn reset_layout_profile(
+    paths: &ConfigPaths,
+    profile: Option<&str>,
+) -> Result<bool, ConfigError> {
+    let mut preferences = load_layout_preferences(paths)?;
+    let changed = preferences
+        .reset_profile(profile)
+        .map_err(ConfigError::from)?;
+    if !changed {
+        return Ok(false);
+    }
+    save_layout_preferences(paths, &preferences)
+}
+
+fn read_layout_bytes(path: &Path) -> Result<Vec<u8>, ConfigError> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    let mut file = options.open(path)?;
+    let mut bytes = Vec::new();
+    // Read one byte beyond the limit so an oversized file is rejected without
+    // allocating the complete hostile payload.
+    Read::by_ref(&mut file)
+        .take((MAX_LAYOUT_PREFERENCES_BYTES as u64).saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_LAYOUT_PREFERENCES_BYTES {
+        return Err(LayoutError::Json(format!(
+            "layout preferences exceed {} bytes",
+            MAX_LAYOUT_PREFERENCES_BYTES
+        ))
+        .into());
+    }
+    Ok(bytes)
+}
+
 /// Return a path inside the configured zenpi root. Reject absolute paths and
 /// parent traversal so session/skill/extension commands cannot escape it.
 pub fn scoped_path(
@@ -1222,6 +1381,8 @@ pub enum ConfigError {
     TomlSerialize(#[from] toml::ser::Error),
     #[error("configuration JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("layout preferences: {0}")]
+    Layout(#[from] LayoutError),
 }
 
 fn choose<'a>(

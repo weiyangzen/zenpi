@@ -5,9 +5,10 @@
 //! pane minimums, and tab presets cheap to test and safe to reuse from the
 //! headless protocol or a future desktop client.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Wire/schema version for persisted layout preferences.
 pub const LAYOUT_SCHEMA_VERSION: u16 = 1;
@@ -115,6 +116,315 @@ impl std::fmt::Display for PaneId {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(self.as_str())
     }
+}
+
+/// Maximum number of bytes accepted for the user-owned BentoBox preference
+/// snapshot.  Layout preferences are intentionally tiny; this guard keeps a
+/// damaged or hostile file from turning startup into an unbounded allocation.
+pub const MAX_LAYOUT_PREFERENCES_BYTES: usize = 256 * 1024;
+/// Maximum number of provider profiles that may own layout preferences.
+pub const MAX_LAYOUT_PROFILES: usize = 64;
+/// Maximum number of pane entries retained in one tab's collapsed set.
+pub const MAX_LAYOUT_COLLAPSED_PANES: usize = 64;
+
+/// A validated, serializable snapshot of one tab's user-owned state.  Pane
+/// capabilities are deliberately omitted: browser/PTY availability belongs
+/// to the host and is applied after this state is loaded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PersistedTabLayout {
+    pub ratios: ColumnRatios,
+    #[serde(default)]
+    pub collapsed: BTreeSet<PaneId>,
+    #[serde(default)]
+    pub focused: Option<PaneId>,
+}
+
+impl PersistedTabLayout {
+    pub fn from_model(model: &LayoutModel) -> Self {
+        Self {
+            ratios: model.ratios,
+            collapsed: model.collapsed.clone(),
+            focused: model.focused,
+        }
+    }
+
+    fn apply_to_model(&self, model: &mut LayoutModel) {
+        model.ratios = self.ratios;
+        model.collapsed = self.collapsed.clone();
+        model.focused = self.focused;
+    }
+}
+
+/// Preferences for one named provider profile.  A profile can have one
+/// independent BentoBox state per upper workspace tab.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileLayoutPreferences {
+    #[serde(default)]
+    pub tabs: BTreeMap<TabId, PersistedTabLayout>,
+}
+
+/// On-disk BentoBox preference document.  It is separate from provider
+/// credentials/configuration so a malformed layout can never invalidate a
+/// working provider profile, and so reset can replace only this file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LayoutPreferences {
+    pub schema_version: u16,
+    #[serde(default)]
+    pub profiles: BTreeMap<String, ProfileLayoutPreferences>,
+}
+
+impl Default for LayoutPreferences {
+    fn default() -> Self {
+        Self {
+            schema_version: LAYOUT_SCHEMA_VERSION,
+            profiles: BTreeMap::new(),
+        }
+    }
+}
+
+/// Validation failures are kept typed so callers can fail closed without
+/// guessing whether a file was corrupt, stale, or out of bounds.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum LayoutError {
+    #[error("unsupported layout schema {found} (expected {expected})")]
+    SchemaVersion { found: u16, expected: u16 },
+    #[error("layout profile `{0}` is invalid")]
+    InvalidProfile(String),
+    #[error("layout preferences contain too many profiles (maximum {0})")]
+    TooManyProfiles(usize),
+    #[error("layout profile `{profile}` contains too many tabs (maximum {max})")]
+    TooManyTabs { profile: String, max: usize },
+    #[error("layout tab `{tab}` has out-of-range ratios")]
+    InvalidRatios { tab: TabId },
+    #[error("layout tab `{tab}` has too many collapsed panes (maximum {max})")]
+    TooManyCollapsed { tab: TabId, max: usize },
+    #[error("pane `{pane}` does not belong to tab `{tab}`")]
+    UnknownPane { tab: TabId, pane: PaneId },
+    #[error("layout JSON: {0}")]
+    Json(String),
+}
+
+impl LayoutPreferences {
+    /// Validate schema, profile names, bounds, and pane identity.  The
+    /// validator rejects rather than clamps values so a typo cannot silently
+    /// change the user's layout or make geometry unsafe.
+    pub fn validate(&self) -> Result<(), LayoutError> {
+        if self.schema_version != LAYOUT_SCHEMA_VERSION {
+            return Err(LayoutError::SchemaVersion {
+                found: self.schema_version,
+                expected: LAYOUT_SCHEMA_VERSION,
+            });
+        }
+        if self.profiles.len() > MAX_LAYOUT_PROFILES {
+            return Err(LayoutError::TooManyProfiles(MAX_LAYOUT_PROFILES));
+        }
+        for (profile, preferences) in &self.profiles {
+            validate_layout_profile_name(profile)?;
+            if preferences.tabs.len() > TabId::ALL.len() {
+                return Err(LayoutError::TooManyTabs {
+                    profile: profile.clone(),
+                    max: TabId::ALL.len(),
+                });
+            }
+            for (tab, state) in &preferences.tabs {
+                validate_tab_state(*tab, state)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Decode a bounded JSON document and validate it before returning it.
+    /// This is intentionally a layout-level helper so headless and TUI hosts
+    /// can share exactly the same migration and fail-closed behavior.
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self, LayoutError> {
+        Self::from_json_bytes_with_migration(bytes).map(|(preferences, _)| preferences)
+    }
+
+    /// Decode a document and report whether it used the pre-v1 single-model
+    /// shape. The caller may then explicitly persist the returned v1 document
+    /// through the config store; ordinary reads remain side-effect free.
+    pub fn from_json_bytes_with_migration(bytes: &[u8]) -> Result<(Self, bool), LayoutError> {
+        if bytes.len() > MAX_LAYOUT_PREFERENCES_BYTES {
+            return Err(LayoutError::Json(format!(
+                "layout preferences exceed {} bytes",
+                MAX_LAYOUT_PREFERENCES_BYTES
+            )));
+        }
+        let value: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|error| LayoutError::Json(error.to_string()))?;
+        let needs_migration = value.get("schema_version").is_none();
+        let preferences = Self::migrate_value(value)?;
+        preferences.validate()?;
+        Ok((preferences, needs_migration))
+    }
+
+    /// Serialize a validated snapshot with a deterministic size bound.
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, LayoutError> {
+        self.validate()?;
+        let mut bytes = serde_json::to_vec_pretty(self)
+            .map_err(|error| LayoutError::Json(error.to_string()))?;
+        bytes.push(b'\n');
+        if bytes.len() > MAX_LAYOUT_PREFERENCES_BYTES {
+            return Err(LayoutError::Json(format!(
+                "layout preferences exceed {} bytes",
+                MAX_LAYOUT_PREFERENCES_BYTES
+            )));
+        }
+        Ok(bytes)
+    }
+
+    /// Return the saved state for a profile/tab, if one exists.
+    pub fn tab_state(
+        &self,
+        profile: Option<&str>,
+        tab: TabId,
+    ) -> Result<Option<&PersistedTabLayout>, LayoutError> {
+        let profile = layout_profile_key(profile)?;
+        Ok(self
+            .profiles
+            .get(&profile)
+            .and_then(|entry| entry.tabs.get(&tab)))
+    }
+
+    /// Build a layout model from the saved state, falling back to the named
+    /// preset when this profile/tab has never been customized.
+    pub fn model_for(&self, profile: Option<&str>, tab: TabId) -> Result<LayoutModel, LayoutError> {
+        self.validate()?;
+        let mut model = LayoutModel::new(tab);
+        if let Some(state) = self.tab_state(profile, tab)? {
+            state.apply_to_model(&mut model);
+        }
+        Ok(model)
+    }
+
+    /// Store one model's user-owned state.  The model's host capabilities are
+    /// not persisted; this keeps a layout portable across machines.
+    pub fn set_model(
+        &mut self,
+        profile: Option<&str>,
+        model: &LayoutModel,
+    ) -> Result<bool, LayoutError> {
+        let profile = layout_profile_key(profile)?;
+        let state = PersistedTabLayout::from_model(model);
+        validate_tab_state(model.tab, &state)?;
+        self.validate()?;
+        let mut next = self.clone();
+        let entry = next.profiles.entry(profile).or_default();
+        if entry.tabs.get(&model.tab) == Some(&state) {
+            return Ok(false);
+        }
+        entry.tabs.insert(model.tab, state);
+        next.validate()?;
+        *self = next;
+        Ok(true)
+    }
+
+    /// Remove one saved tab state.  Reset is idempotent and does not retain an
+    /// empty profile entry on disk.
+    pub fn reset_tab(&mut self, profile: Option<&str>, tab: TabId) -> Result<bool, LayoutError> {
+        let profile = layout_profile_key(profile)?;
+        let Some(entry) = self.profiles.get_mut(&profile) else {
+            return Ok(false);
+        };
+        let changed = entry.tabs.remove(&tab).is_some();
+        if entry.tabs.is_empty() {
+            self.profiles.remove(&profile);
+        }
+        Ok(changed)
+    }
+
+    /// Remove every saved tab state for one profile.
+    pub fn reset_profile(&mut self, profile: Option<&str>) -> Result<bool, LayoutError> {
+        let profile = layout_profile_key(profile)?;
+        Ok(self.profiles.remove(&profile).is_some())
+    }
+
+    /// Migrate the only pre-v1 shape we support: a serialized `LayoutModel`
+    /// without a schema/profile wrapper.  It becomes the `default` profile.
+    /// Unknown or partial legacy data is rejected rather than guessed.
+    fn migrate_value(value: serde_json::Value) -> Result<Self, LayoutError> {
+        let schema = value
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64)
+            .map(|version| u16::try_from(version).unwrap_or(u16::MAX));
+        match schema {
+            Some(version) if version != LAYOUT_SCHEMA_VERSION => Err(LayoutError::SchemaVersion {
+                found: version,
+                expected: LAYOUT_SCHEMA_VERSION,
+            }),
+            Some(_) => {
+                serde_json::from_value(value).map_err(|error| LayoutError::Json(error.to_string()))
+            }
+            None => {
+                let legacy: LayoutModel = serde_json::from_value(value)
+                    .map_err(|error| LayoutError::Json(error.to_string()))?;
+                let mut preferences = Self::default();
+                preferences.set_model(None, &legacy)?;
+                Ok(preferences)
+            }
+        }
+    }
+}
+
+fn validate_tab_state(tab: TabId, state: &PersistedTabLayout) -> Result<(), LayoutError> {
+    let ratios = state.ratios;
+    if ratios.left < ColumnRatios::MIN
+        || ratios.center < ColumnRatios::MIN
+        || ratios.right < ColumnRatios::MIN
+        || ratios.left > ColumnRatios::MAX
+        || ratios.center > ColumnRatios::MAX
+        || ratios.right > ColumnRatios::MAX
+        || ratios
+            .left
+            .saturating_add(ratios.center)
+            .saturating_add(ratios.right)
+            != ColumnRatios::TOTAL
+    {
+        return Err(LayoutError::InvalidRatios { tab });
+    }
+    if state.collapsed.len() > MAX_LAYOUT_COLLAPSED_PANES {
+        return Err(LayoutError::TooManyCollapsed {
+            tab,
+            max: MAX_LAYOUT_COLLAPSED_PANES,
+        });
+    }
+    let valid = LayoutPreset::for_tab(tab)
+        .panes
+        .into_iter()
+        .map(|pane| pane.id)
+        .collect::<BTreeSet<_>>();
+    for pane in state.collapsed.iter().copied() {
+        if !valid.contains(&pane) {
+            return Err(LayoutError::UnknownPane { tab, pane });
+        }
+    }
+    if let Some(pane) = state.focused
+        && !valid.contains(&pane)
+    {
+        return Err(LayoutError::UnknownPane { tab, pane });
+    }
+    Ok(())
+}
+
+fn layout_profile_key(profile: Option<&str>) -> Result<String, LayoutError> {
+    let profile = profile.unwrap_or("default");
+    validate_layout_profile_name(profile)?;
+    Ok(profile.to_owned())
+}
+
+fn validate_layout_profile_name(profile: &str) -> Result<(), LayoutError> {
+    if profile.is_empty()
+        || profile.len() > 128
+        || profile
+            .chars()
+            .any(|character| !(character.is_ascii_alphanumeric() || matches!(character, '_' | '-')))
+    {
+        return Err(LayoutError::InvalidProfile(profile.to_owned()));
+    }
+    Ok(())
 }
 
 /// Responsive layout bands.  A zero-sized viewport is kept separate from a
