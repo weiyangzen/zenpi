@@ -86,7 +86,7 @@ can be repeated after each integration pass.
 | 9 | Interrupt and cancellation | PARTIAL | `src/runtime.rs` has a cooperative `CancellationToken`; core/tool loops check it; TUI/headless expose cancel/live-steer paths (including typed slash `/cancel`), including bounded promotion of a deferred headless steer before shutdown; production hosts now join owned runners, and deterministic headless tests cover deferred steer admission and shutdown ordering. | A blocking `ureq` read or non-streaming Chat request cannot be interrupted at socket granularity; byte budgets for other event/control queues, control-input fairness, and complete shutdown/close-hook semantics remain to be accepted. |
 | 10 | Terminal resize adaptation | PARTIAL | `crossterm` resize handling and `tests/tui_resize.rs` cover the current view; `src/layout.rs` plus `tests/layout.rs` provide wide/standard/compact/narrow/zero-cell geometry, capability collapse, ratios, tabs, presets, and deterministic focus/ratio APIs. The production async TUI now uses a bounded BentoBox adapter, tab bar, keyboard workspace controls, and profile/tab layout restore/save. | A full PTY acceptance matrix is still missing; the legacy synchronous callback keeps the compact vertical renderer. |
 | a | Code/text/simple-Markdown and block rendering | PARTIAL | `src/render.rs` is wired into the TUI for Assistant/System messages (headings, lists, quotes, fences, inline styles); `src/view_model.rs` now defines bounded plain/Markdown/code/diff/tool/approval/error blocks and adapters, while User/Tool/Error messages in the current renderer remain literal and sanitized. `tests/render_markdown.rs`, `tests/tui_markdown.rs`, and `tests/view_model.rs` cover the bounded subset. The audit note [`Docs/research/zenpi-rendering.md`](research/zenpi-rendering.md) records the remaining boundary. | Carry the shared block model through headless events, add streaming fence boundaries, and accept deterministic golden snapshots. |
-| b | Slash command area and common commands | PARTIAL | The hand-written CLI parser covers process commands such as `config`, `session`, and `extension`; `src/slash.rs` defines the shared typed grammar. Production TUI and headless route commands before provider submission. Goal status/show, bounded diff, attachment staging, domain read/put, Learn evidence/checkpoint inspection, session list/open/fork/export/import, durable resume/compact, real approval decisions, and journal-only compete/loop intent submit/status are exercised through owners; headless runtime-intent request IDs are deduplicated across restart and conflicting payload reuse fails closed. Unsupported actions return errors rather than fake success. | Wire `/session gc`, natural-language plan/domain execution, and the external compete/loop delivery, acknowledgement, and result lifecycle, then prove complete command-owner parity. |
+| b | Slash command area and common commands | PARTIAL | The hand-written CLI parser covers process commands such as `config`, `session`, and `extension`; `src/slash.rs` defines the shared typed grammar. Production TUI and headless route commands before provider submission. Goal status/show, bounded diff, attachment staging, domain read/put, Learn evidence/checkpoint inspection, session list/open/fork/export/import, durable resume/compact, real approval decisions, cancel, BentoBox `/layout` and `/pane` owner actions, and journal-only compete/loop intent submit/status are exercised through owners; headless runtime-intent request IDs are deduplicated across restart and conflicting payload reuse fails closed. Unsupported actions return errors rather than fake success. | Wire `/session gc`, natural-language plan/domain execution, and the external compete/loop delivery, acknowledgement, and result lifecycle, then prove complete command-owner parity; headless layout/pane requests still require the interactive TUI owner. |
 | b | b3ehive first-class domains | PARTIAL | `src/b3.rs` contains bounded handoff/budget/lease/evidence records; `src/domains.rs` adds typed, content-addressed Blueprint DAGs plus bounded Goal and Learn records, including the strict per-item `estimated_loc < 5000` invariant; `src/domain_store.rs` now provides a bounded, private, digest-checked JSONL snapshot store with atomic replacement and Goal-to-Blueprint validation. Read-only projections and explicit JSON `put` paths are wired in TUI/headless. Learn evidence owner commands validate a bounded repository-relative artifact, persist an idempotent reference, and return a hash receipt; Learn `resume` is explicitly a read-only checkpoint with external execution untracked. Compete/loop persist bounded typed runtime intents with explicit `journal_only` delivery and `execution_state: untracked`; headless keyed intents are restart-idempotent, and zenpi starts no hidden scheduler. | Blueprint/Goal execution owners, actual Learn worker resume/result handoff, and external runtime delivery/acknowledgement/result import remain open. |
 | c | Tabs and BentoBox workspace | PARTIAL | `src/layout.rs` defines Project/Goal/Learn/Review/Session tabs, capabilities, presets, breakpoints, safe geometry, focus/split controls, and strict profile/tab persistence. The production TUI renders the Ratatui workspace and uses separate single-slot workers for a bounded Resources pane and a bounded Blueprint/Goal summary projection in the center Gantt pane. Session switches clear the prior projection and reject stale completions. | This is a domain summary, not yet a complete Markdown progress Gantt: item execution status/evidence and Learn/Review/Session pane content remain open; periodic resource/domain polling is absent, and browser/PTY adapters stay disabled by default. |
 | d | Scaling and platform quality | PARTIAL | Ratatui/crossterm provide a small terminal surface; release settings use size-oriented optimization; the layout model and production async BentoBox adapter compute compact fallbacks safely, and profile/tab layout state is persisted with bounded JSON and fail-closed migration. | No measured pane-layout budget or production BentoBox PTY proof. A Svelte-quality GUI for macOS/Linux/Windows is deliberately future work, not a v2.0 dependency. |
@@ -273,8 +273,8 @@ request so TUI and headless behavior cannot drift.
 | `/compact` | compact context with a durable marker | core |
 | `/approve [id] once\|always\|deny` | answer a pending side-effect request | approval |
 | `/cancel` | cancel the active turn/tool/goal operation | core |
-| `/layout [preset\|reset\|save]` | choose and persist a BentoBox preset | TUI (parser/owner command still open; keyboard reset and automatic persistence are wired) |
-| `/pane [name]` | focus or collapse a pane | TUI |
+| `/layout [show\|preset\|reset\|save] [tab]` | inspect, select/reset, or persist a BentoBox preset | TUI owner (headless returns an explicit owner-required response) |
+| `/pane [show\|focus\|collapse\|expand\|toggle] [name]` | inspect, focus, or change pane visibility | TUI owner (headless returns an explicit owner-required response) |
 | `/clear`, `/quit` | clear view or close cleanly | TUI |
 
 Unknown commands, ambiguous arguments, and shell-looking payloads fail before
@@ -331,7 +331,10 @@ lower-right. The production async TUI now has the tab/adapter and keyboard
 focus/split controls; the legacy synchronous `run_with_state` path remains
 vertical. V2-206 completes real pane content and narrow-terminal stack behavior
 instead of forcing unreadable six-way splits. V2-207 retains the PTY and
-migration acceptance work for the already-wired persistence path.
+migration acceptance work for the already-wired persistence path. The typed
+`/layout` and `/pane` commands now dispatch to this TUI owner; headless accepts
+the grammar but returns an explicit owner-required response rather than
+mutating layout state without a terminal.
 
 ### 5.3 Scaling and focus rules
 
@@ -346,8 +349,9 @@ migration acceptance work for the already-wired persistence path.
 * `Ctrl-1..Ctrl-5` selects the upper tab; `Tab`/`Shift-Tab` and `Ctrl-Arrow`
   move focus; `Ctrl-Shift-Left/Right` adjusts the focused split by a bounded
   step; `Ctrl-0` resets the active layout. Automatic profile/tab save and
-  restore are wired through bounded `layout.json`; the `/layout` slash
-  parser/owner is still open.
+  restore are wired through bounded `layout.json`; the `/layout` and `/pane`
+  slash parser and TUI owner are wired. Headless parses these commands but
+  reports that an interactive TUI owner is required.
 
 ## 6. Rendering contract
 
