@@ -124,22 +124,6 @@ pub fn runtime_intent_value_with_source(
         if !remaining.is_empty() {
             return Err(RuntimeIntentError::StatusArguments);
         }
-        if let Some(source) = source
-            && let Some(existing) = agent
-                .session()
-                .runtime_intents()
-                .iter()
-                .find(|intent| intent.source_request_id.as_deref() == Some(source.request_id))
-        {
-            if existing.request_fingerprint.as_deref() != Some(source.fingerprint) {
-                return Err(RuntimeIntentError::RequestConflict(
-                    source.request_id.to_owned(),
-                ));
-            }
-            return Err(RuntimeIntentError::RequestConflict(
-                source.request_id.to_owned(),
-            ));
-        }
         return Ok(status_value(agent, kind));
     }
 
