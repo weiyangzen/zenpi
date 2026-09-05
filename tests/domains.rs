@@ -1,8 +1,9 @@
 use zenpi::{
     b3::ResourceBudget,
     domains::{
-        Blueprint, BlueprintItem, DomainError, Goal, GoalStatus, Learn, LeaseRef,
+        Blueprint, BlueprintItem, BlueprintTask, DomainError, Goal, GoalStatus, Learn, LeaseRef,
         MAX_BLUEPRINT_ITEMS, MAX_ESTIMATED_LOC_EXCLUSIVE, MAX_LEARN_EVIDENCE,
+        MAX_TASK_ACCEPTANCE_COMMAND_BYTES, MAX_TASK_ACCEPTANCE_COMMANDS, MAX_TEXT_BYTES,
     },
 };
 
@@ -180,4 +181,95 @@ fn rejected_learn_evidence_does_not_mutate_the_record() {
     assert!(learn.add_evidence(too_long).is_err());
     assert_eq!(learn, before);
     assert!(learn.validate().is_ok());
+}
+
+#[test]
+fn blueprint_task_is_optional_and_preserves_legacy_digest() {
+    let legacy = Blueprint::new("legacy", "1", vec![BlueprintItem::new("build", 120)]).unwrap();
+    let legacy_wire = r#"{"id":"legacy","version":"1","items":[{"id":"build","depends_on":[],"estimated_loc":120}],"digest":"PLACEHOLDER"}"#;
+    let expected = legacy
+        .compute_digest()
+        .expect("legacy canonical digest should be computable");
+    let legacy_wire = legacy_wire.replace("PLACEHOLDER", &expected);
+    assert_eq!(Blueprint::decode_json(&legacy_wire).unwrap(), legacy);
+    assert!(!legacy_wire.contains("task"));
+
+    let with_task = Blueprint::new(
+        "legacy",
+        "1",
+        vec![
+            BlueprintItem::new("build", 120).with_task(
+                BlueprintTask::new(
+                    "Implement the build step\nand keep it bounded",
+                    vec!["cargo test --locked".into()],
+                )
+                .unwrap(),
+            ),
+        ],
+    )
+    .unwrap();
+    assert_ne!(legacy.digest, with_task.digest);
+    assert_ne!(
+        legacy.canonical_bytes().unwrap(),
+        with_task.canonical_bytes().unwrap()
+    );
+}
+
+#[test]
+fn blueprint_task_rejects_invalid_boundaries() {
+    let valid = BlueprintTask::new("line one\nline two", vec!["cargo test --locked".into()]);
+    assert!(valid.is_ok());
+
+    for instruction in ["", "   ", "bad\0instruction", "bad\u{1b}[31m"] {
+        assert!(matches!(
+            BlueprintTask::new(instruction, vec!["true".into()]),
+            Err(DomainError::Empty {
+                field: "task_instruction"
+            }) | Err(DomainError::InvalidText {
+                field: "task_instruction"
+            })
+        ));
+    }
+    assert!(matches!(
+        BlueprintTask::new("x".repeat(MAX_TEXT_BYTES + 1), vec!["true".into()]),
+        Err(DomainError::TooLong {
+            field: "task_instruction",
+            ..
+        })
+    ));
+
+    assert!(matches!(
+        BlueprintTask::new("run", Vec::new()),
+        Err(DomainError::Empty {
+            field: "acceptance_commands"
+        })
+    ));
+    assert!(matches!(
+        BlueprintTask::new(
+            "run",
+            (0..=MAX_TASK_ACCEPTANCE_COMMANDS)
+                .map(|_| "true".to_owned())
+                .collect(),
+        ),
+        Err(DomainError::TooMany {
+            field: "acceptance_commands",
+            ..
+        })
+    ));
+    assert!(matches!(
+        BlueprintTask::new("run", vec!["echo ok\nfalse".into()]),
+        Err(DomainError::InvalidText {
+            field: "acceptance_command"
+        })
+    ));
+    assert!(matches!(
+        BlueprintTask::new(
+            "run",
+            vec!["x".repeat(MAX_TASK_ACCEPTANCE_COMMAND_BYTES + 1)],
+        ),
+        Err(DomainError::TooLong {
+            field: "acceptance_command",
+            ..
+        })
+    ));
 }

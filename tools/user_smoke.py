@@ -812,11 +812,13 @@ def assert_production_blueprint_execution(binary: Path, root: Path) -> None:
     """Prove the installed local Blueprint owner survives a process restart.
 
     This is intentionally a two-process control-plane check rather than a
-    Cargo-unit test.  The Blueprint and Goal are authored as ordinary JSON
+    Cargo-unit test. The Blueprint and Goal are authored as ordinary JSON
     files, admitted through the public ``put`` slash commands, and then one
-    dependency-ready item is run in each process.  A local endpoint that
-    returns an error is kept behind the configured provider URL; any request
-    reaching it means the control commands accidentally started a model turn.
+    dependency-ready bookkeeping step is recorded in each process. The local
+    receipt owner must not claim the Goal is done: it does not execute the
+    item's code or acceptance commands yet. A local endpoint that returns an
+    error is kept behind the configured provider URL; any request reaching it
+    means the control commands accidentally started a model turn.
     """
     workspace = root / "blueprint-execution-workspace"
     workspace.mkdir()
@@ -997,14 +999,14 @@ def assert_production_blueprint_execution(binary: Path, root: Path) -> None:
     if not (
         second_run.get("action") == "run"
         and second_run.get("status") == "succeeded"
-        and second_run.get("goal_status") == "done"
+        and second_run.get("goal_status") == "running"
         and second_run.get("receipt", {}).get("item_id") == "verify"
         and second_run.get("receipt", {}).get("status") == "succeeded"
         and second_run.get("receipt_count") == 2
     ):
         raise AssertionError(f"restart did not execute the dependency successor: {second!r}")
-    if second["goal-status"]["data"].get("goal", {}).get("status") != "done":
-        raise AssertionError(f"Goal status was not durable across restart: {second!r}")
+    if second["goal-status"]["data"].get("goal", {}).get("status") != "running":
+        raise AssertionError(f"Goal was incorrectly marked complete by local bookkeeping: {second!r}")
 
     second_snapshot = json.loads(execution_path.read_text(encoding="utf-8"))
     receipts = second_snapshot.get("receipts", [])

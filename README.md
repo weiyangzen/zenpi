@@ -172,7 +172,10 @@ after storing a Blueprint and linked Goal, `/blueprint run ID[@VERSION]` execute
 one dependency-ready item, persists a bounded private receipt, enforces the
 Goal budget, and can resume an interrupted receipt without a duplicate attempt.
 This is deterministic local evidence execution only; it does not run shell
-commands, contact the provider, or start a b3ehive scheduler.
+commands, contact the provider, or start a b3ehive scheduler. Its `succeeded`
+receipt therefore proves the local admission/recovery machinery, **not** that
+the Blueprint item's requested code change or acceptance test was actually
+performed. Real Blueprint work execution remains a v2 gap.
 
 Example:
 
@@ -263,6 +266,8 @@ session，跳过 domain/unowned 数据，并返回有界收据。工作区内 se
 `/learn resume ID` 只检查持久 checkpoint，不启动 worker。已保存 Blueprint 并关联 Goal 后，
 `/blueprint run ID[@VERSION]` 在 TUI/headless 中执行一个依赖就绪的本地证据步骤，持久化
 有界 receipt 并遵守 Goal budget；它不调用 provider、shell 或 b3ehive scheduler。
+因此 receipt 中的 `succeeded` 目前只证明本地准入、依赖和恢复机制成功，不代表该 item
+要求的代码修改或验收命令真的执行完成；真实 Blueprint 工作执行仍是 v2 缺口。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
 会在不创建、不修改文件的情况下返回错误；已有 journal 超过 256 MiB 也会在
 解析或修改权限前拒绝，不超过上限的有效 journal 会整体载入内存。

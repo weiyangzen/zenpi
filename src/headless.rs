@@ -2092,6 +2092,13 @@ fn sync_goal_status_after_execution(
             .latest_receipt_for(goal, blueprint, &item.id)
             .is_some_and(|receipt| {
                 receipt.status == crate::domain_execution::ExecutionStatus::Succeeded
+                    // The local receipt owner is deliberately not a worker.
+                    // Until an external executor imports evidence that the
+                    // item actually ran, its bookkeeping success must never
+                    // close the user-facing Goal.
+                    && receipt
+                        .evidence
+                        .contains("external_work_executed=true")
             })
     });
     if execution_complete && status == crate::domains::GoalStatus::Running {

@@ -105,7 +105,11 @@ impl ExecutionError {
     }
 }
 
-/// Lifecycle state for one deterministic execution attempt.
+/// Lifecycle state for one deterministic control-plane evidence attempt.
+///
+/// `Succeeded` means the receipt owner persisted and finalized its bounded
+/// local bookkeeping operation. It does not mean the Blueprint item's
+/// described implementation or acceptance command was executed.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionStatus {
@@ -197,7 +201,8 @@ impl ExecutionReceipt {
     }
 }
 
-/// Result of one call to [`BlueprintExecutor::run_next`].
+/// Result of one call to [`BlueprintExecutor::run_next`]. These outcomes
+/// describe receipt-owner progress, not completion of external product work.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunOutcome {
     /// One item reached a durable terminal state in this call.
@@ -527,7 +532,7 @@ impl BlueprintExecutor {
         self.store
     }
 
-    /// Select and execute at most one dependency-ready item.
+    /// Select and record at most one dependency-ready item.
     ///
     /// The local operation is intentionally deterministic: it creates an
     /// evidence string and no external side effect.  The cancellation closure
@@ -738,7 +743,7 @@ fn make_running_receipt(
         status: ExecutionStatus::Running,
         cost,
         evidence: format!(
-            "deterministic_local_evidence blueprint={} item={} estimated_loc={}",
+            "control_plane_only external_work_executed=false blueprint={} item={} estimated_loc={}",
             blueprint.digest, item.id, item.estimated_loc
         ),
         error: None,

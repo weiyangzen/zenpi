@@ -50,7 +50,7 @@ fn records(bytes: &[u8]) -> Vec<Value> {
 }
 
 #[test]
-fn headless_blueprint_run_executes_dependency_order_and_finishes_goal() {
+fn headless_blueprint_run_records_dependency_order_without_faking_goal_completion() {
     let dir = tempdir().unwrap();
     let session = dir.path().join("session.jsonl");
     seed(&session);
@@ -74,7 +74,7 @@ fn headless_blueprint_run_executes_dependency_order_and_finishes_goal() {
     let second = values.iter().find(|value| value["id"] == "second").unwrap();
     assert_eq!(second["success"], true);
     assert_eq!(second["data"]["receipt"]["item_id"], "verify");
-    assert_eq!(second["data"]["goal_status"], "done");
+    assert_eq!(second["data"]["goal_status"], "running");
     assert_eq!(second["data"]["receipt_count"], 2);
 
     let execution = zenpi::domain_execution::ExecutionStore::open(
@@ -91,7 +91,7 @@ fn headless_blueprint_run_executes_dependency_order_and_finishes_goal() {
     let persisted = DomainStore::open(path_for_session(&session)).unwrap();
     assert_eq!(
         persisted.goal("host-goal").unwrap().status,
-        zenpi::domains::GoalStatus::Done
+        zenpi::domains::GoalStatus::Running
     );
     assert!(
         agent.history().is_empty(),

@@ -48,6 +48,8 @@ fn owner_selects_dependencies_and_persists_running_then_terminal_receipts() {
     };
     assert_eq!(receipt.item_id, "first");
     assert_eq!(receipt.status, ExecutionStatus::Succeeded);
+    assert!(receipt.evidence.contains("control_plane_only"));
+    assert!(receipt.evidence.contains("external_work_executed=false"));
     assert_eq!(owner.store().receipts().len(), 1);
     assert_eq!(
         owner.store().receipts()[0].status,

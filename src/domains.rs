@@ -25,6 +25,8 @@ pub const MAX_VERSION_BYTES: usize = 64;
 pub const MAX_TEXT_BYTES: usize = 16 * 1024;
 pub const MAX_BLUEPRINT_ITEMS: usize = 256;
 pub const MAX_DEPENDENCIES_PER_ITEM: usize = 256;
+pub const MAX_TASK_ACCEPTANCE_COMMANDS: usize = 8;
+pub const MAX_TASK_ACCEPTANCE_COMMAND_BYTES: usize = 2 * 1024;
 pub const MAX_LEARN_EVIDENCE: usize = 256;
 pub const MAX_ESTIMATED_LOC_EXCLUSIVE: u32 = 5_000;
 
@@ -86,6 +88,28 @@ fn bounded_text(value: &str, field: &'static str, max: usize) -> Result<(), Doma
     Ok(())
 }
 
+fn bounded_instruction(value: &str, field: &'static str) -> Result<(), DomainError> {
+    if value.trim().is_empty() {
+        return Err(DomainError::Empty { field });
+    }
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(DomainError::TooLong {
+            field,
+            max: MAX_TEXT_BYTES,
+        });
+    }
+    // Instructions are allowed to be genuinely multi-line.  Keep carriage
+    // return for CRLF input, but reject every other control byte (including
+    // NUL, escape, and terminal formatting controls).
+    if value
+        .chars()
+        .any(|character| character.is_control() && character != '\n' && character != '\r')
+    {
+        return Err(DomainError::InvalidText { field });
+    }
+    Ok(())
+}
+
 fn bounded_id(value: &str, field: &'static str) -> Result<(), DomainError> {
     bounded_text(value, field, MAX_ID_BYTES)?;
     if value
@@ -141,6 +165,56 @@ pub struct BlueprintItem {
     pub depends_on: Vec<String>,
     /// Strictly less than [`MAX_ESTIMATED_LOC_EXCLUSIVE`].
     pub estimated_loc: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<BlueprintTask>,
+}
+
+/// The executable intent attached to one Blueprint item.
+///
+/// This remains declarative domain data.  A host owns execution and decides
+/// how to route the instruction and acceptance commands to an agent.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BlueprintTask {
+    pub instruction: String,
+    pub acceptance_commands: Vec<String>,
+}
+
+impl BlueprintTask {
+    pub fn new(
+        instruction: impl Into<String>,
+        acceptance_commands: Vec<String>,
+    ) -> Result<Self, DomainError> {
+        let task = Self {
+            instruction: instruction.into(),
+            acceptance_commands,
+        };
+        task.validate()?;
+        Ok(task)
+    }
+
+    pub fn validate(&self) -> Result<(), DomainError> {
+        bounded_instruction(&self.instruction, "task_instruction")?;
+        if self.acceptance_commands.is_empty() {
+            return Err(DomainError::Empty {
+                field: "acceptance_commands",
+            });
+        }
+        if self.acceptance_commands.len() > MAX_TASK_ACCEPTANCE_COMMANDS {
+            return Err(DomainError::TooMany {
+                field: "acceptance_commands",
+                max: MAX_TASK_ACCEPTANCE_COMMANDS,
+            });
+        }
+        for command in &self.acceptance_commands {
+            bounded_text(
+                command,
+                "acceptance_command",
+                MAX_TASK_ACCEPTANCE_COMMAND_BYTES,
+            )?;
+        }
+        Ok(())
+    }
 }
 
 impl BlueprintItem {
@@ -149,6 +223,7 @@ impl BlueprintItem {
             id: id.into(),
             depends_on: Vec::new(),
             estimated_loc,
+            task: None,
         }
     }
 
@@ -158,6 +233,11 @@ impl BlueprintItem {
         S: Into<String>,
     {
         self.depends_on = dependencies.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn with_task(mut self, task: BlueprintTask) -> Self {
+        self.task = Some(task);
         self
     }
 
@@ -175,6 +255,9 @@ impl BlueprintItem {
                 field: "dependencies",
                 max: MAX_DEPENDENCIES_PER_ITEM,
             });
+        }
+        if let Some(task) = &self.task {
+            task.validate()?;
         }
         let mut seen = BTreeMap::new();
         for dependency in &self.depends_on {
