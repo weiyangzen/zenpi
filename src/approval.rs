@@ -5,7 +5,10 @@
 //! decision, and can persist the decision without retaining credentials.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{
+    Arc, Condvar, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -28,6 +31,8 @@ pub enum ApprovalMode {
     PerTool,
     /// Never prompt; deny anything not already allowed by the host.
     Headless,
+    /// Automatic only after a host binding matches a live per-action gate.
+    WorkerAllowAfterPreflight,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,6 +45,12 @@ pub struct ApprovalRequest {
     pub arguments: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<crate::tools::ToolPreview>,
+    #[serde(default)]
+    pub origin: crate::tools::ToolOrigin,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lease_id: Option<String>,
 }
 
 impl ApprovalRequest {
@@ -59,6 +70,28 @@ impl ApprovalRequest {
         }
         if !self.arguments.is_object() {
             return Err(ApprovalError::Invalid("arguments must be an object".into()));
+        }
+        if let Some(digest) = &self.policy_digest
+            && (digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+        {
+            return Err(ApprovalError::Invalid("policy digest is invalid".into()));
+        }
+        if let Some(lease) = &self.lease_id
+            && (lease.trim().is_empty()
+                || lease.len() > MAX_APPROVAL_ID_BYTES
+                || lease.chars().any(char::is_control))
+        {
+            return Err(ApprovalError::Invalid("lease ID is invalid".into()));
+        }
+        if self.origin == crate::tools::ToolOrigin::BlueprintWorker
+            && (self.policy_digest.is_none() || self.lease_id.is_none())
+        {
+            return Err(ApprovalError::Invalid(
+                "worker approval requires policy and lease correlation".into(),
+            ));
         }
         if let Some(preview) = &self.preview {
             preview
@@ -91,6 +124,7 @@ pub struct ApprovalResponse {
 #[derive(Debug, Clone)]
 pub struct ApprovalCoordinator {
     inner: Arc<(Mutex<CoordinatorState>, Condvar)>,
+    cancellation_epoch: Arc<AtomicU64>,
 }
 
 #[derive(Debug, Default)]
@@ -120,6 +154,7 @@ impl ApprovalCoordinator {
     pub fn new() -> Self {
         Self {
             inner: Arc::new((Mutex::new(CoordinatorState::default()), Condvar::new())),
+            cancellation_epoch: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -159,6 +194,7 @@ impl ApprovalCoordinator {
     ) -> Result<ApprovalResponse, ApprovalError> {
         request.validate()?;
         let id = request.request_id.clone();
+        let tool = request.tool.clone();
         let (lock, wake) = &*self.inner;
         let mut state = lock
             .lock()
@@ -175,6 +211,9 @@ impl ApprovalCoordinator {
                 state.pending.remove(&id);
                 state.visible.remove(&id);
                 state.decisions.remove(&id);
+                state
+                    .accepted
+                    .retain(|accepted| accepted.response.request_id != id);
                 return Err(ApprovalError::Cancelled);
             }
             if let Some(response) = state.decisions.get(&id).cloned() {
@@ -184,17 +223,12 @@ impl ApprovalCoordinator {
                         .retain(|accepted| accepted.response.request_id != id);
                 }
                 state.decisions.remove(&id);
-                let tool = state
-                    .visible
-                    .get(&id)
-                    .map(|request| request.tool.clone())
-                    .unwrap_or_else(|| "unknown".into());
                 state.pending.remove(&id);
                 state.visible.remove(&id);
-                if response.remember {
+                if response.remember && !retain_accepted {
                     // The caller owns the policy, so remembering a decision
                     // never persists credentials or mutates global state.
-                    policy.remember(tool, response.decision);
+                    policy.remember(tool.clone(), response.decision);
                 }
                 return Ok(response);
             }
@@ -253,6 +287,15 @@ impl ApprovalCoordinator {
     /// Answer one visible request. A response for an unknown request is
     /// rejected instead of being buffered for a future tool call.
     pub fn respond(&self, response: ApprovalResponse) -> Result<(), ApprovalError> {
+        self.respond_with_request(response).map(|_| ())
+    }
+
+    /// Return the exact request atomically claimed by this response. Hosts
+    /// echo its digest rather than accepting a client-supplied policy grant.
+    pub fn respond_with_request(
+        &self,
+        response: ApprovalResponse,
+    ) -> Result<ApprovalRequest, ApprovalError> {
         if response.request_id.trim().is_empty()
             || response.request_id.len() > MAX_APPROVAL_ID_BYTES
             || response.request_id.chars().any(char::is_control)
@@ -268,6 +311,14 @@ impl ApprovalCoordinator {
         {
             return Err(ApprovalError::UnknownRequest);
         }
+        if response.remember
+            && state.pending[&response.request_id].origin
+                == crate::tools::ToolOrigin::BlueprintWorker
+        {
+            return Err(ApprovalError::Invalid(
+                "worker decisions cannot become remembered tool grants".into(),
+            ));
+        }
         // An answered request is no longer host-actionable even if the worker
         // has not woken up yet.  Removing it here makes duplicate responses
         // fail closed instead of allowing a later command to overwrite the
@@ -277,14 +328,14 @@ impl ApprovalCoordinator {
             .remove(&response.request_id)
             .ok_or(ApprovalError::UnknownRequest)?;
         state.accepted.push(AcceptedApproval {
-            request,
+            request: request.clone(),
             response: response.clone(),
         });
         state
             .decisions
             .insert(response.request_id.clone(), response);
         wake.notify_all();
-        Ok(())
+        Ok(request)
     }
 
     /// Whether a request still needs a host decision.  This is intentionally
@@ -376,6 +427,17 @@ impl ApprovalCoordinator {
         }
     }
 
+    /// Out-of-band host stop, including an already allowed running command.
+    /// A new explicit turn captures a new epoch; no worker can clear a stop.
+    pub fn emergency_cancel(&self) {
+        self.cancellation_epoch.fetch_add(1, Ordering::SeqCst);
+        self.cancel_all();
+    }
+
+    pub fn cancellation_epoch(&self) -> u64 {
+        self.cancellation_epoch.load(Ordering::SeqCst)
+    }
+
     /// Remove an accepted-but-not-yet-consumed response when its durable host
     /// record could not be written.  This keeps a storage failure fail-closed:
     /// the waiting worker remains blocked and cannot enter the side effect.
@@ -419,6 +481,27 @@ impl Default for ApprovalPolicy {
 
 impl ApprovalPolicy {
     pub fn decide(&self, side_effect: ToolSideEffect, tool: &str) -> Option<ApprovalDecision> {
+        self.decide_after_preflight(side_effect, tool, false)
+    }
+
+    /// `worker_preflight` is supplied only by the core after checking the
+    /// immutable gate and its binding, never from provider arguments.
+    pub fn decide_after_preflight(
+        &self,
+        side_effect: ToolSideEffect,
+        tool: &str,
+        worker_preflight: bool,
+    ) -> Option<ApprovalDecision> {
+        if self.per_tool.get(tool) == Some(&ApprovalDecision::Deny) {
+            return Some(ApprovalDecision::Deny);
+        }
+        if self.mode == ApprovalMode::WorkerAllowAfterPreflight {
+            return Some(if worker_preflight {
+                ApprovalDecision::Allow
+            } else {
+                ApprovalDecision::Deny
+            });
+        }
         if side_effect == ToolSideEffect::ReadOnly {
             return Some(ApprovalDecision::Allow);
         }
@@ -470,6 +553,38 @@ mod tests {
     use crate::tools::ToolSideEffect;
 
     #[test]
+    fn explicit_deny_beats_read_only_trust_and_worker_allow() {
+        for mode in [
+            ApprovalMode::ReadOnly,
+            ApprovalMode::TrustedWorkspace,
+            ApprovalMode::WorkerAllowAfterPreflight,
+        ] {
+            let policy = ApprovalPolicy {
+                mode,
+                trusted_tools: vec!["read_file".into()],
+                per_tool: [("read_file".into(), ApprovalDecision::Deny)].into(),
+            };
+            assert_eq!(
+                policy.decide_after_preflight(ToolSideEffect::ReadOnly, "read_file", true),
+                Some(ApprovalDecision::Deny)
+            );
+        }
+    }
+
+    #[test]
+    fn worker_mode_without_preflight_denies_even_remembered_and_readonly_tools() {
+        let policy = ApprovalPolicy {
+            mode: ApprovalMode::WorkerAllowAfterPreflight,
+            per_tool: [("read_file".into(), ApprovalDecision::Allow)].into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            policy.decide(ToolSideEffect::ReadOnly, "read_file"),
+            Some(ApprovalDecision::Deny)
+        );
+    }
+
+    #[test]
     fn read_only_is_always_allowed_and_headless_denies_side_effects() {
         let policy = ApprovalPolicy {
             mode: ApprovalMode::Headless,
@@ -500,6 +615,9 @@ mod tests {
                     side_effect: ToolSideEffect::WorkspaceWrite,
                     arguments: serde_json::json!({"path":"x"}),
                     preview: None,
+                    origin: crate::tools::ToolOrigin::AgentTool,
+                    policy_digest: None,
+                    lease_id: None,
                 },
                 &mut policy,
                 &|| false,
@@ -521,7 +639,6 @@ mod tests {
                 remember: false,
             })
             .unwrap();
-        coordinator.mark_persisted(&request.request_id).unwrap();
         assert_eq!(join.join().unwrap().unwrap(), ApprovalDecision::Allow);
     }
 
@@ -540,6 +657,9 @@ mod tests {
                     side_effect: ToolSideEffect::WorkspaceWrite,
                     arguments: serde_json::json!({"path":"x"}),
                     preview: None,
+                    origin: crate::tools::ToolOrigin::AgentTool,
+                    policy_digest: None,
+                    lease_id: None,
                 },
                 &mut policy,
                 &|| false,
@@ -589,6 +709,9 @@ mod tests {
                     side_effect: ToolSideEffect::WorkspaceWrite,
                     arguments: serde_json::json!({"path":"x"}),
                     preview: None,
+                    origin: crate::tools::ToolOrigin::AgentTool,
+                    policy_digest: None,
+                    lease_id: None,
                 },
                 &mut policy,
                 &|| false,

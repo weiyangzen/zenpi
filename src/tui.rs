@@ -3931,8 +3931,9 @@ pub fn run_async_with_profile(
                         // know what the pending y/n response refers to.
                         MessageRole::System,
                         format!(
-                            "Approval required: {} {}{preview}\nType y to allow once, n to deny.",
-                            request.tool, request.arguments,
+                            "Approval required: {} {}\nRequest: {}\nPolicy: {}{preview}\nType y to allow once, n to deny.",
+                            request.tool, request.arguments, request.request_id,
+                            request.policy_digest.as_deref().unwrap_or("unbound"),
                         ),
                     );
                     // The coordinator itself is bounded by one request per tool
@@ -4176,6 +4177,9 @@ pub fn run_async_with_profile(
                                                 cancel_result,
                                                 Err(crate::runtime::SubmitError::QueueFull)
                                             ) {
+                                                if let Some(approval) = approval.as_ref() {
+                                                    approval.emergency_cancel();
+                                                }
                                                 pending_approvals.clear();
                                             }
                                             state.set_status("Interrupt requested");
@@ -4322,6 +4326,9 @@ pub fn run_async_with_profile(
                                 // The cancel command is admitted (or the
                                 // worker is already closed), so no approval
                                 // from this turn can be answered safely.
+                                if let Some(approval) = approval.as_ref() {
+                                    approval.emergency_cancel();
+                                }
                                 pending_approvals.clear();
                             }
                             state.set_status("Interrupt requested");

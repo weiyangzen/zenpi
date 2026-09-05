@@ -654,6 +654,14 @@ impl Agent {
         let runtime = self.tools.as_mut().ok_or_else(|| {
             AgentError::InvalidTurn("worker binding requires a configured tool runtime".into())
         })?;
+        if let Some(gate) = runtime.context.policy_evidence() {
+            let Some(binding) = &binding else {
+                return Err(AgentError::InvalidTurn(
+                    "a worker gate requires its matching binding".into(),
+                ));
+            };
+            validate_worker_gate_binding(binding, &gate)?;
+        }
         runtime.worker_binding = binding;
         Ok(())
     }
@@ -1296,6 +1304,16 @@ impl Agent {
         F: Fn() -> bool,
         E: FnMut(ProviderEvent) -> Result<(), BackendError>,
     {
+        let host_approval = self.approval_coordinator();
+        let host_epoch = host_approval
+            .as_ref()
+            .map(ApprovalCoordinator::cancellation_epoch);
+        let is_cancelled = || {
+            is_cancelled()
+                || host_approval
+                    .as_ref()
+                    .is_some_and(|host| Some(host.cancellation_epoch()) != host_epoch)
+        };
         let turn_id = self
             .active_turn_id
             .clone()
@@ -1579,6 +1597,7 @@ impl Agent {
                         turn_id: turn_id.to_owned(),
                         retry_requires_confirmation: true,
                     })?;
+                let mut evidence = evidence.clone();
                 let invocation = if stop.is_some() || is_cancelled() {
                     tool_failure(
                         &call,
@@ -1587,7 +1606,13 @@ impl Agent {
                         ToolInvocationOutcome::Cancelled,
                     )
                 } else {
-                    match self.invoke_tool(turn_id, &call, &operation_id, &evidence, is_cancelled) {
+                    match self.invoke_tool(
+                        turn_id,
+                        &call,
+                        &operation_id,
+                        &mut evidence,
+                        is_cancelled,
+                    ) {
                         Ok(invocation) => invocation,
                         Err(error) => {
                             // No handler is entered on these pre-dispatch errors.
@@ -1648,15 +1673,23 @@ impl Agent {
                     .map_err(|error| AgentError::InvalidTurn(error.to_string()))?
             )
         );
+        let gate = runtime.context.policy_evidence();
         Ok(ToolExecutionEvidence {
-            origin: if runtime.worker_binding.is_some() {
+            origin: if runtime.worker_binding.is_some()
+                || runtime.context.origin() == crate::tools::ToolOrigin::BlueprintWorker
+            {
                 "blueprint_worker"
             } else {
                 "agent_tool"
             },
-            policy_digest: runtime.worker_binding.as_ref().map_or_else(
-                || approval_policy_digest.clone(),
-                |binding| binding.policy_digest.clone(),
+            policy_digest: gate.as_ref().map_or_else(
+                || {
+                    runtime.worker_binding.as_ref().map_or_else(
+                        || approval_policy_digest.clone(),
+                        |binding| binding.policy_digest.clone(),
+                    )
+                },
+                |gate| gate.policy_digest.clone(),
             ),
             approval_policy_digest,
             worker_binding: runtime.worker_binding.clone(),
@@ -1670,7 +1703,7 @@ impl Agent {
         turn_id: &str,
         call: &crate::tools::ToolCall,
         operation_id: &str,
-        evidence: &ToolExecutionEvidence,
+        evidence: &mut ToolExecutionEvidence,
         is_cancelled: &F,
     ) -> Result<ToolInvocation, AgentError> {
         use crate::tools::{ToolErrorCode, ToolSideEffect};
@@ -1697,10 +1730,45 @@ impl Agent {
         if let Some(binding) = &runtime.worker_binding {
             binding.validate()?;
         }
+        let gate = match runtime.context.check_call_gate(
+            &call.name,
+            definition.side_effect,
+            call.arguments
+                .as_object()
+                .expect("validated call arguments"),
+        ) {
+            Ok(gate) => gate,
+            Err(error) => {
+                return Ok(tool_failure(
+                    call,
+                    error.code(),
+                    &error.to_string(),
+                    ToolInvocationOutcome::Denied,
+                ));
+            }
+        };
+        let worker_preflight = match (&runtime.worker_binding, &gate) {
+            (Some(binding), Some(gate)) => {
+                validate_worker_gate_binding(binding, gate)?;
+                true
+            }
+            (_, None) => false,
+            _ => {
+                return Ok(tool_failure(
+                    call,
+                    ToolErrorCode::PolicyDenied,
+                    "worker binding and prohibition gate must both be present",
+                    ToolInvocationOutcome::Denied,
+                ));
+            }
+        };
+        evidence.prohibition_gate_enforced = worker_preflight;
         let approval = if runtime.policy.allows(definition.side_effect) {
-            runtime
-                .approval_policy
-                .decide(definition.side_effect, &call.name)
+            runtime.approval_policy.decide_after_preflight(
+                definition.side_effect,
+                &call.name,
+                worker_preflight,
+            )
         } else {
             Some(ApprovalDecision::Deny)
         };
@@ -1726,13 +1794,21 @@ impl Agent {
                 }
             };
             let request = ApprovalRequest {
-                request_id: format!("approval-{}", call.id),
+                request_id: approval_request_id(
+                    self.session.session_id(),
+                    turn_id,
+                    &call.id,
+                    &evidence.policy_digest,
+                ),
                 turn_id: turn_id.to_owned(),
                 call_id: call.id.clone(),
                 tool: call.name.clone(),
                 side_effect: definition.side_effect,
                 arguments: call.arguments.clone(),
                 preview: preview.clone(),
+                origin: runtime.context.origin(),
+                policy_digest: Some(evidence.policy_digest.clone()),
+                lease_id: gate.as_ref().map(|gate| gate.lease_id.clone()),
             };
             let coordinator = runtime.approval.clone();
             let response = match coordinator.request_response(
@@ -1759,6 +1835,9 @@ impl Agent {
                     "call_id": accepted.request.call_id,
                     "tool": accepted.request.tool,
                     "side_effect": accepted.request.side_effect,
+                    "origin": accepted.request.origin,
+                    "policy_digest": accepted.request.policy_digest,
+                    "lease_id": accepted.request.lease_id,
                     "preview": accepted.request.preview.as_ref().map(|preview| match preview {
                         crate::tools::ToolPreview::Diff {
                             path, changed, truncated, before_bytes, after_bytes, source_sha256, ..
@@ -1775,6 +1854,11 @@ impl Agent {
                 crate::approval::PersistApprovalError::Approval(error) => AgentError::Approval(error),
                 crate::approval::PersistApprovalError::Persistence(error) => AgentError::Session(error),
             })?;
+            if response.remember {
+                runtime
+                    .approval_policy
+                    .remember(call.name.clone(), response.decision);
+            }
             self.session.append_event(serde_json::json!({
                 "type": "approval_consumed",
                 "request_id": response.request_id,
@@ -1794,6 +1878,20 @@ impl Agent {
                 ));
             }
             approved_preview = preview;
+        }
+        if approval == Some(ApprovalDecision::Allow) && worker_preflight {
+            self.session.append_event(serde_json::json!({
+                "type": "approval_resolved",
+                "request_id": approval_request_id(self.session.session_id(), turn_id, &call.id, &evidence.policy_digest),
+                "turn_id": turn_id,
+                "call_id": call.id,
+                "tool": call.name,
+                "decision": "allow",
+                "remember": false,
+                "source": "worker_allow_after_preflight",
+                "policy_digest": evidence.policy_digest,
+                "execution": evidence,
+            }))?;
         }
         // Waiting for approval may outlive a lease or a host cancellation.
         if is_cancelled() {
@@ -2179,6 +2277,37 @@ fn unix_time_ms() -> u64 {
         .unwrap_or_default()
         .as_millis()
         .min(u128::from(u64::MAX)) as u64
+}
+
+fn validate_worker_gate_binding(
+    binding: &WorkerExecutionBinding,
+    gate: &crate::tools::PolicyEvidence,
+) -> Result<(), AgentError> {
+    binding.validate()?;
+    if binding.policy_digest != gate.policy_digest
+        || binding.blueprint_sha256 != gate.blueprint_digest
+        || binding.item_id != gate.item_id
+        || binding.lease_id != gate.lease_id
+        || binding.expires_at_ms != gate.expires_at_ms
+        || !gate.prohibition_gate_enforced
+    {
+        return Err(AgentError::InvalidTurn(
+            "worker binding does not match the compiled prohibition gate".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn approval_request_id(
+    session_id: &str,
+    turn_id: &str,
+    call_id: &str,
+    policy_digest: &str,
+) -> String {
+    use sha2::{Digest, Sha256};
+    let encoded = serde_json::to_vec(&(session_id, turn_id, call_id, policy_digest))
+        .expect("string tuple serializes");
+    format!("approval-{:x}", Sha256::digest(encoded))
 }
 
 fn next_id(prefix: &str) -> String {

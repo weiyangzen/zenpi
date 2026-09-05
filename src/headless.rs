@@ -3618,12 +3618,12 @@ where
                     )?;
                     return Ok(());
                 };
-                match approval.respond(crate::approval::ApprovalResponse {
+                match approval.respond_with_request(crate::approval::ApprovalResponse {
                     request_id: approval_id.clone(),
                     decision,
                     remember,
                 }) {
-                    Ok(()) => write_cached_versioned_response(
+                    Ok(request) => write_cached_versioned_response(
                         output,
                         StdioResponse::success(
                             id,
@@ -3633,6 +3633,8 @@ where
                                 "route": "local",
                                 "accepted": true,
                                 "approval_id": approval_id,
+                                "policy_digest": request.policy_digest,
+                                "lease_id": request.lease_id,
                                 "decision": decision,
                                 "remember": remember,
                             })),
@@ -3716,6 +3718,9 @@ where
                     if let Some(target) = target {
                         match runner.try_cancel(target) {
                             Ok(()) => {
+                                if let Some(approval) = approval {
+                                    approval.emergency_cancel();
+                                }
                                 let _ = cancel_pending_steers_for_job(
                                     pending_steers,
                                     target,
@@ -4069,6 +4074,9 @@ where
             )?,
         },
         Command::Shutdown => {
+            if let Some(approval) = approval {
+                approval.emergency_cancel();
+            }
             // Shutdown is an explicit cancellation boundary. Report that the
             // close was accepted; the outer loop then drains every admitted
             // job to a terminal response before the process exits.
@@ -4097,17 +4105,19 @@ where
                 )?;
                 return Ok(());
             };
-            match approval.respond(crate::approval::ApprovalResponse {
+            match approval.respond_with_request(crate::approval::ApprovalResponse {
                 request_id: approval_id.clone(),
                 decision,
                 remember,
             }) {
-                Ok(()) => write_cached_versioned_response(
+                Ok(request) => write_cached_versioned_response(
                     output,
                     StdioResponse::success(
                         id,
                         name,
-                        Some(json!({"approval_id": approval_id, "accepted": true})),
+                        Some(
+                            json!({"approval_id": approval_id, "accepted": true, "policy_digest": request.policy_digest, "lease_id": request.lease_id}),
+                        ),
                     ),
                     request_version,
                     replay,
@@ -4726,6 +4736,8 @@ pub fn respond_to_slash_approval(
         "call_id": request.call_id,
         "tool": request.tool,
         "side_effect": request.side_effect,
+        "policy_digest": request.policy_digest,
+        "lease_id": request.lease_id,
         "decision": decision,
         "remember": remember,
     }))
