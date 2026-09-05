@@ -2617,7 +2617,10 @@ pub fn dispatch_slash_command(
             );
         }
         SlashCommand::Session { action } => match action {
-            crate::slash::SessionAction::List => match crate::headless::session_list_view() {
+            crate::slash::SessionAction::List => match crate::headless::session_lifecycle_view(
+                &crate::slash::SessionAction::List,
+                agent.as_deref().map(|value| value.session().path()),
+            ) {
                 Ok(data) => state.push_message(
                     MessageRole::System,
                     format!(

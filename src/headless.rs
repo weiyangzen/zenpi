@@ -5324,12 +5324,15 @@ fn execute_headless_slash(
             "message": "plan command is parsed but its blueprint owner is not configured",
         }))),
         SlashCommand::Session { action } => match action {
-            crate::slash::SessionAction::List => session_list_view()
-                .map(SlashExecution::Response)
-                .map_err(|message| SlashDispatchError {
-                    code: "session_list_failed",
-                    message,
-                }),
+            crate::slash::SessionAction::List => session_lifecycle_view(
+                &crate::slash::SessionAction::List,
+                agent.as_deref().map(|value| value.session().path()),
+            )
+            .map(SlashExecution::Response)
+            .map_err(|message| SlashDispatchError {
+                code: "session_list_failed",
+                message,
+            }),
             crate::slash::SessionAction::Open { path } => {
                 let Some(agent) = agent else {
                     return Err(SlashDispatchError {
