@@ -679,6 +679,133 @@ def assert_production_rejects_echo(binary: Path, root: Path) -> None:
         )
 
 
+def assert_production_session_gc(binary: Path, root: Path) -> None:
+    """Exercise the installed production session-retention owner end to end.
+
+    The managed directory deliberately contains clean journals, a recent
+    journal protected by the age threshold, and an unrelated JSONL file.  The
+    command must remove exactly the old owned journal while preserving the
+    newest, recent, and unowned files and returning a bounded structured
+    receipt.  Session creation uses the production binary itself, but no
+    provider request is needed for the shutdown-only setup.
+    """
+    home = root / "session-gc-home"
+    env = isolated_env(
+        home,
+        ZENPI_BASE_URL="http://127.0.0.1:1/v1",
+        ZENPI_API_KEY="session-gc-smoke-key",
+        ZENPI_WIRE_API="responses",
+        ZENPI_MODEL="mock-model",
+    )
+    sessions = home / ".zenpi" / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+
+    def create_clean_session(path: Path) -> None:
+        result = run(
+            [
+                str(binary),
+                "--mode",
+                "headless",
+                "--backend",
+                "openai",
+                "--session",
+                str(path),
+            ],
+            input_text='{"type":"shutdown","id":"setup"}\n',
+            env=env,
+        )
+        assert_success(result, f"session gc setup journal {path.name}")
+        if not path.is_file():
+            raise AssertionError(f"session gc setup did not create {path}")
+
+    # Build each owned journal through the installed release, then place it in
+    # the configured managed directory.  This avoids hand-authoring a journal
+    # that the collector might not recognize as a clean zenpi session.
+    old_source = root / "gc-old-source.jsonl"
+    recent_source = root / "gc-recent-source.jsonl"
+    newest_source = root / "gc-newest-source.jsonl"
+    create_clean_session(old_source)
+    create_clean_session(recent_source)
+    create_clean_session(newest_source)
+    old = sessions / "gc-old.jsonl"
+    recent = sessions / "gc-recent.jsonl"
+    newest = sessions / "gc-newest.jsonl"
+    old.write_bytes(old_source.read_bytes())
+    recent.write_bytes(recent_source.read_bytes())
+    newest.write_bytes(newest_source.read_bytes())
+    foreign = sessions / "gc-foreign.jsonl"
+    foreign.write_text('{"kind":"not-a-session"}\n', encoding="utf-8")
+
+    now = time.time()
+    # Keep the age distinction comfortably away from filesystem timestamp
+    # granularity and the one-hour policy threshold.
+    os.utime(old, (now - 10 * 365 * 24 * 60 * 60, now - 10 * 365 * 24 * 60 * 60))
+    os.utime(recent, (now - 30, now - 30))
+    os.utime(newest, (now + 30, now + 30))
+
+    active = root / "gc-active.jsonl"
+    payload = "\n".join(
+        json.dumps(value, separators=(",", ":"))
+        for value in (
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "gc",
+                "text": "/session gc --retain-newest 1 --older-than-seconds 3600 --yes",
+            },
+            {"schema_version": 2, "type": "shutdown", "id": "shutdown"},
+        )
+    ) + "\n"
+    result = run(
+        [
+            str(binary),
+            "--mode",
+            "headless",
+            "--backend",
+            "openai",
+            "--session",
+            str(active),
+        ],
+        input_text=payload,
+        env=env,
+    )
+    assert_success(result, "installed production session gc owner")
+    responses = {
+        record["id"]: record
+        for record in json_lines(result.stdout)
+        if record.get("type") == "response" and record.get("id")
+    }
+    gc = responses.get("gc", {})
+    data = gc.get("data", {})
+    if gc.get("success") is not True or not (
+        gc.get("schema_version") == 2
+        and gc.get("command") == "session"
+        and data.get("command") == "session"
+        and data.get("route") == "local"
+        and data.get("accepted") is True
+        and data.get("action") == "gc"
+        and data.get("durable") is True
+        and data.get("confirmed") is True
+        and data.get("retention")
+        == {"retain_newest": 1, "older_than_seconds": 3600}
+        and data.get("inspected") == 3
+        and data.get("removed_count") == 1
+        and data.get("skipped_unowned") >= 1
+    ):
+        raise AssertionError(f"installed /session gc returned the wrong receipt: {responses!r}")
+    removed = data.get("removed", [])
+    if len(removed) != 1 or "gc-old.jsonl" not in str(removed[0]):
+        raise AssertionError(f"installed /session gc removed the wrong journal: {data!r}")
+    if str(home) in json.dumps(data):
+        raise AssertionError(f"installed /session gc leaked its absolute home: {data!r}")
+    if not responses.get("shutdown", {}).get("success"):
+        raise AssertionError(f"session gc process did not shut down cleanly: {responses!r}")
+    if old.exists():
+        raise AssertionError("session gc left the old owned journal behind")
+    if not recent.exists() or not newest.exists() or not foreign.exists():
+        raise AssertionError("session gc removed a recent, newest, or unowned journal")
+
+
 def assert_headless_tool_approval(binary: Path, root: Path) -> None:
     """Run provider -> approval -> real write -> provider continuation end to end."""
     workspace = root / "production-tool-workspace"
@@ -1250,6 +1377,7 @@ def main() -> int:
         production_help = run([str(production_binary), "--help"])
         assert_success(production_help, "installed production help")
         assert_production_rejects_echo(production_binary, root)
+        assert_production_session_gc(production_binary, root)
         assert_openai_fixture(production_binary, root)
         assert_headless_eof_drains_slow_provider(production_binary, root)
         assert_headless_tool_approval(production_binary, root)
@@ -1295,7 +1423,7 @@ def main() -> int:
         assert_tui_multiline_paste(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: production install/provider/tool approval/EOF drain, echo fixture, "
+        "user smoke passed: production install/provider/tool approval/EOF drain/session GC, echo fixture, "
         "durable slash/runtime intents, resume, TUI resize/multiline paste, streaming interrupt, "
         "and terminal restoration"
     )
