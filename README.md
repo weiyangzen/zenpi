@@ -157,9 +157,12 @@ lists configured journals (including the legacy `~/.zenpi/session.jsonl`),
 `/session open PATH` switches an idle agent to an existing journal, and
 `/session fork SOURCE DESTINATION`, `/session export SOURCE DESTINATION`, and
 `/session import SOURCE DESTINATION` use explicit clean-source and
-non-overwriting-destination validation. `/session gc` and the in-workspace
-session browser remain explicit host errors until their owner adapters are
-accepted. Learn evidence/checkpoint commands are likewise local and read-only
+non-overwriting-destination validation. `/session gc --retain-newest N
+--older-than-seconds N --yes` requires a bounded explicit retention policy,
+never removes the active journal, skips domain/unowned data, and returns a
+bounded receipt. The in-workspace session browser remains an explicit host
+error until its owner adapter is accepted. Learn evidence/checkpoint commands
+are likewise local and read-only
 with respect to execution: `/learn evidence ID REPOSITORY-RELATIVE-REF`
 stores a bounded hash receipt, while `/learn resume ID` reports a validated
 checkpoint with `zenpi_started: false` until an external owner is present.
@@ -246,8 +249,9 @@ v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下�
 两种运行模式都可执行 `/session list`、`/session open PATH`，以及带明确源和目标的
 `/session fork SOURCE DESTINATION`、`/session export SOURCE DESTINATION`、
 `/session import SOURCE DESTINATION`；切换只针对已有会话文件，维护操作拒绝符号链接、
-脏 journal 和已存在目标，旧版 `~/.zenpi/session.jsonl` 也会被列出。`/session gc`、
-工作区内 session 浏览器以及真正的外部执行仍会在 owner adapter 完成前明确返回错误，
+脏 journal 和已存在目标，旧版 `~/.zenpi/session.jsonl` 也会被列出。`/session gc
+--retain-newest N --older-than-seconds N --yes` 要求明确且有界的保留策略，不删除活动
+session，跳过 domain/unowned 数据，并返回有界收据。工作区内 session 浏览器以及真正的外部执行仍会在 owner adapter 完成前明确返回错误，
 不伪造成功。`/learn evidence ID REPOSITORY-RELATIVE-REF` 只保存有界 hash receipt，
 `/learn resume ID` 只检查持久 checkpoint，不启动 worker。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
@@ -305,7 +309,9 @@ binary data を journal に保存しません。
 を取る `/session fork SOURCE DESTINATION`、`/session export SOURCE DESTINATION`、
 `/session import SOURCE DESTINATION` を実行できます。保守操作は既存の正常な journal
 だけを source に取り、symlink、壊れた journal、既存 destination を拒否します。旧版
-`~/.zenpi/session.jsonl` も一覧に含まれます。`/session gc`、workspace session browser、
+`~/.zenpi/session.jsonl` も一覧に含まれます。`/session gc
+--retain-newest N --older-than-seconds N --yes` は明示的かつ有界な保持方針を要求し、
+active journal を削除せず domain/unowned data を除外して有界 receipt を返します。workspace session browser、
 外部実行は owner adapter が受理されるまで明示的にエラーです。`/learn evidence ID
 REPOSITORY-RELATIVE-REF` は有界 hash receipt だけを保存し、`/learn resume ID` は
 検証済み checkpoint を表示するだけで worker を起動しません。
