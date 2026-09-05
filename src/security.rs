@@ -226,8 +226,58 @@ pub fn redact_text(input: &str, known_secrets: &[&str]) -> String {
     {
         output = output.replace(secret, "<redacted>");
     }
+    output = redact_assignments(&output);
     output = redact_bearer_tokens(&output);
     output = redact_url_credentials(&output);
+    output
+}
+
+/// Redact conventional key/value diagnostics even when the caller did not
+/// register the value first. This catches environment dumps and provider
+/// error strings such as `OPENAI_API_KEY=...` without changing the key name.
+fn redact_assignments(value: &str) -> String {
+    const MARKERS: &[&str] = &[
+        "api_key=",
+        "api-key=",
+        "access_token=",
+        "refresh_token=",
+        "password=",
+        "client_secret=",
+        "secret=",
+    ];
+    let mut output = String::with_capacity(value.len());
+    let mut remaining = value;
+    while !remaining.is_empty() {
+        let lower = remaining.to_ascii_lowercase();
+        let Some((index, marker)) = MARKERS
+            .iter()
+            .filter_map(|marker| lower.find(marker).map(|index| (index, *marker)))
+            .min_by_key(|(index, _)| *index)
+        else {
+            output.push_str(remaining);
+            break;
+        };
+        output.push_str(&remaining[..index + marker.len()]);
+        let tail = &remaining[index + marker.len()..];
+        let (quoted, start) = match tail.as_bytes().first() {
+            Some(b'"') | Some(b'\'') => (Some(tail.as_bytes()[0]), 1),
+            _ => (None, 0),
+        };
+        output.push_str("<redacted>");
+        let content = &tail[start..];
+        let end = if let Some(quote) = quoted {
+            content
+                .find(char::from(quote))
+                .map_or(content.len(), |index| index + 1)
+        } else {
+            content
+                .find(|character: char| {
+                    character.is_whitespace() || matches!(character, ',' | '}' | ']')
+                })
+                .unwrap_or(content.len())
+        };
+        remaining = &content[end..];
+    }
     output
 }
 

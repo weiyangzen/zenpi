@@ -19,6 +19,10 @@ fn redaction_covers_headers_urls_nested_json_and_known_values() {
     let encoded = serde_json::to_string(&redact_json(&value, &[FIXTURE_SECRET])).unwrap();
     assert!(!encoded.contains(FIXTURE_SECRET));
     assert!(encoded.contains("<redacted>"));
+
+    let diagnostic = format!("OPENAI_API_KEY={FIXTURE_SECRET} password='{FIXTURE_SECRET}'");
+    let diagnostic = redact_text(&diagnostic, &[]);
+    assert!(!diagnostic.contains(FIXTURE_SECRET));
 }
 
 #[test]
