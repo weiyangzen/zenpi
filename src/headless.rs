@@ -696,6 +696,14 @@ struct AsyncWork {
     turn_id: Arc<Mutex<Option<String>>>,
 }
 
+/// Runtime result shared by normal provider turns and explicit local shell
+/// operations. Shell output is kept as JSON so the headless wire can expose
+/// the complete supervised outcome without manufacturing a provider turn.
+enum AsyncProcessResult {
+    Turn(ProcessResult),
+    UserShell(serde_json::Value),
+}
+
 /// Events produced by one background request are kept with that request.
 /// The runtime may start a queued replacement before the host has consumed
 /// the previous `Completed` event; storing only a global `Agent` event vector
@@ -2570,6 +2578,7 @@ fn write_cached_versioned_response<W: Write>(
 
 enum AsyncTurn {
     Standard(TurnInputRequest),
+    UserShell(String),
     Reissue {
         message: String,
         superseded_turn_id: String,
@@ -2610,6 +2619,20 @@ impl AsyncRequest {
                     message,
                     superseded_turn_id,
                 },
+                events: Arc::clone(&events),
+                started_turn_id: Arc::clone(&started_turn_id),
+            },
+            events,
+            started_turn_id,
+        )
+    }
+
+    fn user_shell(input: String) -> AsyncRequestParts {
+        let events = Arc::new(Mutex::new(AsyncEventBuffer::default()));
+        let started_turn_id = Arc::new(Mutex::new(None));
+        (
+            Self {
+                turn: AsyncTurn::UserShell(input),
                 events: Arc::clone(&events),
                 started_turn_id: Arc::clone(&started_turn_id),
             },
@@ -2913,7 +2936,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
         .and_then(|agent| agent.approval_coordinator());
     let worker_state = Arc::clone(&shared);
     let runner = crate::runtime::BackgroundRunner::spawn(
-        move |request: AsyncRequest, token| -> Result<ProcessResult, AgentError> {
+        move |request: AsyncRequest, token| -> Result<AsyncProcessResult, AgentError> {
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
@@ -2931,7 +2954,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
             // request's buffer.  A queued replacement may start before the
             // host consumes the previous runtime completion; draining the
             // global agent queue later would mis-correlate those events.
-            let result = (|| -> Result<ProcessResult, AgentError> {
+            let result = (|| -> Result<AsyncProcessResult, AgentError> {
                 match request.turn {
                     AsyncTurn::Standard(request) => {
                         let submission = agent.submit(request)?;
@@ -2955,10 +2978,10 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         } else {
                             None
                         };
-                        Ok(ProcessResult {
+                        Ok(AsyncProcessResult::Turn(ProcessResult {
                             submission,
                             assistant,
-                        })
+                        }))
                     }
                     AsyncTurn::Reissue {
                         message,
@@ -2981,10 +3004,15 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                             || token.is_cancelled(),
                             &mut sink,
                         )?;
-                        Ok(ProcessResult {
+                        Ok(AsyncProcessResult::Turn(ProcessResult {
                             submission,
                             assistant,
-                        })
+                        }))
+                    }
+                    AsyncTurn::UserShell(input) => {
+                        let result =
+                            agent.run_user_shell_with_cancel(&input, || token.is_cancelled())?;
+                        Ok(AsyncProcessResult::UserShell(result))
                     }
                 }
             })();
@@ -3215,7 +3243,7 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
 
 #[allow(clippy::too_many_arguments)]
 fn handle_runtime_event<W: Write>(
-    event: crate::runtime::RuntimeEvent<ProcessResult, AgentError>,
+    event: crate::runtime::RuntimeEvent<AsyncProcessResult, AgentError>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     output: &mut W,
@@ -3362,10 +3390,13 @@ fn handle_runtime_event<W: Write>(
             )?;
             match outcome {
                 JobOutcome::Succeeded(result) => {
-                    let data = json!({
-                        "submission": result.submission,
-                        "assistant": result.assistant,
-                    });
+                    let data = match result {
+                        AsyncProcessResult::Turn(result) => json!({
+                            "submission": result.submission,
+                            "assistant": result.assistant,
+                        }),
+                        AsyncProcessResult::UserShell(result) => result,
+                    };
                     write_cached_response(
                         output,
                         StdioResponse::success(meta.id.clone(), meta.command, Some(data))
@@ -3460,7 +3491,7 @@ fn process_async_line<W, F>(
     line: String,
     shared: &Arc<Mutex<Agent>>,
     approval: Option<&crate::approval::ApprovalCoordinator>,
-    runner: &crate::runtime::BackgroundRunner<AsyncRequest, ProcessResult, AgentError, F>,
+    runner: &crate::runtime::BackgroundRunner<AsyncRequest, AsyncProcessResult, AgentError, F>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     pending_steers: &mut VecDeque<PendingSteer>,
@@ -3472,7 +3503,10 @@ fn process_async_line<W, F>(
 ) -> Result<(), HeadlessError>
 where
     W: Write,
-    F: Fn(AsyncRequest, crate::runtime::CancellationToken) -> Result<ProcessResult, AgentError>
+    F: Fn(
+            AsyncRequest,
+            crate::runtime::CancellationToken,
+        ) -> Result<AsyncProcessResult, AgentError>
         + Send
         + Sync
         + 'static,
@@ -3570,6 +3604,37 @@ where
                         .for_version(request_version),
                         replay,
                     )?;
+                    return Ok(());
+                }
+                Ok(crate::slash::InputRoute::UserShell(input)) => {
+                    let (request, events, started_turn_id) = AsyncRequest::user_shell(input);
+                    let job_id = match runner.try_submit(request) {
+                        Ok(job_id) => job_id,
+                        Err(error) => {
+                            write_runtime_rejection(
+                                output,
+                                id,
+                                name.as_str(),
+                                error,
+                                request_version,
+                                replay,
+                            )?;
+                            return Ok(());
+                        }
+                    };
+                    jobs.insert(
+                        job_id,
+                        AsyncWork {
+                            id: id.clone(),
+                            command: "user_shell",
+                            version: request_version,
+                            events,
+                            turn_id: started_turn_id,
+                        },
+                    );
+                    if let Some(request_id) = id {
+                        request_to_job.insert(request_id, job_id);
+                    }
                     return Ok(());
                 }
                 Err(error) => {
@@ -4053,11 +4118,51 @@ where
             )?,
         },
         Command::UserShell(_) => {
-            write_retryable_response(
-                output,
-                unavailable_control_response(id, &command).for_version(request_version),
-                replay,
-            )?;
+            let input = match command {
+                Command::UserShell(request) => request.input,
+                _ => unreachable!(),
+            };
+            if request_in_flight(id.as_deref(), request_to_job, pending_steers) {
+                write_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "duplicate_request_in_flight",
+                        "request ID is already in flight",
+                    )
+                    .for_version(request_version),
+                )?;
+                return Ok(());
+            }
+            let (request, events, started_turn_id) = AsyncRequest::user_shell(input);
+            let job_id = match runner.try_submit(request) {
+                Ok(job_id) => job_id,
+                Err(error) => {
+                    write_runtime_rejection(
+                        output,
+                        id,
+                        name.as_str(),
+                        error,
+                        request_version,
+                        replay,
+                    )?;
+                    return Ok(());
+                }
+            };
+            jobs.insert(
+                job_id,
+                AsyncWork {
+                    id: id.clone(),
+                    command: "user_shell",
+                    version: request_version,
+                    events,
+                    turn_id: started_turn_id,
+                },
+            );
+            if let Some(request_id) = id {
+                request_to_job.insert(request_id, job_id);
+            }
         }
         Command::Status => match shared.try_lock() {
             Ok(agent) => write_cached_versioned_response(
@@ -4262,7 +4367,7 @@ where
 /// or surfacing a misleading `no_active_turn` error.
 #[allow(clippy::too_many_arguments)]
 fn promote_pending_steers<W, F>(
-    runner: &crate::runtime::BackgroundRunner<AsyncRequest, ProcessResult, AgentError, F>,
+    runner: &crate::runtime::BackgroundRunner<AsyncRequest, AsyncProcessResult, AgentError, F>,
     jobs: &mut HashMap<crate::runtime::JobId, AsyncWork>,
     request_to_job: &mut HashMap<String, crate::runtime::JobId>,
     pending_steers: &mut VecDeque<PendingSteer>,
@@ -4272,7 +4377,10 @@ fn promote_pending_steers<W, F>(
 ) -> Result<(), HeadlessError>
 where
     W: Write,
-    F: Fn(AsyncRequest, crate::runtime::CancellationToken) -> Result<ProcessResult, AgentError>
+    F: Fn(
+            AsyncRequest,
+            crate::runtime::CancellationToken,
+        ) -> Result<AsyncProcessResult, AgentError>
         + Send
         + Sync
         + 'static,
@@ -5314,6 +5422,33 @@ fn handle_command<W: Write>(
                 request_version,
                 replay,
             )?,
+            Ok(crate::slash::InputRoute::UserShell(input)) => {
+                match agent.run_user_shell_with_cancel(&input, || false) {
+                    Ok(data) => {
+                        write_events(agent, output, event_sequence, id.clone(), replay)?;
+                        write_cached_versioned_response(
+                            output,
+                            StdioResponse::success(id, name, Some(data)),
+                            request_version,
+                            replay,
+                        )?
+                    }
+                    Err(error) => {
+                        write_events(agent, output, event_sequence, id.clone(), replay)?;
+                        write_cached_versioned_response(
+                            output,
+                            StdioResponse::error_with_code(
+                                id,
+                                name,
+                                error.code(),
+                                error.to_string(),
+                            ),
+                            request_version,
+                            replay,
+                        )?;
+                    }
+                }
+            }
             Ok(crate::slash::InputRoute::Slash(command)) => {
                 let command_name = command.name();
                 let session_open = matches!(
@@ -5508,11 +5643,27 @@ fn handle_command<W: Write>(
             )?;
         }
         Command::UserShell(_) => {
-            write_retryable_response(
-                output,
-                unavailable_control_response(id, &command).for_version(request_version),
-                replay,
-            )?;
+            let input = match command {
+                Command::UserShell(request) => request.input,
+                _ => unreachable!(),
+            };
+            match agent.run_user_shell_with_cancel(&input, || false) {
+                Ok(data) => write_cached_versioned_response(
+                    output,
+                    StdioResponse::success(id, name, Some(data)),
+                    request_version,
+                    replay,
+                )?,
+                Err(error) => {
+                    write_events(agent, output, event_sequence, id.clone(), replay)?;
+                    write_cached_versioned_response(
+                        output,
+                        StdioResponse::error_with_code(id, name, error.code(), error.to_string()),
+                        request_version,
+                        replay,
+                    )?;
+                }
+            }
         }
         Command::Status => {
             write_cached_versioned_response(
@@ -5785,16 +5936,6 @@ fn checkpoint_response(
         }
     };
     Ok(StdioResponse::success(id, name, Some(data)))
-}
-
-fn unavailable_control_response(id: Option<String>, command: &Command) -> StdioResponse {
-    let owner = match command {
-        Command::Checkpoint(_) => "durable_checkpoint",
-        Command::Mailbox(_) => "session_mailbox",
-        Command::UserShell(_) => "user_shell",
-        _ => unreachable!("only owner-required controls reach this boundary"),
-    };
-    StdioResponse::owner_required(id, crate::protocol::command_name(command), owner)
 }
 
 fn mailbox_response(

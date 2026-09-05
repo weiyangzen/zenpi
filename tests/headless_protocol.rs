@@ -36,6 +36,95 @@ fn json_lines(bytes: &[u8]) -> Vec<Value> {
 }
 
 #[test]
+fn user_shell_echo_is_explicit_and_does_not_call_provider() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("user-shell.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(dir.path()).unwrap(),
+        SideEffectPolicy::all_builtins(),
+    );
+    agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::Always,
+        per_tool: [("user_shell".to_owned(), ApprovalDecision::Allow)]
+            .into_iter()
+            .collect(),
+        ..ApprovalPolicy::default()
+    });
+    let mut output = Vec::new();
+    run_headless(
+        &mut agent,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"user_shell\",\"id\":\"echo\",\"text\":\"!echo hello\"}\n",
+        ),
+        &mut output,
+    )
+    .unwrap();
+    let records = json_lines(&output);
+    let response = records
+        .iter()
+        .find(|record| record["type"] == "response")
+        .unwrap();
+    assert_eq!(response["success"], true);
+    assert_eq!(response["data"]["origin"], "user_shell");
+    assert_eq!(response["data"]["exit_code"], 0);
+    assert!(
+        response["data"]["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("hello")
+    );
+    assert!(
+        !records
+            .iter()
+            .any(|record| record["type"] == "provider_request")
+    );
+}
+
+#[test]
+fn async_user_shell_runs_through_bounded_runtime_and_shutdown() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("async-user-shell.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(dir.path()).unwrap(),
+        SideEffectPolicy::all_builtins(),
+    );
+    agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::Always,
+        per_tool: [("user_shell".to_owned(), ApprovalDecision::Allow)]
+            .into_iter()
+            .collect(),
+        ..ApprovalPolicy::default()
+    });
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    zenpi::headless::run_async_streams(
+        agent,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"user_shell\",\"id\":\"echo\",\"text\":\"!echo async\"}\n",
+        ),
+        output,
+    )
+    .unwrap();
+    let records = json_lines(&captured.0.lock().unwrap());
+    let response = records
+        .iter()
+        .find(|record| record["id"] == "echo")
+        .unwrap();
+    assert_eq!(response["success"], true);
+    assert_eq!(response["data"]["origin"], "user_shell");
+    assert!(
+        response["data"]["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("async")
+    );
+}
+
+#[test]
 fn reconnect_restores_terminal_events_ack_and_monotonic_sequence() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("durable.jsonl");
@@ -1138,7 +1227,7 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for (id, owner, version) in [("shell", "user_shell", 2), ("shell-v1", "user_shell", 1)] {
+    for (id, version) in [("shell", 2), ("shell-v1", 1)] {
         let responses: Vec<_> = records
             .iter()
             .filter(|record| record["id"] == id && record["type"] == "response")
@@ -1147,9 +1236,7 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
         let response = responses[0];
         assert_eq!(response["schema_version"], version);
         assert_eq!(response["success"], false);
-        assert_eq!(response["code"], "owner_required");
-        assert_eq!(response["execution_state"], "untracked");
-        assert_eq!(response["required_owner"], owner);
+        assert_eq!(response["code"], "invalid_turn");
         assert!(response.get("data").is_none());
     }
     let mail = records
@@ -1198,13 +1285,9 @@ fn session_controls_remain_readable_while_provider_is_in_flight() {
     ] {
         writeln!(writer, "{value}").unwrap();
     }
-    wait_for_output(&captured, "\"required_owner\":\"user_shell\"");
+    wait_for_output(&captured, "\"type\":\"request_queued\"");
     let records = json_lines(&captured.0.lock().unwrap());
-    for (id, code) in [
-        ("inspect", "agent_busy"),
-        ("mailbox", "agent_busy"),
-        ("shell", "owner_required"),
-    ] {
+    for (id, code) in [("inspect", "agent_busy"), ("mailbox", "agent_busy")] {
         let responses: Vec<_> = records
             .iter()
             .filter(|record| record["id"] == id && record["type"] == "response")
