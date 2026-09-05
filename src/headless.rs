@@ -1438,6 +1438,14 @@ pub fn session_lifecycle_view(
     };
     use crate::slash::SessionAction;
 
+    if active_session.is_none()
+        && !matches!(
+            action,
+            SessionAction::List | SessionAction::Agents | SessionAction::Inspect { .. }
+        )
+    {
+        return Err("session lifecycle mutation requires the active session owner".into());
+    }
     let paths = crate::config::ConfigPaths::discover().map_err(|error| error.to_string())?;
     let request = match action {
         SessionAction::List => Request::List {
@@ -1565,6 +1573,14 @@ pub fn session_lifecycle_view(
                 object.insert(key.into(), value.clone());
             }
         }
+    }
+    let response = crate::security::redact_json(&response, &[]);
+    if serde_json::to_vec(&response)
+        .map_err(|error| error.to_string())?
+        .len()
+        > MAX_DOMAIN_VIEW_BYTES
+    {
+        return Err("session lifecycle receipt exceeds the bounded response limit".into());
     }
     Ok(response)
 }
@@ -3979,6 +3995,7 @@ where
                 &parsed,
                 crate::slash::SlashCommand::Session {
                     action: crate::slash::SessionAction::Open { .. }
+                        | crate::slash::SessionAction::ResumeLast
                 }
             );
             if session_open && (!jobs.is_empty() || !pending_steers.is_empty()) {
@@ -5747,6 +5764,7 @@ fn handle_command<W: Write>(
                     &command,
                     crate::slash::SlashCommand::Session {
                         action: crate::slash::SessionAction::Open { .. }
+                            | crate::slash::SessionAction::ResumeLast
                     }
                 );
                 let durable_fingerprint = slash_runtime_fingerprint(&command)?;
