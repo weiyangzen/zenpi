@@ -74,7 +74,8 @@ forecast below is strictly less than 5,000.
 **Latest executable slice (2026-09-05):** `src/domain_execution.rs` now owns a
 bounded local `/blueprint run ID[@VERSION]` step. It selects one dependency-ready
 item, persists a private running/terminal receipt, enforces the linked Goal
-budget, and resumes a running receipt without allocating a duplicate attempt.
+budget, rejects duplicate attempt identities, and resumes a running receipt
+without allocating a duplicate attempt.
 Both TUI and headless hosts call the same owner; it performs deterministic local
 evidence only and does not invoke a provider, shell, scheduler, or nested agent.
 The installed smoke now proves session GC and the Blueprint run owner: it
