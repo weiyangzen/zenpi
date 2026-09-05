@@ -1506,7 +1506,15 @@ pub fn session_lifecycle_view(
             payload,
             ttl_ms,
         } => Request::Queue {
-            source: validate_existing_session_path(source)?,
+            source: {
+                let source_path = validate_existing_session_path(source)?;
+                if active_session.is_none()
+                    || !active_session.is_some_and(|active| same_path(active, &source_path))
+                {
+                    return Err("session queue source must be the active session owner".into());
+                }
+                source_path
+            },
             recipient: validate_existing_session_path(recipient)?,
             request_id: request_id.clone(),
             payload: payload.clone(),
@@ -1592,6 +1600,10 @@ fn serialized_catalog_entry(entry: &crate::session::SessionCatalogEntry) -> serd
         object.insert("last_activity_ms".into(), json!(entry.last_activity_ms));
     }
     value
+}
+
+fn same_path(left: &Path, right: &Path) -> bool {
+    left.canonicalize().ok() == right.canonicalize().ok()
 }
 
 fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
