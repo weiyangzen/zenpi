@@ -321,4 +321,57 @@ if records[1].get("code") != "invalid_utf8":
 # framing state. The deterministic borrowed reader covers post-error recovery.
 PY
 
+# New session-control frames must be distinct from prompts and must not
+# pretend an unavailable mailbox or shell owner admitted a side effect.
+python3 - "$BIN" "$TMP_ROOT" <<'PY'
+import json
+import pathlib
+import subprocess
+import sys
+
+binary, root = sys.argv[1], pathlib.Path(sys.argv[2])
+session = root / "control-session.jsonl"
+marker = root / "shell-must-not-run"
+requests = [
+    {"schema_version": 2, "type": "checkpoint", "id": "inspect", "checkpoint": {"action": "inspect"}},
+    {"schema_version": 2, "type": "mailbox", "id": "send", "mailbox": {
+        "action": "send", "recipient_session_id": "other", "message_id": "message",
+        "text": "private mailbox payload", "ttl_ms": 1000,
+    }},
+    {"schema_version": 2, "type": "user_shell", "id": "shell", "text": f"!echo private > {marker}"},
+    {"schema_version": 1, "type": "user_shell", "id": "legacy-shell", "text": "!"},
+    {"schema_version": 2, "type": "shutdown", "id": "stop"},
+]
+run = subprocess.run(
+    [binary, "--mode", "headless", "--backend", "echo", "--session", str(session)],
+    input="".join(json.dumps(request) + "\n" for request in requests),
+    text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=15,
+)
+assert run.returncode == 0, run.stderr
+records = [json.loads(line) for line in run.stdout.split("\n") if line]
+assert all(record.get("type") in ("response", "event") for record in records), records
+responses = [record for record in records if record["type"] == "response"]
+assert len(responses) == len(requests), responses
+by_id = {record["id"]: record for record in responses}
+assert len(by_id) == len(requests), responses
+inspection = by_id["inspect"]
+assert inspection["success"] is True, inspection
+assert inspection["data"]["cursor_scope"] == "session_journal", inspection
+assert inspection["data"]["reconnect_supported"] is False, inspection
+assert inspection["data"]["acknowledgement_supported"] is False, inspection
+for request_id, owner, version in [
+    ("send", "session_mailbox", 2), ("shell", "user_shell", 2), ("legacy-shell", "user_shell", 1),
+]:
+    response = by_id[request_id]
+    assert response["success"] is False and response["code"] == "owner_required", response
+    assert response["execution_state"] == "untracked" and response["required_owner"] == owner, response
+    assert response["schema_version"] == version and "data" not in response, response
+assert not marker.exists(), "unowned user-shell request executed"
+assert "private" not in run.stdout, "unowned request payload was echoed to stdout"
+journal = [json.loads(line) for line in session.read_text().split("\n") if line]
+assert all(record["kind"] not in ("turn", "handoff", "handoff_record") for record in journal), journal
+assert inspection["data"]["cursor"]["session_id"] == journal[0]["session_id"], journal
+print("headless session-control boundary smoke passed")
+PY
+
 echo "headless smoke: passed"

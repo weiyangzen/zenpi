@@ -3829,6 +3829,38 @@ where
                 }
             }
         }
+        Command::Checkpoint(crate::protocol::CheckpointRequest::Inspect) => {
+            match shared.try_lock() {
+                Ok(agent) => write_cached_versioned_response(
+                    output,
+                    StdioResponse::success(
+                        id,
+                        name,
+                        Some(serde_json::to_value(inspect_checkpoint(&agent))?),
+                    ),
+                    request_version,
+                    replay,
+                )?,
+                Err(_) => write_retryable_response(
+                    output,
+                    StdioResponse::error_with_code(
+                        id,
+                        name,
+                        "agent_busy",
+                        "checkpoint inspection requires the session owner",
+                    )
+                    .for_version(request_version),
+                    replay,
+                )?,
+            }
+        }
+        Command::Checkpoint(_) | Command::Mailbox(_) | Command::UserShell(_) => {
+            write_retryable_response(
+                output,
+                unavailable_control_response(id, &command).for_version(request_version),
+                replay,
+            )?;
+        }
         Command::Status => match shared.try_lock() {
             Ok(agent) => write_cached_versioned_response(
                 output,
@@ -5252,6 +5284,25 @@ fn handle_command<W: Write>(
             request_version,
             replay,
         )?,
+        Command::Checkpoint(crate::protocol::CheckpointRequest::Inspect) => {
+            write_cached_versioned_response(
+                output,
+                StdioResponse::success(
+                    id,
+                    name,
+                    Some(serde_json::to_value(inspect_checkpoint(agent))?),
+                ),
+                request_version,
+                replay,
+            )?;
+        }
+        Command::Checkpoint(_) | Command::Mailbox(_) | Command::UserShell(_) => {
+            write_retryable_response(
+                output,
+                unavailable_control_response(id, &command).for_version(request_version),
+                replay,
+            )?;
+        }
         Command::Status => {
             write_cached_versioned_response(
                 output,
@@ -5421,6 +5472,30 @@ fn handle_command<W: Write>(
         }
     }
     Ok(false)
+}
+
+/// Report only the persisted journal projection held by this owner. It is
+/// not a claim that outbound events or client ACKs survive a process restart.
+pub fn inspect_checkpoint(agent: &Agent) -> crate::protocol::CheckpointInspection {
+    crate::protocol::CheckpointInspection {
+        cursor: crate::protocol::CheckpointCursor {
+            session_id: agent.session().session_id().to_owned(),
+            next_sequence: agent.session().next_sequence(),
+        },
+        cursor_scope: crate::protocol::CheckpointCursorScope::SessionJournal,
+        reconnect_supported: false,
+        acknowledgement_supported: false,
+    }
+}
+
+fn unavailable_control_response(id: Option<String>, command: &Command) -> StdioResponse {
+    let owner = match command {
+        Command::Checkpoint(_) => "durable_checkpoint",
+        Command::Mailbox(_) => "session_mailbox",
+        Command::UserShell(_) => "user_shell",
+        _ => unreachable!("only owner-required controls reach this boundary"),
+    };
+    StdioResponse::owner_required(id, crate::protocol::command_name(command), owner)
 }
 
 fn write_response<W: Write>(output: &mut W, response: StdioResponse) -> Result<(), HeadlessError> {

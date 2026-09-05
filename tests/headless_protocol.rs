@@ -698,6 +698,245 @@ fn protocol_v2_accepts_resume_sequence_and_v1_remains_supported() {
 }
 
 #[test]
+fn session_control_requests_roundtrip_into_typed_commands() {
+    use zenpi::protocol::{CheckpointRequest, Command, MailboxRequest};
+    let payloads = [
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"inspect"}}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"acknowledge","cursor":{"session_id":"session-a","next_sequence":8}}}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"replay","cursor":{"session_id":"session-a","next_sequence":8},"limit":128}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"send","recipient_session_id":"session-b","message_id":"m1","text":"line one\nline two","ttl_ms":1000}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"receive","after_sequence":0,"limit":32}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"acknowledge","message_id":"m1"}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"claim","message_id":"m1"}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"complete","message_id":"m1","outcome":"succeeded","result":"done"}}),
+        serde_json::json!({"type":"user_shell","text":"!echo 'hello' | wc -c"}),
+        serde_json::json!({"type":"user_shell","text":"!"}),
+    ];
+    for (index, mut payload) in payloads.into_iter().enumerate() {
+        payload["id"] = Value::String(format!("typed-{index}"));
+        payload["schema_version"] = Value::from(2);
+        let request = parse_line(&payload.to_string()).unwrap();
+        let roundtrip = serde_json::to_string(&request).unwrap();
+        assert_eq!(request, parse_line(&roundtrip).unwrap());
+        let command = request.into_command().unwrap();
+        match (index, command) {
+            (0, Command::Checkpoint(CheckpointRequest::Inspect)) => {}
+            (1, Command::Checkpoint(CheckpointRequest::Acknowledge { cursor })) => {
+                assert_eq!(cursor.next_sequence, 8);
+            }
+            (2, Command::Checkpoint(CheckpointRequest::Replay { limit, .. })) => {
+                assert_eq!(limit, 128);
+            }
+            (3, Command::Mailbox(MailboxRequest::Send { text, .. })) => {
+                assert_eq!(text, "line one\nline two");
+            }
+            (4..=7, Command::Mailbox(_)) => {}
+            (8..=9, Command::UserShell(shell)) => assert!(shell.input.starts_with('!')),
+            (index, command) => panic!("unexpected typed command {index}: {command:?}"),
+        }
+    }
+}
+
+#[test]
+fn session_control_validation_is_bounded_and_rejects_origin_confusion() {
+    let payloads = [
+        serde_json::json!({"type":"checkpoint"}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"replay","cursor":{"session_id":"s","next_sequence":0},"limit":0}}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"replay","cursor":{"session_id":"s","next_sequence":0},"limit":129}}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"acknowledge","cursor":{"session_id":"s\n","next_sequence":0}}}),
+        serde_json::json!({"type":"checkpoint","checkpoint":{"action":"acknowledge","cursor":{"session_id":"s","next_sequence":u64::MAX}}}),
+        serde_json::json!({"type":"mailbox"}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"send","recipient_session_id":"s","message_id":"m","text":"test","ttl_ms":0}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"send","recipient_session_id":"s","message_id":"m","text":"test","ttl_ms":zenpi::protocol::MAX_MAILBOX_TTL_MS + 1}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"send","recipient_session_id":"s","sender_session_id":"forged","message_id":"m","text":"test","ttl_ms":1}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"send","recipient_session_id":"s","message_id":"m","text":"x".repeat(zenpi::protocol::MAX_MAILBOX_TEXT_BYTES + 1),"ttl_ms":1}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"complete","message_id":"m","outcome":"success"}}),
+        serde_json::json!({"type":"mailbox","mailbox":{"action":"claim","message_id":"\u{0}"}}),
+        serde_json::json!({"type":"user_shell","text":"echo hello"}),
+        serde_json::json!({"type":"user_shell","text":"!!echo hello"}),
+        serde_json::json!({"type":"user_shell","text":"!echo \u{0}"}),
+        serde_json::json!({"type":"user_shell","text":format!("!{}", "x".repeat(zenpi::protocol::MAX_USER_SHELL_BYTES))}),
+        serde_json::json!({"type":"user_shell","text":"!echo hello","mode":"steer"}),
+        serde_json::json!({"type":"user_shell","text":"!echo hello","expected_turn_id":"provider-turn"}),
+    ];
+    for (index, mut payload) in payloads.into_iter().enumerate() {
+        payload["id"] = Value::String(format!("invalid-{index}"));
+        payload["schema_version"] = Value::from(2);
+        assert!(
+            parse_line(&payload.to_string())
+                .and_then(|request| request.into_command())
+                .is_err(),
+            "invalid control request was admitted: {payload}"
+        );
+    }
+}
+
+struct NoControlProvider;
+
+impl Backend for NoControlProvider {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        panic!("a session control request reached the provider")
+    }
+
+    fn name(&self) -> &str {
+        "no-control-provider"
+    }
+}
+
+#[test]
+fn checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("cursor.jsonl");
+    let mut session = SessionStore::open(&path).unwrap();
+    session
+        .append_event(serde_json::json!({"type":"checkpoint-fixture"}))
+        .unwrap();
+    let expected_id = session.session_id().to_owned();
+    let expected_sequence = session.next_sequence();
+    drop(session);
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let before = fs::read(&path).unwrap();
+    let mut output = Vec::new();
+    run_headless(
+        &mut agent,
+        Cursor::new(b"{\"schema_version\":2,\"type\":\"checkpoint\",\"id\":\"cursor\",\"checkpoint\":{\"action\":\"inspect\"}}\n"),
+        &mut output,
+    ).unwrap();
+    let records = json_lines(&output);
+    let response = records
+        .iter()
+        .find(|record| record["id"] == "cursor")
+        .unwrap();
+    assert_eq!(response["success"], true);
+    assert_eq!(response["data"]["cursor"]["session_id"], expected_id);
+    assert_eq!(
+        response["data"]["cursor"]["next_sequence"],
+        expected_sequence
+    );
+    assert_eq!(response["data"]["cursor_scope"], "session_journal");
+    assert_eq!(response["data"]["reconnect_supported"], false);
+    assert_eq!(response["data"]["acknowledgement_supported"], false);
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("unowned.jsonl");
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let before = fs::read(&path).unwrap();
+    let input = concat!(
+        "{\"schema_version\":2,\"type\":\"mailbox\",\"id\":\"mail\",\"mailbox\":{\"action\":\"send\",\"recipient_session_id\":\"other\",\"message_id\":\"m\",\"text\":\"private mail content\",\"ttl_ms\":1000}}\n",
+        "{\"schema_version\":2,\"type\":\"checkpoint\",\"id\":\"ack\",\"checkpoint\":{\"action\":\"acknowledge\",\"cursor\":{\"session_id\":\"session\",\"next_sequence\":1}}}\n",
+        "{\"schema_version\":2,\"type\":\"user_shell\",\"id\":\"shell\",\"text\":\"!echo private shell content\"}\n",
+        "{\"schema_version\":1,\"type\":\"user_shell\",\"id\":\"shell-v1\",\"text\":\"!\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    for (id, owner, version) in [
+        ("mail", "session_mailbox", 2),
+        ("ack", "durable_checkpoint", 2),
+        ("shell", "user_shell", 2),
+        ("shell-v1", "user_shell", 1),
+    ] {
+        let responses: Vec<_> = records
+            .iter()
+            .filter(|record| record["id"] == id && record["type"] == "response")
+            .collect();
+        assert_eq!(responses.len(), 1);
+        let response = responses[0];
+        assert_eq!(response["schema_version"], version);
+        assert_eq!(response["success"], false);
+        assert_eq!(response["code"], "owner_required");
+        assert_eq!(response["execution_state"], "untracked");
+        assert_eq!(response["required_owner"], owner);
+        assert!(response.get("data").is_none());
+    }
+    assert!(!String::from_utf8(output).unwrap().contains("private "));
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert!(agent.history().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn session_controls_remain_readable_while_provider_is_in_flight() {
+    let (first_started_tx, first_started_rx) = mpsc::sync_channel(1);
+    let (cancellation_seen_tx, cancellation_seen_rx) = mpsc::sync_channel(1);
+    let backend = BurstSteerBackend {
+        calls: AtomicUsize::new(0),
+        first_started: first_started_tx,
+        cancellation_seen: cancellation_seen_tx,
+    };
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("inflight-controls.jsonl");
+    let agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(backend));
+    let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    let host =
+        thread::spawn(move || zenpi::headless::run_async_streams(agent, reader, output).unwrap());
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"prompt","id":"provider","text":"wait"})
+    )
+    .unwrap();
+    first_started_rx
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap();
+    for value in [
+        serde_json::json!({"schema_version":2,"type":"checkpoint","id":"inspect","checkpoint":{"action":"inspect"}}),
+        serde_json::json!({"schema_version":2,"type":"mailbox","id":"mailbox","mailbox":{"action":"receive","after_sequence":0,"limit":1}}),
+        serde_json::json!({"schema_version":2,"type":"user_shell","id":"shell","text":"!echo hi"}),
+    ] {
+        writeln!(writer, "{value}").unwrap();
+    }
+    wait_for_output(&captured, "\"required_owner\":\"user_shell\"");
+    let records = json_lines(&captured.0.lock().unwrap());
+    for (id, code) in [
+        ("inspect", "agent_busy"),
+        ("mailbox", "owner_required"),
+        ("shell", "owner_required"),
+    ] {
+        let responses: Vec<_> = records
+            .iter()
+            .filter(|record| record["id"] == id && record["type"] == "response")
+            .collect();
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0]["code"], code);
+        assert_eq!(responses[0]["success"], false);
+    }
+    assert!(
+        cancellation_seen_rx.try_recv().is_err(),
+        "shell control steered/cancelled the provider"
+    );
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"cancel","id":"cancel","target_id":"provider"})
+    )
+    .unwrap();
+    cancellation_seen_rx
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap();
+    writeln!(
+        writer,
+        "{}",
+        serde_json::json!({"schema_version":2,"type":"shutdown","id":"stop"})
+    )
+    .unwrap();
+    drop(writer);
+    host.join().unwrap();
+}
+
+#[test]
 fn headless_slash_commands_are_control_plane_only() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("slash-command.jsonl");

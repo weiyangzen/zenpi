@@ -31,6 +31,10 @@ pub const LEGACY_PROTOCOL_VERSION: u16 = 1;
 pub const ASYNC_PROTOCOL_VERSION: u16 = PROTOCOL_VERSION;
 /// Maximum bytes in a correlation identifier.
 pub const MAX_ID_BYTES: usize = 128;
+pub const MAX_MAILBOX_TEXT_BYTES: usize = 64 * 1024;
+pub const MAX_MAILBOX_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1000;
+pub const MAX_USER_SHELL_BYTES: usize = 16 * 1024;
+pub const MAX_CHECKPOINT_PAGE_RECORDS: u16 = 128;
 
 const fn default_protocol_version() -> u16 {
     LEGACY_PROTOCOL_VERSION
@@ -48,6 +52,92 @@ pub enum TurnMode {
     StartIfIdle,
     /// Refuse the request unless a compatible active turn exists.
     Steer,
+}
+
+/// This cursor addresses the durable session journal, not process-local
+/// stdout events. A transport reconnect owner must not conflate the two.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckpointCursor {
+    pub session_id: String,
+    pub next_sequence: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CheckpointRequest {
+    Inspect,
+    Acknowledge {
+        cursor: CheckpointCursor,
+    },
+    Replay {
+        cursor: CheckpointCursor,
+        limit: u16,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailboxOutcome {
+    Succeeded,
+    Failed,
+    Abandoned,
+}
+
+/// Sender identity and workspace authorization are deliberately absent from
+/// client-controlled fields; those belong to the eventual mailbox owner.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum MailboxRequest {
+    Send {
+        recipient_session_id: String,
+        message_id: String,
+        text: String,
+        ttl_ms: u64,
+    },
+    Receive {
+        after_sequence: u64,
+        limit: u16,
+    },
+    Acknowledge {
+        message_id: String,
+    },
+    Claim {
+        message_id: String,
+    },
+    Complete {
+        message_id: String,
+        outcome: MailboxOutcome,
+        result: Option<String>,
+    },
+}
+
+/// Parsing an explicit user-shell request does not grant shell execution.
+/// The host must still have a shell owner and an applicable side-effect gate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserShellRequest {
+    pub input: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionState {
+    Untracked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckpointCursorScope {
+    SessionJournal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckpointInspection {
+    pub cursor: CheckpointCursor,
+    pub cursor_scope: CheckpointCursorScope,
+    pub reconnect_supported: bool,
+    pub acknowledgement_supported: bool,
 }
 
 /// A decoded request from stdin.  Optional fields are kept here so malformed
@@ -91,6 +181,10 @@ pub struct StdioRequest {
     pub attachments: Vec<InputAttachment>,
     #[serde(default)]
     pub from_sequence: Option<u64>,
+    #[serde(default)]
+    pub checkpoint: Option<CheckpointRequest>,
+    #[serde(default)]
+    pub mailbox: Option<MailboxRequest>,
 }
 
 /// A validated command.  The command owns its payload so admission can move
@@ -132,6 +226,9 @@ pub enum Command {
         path: Option<String>,
         from_sequence: Option<u64>,
     },
+    Checkpoint(CheckpointRequest),
+    Mailbox(MailboxRequest),
+    UserShell(UserShellRequest),
     Approve {
         approval_id: String,
         decision: crate::approval::ApprovalDecision,
@@ -223,6 +320,51 @@ impl StdioRequest {
                     from_sequence: self.from_sequence,
                 })
             }
+            "checkpoint" => {
+                let checkpoint = self.checkpoint.ok_or(ProtocolError::MissingField {
+                    field: "checkpoint",
+                })?;
+                match &checkpoint {
+                    CheckpointRequest::Inspect => {}
+                    CheckpointRequest::Acknowledge { cursor } => validate_cursor(cursor)?,
+                    CheckpointRequest::Replay { cursor, limit } => {
+                        validate_cursor(cursor)?;
+                        validate_page_limit(*limit)?;
+                    }
+                }
+                Ok(Command::Checkpoint(checkpoint))
+            }
+            "mailbox" => {
+                let mailbox = self
+                    .mailbox
+                    .ok_or(ProtocolError::MissingField { field: "mailbox" })?;
+                validate_mailbox(&mailbox)?;
+                Ok(Command::Mailbox(mailbox))
+            }
+            "user_shell" => {
+                if !self.attachments.is_empty()
+                    || self.mode.is_some()
+                    || self.expected_turn_id.is_some()
+                {
+                    return Err(ProtocolError::InvalidField {
+                        field: "user_shell",
+                    });
+                }
+                let input = bounded_text(self.text.or(self.message), "user_shell")?;
+                if input.len() > MAX_USER_SHELL_BYTES {
+                    return Err(ProtocolError::FieldTooLong {
+                        field: "user_shell",
+                        max: MAX_USER_SHELL_BYTES,
+                    });
+                }
+                let trimmed = input.trim_start();
+                if !trimmed.starts_with('!') || trimmed.starts_with("!!") {
+                    return Err(ProtocolError::InvalidField {
+                        field: "user_shell",
+                    });
+                }
+                Ok(Command::UserShell(UserShellRequest { input }))
+            }
             "approve" | "approval" => {
                 let approval_id = self.approval_id.ok_or(ProtocolError::MissingField {
                     field: "approval_id",
@@ -247,6 +389,80 @@ impl StdioRequest {
     pub fn id(&self) -> Option<&str> {
         self.id.as_deref()
     }
+}
+
+fn validate_cursor(cursor: &CheckpointCursor) -> Result<(), ProtocolError> {
+    validate_identifier(&cursor.session_id, "session_id")?;
+    if cursor.next_sequence == u64::MAX {
+        return Err(ProtocolError::InvalidField {
+            field: "next_sequence",
+        });
+    }
+    Ok(())
+}
+
+fn validate_page_limit(limit: u16) -> Result<(), ProtocolError> {
+    if limit == 0 || limit > MAX_CHECKPOINT_PAGE_RECORDS {
+        return Err(ProtocolError::InvalidField { field: "limit" });
+    }
+    Ok(())
+}
+
+fn validate_mailbox(mailbox: &MailboxRequest) -> Result<(), ProtocolError> {
+    match mailbox {
+        MailboxRequest::Send {
+            recipient_session_id,
+            message_id,
+            text,
+            ttl_ms,
+        } => {
+            validate_identifier(recipient_session_id, "recipient_session_id")?;
+            validate_identifier(message_id, "message_id")?;
+            validate_mailbox_text(text, "mailbox text")?;
+            if *ttl_ms == 0 || *ttl_ms > MAX_MAILBOX_TTL_MS {
+                return Err(ProtocolError::InvalidField { field: "ttl_ms" });
+            }
+        }
+        MailboxRequest::Receive {
+            after_sequence,
+            limit,
+        } => {
+            validate_page_limit(*limit)?;
+            if *after_sequence == u64::MAX {
+                return Err(ProtocolError::InvalidField {
+                    field: "after_sequence",
+                });
+            }
+        }
+        MailboxRequest::Acknowledge { message_id } | MailboxRequest::Claim { message_id } => {
+            validate_identifier(message_id, "message_id")?;
+        }
+        MailboxRequest::Complete {
+            message_id, result, ..
+        } => {
+            validate_identifier(message_id, "message_id")?;
+            if let Some(result) = result {
+                validate_mailbox_text(result, "mailbox result")?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_mailbox_text(value: &str, field: &'static str) -> Result<(), ProtocolError> {
+    if value.trim().is_empty() {
+        return Err(ProtocolError::EmptyField { field });
+    }
+    if value.len() > MAX_MAILBOX_TEXT_BYTES {
+        return Err(ProtocolError::FieldTooLong {
+            field,
+            max: MAX_MAILBOX_TEXT_BYTES,
+        });
+    }
+    if value.contains('\0') {
+        return Err(ProtocolError::InvalidField { field });
+    }
+    Ok(())
 }
 
 fn validate_id(id: Option<&str>) -> Result<(), ProtocolError> {
@@ -427,6 +643,10 @@ pub struct StdioResponse {
     /// success (`ok`) and failure (`error` or a typed protocol code).
     #[serde(rename = "code")]
     pub error_code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_state: Option<ExecutionState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required_owner: Option<&'static str>,
 }
 
 /// An event envelope emitted by asynchronous hosts. Keeping events separate
@@ -476,6 +696,8 @@ impl StdioResponse {
             data,
             error: None,
             error_code: "ok".into(),
+            execution_state: None,
+            required_owner: None,
         }
     }
 
@@ -489,6 +711,8 @@ impl StdioResponse {
             data: None,
             error: Some(error.into()),
             error_code: "error".into(),
+            execution_state: None,
+            required_owner: None,
         }
     }
 
@@ -512,6 +736,24 @@ impl StdioResponse {
         };
         self
     }
+
+    /// A decoded request is not an admission or an execution receipt when
+    /// its side-effect owner is unavailable. Keep this a terminal error.
+    pub fn owner_required(
+        id: Option<String>,
+        command: impl Into<String>,
+        owner: &'static str,
+    ) -> Self {
+        let mut response = Self::error_with_code(
+            id,
+            command,
+            "owner_required",
+            "request was not executed; the required owner is unavailable",
+        );
+        response.execution_state = Some(ExecutionState::Untracked);
+        response.required_owner = Some(owner);
+        response
+    }
 }
 
 /// Serialize one response/event as exactly one LF-terminated line.
@@ -533,6 +775,9 @@ pub fn command_name(command: &Command) -> &'static str {
         Command::Resources { .. } => "resources",
         Command::Handoff { .. } => "handoff",
         Command::Resume { .. } => "resume",
+        Command::Checkpoint(_) => "checkpoint",
+        Command::Mailbox(_) => "mailbox",
+        Command::UserShell(_) => "user_shell",
         Command::Approve { .. } => "approve",
         Command::Shutdown => "shutdown",
     }
