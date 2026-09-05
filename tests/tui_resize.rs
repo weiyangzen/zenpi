@@ -105,6 +105,65 @@ fn unbound_control_keys_never_insert_printable_characters() {
 }
 
 #[test]
+fn tab_completes_slash_commands_without_touching_prompt_text() {
+    let mut state = TuiState::default();
+    state.set_input("/doc");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.input(), "/doctor ");
+
+    // A command prefix with several matches expands only to the common
+    // canonical prefix; a second Tab completes the exact command and leaves
+    // its argument slot ready for typing.
+    state.set_input("/m");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.input(), "/model");
+    state.set_input("/mo");
+    state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(state.input(), "/model");
+    state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(state.input(), "/model ");
+
+    // Tab remains inert for ordinary prompts, commands with an argument, and
+    // a cursor positioned before the end of a draft.
+    state.set_input("ordinary prompt");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "ordinary prompt");
+    state.set_input("/doctor now");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "/doctor now");
+    state.set_input("/doc");
+    state.handle_key(key(KeyCode::Left, KeyModifiers::NONE));
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "/doc");
+}
+
+#[test]
+fn tab_does_not_complete_after_multiline_leading_whitespace() {
+    let mut state = TuiState::default();
+    state.set_input("  /doc\nnext");
+    assert_eq!(
+        state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::None
+    );
+    assert_eq!(state.input(), "  /doc\nnext");
+}
+
+#[test]
 fn submit_preserves_prompt_whitespace() {
     let mut state = TuiState::default();
     state.set_input("  indented code  \n");

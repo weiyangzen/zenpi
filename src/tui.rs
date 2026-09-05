@@ -1301,6 +1301,14 @@ impl TuiState {
                 self.focus_previous_workspace_pane();
                 return TuiAction::Redraw;
             }
+            // Complete a slash command only while the command name is the
+            // whole trailing token. Ordinary prompt text keeps Tab inert,
+            // and a cursor in the middle of a draft never moves later bytes.
+            KeyCode::Tab if modifiers.is_empty() => {
+                if self.complete_slash_input() {
+                    return TuiAction::Redraw;
+                }
+            }
             // An unbound control chord must never type its printable key name
             // into the prompt. For example, Ctrl-D on a non-empty draft used
             // to append `d`, and Ctrl-A appended `a` instead of being inert.
@@ -1388,6 +1396,61 @@ impl TuiState {
         }
         self.dirty = true;
         TuiAction::None
+    }
+
+    /// Complete the slash command name at the end of the input buffer.
+    /// Completion is deliberately conservative: it never rewrites a
+    /// multiline prompt, guesses an argument, or acts on a cursor in the
+    /// middle of a draft. The shared slash catalogue remains authoritative.
+    fn complete_slash_input(&mut self) -> bool {
+        if self.cursor != self.input.len() {
+            return false;
+        }
+        let trimmed = self.input.trim_start_matches(char::is_whitespace);
+        let leading = self.input.len().saturating_sub(trimmed.len());
+        if self.input[..leading].contains(['\n', '\r']) {
+            return false;
+        }
+        if !trimmed.starts_with('/')
+            || trimmed.len() <= 1
+            || trimmed[1..].chars().any(char::is_whitespace)
+        {
+            return false;
+        }
+        let candidates = slash::complete(trimmed);
+        if candidates.is_empty() {
+            return false;
+        }
+        let body = &trimmed[1..];
+        let common = slash_common_prefix(&candidates);
+        let replacement = if candidates.len() == 1 && common.len() >= body.len() {
+            format!("/{} ", candidates[0])
+        } else if common.len() > body.len() {
+            format!("/{common}")
+        } else if let Some(exact) = candidates
+            .iter()
+            .find(|candidate| candidate.eq_ignore_ascii_case(body))
+        {
+            format!("/{exact} ")
+        } else {
+            return false;
+        };
+        let replaced_len = self.cursor.saturating_sub(leading);
+        let resulting_len = self
+            .input
+            .len()
+            .saturating_sub(replaced_len)
+            .saturating_add(replacement.len());
+        if resulting_len > MAX_MESSAGE_BYTES {
+            return false;
+        }
+        self.input.replace_range(leading..self.cursor, &replacement);
+        self.cursor = leading.saturating_add(replacement.len());
+        self.history_cursor = None;
+        self.input_scroll = 0;
+        self.preferred_column = None;
+        self.dirty = true;
+        true
     }
 
     fn insert_text(&mut self, text: &str) {
@@ -4425,6 +4488,25 @@ fn drain_tui_provider_events(
 
 fn bound_text(text: String) -> String {
     truncate_bytes(&text, MAX_MESSAGE_BYTES).to_owned()
+}
+
+fn slash_common_prefix(candidates: &[&'static str]) -> String {
+    let Some(first) = candidates.first() else {
+        return String::new();
+    };
+    let mut prefix = first.to_string();
+    for candidate in candidates.iter().skip(1) {
+        let shared = prefix
+            .chars()
+            .zip(candidate.chars())
+            .take_while(|(left, right)| left.eq_ignore_ascii_case(right))
+            .count();
+        prefix = prefix.chars().take(shared).collect();
+        if prefix.is_empty() {
+            break;
+        }
+    }
+    prefix
 }
 
 /// Keep pasted prompt text from emitting terminal control sequences. Newlines

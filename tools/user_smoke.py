@@ -1506,6 +1506,57 @@ def assert_tui_multiline_paste(binary: Path, root: Path) -> None:
         )
 
 
+def assert_tui_slash_completion(binary: Path, root: Path) -> None:
+    """Prove slash completion is usable through the installed PTY binary."""
+    session = root / "tui-completion-session.jsonl"
+    command = [str(binary), "--mode", "tui", "--backend", "echo", "--session", str(session)]
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execve(command[0], command, isolated_env(root / "tui-completion-home"))
+    exited = False
+    output = bytearray()
+    try:
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 20, 80, 0, 0))
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and b"Prompt" not in output:
+            ready, _, _ = select.select([fd], [], [], 0.1)
+            if ready:
+                try:
+                    output.extend(os.read(fd, 65536))
+                except OSError:
+                    break
+        if b"Prompt" not in output:
+            raise AssertionError(f"completion TUI did not reach prompt: {bytes(output)!r}")
+        # `/doc` + Tab must become `/doctor `, then Enter dispatches the
+        # completed local command instead of sending it to the echo backend.
+        os.write(fd, b"/doc\t\r")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            drain_pty(fd, output, 0.05)
+            # Local slash owners render their bounded response but do not
+            # manufacture a durable model turn. Inspecting the terminal text
+            # proves the completed command ran; checking the journal below
+            # proves it never fell through to the echo provider.
+            if b'"route":"local"' in strip_ansi(bytes(output)):
+                break
+            time.sleep(0.01)
+        else:
+            raise AssertionError(f"slash completion did not dispatch /doctor: output={bytes(output)!r}")
+        os.write(fd, b"\x04")
+        exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
+        exited = True
+        output.extend(trailing)
+    finally:
+        if not exited:
+            terminate_pty_child(pid)
+        os.close(fd)
+    if exit_code != 0 or b"\x1b[?1049l" not in output:
+        raise AssertionError(f"slash completion TUI did not restore terminal: {output!r}")
+    journal = json_lines(session.read_text(encoding="utf-8"))
+    if any(record.get("kind") == "turn" for record in journal):
+        raise AssertionError(f"completed local slash command reached provider: {journal!r}")
+
+
 def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
     """Drive the production TUI against a deliberately slow Responses stream."""
     class SlowHandler(BaseHTTPRequestHandler):
@@ -1654,10 +1705,11 @@ def main() -> int:
         assert_invalid_inputs(binary, root)
         assert_tui(binary, root)
         assert_tui_multiline_paste(binary, root)
+        assert_tui_slash_completion(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
         "user smoke passed: production install/provider/tool approval/EOF drain/session GC/Blueprint execution, echo fixture, "
-        "durable slash/runtime intents, resume, TUI resize/multiline paste, streaming interrupt, "
+        "durable slash/runtime intents, resume, TUI resize/multiline paste/slash completion, streaming interrupt, "
         "and terminal restoration"
     )
     return 0
