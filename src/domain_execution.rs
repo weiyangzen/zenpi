@@ -320,7 +320,7 @@ impl BlueprintHandoff {
             .ok_or_else(|| ExecutionError::HandoffTaskMissing {
                 item_id: item.id.clone(),
             })?;
-        let expected = make_handoff_request(goal, blueprint, item, 1, task)?;
+        let expected = make_handoff_request(goal, blueprint, item, self.attempt, task)?;
         if self != &expected {
             return Err(ExecutionError::HandoffConflict {
                 handoff_id: self.handoff_id.clone(),
@@ -332,6 +332,7 @@ impl BlueprintHandoff {
 
 /// Result of one call to [`BlueprintExecutor::run_next`]. These outcomes
 /// describe receipt-owner progress, not completion of external product work.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunOutcome {
     /// One item reached a durable terminal state in this call.
@@ -975,7 +976,7 @@ impl BlueprintExecutor {
                 status: goal.status,
             });
         }
-        let Some(selection) = self.select_item(goal, blueprint)? else {
+        let Some(selection) = self.select_handoff_item(goal, blueprint)? else {
             // A control-plane receipt is not external acceptance evidence.
             // Refuse to claim a later item is ready until a future importer
             // records that evidence; never turn this into a fake completion.
@@ -1141,6 +1142,54 @@ impl BlueprintExecutor {
                         .checked_add(1)
                         .ok_or(ExecutionError::BudgetOverflow {
                             field: "execution_attempt",
+                        })
+                })?
+            };
+            return Ok(Some(Selection {
+                item,
+                attempt,
+                running: running.cloned(),
+            }));
+        }
+        Ok(None)
+    }
+
+    /// Select an item for an external worker only when every dependency has
+    /// externally evidenced completion. A local control-plane receipt is
+    /// intentionally insufficient for this path.
+    fn select_handoff_item<'a>(
+        &self,
+        goal: &Goal,
+        blueprint: &'a Blueprint,
+    ) -> Result<Option<Selection<'a>>, ExecutionError> {
+        for item in &blueprint.items {
+            let latest = self.latest_receipt(goal, blueprint, &item.id);
+            if latest.is_some_and(|receipt| {
+                receipt.status == ExecutionStatus::Succeeded && receipt.external_work_executed
+            }) {
+                continue;
+            }
+            let mut waiting_on = item.depends_on.iter().filter(|dependency| {
+                !self
+                    .latest_receipt(goal, blueprint, dependency)
+                    .is_some_and(|receipt| {
+                        receipt.status == ExecutionStatus::Succeeded
+                            && receipt.external_work_executed
+                    })
+            });
+            if waiting_on.next().is_some() {
+                continue;
+            }
+            let running = latest.filter(|receipt| receipt.status == ExecutionStatus::Running);
+            let attempt = if let Some(running) = running {
+                running.attempt
+            } else {
+                latest.map_or(Ok(1), |receipt| {
+                    receipt
+                        .attempt
+                        .checked_add(1)
+                        .ok_or(ExecutionError::BudgetOverflow {
+                            field: "handoff_attempt",
                         })
                 })?
             };
