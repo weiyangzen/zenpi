@@ -470,6 +470,8 @@ The installed smoke now includes the local Blueprint owner path: it installs
 the no-fixture binary, persists a valid Blueprint and linked Goal, runs two
 dependency-ordered items across two processes, verifies private receipt
 recovery and Goal completion, and asserts that no provider request occurred.
+This executable evidence supersedes the older shorthand in the V2-205/V2-305
+row text; the remaining gaps listed in those rows are still intentionally open.
 
 The following tests are mandatory evidence, not illustrative examples:
 
