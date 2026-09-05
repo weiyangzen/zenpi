@@ -618,18 +618,34 @@ impl OpenAiCompatibleBackend {
         policy_digest: impl Into<String>,
         model: impl Into<String>,
     ) -> Result<Self, BackendError> {
-        let policy_digest = policy_digest.into();
-        secret
-            .verify_policy_digest(&policy_digest)
-            .map_err(secret_error)?;
-        let mut backend = Self::new_with_settings(
+        Self::new_with_secret_handle_and_settings(
             endpoint,
-            None,
+            secret,
+            policy_digest,
             model,
             OpenAiWireApi::ChatCompletions,
             None,
             None,
-        )?;
+        )
+    }
+
+    /// Settings-preserving variant for Responses streaming and provider
+    /// reasoning/verbosity controls.
+    pub fn new_with_secret_handle_and_settings(
+        endpoint: impl Into<String>,
+        secret: SecretHandle,
+        policy_digest: impl Into<String>,
+        model: impl Into<String>,
+        wire_api: OpenAiWireApi,
+        reasoning_effort: Option<String>,
+        verbosity: Option<String>,
+    ) -> Result<Self, BackendError> {
+        let policy_digest = policy_digest.into();
+        secret
+            .verify_policy_digest(&policy_digest)
+            .map_err(secret_error)?;
+        let mut backend =
+            Self::new_with_settings(endpoint, None, model, wire_api, reasoning_effort, verbosity)?;
         backend.secret_handle = Some(secret);
         backend.secret_policy_digest = Some(policy_digest);
         Ok(backend)
