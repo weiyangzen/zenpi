@@ -7,6 +7,7 @@ pub mod config;
 pub mod context;
 pub mod core;
 pub mod diagnostics;
+pub mod domain_execution;
 pub mod domain_store;
 pub mod domains;
 pub mod error;
