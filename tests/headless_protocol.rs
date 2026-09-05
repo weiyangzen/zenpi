@@ -1317,6 +1317,13 @@ fn session_controls_remain_readable_while_provider_is_in_flight() {
     .unwrap();
     drop(writer);
     host.join().unwrap();
+    let records = json_lines(&captured.0.lock().unwrap());
+    let shell = records
+        .iter()
+        .find(|record| record["id"] == "shell" && record["type"] == "response")
+        .expect("queued shell must reach a terminal response");
+    assert_eq!(shell["success"], false);
+    assert_eq!(shell["code"], "invalid_turn");
 }
 
 #[test]
