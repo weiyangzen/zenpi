@@ -193,6 +193,7 @@ fn blueprint_task_is_optional_and_preserves_legacy_digest() {
     let legacy_wire = legacy_wire.replace("PLACEHOLDER", &expected);
     assert_eq!(Blueprint::decode_json(&legacy_wire).unwrap(), legacy);
     assert!(!legacy_wire.contains("task"));
+    assert!(!legacy.encode_json().unwrap().contains("\"task\""));
 
     let with_task = Blueprint::new(
         "legacy",
@@ -270,6 +271,22 @@ fn blueprint_task_rejects_invalid_boundaries() {
         Err(DomainError::TooLong {
             field: "acceptance_command",
             ..
+        })
+    ));
+
+    let invalid_item = BlueprintItem {
+        id: "build".into(),
+        depends_on: Vec::new(),
+        estimated_loc: 1,
+        task: Some(BlueprintTask {
+            instruction: "bad\0instruction".into(),
+            acceptance_commands: vec!["true".into()],
+        }),
+    };
+    assert!(matches!(
+        invalid_item.validate(),
+        Err(DomainError::InvalidText {
+            field: "task_instruction"
         })
     ));
 }

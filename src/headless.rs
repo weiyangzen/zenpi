@@ -2063,8 +2063,8 @@ pub fn run_blueprint_next(agent: &mut Agent, target: &str) -> Result<serde_json:
 fn sync_goal_status_after_execution(
     agent: &Agent,
     goal: &crate::domains::Goal,
-    blueprint: &crate::domains::Blueprint,
-    execution_store: &crate::domain_execution::ExecutionStore,
+    _blueprint: &crate::domains::Blueprint,
+    _execution_store: &crate::domain_execution::ExecutionStore,
     outcome: &crate::domain_execution::RunOutcome,
 ) -> Result<crate::domains::GoalStatus, String> {
     let should_start = matches!(
@@ -2079,34 +2079,15 @@ fn sync_goal_status_after_execution(
             .transition_goal(&goal.id, crate::domains::GoalStatus::Running)
             .map_err(|error| error.to_string())?;
     }
-    let mut status = store
+    let status = store
         .goal(&goal.id)
         .map(|record| record.status)
         .ok_or_else(|| format!("Goal `{}` disappeared during Blueprint execution", goal.id))?;
-    let execution_complete = matches!(
-        outcome,
-        crate::domain_execution::RunOutcome::Complete
-            | crate::domain_execution::RunOutcome::Executed { .. }
-    ) && blueprint.items.iter().all(|item| {
-        execution_store
-            .latest_receipt_for(goal, blueprint, &item.id)
-            .is_some_and(|receipt| {
-                receipt.status == crate::domain_execution::ExecutionStatus::Succeeded
-                    // The local receipt owner is deliberately not a worker.
-                    // Until an external executor imports evidence that the
-                    // item actually ran, its bookkeeping success must never
-                    // close the user-facing Goal.
-                    && receipt
-                        .evidence
-                        .contains("external_work_executed=true")
-            })
-    });
-    if execution_complete && status == crate::domains::GoalStatus::Running {
-        store
-            .transition_goal(&goal.id, crate::domains::GoalStatus::Done)
-            .map_err(|error| error.to_string())?;
-        status = crate::domains::GoalStatus::Done;
-    }
+    // No external-work evidence importer exists yet. The local receipt owner
+    // is deliberately bookkeeping-only, so it must never close a user-facing
+    // Goal, even when every local receipt says `succeeded`. The unused
+    // reconciliation inputs stay in the signature for the future
+    // result-manifest owner.
     Ok(status)
 }
 
