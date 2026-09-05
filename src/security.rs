@@ -195,7 +195,6 @@ fn registered_secret_values() -> Vec<String> {
             return false;
         };
         if let Ok(value) = material.value.lock()
-            && !material.revoked.load(std::sync::atomic::Ordering::Acquire)
             && let Ok(value) = std::str::from_utf8(&value)
         {
             values.push(value.to_owned());
