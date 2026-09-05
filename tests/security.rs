@@ -1,4 +1,4 @@
-use zenpi::security::{child_environment, redact_json, redact_text};
+use zenpi::security::{SecretError, SecretHandle, child_environment, redact_json, redact_text};
 
 const FIXTURE_SECRET: &str = "sk-fixture-secret-123456";
 
@@ -44,4 +44,32 @@ fn debug_output_redacts_backend_credentials() {
     let debug = format!("{backend:?}");
     assert!(!debug.contains(FIXTURE_SECRET));
     assert!(debug.contains("<redacted>"));
+}
+
+#[test]
+fn secret_handle_is_opaque_and_policy_bound() {
+    let digest = "a".repeat(64);
+    let (handle, revoke) = SecretHandle::new(FIXTURE_SECRET, digest.clone()).unwrap();
+    assert_eq!(handle.policy_digest(), digest);
+    assert!(format!("{handle:?}").contains("present: true"));
+    assert!(!format!("{handle:?}").contains(FIXTURE_SECRET));
+    assert!(handle.verify_policy_digest(&"b".repeat(64)).is_err());
+    assert_eq!(
+        handle.verify_policy_digest(&"b".repeat(64)).unwrap_err(),
+        SecretError::PolicyMismatch
+    );
+    revoke.revoke();
+    assert_eq!(
+        handle.verify_policy_digest(&digest).unwrap_err(),
+        SecretError::RevokedOrExpired
+    );
+}
+
+#[test]
+fn active_secret_handles_are_redacted_without_explicit_secret_lists() {
+    let digest = "c".repeat(64);
+    let (handle, _revoke) = SecretHandle::new(FIXTURE_SECRET, digest).unwrap();
+    let text = format!("tool returned {FIXTURE_SECRET}");
+    assert!(!redact_text(&text, &[]).contains(FIXTURE_SECRET));
+    drop(handle);
 }

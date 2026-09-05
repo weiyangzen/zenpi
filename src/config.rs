@@ -27,6 +27,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use crate::layout::{
     LayoutError, LayoutModel, LayoutPreferences, MAX_LAYOUT_PREFERENCES_BYTES, TabId,
 };
+use crate::security::{SecretHandle, SecretRevocation};
 
 /// The directory name created below the user's home directory.
 pub const ZENPI_DIR: &str = ".zenpi";
@@ -467,6 +468,23 @@ pub struct EffectiveConfig {
     pub max_retries: Option<u32>,
     pub requires_openai_auth: bool,
     pub supports_websockets: bool,
+}
+
+impl EffectiveConfig {
+    /// Issue an opaque credential capability for a single Blueprint policy.
+    /// The API key remains private to configuration/backend setup and is never
+    /// serialized as part of the handle or policy evidence.
+    pub fn issue_secret_handle(
+        &self,
+        policy_digest: impl Into<String>,
+    ) -> Result<Option<(SecretHandle, SecretRevocation)>, ConfigError> {
+        let Some(key) = self.api_key.as_deref() else {
+            return Ok(None);
+        };
+        SecretHandle::new(key, policy_digest.into())
+            .map(Some)
+            .map_err(|error| ConfigError::Invalid(error.to_string()))
+    }
 }
 
 impl std::fmt::Debug for EffectiveConfig {

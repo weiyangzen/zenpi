@@ -1,8 +1,210 @@
 //! Central redaction and private-file helpers.
 
-use std::{fs, io, path::Path};
+use std::{
+    fs, io,
+    path::Path,
+    sync::{Arc, Mutex, OnceLock, Weak},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use serde_json::Value;
+
+const MAX_REGISTERED_SECRETS: usize = 128;
+const MAX_SECRET_BYTES: usize = 16 * 1024;
+
+#[derive(Debug)]
+struct SecretMaterial {
+    value: Mutex<Vec<u8>>,
+    policy_digest: String,
+    expires_at_ms: Option<u64>,
+    revoked: std::sync::atomic::AtomicBool,
+}
+
+impl Drop for SecretMaterial {
+    fn drop(&mut self) {
+        if let Ok(value) = self.value.get_mut() {
+            for byte in value.iter_mut() {
+                *byte = 0;
+            }
+        }
+    }
+}
+
+/// An opaque, non-serializable credential capability.  A worker can carry the
+/// handle but cannot inspect or export its value; only the host-side backend
+/// adapter can borrow it for the duration of an authenticated request.
+#[derive(Clone)]
+pub struct SecretHandle(Arc<SecretMaterial>);
+
+impl std::fmt::Debug for SecretHandle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SecretHandle")
+            .field("policy_digest", &self.0.policy_digest)
+            .field("present", &true)
+            .finish()
+    }
+}
+
+/// Host-owned revocation capability.  It is intentionally a separate type so
+/// granting a handle to a worker does not grant permission to revoke it.
+#[derive(Clone, Debug)]
+pub struct SecretRevocation(Arc<SecretMaterial>);
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum SecretError {
+    #[error("secret is empty or contains control characters")]
+    Invalid,
+    #[error("policy digest must be a lowercase SHA-256")]
+    InvalidPolicyDigest,
+    #[error("secret handle is revoked or expired")]
+    RevokedOrExpired,
+    #[error("secret handle policy digest mismatch")]
+    PolicyMismatch,
+}
+
+impl SecretHandle {
+    /// Create a host-owned handle bound to one immutable Blueprint policy.
+    /// Callers should pass a value read from a private auth source, never a
+    /// value supplied by model/tool input.
+    pub fn new(
+        value: impl Into<String>,
+        policy_digest: impl Into<String>,
+    ) -> Result<(Self, SecretRevocation), SecretError> {
+        let value = value.into();
+        let policy_digest = policy_digest.into();
+        if value.is_empty() || value.len() > MAX_SECRET_BYTES || value.chars().any(char::is_control)
+        {
+            return Err(SecretError::Invalid);
+        }
+        validate_policy_digest(&policy_digest)?;
+        let material = Arc::new(SecretMaterial {
+            value: Mutex::new(value.into_bytes()),
+            policy_digest,
+            expires_at_ms: None,
+            revoked: std::sync::atomic::AtomicBool::new(false),
+        });
+        register_secret(&material);
+        let revoke = SecretRevocation(Arc::clone(&material));
+        Ok((Self(material), revoke))
+    }
+
+    /// Return the non-sensitive policy binding for evidence and receipts.
+    pub fn policy_digest(&self) -> &str {
+        &self.0.policy_digest
+    }
+
+    /// Verify that a handle is usable under an exact policy digest.  Digest
+    /// comparison is constant-time for equal-length values and fail-closed for
+    /// malformed input.
+    pub fn verify_policy_digest(&self, expected: &str) -> Result<(), SecretError> {
+        validate_policy_digest(expected)?;
+        if !constant_time_equal(self.policy_digest().as_bytes(), expected.as_bytes()) {
+            return Err(SecretError::PolicyMismatch);
+        }
+        if self.0.revoked.load(std::sync::atomic::Ordering::Acquire)
+            || self
+                .0
+                .expires_at_ms
+                .is_some_and(|expiry| now_ms() >= expiry)
+        {
+            return Err(SecretError::RevokedOrExpired);
+        }
+        Ok(())
+    }
+
+    /// Borrow the secret only inside this crate's host adapter.  No public API
+    /// converts a handle to a String or serializes the underlying bytes.
+    pub(crate) fn with_secret<T>(
+        &self,
+        expected_policy_digest: &str,
+        f: impl FnOnce(&str) -> T,
+    ) -> Result<T, SecretError> {
+        self.verify_policy_digest(expected_policy_digest)?;
+        let value = self
+            .0
+            .value
+            .lock()
+            .map_err(|_| SecretError::RevokedOrExpired)?;
+        let value = std::str::from_utf8(&value).map_err(|_| SecretError::RevokedOrExpired)?;
+        Ok(f(value))
+    }
+}
+
+impl SecretRevocation {
+    pub fn revoke(&self) {
+        self.0
+            .revoked
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
+fn validate_policy_digest(value: &str) -> Result<(), SecretError> {
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(SecretError::InvalidPolicyDigest)
+    }
+}
+
+fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut difference = 0_u8;
+    for (&a, &b) in left.iter().zip(right) {
+        difference |= a ^ b;
+    }
+    difference == 0
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| {
+            duration.as_millis().min(u128::from(u64::MAX)) as u64
+        })
+}
+
+fn secret_registry() -> &'static Mutex<Vec<Weak<SecretMaterial>>> {
+    static REGISTRY: OnceLock<Mutex<Vec<Weak<SecretMaterial>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn register_secret(material: &Arc<SecretMaterial>) {
+    let Ok(mut registry) = secret_registry().lock() else {
+        return;
+    };
+    registry.retain(|entry| entry.strong_count() > 0);
+    if registry.len() < MAX_REGISTERED_SECRETS {
+        registry.push(Arc::downgrade(material));
+    }
+}
+
+fn registered_secret_values() -> Vec<String> {
+    let Ok(mut registry) = secret_registry().lock() else {
+        return Vec::new();
+    };
+    let mut values = Vec::new();
+    registry.retain(|entry| {
+        let Some(material) = entry.upgrade() else {
+            return false;
+        };
+        if let Ok(value) = material.value.lock()
+            && !material.revoked.load(std::sync::atomic::Ordering::Acquire)
+        {
+            if let Ok(value) = std::str::from_utf8(&value) {
+                values.push(value.to_owned());
+            }
+        }
+        true
+    });
+    values
+}
 
 const SECRET_KEYS: &[&str] = &[
     "authorization",
@@ -17,6 +219,12 @@ const SECRET_KEYS: &[&str] = &[
 pub fn redact_text(input: &str, known_secrets: &[&str]) -> String {
     let mut output = input.to_owned();
     for secret in known_secrets.iter().filter(|secret| secret.len() >= 4) {
+        output = output.replace(secret, "<redacted>");
+    }
+    for secret in registered_secret_values()
+        .iter()
+        .filter(|secret| secret.len() >= 4)
+    {
         output = output.replace(secret, "<redacted>");
     }
     output = redact_bearer_tokens(&output);

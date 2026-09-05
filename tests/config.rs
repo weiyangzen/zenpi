@@ -85,6 +85,31 @@ fn pairing_imports_codex_and_is_idempotent_without_leaking_key() {
 }
 
 #[test]
+fn effective_config_can_issue_policy_bound_secret_handle() {
+    let config = zenpi::config::EffectiveConfig {
+        profile: None,
+        backend: "openai".into(),
+        provider: Some("openai".into()),
+        model: Some("fixture".into()),
+        base_url: Some("https://example.test/v1".into()),
+        wire_api: Some("chat".into()),
+        api_key: Some("secret-config-key".into()),
+        credential_source: CredentialSource::AuthFile,
+        model_reasoning_effort: None,
+        model_verbosity: None,
+        timeout_seconds: None,
+        max_retries: None,
+        requires_openai_auth: true,
+        supports_websockets: false,
+    };
+    let digest = "d".repeat(64);
+    let (handle, revoke) = config.issue_secret_handle(digest.clone()).unwrap().unwrap();
+    assert_eq!(handle.policy_digest(), digest);
+    assert!(!format!("{handle:?}").contains("secret-config-key"));
+    revoke.revoke();
+}
+
+#[test]
 fn cli_import_honors_codex_home_as_the_profile_root() {
     let temp = tempdir().unwrap();
     let codex_home = temp.path().join("alternate-codex");

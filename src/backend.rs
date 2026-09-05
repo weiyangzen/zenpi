@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::core::{Turn, TurnRole};
+use crate::security::{SecretError, SecretHandle};
 use crate::tools::{ToolCall, ToolDefinition};
 
 /// Keep provider responses bounded even when an endpoint omits a content
@@ -472,6 +473,8 @@ pub struct OpenAiCompatibleBackend {
     client: ureq::Agent,
     endpoint: String,
     api_key: Option<String>,
+    secret_handle: Option<SecretHandle>,
+    secret_policy_digest: Option<String>,
     model: String,
     wire_api: OpenAiWireApi,
     reasoning_effort: Option<String>,
@@ -489,6 +492,7 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .debug_struct("OpenAiCompatibleBackend")
             .field("endpoint", &self.endpoint)
             .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("secret_handle", &self.secret_handle)
             .field("model", &self.model)
             .field("wire_api", &self.wire_api)
             .field("reasoning_effort", &self.reasoning_effort)
@@ -591,6 +595,8 @@ impl OpenAiCompatibleBackend {
             client: ureq::Agent::new_with_config(config),
             endpoint,
             api_key,
+            secret_handle: None,
+            secret_policy_digest: None,
             model,
             wire_api,
             reasoning_effort,
@@ -601,6 +607,32 @@ impl OpenAiCompatibleBackend {
             circuit_cooldown: Duration::from_secs(2),
             circuit: Mutex::new(CircuitState::default()),
         })
+    }
+
+    /// Build a provider backend from an opaque, policy-bound credential. The
+    /// handle is verified before admission and unwrapped only while adding the
+    /// Authorization header to a host-owned request.
+    pub fn new_with_secret_handle(
+        endpoint: impl Into<String>,
+        secret: SecretHandle,
+        policy_digest: impl Into<String>,
+        model: impl Into<String>,
+    ) -> Result<Self, BackendError> {
+        let policy_digest = policy_digest.into();
+        secret
+            .verify_policy_digest(&policy_digest)
+            .map_err(secret_error)?;
+        let mut backend = Self::new_with_settings(
+            endpoint,
+            None,
+            model,
+            OpenAiWireApi::ChatCompletions,
+            None,
+            None,
+        )?;
+        backend.secret_handle = Some(secret);
+        backend.secret_policy_digest = Some(policy_digest);
+        Ok(backend)
     }
 
     pub fn from_env() -> Result<Self, BackendError> {
@@ -908,7 +940,15 @@ impl OpenAiCompatibleBackend {
             .post(&self.endpoint)
             .header("content-type", "application/json")
             .header("x-idempotency-key", idempotency_key(request.turn_id));
-        if let Some(key) = &self.api_key {
+        if let Some(secret) = &self.secret_handle {
+            let digest = self.secret_policy_digest.as_deref().ok_or_else(|| {
+                BackendError::Configuration("secret policy binding missing".into())
+            })?;
+            let header = secret
+                .with_secret(digest, |key| format!("Bearer {key}"))
+                .map_err(secret_error)?;
+            request_builder = request_builder.header("authorization", header);
+        } else if let Some(key) = &self.api_key {
             request_builder = request_builder.header("authorization", format!("Bearer {key}"));
         }
         // Only the streaming Responses adapter can safely treat a short body
@@ -1351,6 +1391,10 @@ fn responses_input_items(turn: &Turn) -> Vec<Value> {
         "content": turn.content,
         "_zenpi_turn_id": turn.id,
     })]
+}
+
+fn secret_error(error: SecretError) -> BackendError {
+    BackendError::Configuration(error.to_string())
 }
 
 fn map_ureq_error(error: ureq::Error) -> BackendError {

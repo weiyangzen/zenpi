@@ -1095,7 +1095,10 @@ impl ToolRegistry {
                 tool: call.name,
                 error: ToolFailure {
                     code: error.code(),
-                    message: format!("approved preview revalidation failed: {error}"),
+                    message: crate::security::redact_text(
+                        &format!("approved preview revalidation failed: {error}"),
+                        &[],
+                    ),
                 },
             },
             (None, Ok(None)) => self.execute_compact(context, policy, call),
@@ -1122,7 +1125,7 @@ impl ToolRegistry {
                 tool: tool_name,
                 error: ToolFailure {
                     code: error.code(),
-                    message: error.to_string(),
+                    message: crate::security::redact_text(&error.to_string(), &[]),
                 },
             },
         }
@@ -1175,6 +1178,11 @@ impl ToolRegistry {
             return Err(gate.deny("untrusted_tool_implementation"));
         }
         let mut output = registered.handler.invoke(context, arguments)?;
+        // Tool output may be persisted in a session, handoff, or compact
+        // artifact. Redact active host-owned credential handles before it can
+        // cross that boundary, even when a third-party tool returns a secret
+        // under an unrecognised JSON key.
+        output = crate::security::redact_json(&output, &[]);
         if let (Some(evidence), Some(object)) = (context.policy_evidence(), output.as_object_mut())
         {
             object.insert(
