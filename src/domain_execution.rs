@@ -336,6 +336,24 @@ impl ExecutionStore {
         &self.receipts
     }
 
+    /// Return the highest-attempt receipt for one item in the exact immutable
+    /// Goal/Blueprint execution scope.
+    ///
+    /// A successful older attempt does not make an item complete after a
+    /// newer attempt has failed or been cancelled. Hosts should use this
+    /// projection rather than searching for any historical success.
+    pub fn latest_receipt_for<'a>(
+        &'a self,
+        goal: &Goal,
+        blueprint: &Blueprint,
+        item_id: &str,
+    ) -> Option<&'a ExecutionReceipt> {
+        self.receipts
+            .iter()
+            .filter(|receipt| receipt_matches_item(receipt, goal, blueprint, item_id))
+            .max_by_key(|receipt| receipt.attempt)
+    }
+
     pub fn digest(&self) -> Result<String, ExecutionError> {
         digest_receipts(&self.receipts)
     }
@@ -383,6 +401,15 @@ impl ExecutionStore {
             next.commit(ExecutionStoreChange::Updated)?;
             *self = next;
             return Ok(ExecutionStoreChange::Updated);
+        }
+        if self
+            .receipts
+            .iter()
+            .any(|existing| same_attempt_identity(existing, &receipt))
+        {
+            return Err(ExecutionError::ReceiptConflict {
+                execution_id: receipt.execution_id,
+            });
         }
         if self.receipts.len() >= MAX_EXECUTION_RECEIPTS {
             return Err(ExecutionError::TooManyReceipts {
@@ -652,17 +679,7 @@ impl BlueprintExecutor {
         blueprint: &Blueprint,
         item_id: &str,
     ) -> Option<&ExecutionReceipt> {
-        self.store
-            .receipts()
-            .iter()
-            .filter(|receipt| {
-                receipt.goal_id == goal.id
-                    && receipt.blueprint_id == blueprint.id
-                    && receipt.blueprint_version == blueprint.version
-                    && receipt.blueprint_digest == blueprint.digest
-                    && receipt.item_id == item_id
-            })
-            .max_by_key(|receipt| receipt.attempt)
+        self.store.latest_receipt_for(goal, blueprint, item_id)
     }
 
     fn spent_for(&self, goal: &Goal, blueprint: &Blueprint) -> ResourceBudget {
@@ -809,6 +826,7 @@ fn validate_receipts(receipts: &[ExecutionReceipt]) -> Result<(), ExecutionError
         });
     }
     let mut ids = std::collections::BTreeSet::new();
+    let mut attempts = std::collections::BTreeSet::new();
     for receipt in receipts {
         receipt.validate()?;
         if !ids.insert(receipt.execution_id.as_str()) {
@@ -817,8 +835,48 @@ fn validate_receipts(receipts: &[ExecutionReceipt]) -> Result<(), ExecutionError
                 receipt.execution_id
             )));
         }
+        let attempt_identity = (
+            receipt.goal_id.as_str(),
+            receipt.blueprint_id.as_str(),
+            receipt.blueprint_version.as_str(),
+            receipt.blueprint_digest.as_str(),
+            receipt.item_id.as_str(),
+            receipt.attempt,
+        );
+        if !attempts.insert(attempt_identity) {
+            return Err(ExecutionError::InvalidReceipt(format!(
+                "duplicate execution attempt for goal {} blueprint {}@{} item {} attempt {}",
+                receipt.goal_id,
+                receipt.blueprint_id,
+                receipt.blueprint_version,
+                receipt.item_id,
+                receipt.attempt
+            )));
+        }
     }
     Ok(())
+}
+
+fn receipt_matches_item(
+    receipt: &ExecutionReceipt,
+    goal: &Goal,
+    blueprint: &Blueprint,
+    item_id: &str,
+) -> bool {
+    receipt.goal_id == goal.id
+        && receipt.blueprint_id == blueprint.id
+        && receipt.blueprint_version == blueprint.version
+        && receipt.blueprint_digest == blueprint.digest
+        && receipt.item_id == item_id
+}
+
+fn same_attempt_identity(left: &ExecutionReceipt, right: &ExecutionReceipt) -> bool {
+    left.goal_id == right.goal_id
+        && left.blueprint_id == right.blueprint_id
+        && left.blueprint_version == right.blueprint_version
+        && left.blueprint_digest == right.blueprint_digest
+        && left.item_id == right.item_id
+        && left.attempt == right.attempt
 }
 
 fn digest_receipts(receipts: &[ExecutionReceipt]) -> Result<String, ExecutionError> {

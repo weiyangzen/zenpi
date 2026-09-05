@@ -2088,14 +2088,11 @@ fn sync_goal_status_after_execution(
         crate::domain_execution::RunOutcome::Complete
             | crate::domain_execution::RunOutcome::Executed { .. }
     ) && blueprint.items.iter().all(|item| {
-        execution_store.receipts().iter().any(|receipt| {
-            receipt.goal_id == goal.id
-                && receipt.blueprint_id == blueprint.id
-                && receipt.blueprint_version == blueprint.version
-                && receipt.blueprint_digest == blueprint.digest
-                && receipt.item_id == item.id
-                && receipt.status == crate::domain_execution::ExecutionStatus::Succeeded
-        })
+        execution_store
+            .latest_receipt_for(goal, blueprint, &item.id)
+            .is_some_and(|receipt| {
+                receipt.status == crate::domain_execution::ExecutionStatus::Succeeded
+            })
     });
     if execution_complete && status == crate::domains::GoalStatus::Running {
         store
