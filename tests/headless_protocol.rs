@@ -1227,7 +1227,7 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for (id, version) in [("shell", 2), ("shell-v1", 1)] {
+    for (id, version) in [("shell", 2)] {
         let responses: Vec<_> = records
             .iter()
             .filter(|record| record["id"] == id && record["type"] == "response")
@@ -1239,6 +1239,14 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
         assert_eq!(response["code"], "invalid_turn");
         assert!(response.get("data").is_none());
     }
+    let help = records
+        .iter()
+        .find(|record| record["id"] == "shell-v1" && record["type"] == "response")
+        .unwrap();
+    assert_eq!(help["schema_version"], 1);
+    assert_eq!(help["success"], true);
+    assert_eq!(help["data"]["status"], "help");
+    assert_eq!(help["data"]["execution_started"], false);
     let mail = records
         .iter()
         .find(|record| record["id"] == "mail")
