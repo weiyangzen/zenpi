@@ -477,7 +477,9 @@ The installed production smoke now covers `/blueprint run` as well as session
 GC: it persists a valid Blueprint and linked Goal, executes two dependency-
 ordered items across two processes, verifies private receipt recovery and Goal
 completion, and asserts that no provider request occurred. The following tests
-are mandatory evidence, not illustrative examples:
+are mandatory evidence, not illustrative examples. The V2-205/V2-305 matrix
+still retains the remaining parity and UX gaps explicitly; this smoke is not a
+claim that the full v2 gate has passed:
 
 | Experience | Positive proof | Failure/edge proof |
 |---|---|---|
