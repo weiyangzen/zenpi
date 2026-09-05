@@ -61,6 +61,7 @@ pub enum OperationOutcome {
     Failed,
     Cancelled,
     Interrupted,
+    UnknownOutcome,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -69,6 +70,28 @@ pub struct InterruptedOperation {
     pub kind: OperationKind,
     pub turn_id: String,
     pub retry_requires_confirmation: bool,
+}
+
+/// Durable recovery projection for an operation marker.  A marker is written
+/// before dispatch and therefore an absent terminal record is never treated as
+/// success.  The projection is deliberately separate from
+/// [`InterruptedOperation`] so existing embedders can keep constructing the
+/// compact legacy type while recovery owners gain idempotency metadata.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationRecoveryState {
+    Interrupted,
+    UnknownOutcome,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OperationRecovery {
+    pub operation_id: String,
+    pub kind: OperationKind,
+    pub turn_id: String,
+    pub retry_requires_confirmation: bool,
+    pub idempotency_key: String,
+    pub state: OperationRecoveryState,
 }
 
 #[derive(Debug, Error)]
@@ -538,6 +561,16 @@ impl SessionStore {
     /// Persist and then retain a turn.  If the write fails, the in-memory
     /// projection is unchanged.
     pub fn append_turn(&mut self, turn: Turn) -> Result<(), SessionError> {
+        turn.validate()
+            .map_err(|error| SessionError::InvalidRecord(error.to_string()))?;
+        if let Some(existing) = self.turns.iter().find(|existing| existing.id == turn.id) {
+            if existing == &turn {
+                return Ok(());
+            }
+            return Err(SessionError::InvalidRecord(
+                "turn ID conflicts with its durable content".into(),
+            ));
+        }
         self.append_json(&json!({ "kind": "turn", "turn": &turn }))?;
         self.turns.push(turn);
         Ok(())
@@ -643,12 +676,38 @@ impl SessionStore {
         &mut self,
         operation: &InterruptedOperation,
     ) -> Result<(), SessionError> {
+        self.begin_operation_with_key(operation, &operation.operation_id)
+    }
+
+    /// Persist the key used to identify this exact logical attempt. An
+    /// explicit retry must use a new operation ID, even if a remote service
+    /// supports reusing its own idempotency key. This API never dispatches it.
+    pub fn begin_operation_with_key(
+        &mut self,
+        operation: &InterruptedOperation,
+        idempotency_key: &str,
+    ) -> Result<(), SessionError> {
+        operation_id(&operation.operation_id)?;
+        operation_id(&operation.turn_id)?;
+        operation_id(idempotency_key)?;
+        if let Some(existing) = operation_markers(&self.event_values).get(&operation.operation_id) {
+            if existing.outcome.is_none()
+                && existing.operation == *operation
+                && existing.idempotency_key == idempotency_key
+            {
+                return Ok(());
+            }
+            return Err(SessionError::InvalidRecord(
+                "operation ID conflicts with its durable marker or idempotency key".into(),
+            ));
+        }
         self.append_event(json!({
             "type": "operation_started",
             "operation_id": operation.operation_id,
             "operation_kind": operation.kind,
             "turn_id": operation.turn_id,
             "retry_requires_confirmation": operation.retry_requires_confirmation,
+            "idempotency_key": idempotency_key,
         }))
     }
 
@@ -657,9 +716,15 @@ impl SessionStore {
         operation_id: &str,
         outcome: OperationOutcome,
     ) -> Result<(), SessionError> {
-        if operation_id.trim().is_empty() || operation_id.len() > 256 {
+        self::operation_id(operation_id)?;
+        if let Some(existing) = self.event_values.iter().rev().find(|event| {
+            event["type"] == "operation_finished" && event["operation_id"] == operation_id
+        }) {
+            if existing["outcome"] == json!(outcome) {
+                return Ok(());
+            }
             return Err(SessionError::InvalidRecord(
-                "operation ID is empty or too large".into(),
+                "operation terminal outcome conflicts with its durable record".into(),
             ));
         }
         self.append_event(json!({
@@ -677,9 +742,109 @@ impl SessionStore {
     ) -> Result<Vec<InterruptedOperation>, SessionError> {
         let interrupted = self.interrupted_operations();
         for operation in &interrupted {
-            self.finish_operation(&operation.operation_id, OperationOutcome::Interrupted)?;
+            let outcome = self
+                .durable_operation_outcome(&operation.operation_id)
+                .unwrap_or(OperationOutcome::Interrupted);
+            self.finish_operation(&operation.operation_id, outcome)?;
         }
         Ok(interrupted)
+    }
+
+    /// Read-only recovery state remains visible after startup acknowledgement.
+    /// Local terminal evidence can repair an orphan marker, but an interrupted
+    /// provider/tool effect remains unknown until an explicit host decision.
+    pub fn operation_recovery(&self) -> Vec<OperationRecovery> {
+        operation_markers(&self.event_values)
+            .into_values()
+            .filter(|marker| {
+                !marker.decided
+                    && matches!(
+                        marker.outcome,
+                        None | Some(
+                            OperationOutcome::Interrupted | OperationOutcome::UnknownOutcome
+                        )
+                    )
+                    && self
+                        .durable_operation_outcome(&marker.operation.operation_id)
+                        .is_none()
+            })
+            .map(|marker| OperationRecovery {
+                operation_id: marker.operation.operation_id,
+                kind: marker.operation.kind,
+                turn_id: marker.operation.turn_id,
+                retry_requires_confirmation: true,
+                idempotency_key: marker.idempotency_key,
+                state: if marker.operation.kind == OperationKind::Compaction {
+                    OperationRecoveryState::Interrupted
+                } else {
+                    OperationRecoveryState::UnknownOutcome
+                },
+            })
+            .collect()
+    }
+
+    /// A durable result precedes its terminal marker. Recognize that narrow
+    /// crash window without repeating the handler or inventing a result.
+    pub fn durable_operation_outcome(&self, operation_id: &str) -> Option<OperationOutcome> {
+        let outcome = self.event_values.iter().rev().find_map(|event| {
+            (event["operation_id"] == operation_id)
+                .then(|| match event["type"].as_str() {
+                    Some("tool_execution_finished" | "provider_request_finished") => {
+                        known_operation_outcome(&event["outcome"])
+                    }
+                    Some("context_compacted") => Some(OperationOutcome::Succeeded),
+                    _ => None,
+                })
+                .flatten()
+        });
+        let outcome = outcome.or_else(|| {
+            self.turns.iter().rev().find_map(|turn| {
+                let metadata = turn.metadata.as_ref()?;
+                if metadata["operation_id"] != operation_id {
+                    return None;
+                }
+                known_operation_outcome(&metadata["outcome"])
+            })
+        });
+        outcome.filter(|value| {
+            !matches!(
+                value,
+                OperationOutcome::UnknownOutcome | OperationOutcome::Interrupted
+            )
+        })
+    }
+
+    /// Store one explicit decision exactly once. It authorizes no immediate
+    /// dispatch; the host must submit a new operation for a requested retry.
+    pub fn decide_operation_recovery(
+        &mut self,
+        operation_id: &str,
+        decision: crate::core::ToolRecoveryDecision,
+    ) -> Result<(), SessionError> {
+        self::operation_id(operation_id)?;
+        if let Some(existing) = self.events().iter().rev().find(|event| {
+            event["type"] == "operation_recovery_decided" && event["operation_id"] == operation_id
+        }) {
+            if existing["decision"] == json!(decision) {
+                return Ok(());
+            }
+            return Err(SessionError::InvalidRecord(
+                "recovery decision conflicts with durable decision".into(),
+            ));
+        }
+        let pending = self
+            .operation_recovery()
+            .into_iter()
+            .find(|pending| pending.operation_id == operation_id)
+            .ok_or_else(|| {
+                SessionError::InvalidRecord("operation recovery is not pending".into())
+            })?;
+        self.append_event(json!({
+            "type": "operation_recovery_decided", "operation_id": operation_id,
+            "idempotency_key": pending.idempotency_key, "decision": decision,
+            "execution_started": false, "retry_requires_new_operation": true,
+            "implementation_complete": false,
+        }))
     }
 
     pub fn latest_assistant(&self) -> Option<&Turn> {
@@ -1099,6 +1264,95 @@ fn interrupted_operations(events: &[Value]) -> Vec<InterruptedOperation> {
         }
     }
     active.into_values().collect()
+}
+
+#[derive(Debug, Clone)]
+struct OperationMarker {
+    operation: InterruptedOperation,
+    idempotency_key: String,
+    outcome: Option<OperationOutcome>,
+    decided: bool,
+}
+
+fn operation_id(value: &str) -> Result<(), SessionError> {
+    if value.trim().is_empty() || value.len() > 256 || value.chars().any(char::is_control) {
+        return Err(SessionError::InvalidRecord(
+            "operation ID or idempotency key is empty, too large, or contains control characters"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+fn known_operation_outcome(value: &Value) -> Option<OperationOutcome> {
+    match value.as_str()? {
+        "succeeded" => Some(OperationOutcome::Succeeded),
+        "failed" => Some(OperationOutcome::Failed),
+        "cancelled" => Some(OperationOutcome::Cancelled),
+        "interrupted" => Some(OperationOutcome::Interrupted),
+        "unknown_outcome" => Some(OperationOutcome::UnknownOutcome),
+        _ => None,
+    }
+}
+
+fn operation_markers(events: &[Value]) -> BTreeMap<String, OperationMarker> {
+    let mut markers = BTreeMap::new();
+    for event in events {
+        match event.get("type").and_then(Value::as_str) {
+            Some("operation_started") => {
+                let (Some(operation_id), Some(turn_id), Some(kind)) = (
+                    event.get("operation_id").and_then(Value::as_str),
+                    event.get("turn_id").and_then(Value::as_str),
+                    event
+                        .get("operation_kind")
+                        .cloned()
+                        .and_then(|v| serde_json::from_value(v).ok()),
+                ) else {
+                    continue;
+                };
+                let operation = InterruptedOperation {
+                    operation_id: operation_id.to_owned(),
+                    kind,
+                    turn_id: turn_id.to_owned(),
+                    retry_requires_confirmation: event
+                        .get("retry_requires_confirmation")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(true),
+                };
+                let idempotency_key = event
+                    .get("idempotency_key")
+                    .and_then(Value::as_str)
+                    .unwrap_or(operation_id)
+                    .to_owned();
+                markers
+                    .entry(operation_id.to_owned())
+                    .or_insert(OperationMarker {
+                        operation,
+                        idempotency_key,
+                        outcome: None,
+                        decided: false,
+                    });
+            }
+            Some(
+                "operation_finished" | "tool_execution_finished" | "provider_request_finished",
+            ) => {
+                if let Some(operation_id) = event.get("operation_id").and_then(Value::as_str)
+                    && let Some(marker) = markers.get_mut(operation_id)
+                {
+                    marker.outcome = known_operation_outcome(&event["outcome"]);
+                }
+            }
+            Some("operation_recovery_decided" | "tool_recovery_decided") => {
+                if let Some(operation_id) = event.get("operation_id").and_then(Value::as_str)
+                    && let Some(marker) = markers.get_mut(operation_id)
+                {
+                    marker.decided = true;
+                }
+            }
+            _ => {}
+        }
+    }
+    markers
 }
 
 #[cfg(unix)]

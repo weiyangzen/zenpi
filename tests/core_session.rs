@@ -340,6 +340,31 @@ fn backend_failure_keeps_the_user_turn_and_returns_idle() {
 }
 
 #[test]
+fn provider_transport_failure_is_unknown_and_requires_explicit_recovery() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("provider-unknown.jsonl");
+    let mut agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(FailingBackend));
+    assert!(matches!(
+        agent.process(TurnInputRequest::new("may have reached provider")),
+        Err(AgentError::Backend(BackendError::Transport(_)))
+    ));
+    let pending = agent.operation_recovery();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].state, zenpi::session::OperationRecoveryState::UnknownOutcome);
+    assert!(matches!(
+        agent.process(TurnInputRequest::new("must be blocked")),
+        Err(AgentError::Recovery(_))
+    ));
+    agent
+        .resolve_operation_recovery(
+            &pending[0].operation_id,
+            zenpi::core::ToolRecoveryDecision::Abandon,
+        )
+        .unwrap();
+    assert!(agent.operation_recovery().is_empty());
+}
+
+#[test]
 fn backend_retryability_is_typed() {
     assert!(BackendError::Transport("offline".into()).is_retryable());
     assert!(

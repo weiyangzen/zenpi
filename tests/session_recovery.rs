@@ -5,8 +5,8 @@ use tempfile::tempdir;
 use zenpi::{
     core::{Turn, TurnRole},
     session::{
-        InterruptedOperation, MAX_SESSION_BYTES, OperationKind, OperationOutcome, SessionError,
-        SessionStore,
+        InterruptedOperation, MAX_SESSION_BYTES, OperationKind, OperationOutcome,
+        OperationRecoveryState, SessionError, SessionStore,
     },
 };
 
@@ -527,6 +527,58 @@ fn unfinished_operations_are_detected_and_never_retried_implicitly() {
     assert!(reopened.events().iter().any(|event| {
         event["operation_id"] == "tool-call-1" && event["outcome"] == "interrupted"
     }));
+}
+
+#[test]
+fn operation_markers_are_idempotent_and_recovery_requires_a_new_decision() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("operation-marker.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    let operation = InterruptedOperation {
+        operation_id: "tool-attempt-1".into(),
+        kind: OperationKind::Tool,
+        turn_id: "turn-1".into(),
+        retry_requires_confirmation: true,
+    };
+    store.begin_operation_with_key(&operation, "idem-1").unwrap();
+    let before = fs::read(&path).unwrap();
+    store.begin_operation_with_key(&operation, "idem-1").unwrap();
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert!(store
+        .begin_operation_with_key(&operation, "idem-2")
+        .is_err());
+    assert_eq!(store.operation_recovery().len(), 1);
+    assert_eq!(
+        store.operation_recovery()[0].state,
+        OperationRecoveryState::UnknownOutcome
+    );
+    store
+        .finish_operation(&operation.operation_id, OperationOutcome::UnknownOutcome)
+        .unwrap();
+    let after = fs::read(&path).unwrap();
+    store
+        .finish_operation(&operation.operation_id, OperationOutcome::UnknownOutcome)
+        .unwrap();
+    assert_eq!(fs::read(&path).unwrap(), after);
+    assert!(store
+        .finish_operation(&operation.operation_id, OperationOutcome::Succeeded)
+        .is_err());
+    assert_eq!(store.operation_recovery().len(), 1);
+    store
+        .decide_operation_recovery(
+            &operation.operation_id,
+            zenpi::core::ToolRecoveryDecision::Retry,
+        )
+        .unwrap();
+    assert!(store.operation_recovery().is_empty());
+    let next = fs::read(&path).unwrap();
+    store
+        .decide_operation_recovery(
+            &operation.operation_id,
+            zenpi::core::ToolRecoveryDecision::Retry,
+        )
+        .unwrap();
+    assert_eq!(fs::read(&path).unwrap(), next);
 }
 
 #[test]

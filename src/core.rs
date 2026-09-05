@@ -696,6 +696,29 @@ impl Agent {
         pending.into_values().collect()
     }
 
+    /// Return generic provider/tool/compaction markers that need a host
+    /// decision after restart. This is intentionally read-only and never
+    /// dispatches a retry.
+    pub fn operation_recovery(&self) -> Vec<crate::session::OperationRecovery> {
+        self.session.operation_recovery()
+    }
+
+    /// Record an explicit retry/abandon decision for a generic operation.
+    /// Retry means that a host may submit a *new* attempt; it is not an
+    /// instruction to execute the old side effect again.
+    pub fn resolve_operation_recovery(
+        &mut self,
+        operation_id: &str,
+        decision: ToolRecoveryDecision,
+    ) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        self.session
+            .decide_operation_recovery(operation_id, decision)
+            .map_err(AgentError::from)
+    }
+
     /// Record an explicit host decision; `retry` permits a future user turn
     /// but never reexecutes the call here or marks an external task complete.
     pub fn resolve_tool_outcome(
@@ -1202,7 +1225,9 @@ impl Agent {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
         }
-        if self.phase == AgentPhase::Idle && !self.unknown_tool_outcomes().is_empty() {
+        if self.phase == AgentPhase::Idle
+            && (!self.unknown_tool_outcomes().is_empty() || !self.operation_recovery().is_empty())
+        {
             return Err(AgentError::Recovery(
                 "unknown_outcome requires explicit retry or abandon before a new turn".into(),
             ));
@@ -1586,7 +1611,10 @@ impl Agent {
             turn_id: turn_id.clone(),
             retry_requires_confirmation: false,
         };
-        self.session.begin_operation(&provider_operation)?;
+        self.session.begin_operation_with_key(
+            &provider_operation,
+            &provider_idempotency_key(&turn_id),
+        )?;
         const MAX_TOOL_ITERATIONS: usize = 8;
         let completion = match self.complete_with_tools(
             &turn_id,
@@ -1601,6 +1629,18 @@ impl Agent {
                     AgentError::Backend(BackendError::Cancelled | BackendError::Steered)
                 ) {
                     crate::session::OperationOutcome::Cancelled
+                } else if matches!(
+                    error,
+                    AgentError::Backend(
+                        BackendError::Transport(_)
+                            | BackendError::HttpStatus { .. }
+                            | BackendError::InvalidResponse(_)
+                    )
+                ) {
+                    // The request may have reached the provider. A transport
+                    // or partial-response failure is therefore unknown, not
+                    // evidence that retrying is harmless.
+                    crate::session::OperationOutcome::UnknownOutcome
                 } else {
                     crate::session::OperationOutcome::Failed
                 };
@@ -2570,6 +2610,11 @@ fn approval_request_id(
     let encoded = serde_json::to_vec(&(session_id, turn_id, call_id, policy_digest))
         .expect("string tuple serializes");
     format!("approval-{:x}", Sha256::digest(encoded))
+}
+
+fn provider_idempotency_key(turn_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("provider-{:x}", Sha256::digest(turn_id.as_bytes()))
 }
 
 fn next_id(prefix: &str) -> String {
