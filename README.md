@@ -167,6 +167,13 @@ with respect to execution: `/learn evidence ID REPOSITORY-RELATIVE-REF`
 stores a bounded hash receipt, while `/learn resume ID` reports a validated
 checkpoint with `zenpi_started: false` until an external owner is present.
 
+The first local Blueprint execution owner is also available in both hosts:
+after storing a Blueprint and linked Goal, `/blueprint run ID[@VERSION]` executes
+one dependency-ready item, persists a bounded private receipt, enforces the
+Goal budget, and can resume an interrupted receipt without a duplicate attempt.
+This is deterministic local evidence execution only; it does not run shell
+commands, contact the provider, or start a b3ehive scheduler.
+
 Example:
 
 ```json
@@ -253,7 +260,9 @@ v1 冻结收据在 `Docs/Zenpi_Execution_Blueprint.md`，版本化自查和下�
 --retain-newest N --older-than-seconds N --yes` 要求明确且有界的保留策略，不删除活动
 session，跳过 domain/unowned 数据，并返回有界收据。工作区内 session 浏览器以及真正的外部执行仍会在 owner adapter 完成前明确返回错误，
 不伪造成功。`/learn evidence ID REPOSITORY-RELATIVE-REF` 只保存有界 hash receipt，
-`/learn resume ID` 只检查持久 checkpoint，不启动 worker。
+`/learn resume ID` 只检查持久 checkpoint，不启动 worker。已保存 Blueprint 并关联 Goal 后，
+`/blueprint run ID[@VERSION]` 在 TUI/headless 中执行一个依赖就绪的本地证据步骤，持久化
+有界 receipt 并遵守 Goal budget；它不调用 provider、shell 或 b3ehive scheduler。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
 会在不创建、不修改文件的情况下返回错误；已有 journal 超过 256 MiB 也会在
 解析或修改权限前拒绝，不超过上限的有效 journal 会整体载入内存。

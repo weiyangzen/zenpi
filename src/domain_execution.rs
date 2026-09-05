@@ -29,6 +29,13 @@ use crate::domains::{
 
 /// On-disk schema for the bounded execution snapshot.
 pub const EXECUTION_SCHEMA_VERSION: u16 = 1;
+/// Optional process-level override used by hosts that keep execution state in
+/// a workspace-owned location.  The default remains next to a custom session
+/// journal so a session can be copied without touching the user's global
+/// state.
+pub const EXECUTION_STORE_ENV: &str = "ZENPI_EXECUTION_STORE";
+/// Filename used when no explicit execution-store override is configured.
+pub const EXECUTION_STORE_FILE_NAME: &str = "execution.json";
 /// A malformed execution path must not turn startup into an unbounded read.
 pub const MAX_EXECUTION_STORE_BYTES: usize = 16 * 1024 * 1024;
 /// One goal can have many retries, but the owner still needs a hard ceiling.
@@ -240,6 +247,33 @@ pub struct ExecutionStore {
     path: PathBuf,
     generation: u64,
     receipts: Vec<ExecutionReceipt>,
+}
+
+/// Resolve the receipt store associated with one session journal.
+///
+/// A caller may set [`EXECUTION_STORE_ENV`] to an explicit path (useful for a
+/// workspace owner or an integration test).  Otherwise custom session files
+/// keep their receipts beside the journal, while the conventional user
+/// session uses `~/.zenpi/execution.json`.
+pub fn path_for_session(session_path: impl AsRef<Path>) -> PathBuf {
+    if let Ok(path) = std::env::var(EXECUTION_STORE_ENV)
+        && !path.trim().is_empty()
+    {
+        return PathBuf::from(path);
+    }
+    let session_path = session_path.as_ref();
+    let default_session = crate::session::SessionStore::default_path();
+    if session_path == default_session {
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return home.join(".zenpi").join(EXECUTION_STORE_FILE_NAME);
+    }
+    session_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(|parent| parent.join(EXECUTION_STORE_FILE_NAME))
+        .unwrap_or_else(|| PathBuf::from(EXECUTION_STORE_FILE_NAME))
 }
 
 impl ExecutionStore {
@@ -855,7 +889,11 @@ fn ensure_parent(path: &Path) -> Result<(), ExecutionError> {
 }
 
 fn read_bounded(path: &Path) -> Result<Vec<u8>, ExecutionError> {
-    let file = File::open(path)?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    let file = options.open(path)?;
     let metadata = file.metadata()?;
     if metadata.len() > MAX_EXECUTION_STORE_BYTES as u64 {
         return Err(ExecutionError::StoreTooLong {

@@ -1913,6 +1913,199 @@ fn resume_learn_view(
     }))
 }
 
+/// Execute one deterministic, dependency-aware Blueprint item through the
+/// local receipt owner.  This operation is deliberately provider/shell-free:
+/// it proves durable admission, budget accounting, dependency ordering, and
+/// restart-safe evidence without pretending that zenpi is a b3ehive scheduler.
+pub fn run_blueprint_next(agent: &mut Agent, target: &str) -> Result<serde_json::Value, String> {
+    if agent.phase() != crate::core::AgentPhase::Idle {
+        return Err("blueprint execution is available only while the agent is idle".into());
+    }
+    let target = target.trim();
+    if target.is_empty() || target.len() > crate::domains::MAX_ID_BYTES {
+        return Err("blueprint run target must be a bounded id or id@version".into());
+    }
+    let (blueprint_id, version) = target
+        .split_once('@')
+        .map_or((target, None), |(id, version)| (id, Some(version)));
+    if blueprint_id.is_empty()
+        || blueprint_id.len() > crate::domains::MAX_ID_BYTES
+        || blueprint_id.chars().any(char::is_control)
+        || !blueprint_id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character))
+        || version.is_some_and(|value| {
+            value.is_empty()
+                || value.len() > crate::domains::MAX_VERSION_BYTES
+                || value.chars().any(char::is_control)
+                || value.chars().any(char::is_whitespace)
+        })
+    {
+        return Err("blueprint run target is invalid".into());
+    }
+    let path = domain_store::path_for_session(agent.session().path());
+    let store = DomainStore::open_read_only(&path).map_err(|error| error.to_string())?;
+    let blueprint = if let Some(version) = version {
+        store
+            .blueprint(blueprint_id, version)
+            .cloned()
+            .ok_or_else(|| format!("blueprint `{target}` is not found"))?
+    } else {
+        let versions = store.blueprint_versions(blueprint_id);
+        if versions.is_empty() {
+            return Err(format!("blueprint `{target}` is not found"));
+        }
+        if versions.len() > 1 {
+            return Err(format!(
+                "blueprint `{blueprint_id}` has multiple versions; use id@version"
+            ));
+        }
+        versions[0].clone()
+    };
+    let linked_goals = store
+        .goals()
+        .into_iter()
+        .filter(|goal| {
+            goal.blueprint_id == blueprint.id
+                && goal.blueprint_version == blueprint.version
+                && goal.blueprint_digest == blueprint.digest
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let goal = match linked_goals.as_slice() {
+        [] => return Err(format!("no Goal is linked to blueprint `{target}`")),
+        [goal] => goal.clone(),
+        _ => {
+            return Err(format!(
+                "blueprint `{target}` has multiple linked Goals; run one Goal at a time"
+            ));
+        }
+    };
+    drop(store);
+
+    let execution_path = crate::domain_execution::path_for_session(agent.session().path());
+    let execution_store = crate::domain_execution::ExecutionStore::open(&execution_path)
+        .map_err(|error| error.to_string())?;
+    let mut executor = crate::domain_execution::BlueprintExecutor::new(execution_store);
+    let outcome = executor
+        .run_next(&goal, &blueprint, || false)
+        .map_err(|error| error.to_string())?;
+    let mut value = match &outcome {
+        crate::domain_execution::RunOutcome::Executed {
+            receipt,
+            resumed_running,
+        } => json!({
+            "command": "blueprint",
+            "route": "local",
+            "accepted": true,
+            "action": "run",
+            "target": target,
+            "goal_id": goal.id,
+            "status": "succeeded",
+            "resumed_running": resumed_running,
+            "receipt": receipt,
+        }),
+        crate::domain_execution::RunOutcome::Complete => json!({
+            "command": "blueprint",
+            "route": "local",
+            "accepted": true,
+            "action": "run",
+            "target": target,
+            "goal_id": goal.id,
+            "status": "complete",
+        }),
+        crate::domain_execution::RunOutcome::Blocked {
+            item_id,
+            waiting_on,
+        } => json!({
+            "command": "blueprint",
+            "route": "local",
+            "accepted": true,
+            "action": "run",
+            "target": target,
+            "goal_id": goal.id,
+            "status": "blocked",
+            "item_id": item_id,
+            "waiting_on": waiting_on,
+        }),
+        crate::domain_execution::RunOutcome::Cancelled { item_id, attempt } => json!({
+            "command": "blueprint",
+            "route": "local",
+            "accepted": true,
+            "action": "run",
+            "target": target,
+            "goal_id": goal.id,
+            "status": "cancelled",
+            "item_id": item_id,
+            "attempt": attempt,
+        }),
+    };
+    let goal_status =
+        sync_goal_status_after_execution(agent, &goal, &blueprint, executor.store(), &outcome)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("goal_status".into(), json!(goal_status));
+        object.insert(
+            "receipt_store_generation".into(),
+            json!(executor.store().generation()),
+        );
+        object.insert(
+            "receipt_count".into(),
+            json!(executor.store().receipts().len()),
+        );
+    }
+    Ok(value)
+}
+
+/// Reconcile the durable Goal state after a receipt owner call.  Receipts are
+/// written first, so a crash between the two snapshots is recoverable: a
+/// later `/blueprint run` sees the existing receipt and finishes the Goal
+/// transition without repeating the item.
+fn sync_goal_status_after_execution(
+    agent: &Agent,
+    goal: &crate::domains::Goal,
+    blueprint: &crate::domains::Blueprint,
+    execution_store: &crate::domain_execution::ExecutionStore,
+    outcome: &crate::domain_execution::RunOutcome,
+) -> Result<crate::domains::GoalStatus, String> {
+    let should_start = matches!(
+        outcome,
+        crate::domain_execution::RunOutcome::Executed { .. }
+            | crate::domain_execution::RunOutcome::Complete
+    ) && goal.status == crate::domains::GoalStatus::Queued;
+    let mut store = DomainStore::open(domain_store::path_for_session(agent.session().path()))
+        .map_err(|error| error.to_string())?;
+    if should_start {
+        store
+            .transition_goal(&goal.id, crate::domains::GoalStatus::Running)
+            .map_err(|error| error.to_string())?;
+    }
+    let mut status = store
+        .goal(&goal.id)
+        .map(|record| record.status)
+        .ok_or_else(|| format!("Goal `{}` disappeared during Blueprint execution", goal.id))?;
+    let execution_complete = matches!(
+        outcome,
+        crate::domain_execution::RunOutcome::Complete
+            | crate::domain_execution::RunOutcome::Executed { .. }
+    ) && blueprint.items.iter().all(|item| {
+        execution_store.receipts().iter().any(|receipt| {
+            receipt.goal_id == goal.id
+                && receipt.blueprint_id == blueprint.id
+                && receipt.blueprint_version == blueprint.version
+                && receipt.blueprint_digest == blueprint.digest
+                && receipt.item_id == item.id
+                && receipt.status == crate::domain_execution::ExecutionStatus::Succeeded
+        })
+    });
+    if execution_complete && status == crate::domains::GoalStatus::Running {
+        store
+            .transition_goal(&goal.id, crate::domains::GoalStatus::Done)
+            .map_err(|error| error.to_string())?;
+        status = crate::domains::GoalStatus::Done;
+    }
+    Ok(status)
+}
+
 fn validate_domain_id(value: &str, field: &'static str) -> Result<(), SlashDispatchError> {
     if value.trim().is_empty()
         || value.len() > crate::domains::MAX_ID_BYTES
@@ -4649,16 +4842,29 @@ fn execute_headless_slash(
                 BlueprintAction::Put { path } => Ok(SlashExecution::Response(
                     persist_blueprint_from_path(agent, &path)?,
                 )),
-                BlueprintAction::Run { target } | BlueprintAction::Open { path: target } => {
-                    Ok(SlashExecution::Response(json!({
-                        "command": "blueprint",
-                        "route": "local",
-                        "accepted": false,
-                        "action": action_name,
-                        "target": target,
-                        "message": "blueprint execution or interactive opening requires a host adapter",
-                    })))
+                BlueprintAction::Run { target } => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "blueprint execution is unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    run_blueprint_next(agent, &target)
+                        .map(SlashExecution::Response)
+                        .map_err(|message| SlashDispatchError {
+                            code: "blueprint_execution_error",
+                            message,
+                        })
                 }
+                BlueprintAction::Open { path: target } => Ok(SlashExecution::Response(json!({
+                    "command": "blueprint",
+                    "route": "local",
+                    "accepted": false,
+                    "action": action_name,
+                    "target": target,
+                    "message": "blueprint execution or interactive opening requires a host adapter",
+                }))),
             }
         }
         SlashCommand::Learn { target } => {
