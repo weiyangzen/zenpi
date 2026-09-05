@@ -15,6 +15,7 @@ use std::{
 };
 
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -25,7 +26,7 @@ use crate::{
     core::{Agent, AgentError, AgentEvent, ProcessResult, TurnInputRequest},
     domain_store::{self, DomainStore},
     protocol::{Command, StdioEvent, StdioRequest, StdioResponse, encode_line, parse_line},
-    session::{SessionStore, SessionSummary, unix_time_ms},
+    session::{ReconnectJournal, SessionStore, SessionSummary, unix_time_ms},
 };
 
 const MAX_REPLAY_EVENTS: usize = 4096;
@@ -87,6 +88,36 @@ enum RequestIdAdmission {
     Replay,
     InFlightSame,
     Conflict,
+    UnknownOutcome,
+    ReplayExpired,
+    LedgerFull,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum ReconnectEntry {
+    Owner {
+        epoch: u64,
+    },
+    Reserved {
+        id: String,
+        fingerprint: String,
+    },
+    Released {
+        id: String,
+    },
+    Terminal {
+        id: String,
+        fingerprint: String,
+        line: String,
+    },
+    Event {
+        sequence: u64,
+        line: String,
+    },
+    Acknowledged {
+        next_sequence: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,11 +141,72 @@ struct ReplayState {
     in_flight: HashMap<String, String>,
     /// The first sequence no longer retained after FIFO eviction.
     replay_floor: Option<u64>,
+    journal: Option<ReconnectJournal>,
+    completed: HashMap<String, String>,
+    unknown: HashMap<String, String>,
+    owner_epoch: u64,
+    next_sequence: u64,
+    acknowledged: u64,
 }
 
 impl ReplayState {
-    fn remember_event(&mut self, sequence: u64, line: String) {
+    fn open(session: &SessionStore) -> Result<Self, HeadlessError> {
+        let (journal, entries) = ReconnectJournal::open(session)?;
+        let mut state = Self::default();
+        for entry in entries {
+            match serde_json::from_value::<ReconnectEntry>(entry)? {
+                ReconnectEntry::Owner { epoch } => state.owner_epoch = epoch,
+                ReconnectEntry::Reserved { id, fingerprint } => {
+                    state.in_flight.insert(id, fingerprint);
+                }
+                ReconnectEntry::Released { id } => {
+                    state.in_flight.remove(&id);
+                }
+                ReconnectEntry::Terminal {
+                    id,
+                    fingerprint,
+                    line,
+                } => {
+                    state.in_flight.insert(id.clone(), fingerprint);
+                    state.cache_terminal(id, line);
+                }
+                ReconnectEntry::Event { sequence, line } => state.cache_event(sequence, line),
+                ReconnectEntry::Acknowledged { next_sequence } => {
+                    state.acknowledged = next_sequence
+                }
+            }
+        }
+        state.unknown = std::mem::take(&mut state.in_flight);
+        state.owner_epoch = state
+            .owner_epoch
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("reconnect owner epoch exhausted"))?;
+        state.journal = Some(journal);
+        state.persist(ReconnectEntry::Owner {
+            epoch: state.owner_epoch,
+        })?;
+        Ok(state)
+    }
+
+    fn persist(&mut self, entry: ReconnectEntry) -> Result<(), HeadlessError> {
+        if let Some(journal) = &mut self.journal {
+            journal.append(serde_json::to_value(entry)?)?;
+        }
+        Ok(())
+    }
+
+    fn remember_event(&mut self, sequence: u64, line: String) -> Result<(), HeadlessError> {
+        self.persist(ReconnectEntry::Event {
+            sequence,
+            line: line.clone(),
+        })?;
+        self.cache_event(sequence, line);
+        Ok(())
+    }
+
+    fn cache_event(&mut self, sequence: u64, line: String) {
         const MAX_REPLAY_BYTES: usize = 16 * 1024 * 1024;
+        self.next_sequence = self.next_sequence.max(sequence.saturating_add(1));
         self.event_bytes = self.event_bytes.saturating_add(line.len());
         self.events.push_back((sequence, line));
         while self.events.len() > MAX_REPLAY_EVENTS || self.event_bytes > MAX_REPLAY_BYTES {
@@ -138,13 +230,17 @@ impl ReplayState {
     ) -> io::Result<ReplayReport> {
         let first_available = self.events.front().map(|(sequence, _)| *sequence);
         let last_available = self.events.back().map(|(sequence, _)| *sequence);
-        let gap = self.replay_floor.is_some_and(|floor| from_sequence < floor);
+        let mut gap = self.replay_floor.is_some_and(|floor| from_sequence < floor)
+            || from_sequence > self.next_sequence;
         let mut replayed = 0;
-        for (_, line) in self
+        let mut expected = from_sequence;
+        for (sequence, line) in self
             .events
             .iter()
             .filter(|(sequence, _)| *sequence >= from_sequence)
         {
+            gap |= *sequence != expected;
+            expected = sequence.saturating_add(1);
             output.write_all(line.as_bytes())?;
             replayed += 1;
         }
@@ -157,16 +253,34 @@ impl ReplayState {
         })
     }
 
-    fn admit(&mut self, request_id: Option<&str>, fingerprint: &str) -> RequestIdAdmission {
+    fn admit(
+        &mut self,
+        request_id: Option<&str>,
+        fingerprint: &str,
+    ) -> Result<RequestIdAdmission, HeadlessError> {
         let Some(request_id) = request_id else {
-            return RequestIdAdmission::New;
+            return Ok(RequestIdAdmission::New);
         };
         if let Some(record) = self.terminals.get(request_id) {
-            return if record.fingerprint == fingerprint {
+            return Ok(if record.fingerprint == fingerprint {
                 RequestIdAdmission::Replay
             } else {
                 RequestIdAdmission::Conflict
-            };
+            });
+        }
+        if let Some(existing) = self.unknown.get(request_id) {
+            return Ok(if existing == fingerprint {
+                RequestIdAdmission::UnknownOutcome
+            } else {
+                RequestIdAdmission::Conflict
+            });
+        }
+        if let Some(existing) = self.completed.get(request_id) {
+            return Ok(if existing == fingerprint {
+                RequestIdAdmission::ReplayExpired
+            } else {
+                RequestIdAdmission::Conflict
+            });
         }
         if let Some(existing) = self.in_flight.get(request_id) {
             // A request that is still running has no terminal record to
@@ -174,11 +288,18 @@ impl ReplayState {
             // and keep the original reservation intact; once it completes,
             // the terminal fingerprint enforces payload conflict semantics.
             let _payload_matches = existing == fingerprint;
-            return RequestIdAdmission::InFlightSame;
+            return Ok(RequestIdAdmission::InFlightSame);
         }
+        if self.completed.len() + self.unknown.len() + self.in_flight.len() >= 16_384 {
+            return Ok(RequestIdAdmission::LedgerFull);
+        }
+        self.persist(ReconnectEntry::Reserved {
+            id: request_id.into(),
+            fingerprint: fingerprint.into(),
+        })?;
         self.in_flight
             .insert(request_id.to_owned(), fingerprint.to_owned());
-        RequestIdAdmission::New
+        Ok(RequestIdAdmission::New)
     }
 
     fn cached_line(&self, request_id: &str) -> Option<&str> {
@@ -187,10 +308,14 @@ impl ReplayState {
             .map(|record| record.line.as_str())
     }
 
-    fn release(&mut self, request_id: Option<&str>) {
+    fn release(&mut self, request_id: Option<&str>) -> Result<(), HeadlessError> {
         if let Some(request_id) = request_id {
+            self.persist(ReconnectEntry::Released {
+                id: request_id.into(),
+            })?;
             self.in_flight.remove(request_id);
         }
+        Ok(())
     }
 
     /// Isolate replay and request-ID state when a host switches to a
@@ -198,26 +323,57 @@ impl ReplayState {
     /// reconnecting clients can still detect that the old prefix is gone.
     /// The request currently performing the switch stays reserved until its
     /// new-session terminal response is cached.
-    fn reset_for_session(&mut self, request_id: Option<&str>, sequence_floor: u64) {
+    fn reset_for_session(
+        &mut self,
+        session: &SessionStore,
+        request_id: Option<&str>,
+        sequence_floor: u64,
+    ) -> Result<(), HeadlessError> {
+        if self.journal.as_ref().is_some_and(|journal| {
+            fs::canonicalize(session.path()).ok().as_ref() == Some(&journal.session_path)
+        }) {
+            return Ok(());
+        }
         let current = request_id.and_then(|id| {
             self.in_flight
                 .get(id)
                 .cloned()
                 .map(|fingerprint| (id.to_owned(), fingerprint))
         });
-        self.events.clear();
-        self.event_bytes = 0;
-        self.terminals.clear();
-        self.terminal_order.clear();
-        self.terminal_bytes = 0;
-        self.in_flight.clear();
+        let mut next = Self::open(session)?;
         if let Some((id, fingerprint)) = current {
-            self.in_flight.insert(id, fingerprint);
+            match next.admit(Some(&id), &fingerprint)? {
+                RequestIdAdmission::New => {}
+                _ => {
+                    return Err(io::Error::other(
+                        "session switch request ID conflicts with target journal",
+                    )
+                    .into());
+                }
+            }
         }
-        self.replay_floor = Some(sequence_floor);
+        next.replay_floor = Some(next.replay_floor.unwrap_or(0).max(sequence_floor));
+        *self = next;
+        Ok(())
     }
 
-    fn remember_terminal(&mut self, request_id: String, line: String) {
+    fn remember_terminal(&mut self, request_id: String, line: String) -> Result<(), HeadlessError> {
+        let fingerprint = self
+            .in_flight
+            .get(&request_id)
+            .cloned()
+            .or_else(|| self.completed.get(&request_id).cloned())
+            .unwrap_or_default();
+        self.persist(ReconnectEntry::Terminal {
+            id: request_id.clone(),
+            fingerprint,
+            line: line.clone(),
+        })?;
+        self.cache_terminal(request_id, line);
+        Ok(())
+    }
+
+    fn cache_terminal(&mut self, request_id: String, line: String) {
         // A retry of an existing ID replaces its cached line and refreshes
         // its position.  Keeping an explicit FIFO avoids relying on the
         // intentionally unordered `HashMap` iteration order when evicting.
@@ -235,6 +391,8 @@ impl ReplayState {
             self.terminal_order.retain(|id| id != &request_id);
         }
         self.terminal_bytes = self.terminal_bytes.saturating_add(line.len());
+        self.completed
+            .insert(request_id.clone(), fingerprint.clone());
         self.terminals
             .insert(request_id.clone(), TerminalRecord { fingerprint, line });
         self.terminal_order.push_back(request_id);
@@ -280,6 +438,8 @@ pub enum HeadlessError {
     Encoding(#[from] serde_json::Error),
     #[error("headless agent: {0}")]
     Agent(#[from] AgentError),
+    #[error("headless persistence: {0}")]
+    Session(#[from] crate::session::SessionError),
 }
 
 /// Run the headless loop over arbitrary buffered input/output.  This generic
@@ -290,8 +450,8 @@ pub fn run_headless<R: BufRead, W: Write>(
     mut input: R,
     mut output: W,
 ) -> Result<(), HeadlessError> {
-    let mut event_sequence = 0_u64;
-    let mut replay = ReplayState::default();
+    let mut replay = ReplayState::open(agent.session())?;
+    let mut event_sequence = replay.next_sequence;
     // Keep at most one bounded frame in memory. `BufRead::read_line` grows its
     // destination until LF, which lets an untrusted peer force an arbitrarily
     // large allocation before the protocol limit is checked. The chunked
@@ -361,7 +521,7 @@ pub fn run_headless<R: BufRead, W: Write>(
         // a reused ID with an unsupported version or malformed payload from
         // bypassing protocol validation by replaying an old response.
         let parsed_command = request.clone().into_command();
-        match replay.admit(id.as_deref(), &fingerprint) {
+        match replay.admit(id.as_deref(), &fingerprint)? {
             RequestIdAdmission::Replay => {
                 if let Some(request_id) = id.as_deref()
                     && let Some(cached) = replay.cached_line(request_id)
@@ -401,6 +561,13 @@ pub fn run_headless<R: BufRead, W: Write>(
                 continue;
             }
             RequestIdAdmission::New => {}
+            admission => {
+                write_response(
+                    &mut output,
+                    admission_error(id, command_kind, admission).for_version(request_version),
+                )?;
+                continue;
+            }
         }
         let command = match parsed_command {
             Ok(command) => command,
@@ -2373,7 +2540,7 @@ fn write_runtime_rejection<W: Write>(
     if reason == crate::runtime::SubmitError::QueueFull {
         // Queue pressure is retryable. Do not turn a transient admission
         // failure into a cached terminal result for this request ID.
-        replay.release(id.as_deref());
+        replay.release(id.as_deref())?;
         write_response(output, response)
     } else {
         write_cached_response(output, response, replay)
@@ -2388,7 +2555,7 @@ fn write_retryable_response<W: Write>(
     response: StdioResponse,
     replay: &mut ReplayState,
 ) -> Result<(), HeadlessError> {
-    replay.release(response.id.as_deref());
+    replay.release(response.id.as_deref())?;
     write_response(output, response)
 }
 
@@ -2506,7 +2673,7 @@ fn write_dropped_event<W: Write>(
     let current = *sequence;
     *sequence = sequence.saturating_add(1);
     let line = encode_line(&envelope)?;
-    replay.remember_event(current, line.clone());
+    replay.remember_event(current, line.clone())?;
     output.write_all(line.as_bytes())?;
     Ok(())
 }
@@ -2552,7 +2719,7 @@ fn drain_provider_events<W: Write>(
             let current = *sequence;
             *sequence = sequence.saturating_add(1);
             let line = encode_line(&envelope)?;
-            replay.remember_event(current, line.clone());
+            replay.remember_event(current, line.clone())?;
             output.write_all(line.as_bytes())?;
         }
         write_dropped_event(
@@ -2606,7 +2773,7 @@ fn drain_approval_events<W: Write>(
         let current = *sequence;
         *sequence = sequence.saturating_add(1);
         let line = encode_line(&envelope)?;
-        replay.remember_event(current, line.clone());
+        replay.remember_event(current, line.clone())?;
         output.write_all(line.as_bytes())?;
     }
     output.flush()?;
@@ -2645,7 +2812,7 @@ fn drain_provider_events_for_job<W: Write>(
         let current = *sequence;
         *sequence = sequence.saturating_add(1);
         let line = encode_line(&envelope)?;
-        replay.remember_event(current, line.clone());
+        replay.remember_event(current, line.clone())?;
         output.write_all(line.as_bytes())?;
     }
     write_dropped_event(
@@ -2683,7 +2850,7 @@ fn write_runtime_lifecycle_event<W: Write>(
     let current = *sequence;
     *sequence = sequence.saturating_add(1);
     let line = encode_line(&envelope)?;
-    replay.remember_event(current, line.clone());
+    replay.remember_event(current, line.clone())?;
     output.write_all(line.as_bytes())?;
     output.flush()?;
     Ok(())
@@ -2702,6 +2869,8 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     input: R,
     mut output: W,
 ) -> Result<(), HeadlessError> {
+    let mut replay = ReplayState::open(agent.session())?;
+    let mut event_sequence = replay.next_sequence;
     let (line_tx, line_rx) = mpsc::sync_channel::<ReaderMessage>(32);
     thread::Builder::new()
         .name("zenpi-stdin-reader".into())
@@ -2840,8 +3009,6 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
     let mut jobs: HashMap<crate::runtime::JobId, AsyncWork> = HashMap::new();
     let mut request_to_job: HashMap<String, crate::runtime::JobId> = HashMap::new();
     let mut pending_steers = VecDeque::new();
-    let mut event_sequence = 0_u64;
-    let mut replay = ReplayState::default();
     let mut stopping = false;
     let mut explicit_shutdown = false;
     let mut stopping_since: Option<Instant> = None;
@@ -3263,7 +3430,7 @@ fn handle_runtime_event<W: Write>(
                 StdioResponse::error_with_code(meta.id.clone(), meta.command, code, message)
                     .for_version(meta.version);
             if reason == crate::runtime::SubmitError::QueueFull {
-                replay.release(meta.id.as_deref());
+                replay.release(meta.id.as_deref())?;
                 write_response(output, response)?;
             } else {
                 write_cached_response(output, response, replay)?;
@@ -3330,7 +3497,7 @@ where
     // Validate before consulting the cache. A reused ID must not let an
     // unsupported schema or malformed payload silently replay an old result.
     let parsed_command = request.clone().into_command();
-    match replay.admit(id.as_deref(), &fingerprint) {
+    match replay.admit(id.as_deref(), &fingerprint)? {
         RequestIdAdmission::Replay => {
             if let Some(request_id) = id.as_deref()
                 && let Some(cached) = replay.cached_line(request_id)
@@ -3367,6 +3534,13 @@ where
             return Ok(());
         }
         RequestIdAdmission::New => {}
+        admission => {
+            write_response(
+                output,
+                admission_error(id, name, admission).for_version(request_version),
+            )?;
+            return Ok(());
+        }
     }
     let command = match parsed_command {
         Ok(command) => command,
@@ -3519,7 +3693,13 @@ where
                         slash_execution_response(id.clone(), command_name, data, request_version);
                     if session_open && response.success {
                         request_to_job.clear();
-                        replay.reset_for_session(id.as_deref(), *event_sequence);
+                        let agent = shared.lock().map_err(|_| event_mailbox_headless_error())?;
+                        replay.reset_for_session(
+                            agent.session(),
+                            id.as_deref(),
+                            *event_sequence,
+                        )?;
+                        *event_sequence = (*event_sequence).max(replay.next_sequence);
                     }
                     write_cached_response(output, response, replay)?;
                 }
@@ -3829,32 +4009,45 @@ where
                 }
             }
         }
-        Command::Checkpoint(crate::protocol::CheckpointRequest::Inspect) => {
-            match shared.try_lock() {
-                Ok(agent) => write_cached_versioned_response(
-                    output,
-                    StdioResponse::success(
-                        id,
-                        name,
-                        Some(serde_json::to_value(inspect_checkpoint(&agent))?),
-                    ),
-                    request_version,
-                    replay,
-                )?,
-                Err(_) => write_retryable_response(
-                    output,
-                    StdioResponse::error_with_code(
-                        id,
-                        name,
-                        "agent_busy",
-                        "checkpoint inspection requires the session owner",
-                    )
-                    .for_version(request_version),
-                    replay,
-                )?,
-            }
-        }
-        Command::Checkpoint(_) | Command::Mailbox(_) | Command::UserShell(_) => {
+        Command::Checkpoint(ref request) => match shared.try_lock() {
+            Ok(agent) => write_cached_versioned_response(
+                output,
+                checkpoint_response(&agent, request, id, name, replay)?,
+                request_version,
+                replay,
+            )?,
+            Err(_) => write_retryable_response(
+                output,
+                StdioResponse::error_with_code(
+                    id,
+                    name,
+                    "agent_busy",
+                    "checkpoint inspection requires the session owner",
+                )
+                .for_version(request_version),
+                replay,
+            )?,
+        },
+        Command::Mailbox(ref request) => match shared.try_lock() {
+            Ok(agent) => write_cached_versioned_response(
+                output,
+                mailbox_response(&agent, request, id, name),
+                request_version,
+                replay,
+            )?,
+            Err(_) => write_retryable_response(
+                output,
+                StdioResponse::error_with_code(
+                    id,
+                    name,
+                    "agent_busy",
+                    "mailbox command requires the session owner",
+                )
+                .for_version(request_version),
+                replay,
+            )?,
+        },
+        Command::UserShell(_) => {
             write_retryable_response(
                 output,
                 unavailable_control_response(id, &command).for_version(request_version),
@@ -3952,7 +4145,7 @@ where
             // the event suffix written above. Do not cache only its summary
             // line: an identical retry must be able to request the suffix
             // again rather than receiving a misleading response-only replay.
-            replay.release(id.as_deref());
+            replay.release(id.as_deref())?;
         }
         Command::Resume {
             path: Some(path),
@@ -4003,7 +4196,8 @@ where
                 Ok(()) => {
                     agent.take_events();
                     request_to_job.clear();
-                    replay.reset_for_session(id.as_deref(), *event_sequence);
+                    replay.reset_for_session(agent.session(), id.as_deref(), *event_sequence)?;
+                    *event_sequence = (*event_sequence).max(replay.next_sequence);
                     write_cached_versioned_response(
                         output,
                         StdioResponse::success(id, name, Some(serialized_agent_snapshot(&agent)?)),
@@ -5134,7 +5328,12 @@ fn handle_command<W: Write>(
                             request_version,
                         );
                         if session_open && response.success {
-                            replay.reset_for_session(id.as_deref(), *event_sequence);
+                            replay.reset_for_session(
+                                agent.session(),
+                                id.as_deref(),
+                                *event_sequence,
+                            )?;
+                            *event_sequence = (*event_sequence).max(replay.next_sequence);
                         }
                         write_cached_response(output, response, replay)?
                     }
@@ -5284,19 +5483,19 @@ fn handle_command<W: Write>(
             request_version,
             replay,
         )?,
-        Command::Checkpoint(crate::protocol::CheckpointRequest::Inspect) => {
+        Command::Checkpoint(ref request) => {
+            let response = checkpoint_response(agent, request, id, name, replay)?;
+            write_cached_versioned_response(output, response, request_version, replay)?;
+        }
+        Command::Mailbox(ref request) => {
             write_cached_versioned_response(
                 output,
-                StdioResponse::success(
-                    id,
-                    name,
-                    Some(serde_json::to_value(inspect_checkpoint(agent))?),
-                ),
+                mailbox_response(agent, request, id, name),
                 request_version,
                 replay,
             )?;
         }
-        Command::Checkpoint(_) | Command::Mailbox(_) | Command::UserShell(_) => {
+        Command::UserShell(_) => {
             write_retryable_response(
                 output,
                 unavailable_control_response(id, &command).for_version(request_version),
@@ -5401,7 +5600,12 @@ fn handle_command<W: Write>(
                         // events and terminal IDs before exposing the new
                         // snapshot.
                         agent.take_events();
-                        replay.reset_for_session(id.as_deref(), *event_sequence);
+                        replay.reset_for_session(
+                            agent.session(),
+                            id.as_deref(),
+                            *event_sequence,
+                        )?;
+                        *event_sequence = (*event_sequence).max(replay.next_sequence);
                         write_cached_versioned_response(
                             output,
                             StdioResponse::success(
@@ -5439,7 +5643,7 @@ fn handle_command<W: Write>(
                     )
                     .for_version(request_version),
                 )?;
-                replay.release(id.as_deref());
+                replay.release(id.as_deref())?;
             }
             (None, None) => write_cached_versioned_response(
                 output,
@@ -5474,8 +5678,8 @@ fn handle_command<W: Write>(
     Ok(false)
 }
 
-/// Report only the persisted journal projection held by this owner. It is
-/// not a claim that outbound events or client ACKs survive a process restart.
+/// The checkpoint cursor names the transcript journal. Transport replay has
+/// its own namespace and is reported separately by the headless owner.
 pub fn inspect_checkpoint(agent: &Agent) -> crate::protocol::CheckpointInspection {
     crate::protocol::CheckpointInspection {
         cursor: crate::protocol::CheckpointCursor {
@@ -5483,9 +5687,92 @@ pub fn inspect_checkpoint(agent: &Agent) -> crate::protocol::CheckpointInspectio
             next_sequence: agent.session().next_sequence(),
         },
         cursor_scope: crate::protocol::CheckpointCursorScope::SessionJournal,
-        reconnect_supported: false,
-        acknowledgement_supported: false,
+        reconnect_supported: true,
+        acknowledgement_supported: true,
     }
+}
+
+fn checkpoint_response(
+    agent: &Agent,
+    request: &crate::protocol::CheckpointRequest,
+    id: Option<String>,
+    name: impl Into<String>,
+    replay: &mut ReplayState,
+) -> Result<StdioResponse, HeadlessError> {
+    use crate::protocol::CheckpointRequest;
+    let name = name.into();
+    let cursor = match request {
+        CheckpointRequest::Inspect => None,
+        CheckpointRequest::Acknowledge { cursor } | CheckpointRequest::Replay { cursor, .. } => {
+            Some(cursor)
+        }
+    };
+    if let Some(cursor) = cursor
+        && (cursor.session_id != agent.session().session_id()
+            || cursor.next_sequence > agent.session().next_sequence())
+    {
+        return Ok(StdioResponse::error_with_code(
+            id,
+            name,
+            "checkpoint_cursor_invalid",
+            "cursor belongs to another session or is ahead of the durable journal",
+        ));
+    }
+    let data = match request {
+        CheckpointRequest::Inspect => {
+            let mut value = serde_json::to_value(inspect_checkpoint(agent))?;
+            value["acknowledged_next_sequence"] = json!(replay.acknowledged);
+            value["transport"] = json!({
+                "cursor_scope": "outbound_events", "session_id": agent.session().session_id(),
+                "next_sequence": replay.next_sequence, "owner_epoch": replay.owner_epoch,
+                "first_available_sequence": replay.events.front().map(|(sequence, _)| sequence),
+                "unknown_requests": replay.unknown.len(),
+            });
+            value
+        }
+        CheckpointRequest::Acknowledge { cursor } => {
+            let acknowledged = replay.acknowledged.max(cursor.next_sequence);
+            replay.persist(ReconnectEntry::Acknowledged {
+                next_sequence: acknowledged,
+            })?;
+            replay.acknowledged = acknowledged;
+            json!({ "cursor_scope": "session_journal", "session_id": cursor.session_id, "acknowledged_next_sequence": acknowledged })
+        }
+        CheckpointRequest::Replay { cursor, limit } => {
+            let mut records = Vec::new();
+            let mut bytes = 0;
+            let mut next = cursor.next_sequence;
+            let mut gap = false;
+            for record in agent
+                .session()
+                .records()
+                .iter()
+                .filter(|record| record.sequence >= cursor.next_sequence)
+            {
+                if records.len() >= usize::from(*limit) {
+                    break;
+                }
+                let size = serde_json::to_vec(record)?.len();
+                if bytes + size > MAX_SLASH_RESUME_BYTES {
+                    if records.is_empty() {
+                        next = record.sequence.saturating_add(1);
+                        gap = true;
+                    }
+                    break;
+                }
+                gap |= record.sequence != next;
+                next = record.sequence.saturating_add(1);
+                bytes += size;
+                records.push(record);
+            }
+            gap |= next < agent.session().next_sequence() && records.is_empty();
+            json!({
+                "cursor_scope": "session_journal", "cursor": { "session_id": cursor.session_id, "next_sequence": next },
+                "records": records, "replay_gap": gap, "has_more": next < agent.session().next_sequence(),
+            })
+        }
+    };
+    Ok(StdioResponse::success(id, name, Some(data)))
 }
 
 fn unavailable_control_response(id: Option<String>, command: &Command) -> StdioResponse {
@@ -5496,6 +5783,127 @@ fn unavailable_control_response(id: Option<String>, command: &Command) -> StdioR
         _ => unreachable!("only owner-required controls reach this boundary"),
     };
     StdioResponse::owner_required(id, crate::protocol::command_name(command), owner)
+}
+
+fn mailbox_response(
+    agent: &Agent,
+    request: &crate::protocol::MailboxRequest,
+    id: Option<String>,
+    name: impl Into<String>,
+) -> StdioResponse {
+    let name = name.into();
+    match execute_mailbox(agent.session(), request) {
+        Ok(data) => StdioResponse::success(id, name, Some(data)),
+        Err(error) => StdioResponse::error_with_code(id, name, "mailbox_error", error.to_string()),
+    }
+}
+
+fn execute_mailbox(
+    session: &SessionStore,
+    request: &crate::protocol::MailboxRequest,
+) -> Result<serde_json::Value, crate::session::SessionError> {
+    use crate::protocol::{MailboxOutcome, MailboxRequest};
+    use crate::session::{MailboxAction, SessionError, SessionMailbox};
+    let now = unix_time_ms();
+    if let MailboxRequest::Send {
+        recipient_session_id,
+        message_id,
+        text,
+        ttl_ms,
+    } = request
+    {
+        // Only clean journals registered beside the active session are
+        // addressable. Neither a wire path nor a sender identity is trusted.
+        let directory = session.path().parent().unwrap_or_else(|| Path::new("."));
+        let matches: Vec<_> = crate::session::list_sessions(directory)?
+            .into_iter()
+            .filter(|summary| &summary.session_id == recipient_session_id)
+            .collect();
+        if matches.len() != 1 {
+            return Err(SessionError::InvalidRecord(
+                "recipient is missing or ambiguous in this session directory".into(),
+            ));
+        }
+        let mailbox = SessionMailbox::open(&matches[0].path)?;
+        let message = mailbox.enqueue(session, message_id, json!({"text": text}), *ttl_ms, now)?;
+        return Ok(
+            json!({"message_id": message.digest, "message": message, "execution_started": false}),
+        );
+    }
+    let mailbox = SessionMailbox::open(session.path())?;
+    if let MailboxRequest::Receive {
+        after_sequence,
+        limit,
+    } = request
+    {
+        let page = mailbox.list(session, *after_sequence, usize::from(*limit).min(64), now)?;
+        let messages: Vec<_> = page
+            .messages
+            .iter()
+            .map(|message| json!({ "message_id": message.digest, "message": message }))
+            .collect();
+        return Ok(json!({"messages": messages, "next_sequence": page.next_sequence}));
+    }
+    let message_id = match request {
+        MailboxRequest::Acknowledge { message_id }
+        | MailboxRequest::Claim { message_id }
+        | MailboxRequest::Complete { message_id, .. } => message_id,
+        _ => unreachable!("send/receive already handled"),
+    };
+    let message = mailbox.find_message(session, message_id, now)?;
+    let action = match request {
+        MailboxRequest::Acknowledge { .. } => MailboxAction::Acknowledge,
+        MailboxRequest::Claim { .. } => MailboxAction::Claim {
+            token: format!("headless-{}", message.digest),
+        },
+        MailboxRequest::Complete {
+            outcome, result, ..
+        } => {
+            let token = message.claim_token.clone().ok_or_else(|| {
+                SessionError::InvalidRecord("message must be claimed before completion".into())
+            })?;
+            let result = json!({"outcome": outcome, "result": result});
+            match outcome {
+                MailboxOutcome::Succeeded => MailboxAction::Complete { token, result },
+                MailboxOutcome::Failed | MailboxOutcome::Abandoned => MailboxAction::Fail {
+                    token,
+                    error: result,
+                },
+            }
+        }
+        _ => unreachable!("send/receive already handled"),
+    };
+    let updated = mailbox.update(
+        session,
+        &message.sender_session_id,
+        &message.request_id,
+        action,
+        now,
+    )?;
+    Ok(json!({"message_id": updated.digest, "message": updated, "execution_started": false}))
+}
+
+fn admission_error(
+    id: Option<String>,
+    command: String,
+    admission: RequestIdAdmission,
+) -> StdioResponse {
+    let (code, message) = match admission {
+        RequestIdAdmission::UnknownOutcome => (
+            "unknown_outcome",
+            "previous owner stopped without a durable result; execution was not retried; inspect effects and explicitly retry with a new ID or abandon",
+        ),
+        RequestIdAdmission::ReplayExpired => (
+            "request_replay_expired",
+            "request completed but its response left the bounded replay window; execution was not repeated",
+        ),
+        RequestIdAdmission::LedgerFull => (
+            "request_ledger_full",
+            "durable request ledger is full; execution was not admitted; start a new session",
+        ),
+        _ => unreachable!("normal admission is handled by the dispatcher"),
+    };
+    StdioResponse::error_with_code(id, command, code, message)
 }
 
 fn write_response<W: Write>(output: &mut W, response: StdioResponse) -> Result<(), HeadlessError> {
@@ -5512,11 +5920,11 @@ fn write_cached_response<W: Write>(
 ) -> Result<(), HeadlessError> {
     let request_id = response.id.clone();
     let line = encode_line(&response)?;
+    if let Some(request_id) = request_id {
+        replay.remember_terminal(request_id, line.clone())?;
+    }
     output.write_all(line.as_bytes())?;
     output.flush()?;
-    if let Some(request_id) = request_id {
-        replay.remember_terminal(request_id, line);
-    }
     Ok(())
 }
 
@@ -5557,7 +5965,7 @@ fn write_buffered_events<W: Write>(
         // Lifecycle events are replayable just like provider deltas. This
         // keeps resume suffixes complete after a reconnect.
         if let Some(replay) = replay.as_deref_mut() {
-            replay.remember_event(current, line.clone());
+            replay.remember_event(current, line.clone())?;
         }
         output.write_all(line.as_bytes())?;
     }

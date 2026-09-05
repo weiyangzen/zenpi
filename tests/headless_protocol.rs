@@ -35,6 +35,299 @@ fn json_lines(bytes: &[u8]) -> Vec<Value> {
         .collect()
 }
 
+#[test]
+fn reconnect_restores_terminal_events_ack_and_monotonic_sequence() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("durable.jsonl");
+    let prompt = b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"once\",\"text\":\"hello\"}\n";
+    let mut original = Vec::new();
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    run_headless(&mut agent, Cursor::new(prompt), &mut original).unwrap();
+    let original = json_lines(&original);
+    let terminal = original
+        .iter()
+        .find(|record| record["type"] == "response")
+        .unwrap();
+    let events: Vec<_> = original
+        .iter()
+        .filter(|record| record["type"] == "event")
+        .cloned()
+        .collect();
+    let cursor = serde_json::json!({"session_id": agent.session().session_id(), "next_sequence": agent.session().next_sequence()});
+    drop(agent);
+    let before = fs::read(&path).unwrap();
+    let ack = serde_json::json!({"schema_version":2,"type":"checkpoint","id":"ack","checkpoint":{"action":"acknowledge","cursor":cursor}});
+    let mut input = prompt.to_vec();
+    input.extend_from_slice(
+        b"{\"schema_version\":2,\"type\":\"resume\",\"id\":\"replay\",\"from_sequence\":0}\n",
+    );
+    input.extend_from_slice(format!("{ack}\n").as_bytes());
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input), &mut output).unwrap();
+    let records = json_lines(&output);
+    assert_eq!(&records[0], terminal);
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record["type"] == "event")
+            .cloned()
+            .collect::<Vec<_>>(),
+        events
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    drop(agent);
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(b"{\"schema_version\":2,\"type\":\"checkpoint\",\"id\":\"inspect\",\"checkpoint\":{\"action\":\"inspect\"}}\n"), &mut output).unwrap();
+    let record = &json_lines(&output)[0];
+    assert_eq!(
+        record["data"]["acknowledged_next_sequence"],
+        cursor["next_sequence"]
+    );
+    assert_eq!(record["data"]["transport"]["owner_epoch"], 3);
+    assert_eq!(
+        record["data"]["transport"]["next_sequence"]
+            .as_u64()
+            .unwrap(),
+        events.last().unwrap()["sequence"].as_u64().unwrap() + 1
+    );
+}
+
+struct FailWire {
+    terminal_only: bool,
+}
+impl Write for FailWire {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if !self.terminal_only
+            || serde_json::from_slice::<Value>(bytes).unwrap()["type"] == "response"
+        {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "fixture disconnected",
+            ))
+        } else {
+            Ok(bytes.len())
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn disconnected_wire_preserves_unknown_or_completed_outcome_without_retry() {
+    for terminal_only in [false, true] {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("disconnect.jsonl");
+        let input =
+            b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"once\",\"text\":\"hello\"}\n";
+        let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+        assert!(run_headless(&mut agent, Cursor::new(input), FailWire { terminal_only }).is_err());
+        drop(agent);
+        let before = fs::read(&path).unwrap();
+        let mut agent = Agent::new(
+            SessionStore::open(&path).unwrap(),
+            Box::new(NoControlProvider),
+        );
+        let mut output = Vec::new();
+        run_headless(&mut agent, Cursor::new(input), &mut output).unwrap();
+        let record = &json_lines(&output)[0];
+        if terminal_only {
+            assert_eq!(record["success"], true);
+        } else {
+            assert_eq!(record["code"], "unknown_outcome");
+        }
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+}
+
+#[test]
+fn stale_session_writers_are_rejected_without_duplicate_sequences() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("writers.jsonl");
+    let mut first = SessionStore::open(&path).unwrap();
+    let mut stale = SessionStore::open(&path).unwrap();
+    first
+        .append_event(serde_json::json!({"type":"first"}))
+        .unwrap();
+    let before = fs::read(&path).unwrap();
+    assert!(
+        stale
+            .append_event(serde_json::json!({"type":"stale"}))
+            .unwrap_err()
+            .to_string()
+            .contains("stale")
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let mut fresh = SessionStore::open(&path).unwrap();
+    fresh
+        .append_event(serde_json::json!({"type":"fresh"}))
+        .unwrap();
+    assert_eq!(fresh.next_sequence(), 3);
+    assert!(
+        SessionStore::open_existing(path)
+            .unwrap()
+            .recovery_warnings()
+            .is_empty()
+    );
+}
+
+struct ReconnectCrashBackend {
+    marker: PathBuf,
+}
+impl Backend for ReconnectCrashBackend {
+    fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        fs::write(&self.marker, b"provider entered").unwrap();
+        thread::sleep(Duration::from_secs(30));
+        panic!("parent failed to kill reconnect fixture")
+    }
+    fn name(&self) -> &str {
+        "reconnect-crash-fixture"
+    }
+}
+
+#[test]
+fn reconnect_process_fixture() {
+    let Some(path) = std::env::var_os("ZENPI_TEST_RECONNECT_CHILD_PATH") else {
+        return;
+    };
+    let path = PathBuf::from(path);
+    let mode = std::env::var("ZENPI_TEST_RECONNECT_CHILD_MODE").unwrap();
+    if mode == "probe" {
+        let mut store = SessionStore::open(&path).unwrap();
+        assert!(
+            store
+                .append_event(serde_json::json!({"type":"must-not-write"}))
+                .is_err()
+        );
+        let mut agent = Agent::new(store, Box::new(NoControlProvider));
+        assert!(run_headless(&mut agent, Cursor::new(b""), Vec::new()).is_err());
+    } else {
+        let backend = ReconnectCrashBackend {
+            marker: path.with_extension("ready"),
+        };
+        let mut agent = Agent::new(SessionStore::open(&path).unwrap(), Box::new(backend));
+        run_headless(
+            &mut agent,
+            Cursor::new(
+                b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"killed\",\"text\":\"once\"}\n",
+            ),
+            Vec::new(),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn cross_process_owner_lock_survives_contention_and_releases_after_kill() {
+    use std::process::{Command, Stdio};
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("kill.jsonl");
+    let command = |mode: &str| {
+        let mut command = Command::new(std::env::current_exe().unwrap());
+        command
+            .args(["--exact", "reconnect_process_fixture", "--nocapture"])
+            .env("ZENPI_TEST_RECONNECT_CHILD_PATH", &path)
+            .env("ZENPI_TEST_RECONNECT_CHILD_MODE", mode);
+        command
+    };
+    let mut child = command("hold")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    while !path.with_extension("ready").exists() && started.elapsed() < Duration::from_secs(5) {
+        thread::sleep(Duration::from_millis(10));
+    }
+    let ready = path.with_extension("ready").exists();
+    let probe = if ready {
+        Some(command("probe").output().unwrap())
+    } else {
+        None
+    };
+    child.kill().unwrap();
+    child.wait().unwrap();
+    assert!(ready, "child did not reach the reserved provider boundary");
+    let probe = probe.unwrap();
+    assert!(
+        probe.status.success(),
+        "{}",
+        String::from_utf8_lossy(&probe.stderr)
+    );
+    let mut agent = Agent::new(
+        SessionStore::open(&path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let mut output = Vec::new();
+    run_headless(
+        &mut agent,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"prompt\",\"id\":\"killed\",\"text\":\"once\"}\n",
+        ),
+        &mut output,
+    )
+    .unwrap();
+    assert_eq!(json_lines(&output)[0]["code"], "unknown_outcome");
+    assert!(agent.session().recovery_warnings().is_empty());
+}
+
+#[test]
+fn checkpoint_pages_and_mailbox_are_local_durable_and_addressed() {
+    let directory = tempdir().unwrap();
+    let source_path = directory.path().join("sender.jsonl");
+    let recipient_path = directory.path().join("recipient.jsonl");
+    let mut recipient = SessionStore::open(&recipient_path).unwrap();
+    recipient
+        .append_event(serde_json::json!({"type":"fixture"}))
+        .unwrap();
+    let recipient_id = recipient.session_id().to_owned();
+    drop(recipient);
+    let send = serde_json::json!({"schema_version":2,"type":"mailbox","id":"send","mailbox":{"action":"send","recipient_session_id":recipient_id,"message_id":"work","text":"inspect this","ttl_ms":60000}});
+    let mut sender = Agent::new(
+        SessionStore::open(&source_path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let mut output = Vec::new();
+    run_headless(&mut sender, Cursor::new(format!("{send}\n")), &mut output).unwrap();
+    let send_response = &json_lines(&output)[0];
+    assert_eq!(send_response["success"], true, "{send_response}");
+    let message_id = send_response["data"]["message_id"].as_str().unwrap();
+    let requests = [
+        serde_json::json!({"schema_version":2,"type":"mailbox","id":"receive","mailbox":{"action":"receive","after_sequence":0,"limit":128}}),
+        serde_json::json!({"schema_version":2,"type":"mailbox","id":"claim","mailbox":{"action":"claim","message_id":message_id}}),
+        serde_json::json!({"schema_version":2,"type":"mailbox","id":"complete","mailbox":{"action":"complete","message_id":message_id,"outcome":"succeeded","result":"reviewed"}}),
+        serde_json::json!({"schema_version":2,"type":"checkpoint","id":"page","checkpoint":{"action":"replay","cursor":{"session_id":recipient_id,"next_sequence":0},"limit":1}}),
+    ];
+    let mut recipient = Agent::new(
+        SessionStore::open(&recipient_path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let input = requests
+        .iter()
+        .map(|request| format!("{request}\n"))
+        .collect::<String>();
+    let mut output = Vec::new();
+    run_headless(&mut recipient, Cursor::new(input), &mut output).unwrap();
+    let records = json_lines(&output);
+    assert!(
+        records.iter().all(|record| record["success"] == true),
+        "{records:?}"
+    );
+    assert_eq!(records[0]["data"]["messages"][0]["message_id"], message_id);
+    assert_eq!(records[2]["data"]["message"]["status"], "succeeded");
+    assert_eq!(records[3]["data"]["records"].as_array().unwrap().len(), 1);
+    assert_eq!(records[3]["data"]["cursor"]["next_sequence"], 1);
+    assert_eq!(records[3]["data"]["has_more"], true);
+}
+
 /// Create a domain input under the process workspace so the host's
 /// workspace-relative path policy is exercised rather than bypassed with an
 /// absolute temporary path.
@@ -817,8 +1110,13 @@ fn checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence(
         expected_sequence
     );
     assert_eq!(response["data"]["cursor_scope"], "session_journal");
-    assert_eq!(response["data"]["reconnect_supported"], false);
-    assert_eq!(response["data"]["acknowledgement_supported"], false);
+    assert_eq!(response["data"]["reconnect_supported"], true);
+    assert_eq!(response["data"]["acknowledgement_supported"], true);
+    assert_eq!(
+        response["data"]["transport"]["cursor_scope"],
+        "outbound_events"
+    );
+    assert_eq!(response["data"]["transport"]["owner_epoch"], 1);
     assert_eq!(fs::read(&path).unwrap(), before);
 }
 
@@ -840,12 +1138,7 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for (id, owner, version) in [
-        ("mail", "session_mailbox", 2),
-        ("ack", "durable_checkpoint", 2),
-        ("shell", "user_shell", 2),
-        ("shell-v1", "user_shell", 1),
-    ] {
+    for (id, owner, version) in [("shell", "user_shell", 2), ("shell-v1", "user_shell", 1)] {
         let responses: Vec<_> = records
             .iter()
             .filter(|record| record["id"] == id && record["type"] == "response")
@@ -859,6 +1152,13 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
         assert_eq!(response["required_owner"], owner);
         assert!(response.get("data").is_none());
     }
+    let mail = records
+        .iter()
+        .find(|record| record["id"] == "mail")
+        .unwrap();
+    assert_eq!(mail["code"], "mailbox_error");
+    let ack = records.iter().find(|record| record["id"] == "ack").unwrap();
+    assert_eq!(ack["code"], "checkpoint_cursor_invalid");
     assert!(!String::from_utf8(output).unwrap().contains("private "));
     assert_eq!(fs::read(&path).unwrap(), before);
     assert!(agent.history().is_empty());
@@ -902,7 +1202,7 @@ fn session_controls_remain_readable_while_provider_is_in_flight() {
     let records = json_lines(&captured.0.lock().unwrap());
     for (id, code) in [
         ("inspect", "agent_busy"),
-        ("mailbox", "owner_required"),
+        ("mailbox", "agent_busy"),
         ("shell", "owner_required"),
     ] {
         let responses: Vec<_> = records

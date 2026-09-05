@@ -5,10 +5,11 @@
 //! malformed trailing line, and append again without rewriting the transcript.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -130,6 +131,7 @@ pub struct SessionStore {
     warnings: Vec<RecoveryWarning>,
     needs_separator: bool,
     next_seq: u64,
+    observed_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -244,6 +246,7 @@ impl SessionStore {
         if writable && existing.is_some() {
             restrict_session_permissions(&path)?;
         }
+        let observed_bytes = bytes.len() as u64;
         let had_content = !bytes.is_empty();
         let needs_separator = had_content && !bytes.ends_with(b"\n");
         let text = String::from_utf8(bytes)
@@ -464,6 +467,7 @@ impl SessionStore {
             warnings,
             needs_separator,
             next_seq,
+            observed_bytes,
         };
         if writable && (!had_content || needs_header) {
             // A header is the only record whose absence changes the meaning of
@@ -830,6 +834,16 @@ impl SessionStore {
             options.custom_flags(libc::O_NOFOLLOW);
         }
         let mut file = options.open(&self.path)?;
+        lock_exclusive(&file)?;
+        let _transport = guard_transport_writer(&self.path)?;
+        // A second writer must reopen its projection rather than append a
+        // sequence computed from stale history. The OS releases this lock on
+        // close or process death, so a crash cannot strand a PID-file lease.
+        if file.metadata()?.len() != self.observed_bytes {
+            return Err(SessionError::InvalidRecord(
+                "session writer is stale; reopen the journal before retrying".into(),
+            ));
+        }
         if self.needs_separator {
             file.write_all(b"\n")?;
             self.needs_separator = false;
@@ -837,6 +851,7 @@ impl SessionStore {
         file.write_all(&encoded)?;
         file.flush()?;
         file.sync_data()?;
+        self.observed_bytes = file.metadata()?.len();
         self.next_seq = following_sequence;
         let kind = record
             .get("kind")
@@ -850,6 +865,198 @@ impl SessionStore {
         });
         Ok(())
     }
+}
+
+fn lock_exclusive(file: &File) -> Result<(), SessionError> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = file;
+        Err(SessionError::InvalidRecord(
+            "cross-process session locking is unsupported on this platform".into(),
+        ))
+    }
+}
+
+/// Private transport WAL, separate from transcript sequence space. Holding
+/// the file owns the session's headless transport until close/process death.
+/// Reservations are committed before dispatch; outcomes before stdout.
+#[derive(Debug)]
+pub(crate) struct ReconnectJournal {
+    file: File,
+    pub session_path: PathBuf,
+    session_id: String,
+    sequence: u64,
+    bytes: u64,
+}
+
+fn local_transport_owners() -> &'static Mutex<BTreeSet<PathBuf>> {
+    static OWNERS: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+    OWNERS.get_or_init(Mutex::default)
+}
+
+fn reconnect_path(session: &Path) -> PathBuf {
+    let mut path = session.as_os_str().to_owned();
+    path.push(".reconnect");
+    PathBuf::from(path)
+}
+
+fn guard_transport_writer(path: &Path) -> Result<Option<File>, SessionError> {
+    let path = fs::canonicalize(path)?;
+    if local_transport_owners()
+        .lock()
+        .map_err(|_| io::Error::other("transport ownership lock poisoned"))?
+        .contains(&path)
+    {
+        return Ok(None);
+    }
+    let mut options = OpenOptions::new();
+    options.read(true).write(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    let file = match options.open(reconnect_path(&path)) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    lock_exclusive(&file)?;
+    Ok(Some(file))
+}
+
+impl Drop for ReconnectJournal {
+    fn drop(&mut self) {
+        if let Ok(mut owners) = local_transport_owners().lock() {
+            owners.remove(&self.session_path);
+        }
+    }
+}
+
+impl ReconnectJournal {
+    const MAX_BYTES: u64 = 128 * 1024 * 1024;
+
+    pub fn open(session: &SessionStore) -> Result<(Self, Vec<Value>), SessionError> {
+        let session_path = fs::canonicalize(session.path())?;
+        // Match the session append lock order, including startup recovery.
+        // A second process cannot mark a live owner's operation interrupted.
+        let session_guard = File::open(&session_path)?;
+        lock_exclusive(&session_guard)?;
+        let path = reconnect_path(&session_path);
+        reject_session_symlink(&path)?;
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true);
+        #[cfg(unix)]
+        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        let mut file = options.open(path)?;
+        if !file.metadata()?.is_file() {
+            return Err(SessionError::InvalidRecord(
+                "reconnect WAL is not a file".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = file.metadata()?;
+            if metadata.mode() & 0o077 != 0 || metadata.uid() != unsafe { libc::geteuid() } {
+                return Err(SessionError::InvalidRecord(
+                    "reconnect WAL must be private and owned by the current user".into(),
+                ));
+            }
+        }
+        lock_exclusive(&file)?;
+        let mut bytes = Vec::new();
+        (&mut file)
+            .take(Self::MAX_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > Self::MAX_BYTES {
+            return Err(SessionError::LimitExceeded {
+                max: Self::MAX_BYTES as usize,
+                actual: bytes.len() as u64,
+            });
+        }
+        let valid_len = bytes
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .map_or(0, |pos| pos + 1);
+        let mut records = Vec::new();
+        let mut sequence = 0;
+        for line in bytes[..valid_len]
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            let record: Value = serde_json::from_slice(line)?;
+            if record["schema_version"] != 1
+                || record["session_id"] != session.session_id()
+                || record["sequence"] != sequence
+                || !record["event"].is_object()
+            {
+                return Err(SessionError::InvalidRecord(
+                    "invalid reconnect WAL identity or sequence".into(),
+                ));
+            }
+            let payload = serde_json::to_vec(&record["event"])?;
+            if record["sha256"] != reconnect_digest(&payload) {
+                return Err(SessionError::InvalidRecord(
+                    "reconnect WAL checksum mismatch".into(),
+                ));
+            }
+            records.push(record["event"].clone());
+            sequence += 1;
+        }
+        // Only a torn final append is recoverable. A missing terminal after
+        // a durable reservation remains unknown, never an implicit retry.
+        if valid_len < bytes.len() {
+            file.set_len(valid_len as u64)?;
+            file.sync_data()?;
+        }
+        file.seek(SeekFrom::End(0))?;
+        local_transport_owners()
+            .lock()
+            .map_err(|_| io::Error::other("transport ownership lock poisoned"))?
+            .insert(session_path.clone());
+        Ok((
+            Self {
+                file,
+                session_path,
+                session_id: session.session_id().into(),
+                sequence,
+                bytes: valid_len as u64,
+            },
+            records,
+        ))
+    }
+
+    pub fn append(&mut self, event: Value) -> Result<(), SessionError> {
+        let digest = reconnect_digest(&serde_json::to_vec(&event)?);
+        let mut bytes = serde_json::to_vec(&json!({
+            "schema_version": 1, "session_id": self.session_id,
+            "sequence": self.sequence, "event": event, "sha256": digest,
+        }))?;
+        bytes.push(b'\n');
+        if bytes.len() > MAX_SESSION_RECORD_BYTES
+            || self.bytes + bytes.len() as u64 > Self::MAX_BYTES
+        {
+            return Err(SessionError::InvalidRecord(
+                "reconnect WAL capacity exhausted; refusing untracked execution".into(),
+            ));
+        }
+        self.file.write_all(&bytes)?;
+        self.file.sync_data()?;
+        self.bytes += bytes.len() as u64;
+        self.sequence += 1;
+        Ok(())
+    }
+}
+
+fn reconnect_digest(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 fn interrupted_operations(events: &[Value]) -> Vec<InterruptedOperation> {
@@ -1820,6 +2027,29 @@ impl SessionMailbox {
             ));
         }
         Ok(())
+    }
+
+    /// Address a message by its immutable digest, avoiding ambiguity when
+    /// multiple senders choose the same request ID.
+    pub fn find_message(
+        &self,
+        recipient: &SessionStore,
+        digest: &str,
+        now: u64,
+    ) -> Result<MailboxMessage, SessionError> {
+        self.check_access(recipient, true)?;
+        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(SessionError::InvalidRecord(
+                "mailbox message ID must be an envelope digest".into(),
+            ));
+        }
+        let mut journal = self.locked(false)?;
+        let (messages, _) = self.recover(&mut journal.file)?;
+        messages
+            .into_iter()
+            .find(|message| message.digest == digest)
+            .map(|message| message.at_time(now))
+            .ok_or_else(|| SessionError::InvalidRecord("mailbox message does not exist".into()))
     }
 
     pub fn enqueue(
