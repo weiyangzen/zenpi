@@ -2,6 +2,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use tempfile::tempdir;
 use zenpi::b3::ResourceBudget;
+use zenpi::domain_execution::{
+    ExecutionReceipt, ExecutionStatus, ExecutionStore, deterministic_cost,
+};
 use zenpi::domain_store::{DomainStore, path_for_session};
 use zenpi::domains::{Blueprint, BlueprintItem, Goal, GoalStatus, MAX_BLUEPRINT_ITEMS};
 use zenpi::layout::{FocusDirection, LayoutModel, PaneCapabilities, PaneId, TabId, Visibility};
@@ -172,6 +175,106 @@ fn production_gantt_pane_renders_bounded_domain_projection() {
     assert!(output.contains("verify"));
     assert!(output.contains("after 1"));
     assert!(!output.contains("No blueprint selected"));
+}
+
+#[test]
+fn gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let blueprint = Blueprint::new(
+        "receipt-plan",
+        "1",
+        vec![
+            BlueprintItem::new("build", 12),
+            BlueprintItem::new("verify", 34).with_dependencies(["build"]),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new("receipt-goal", &blueprint, ResourceBudget::default(), None).unwrap();
+    let mut domains = DomainStore::open(path_for_session(&session_path)).unwrap();
+    domains.put_blueprint(blueprint.clone()).unwrap();
+    domains.put_goal(goal.clone()).unwrap();
+
+    let mut execution =
+        ExecutionStore::open(zenpi::domain_execution::path_for_session(&session_path)).unwrap();
+    // The newest attempt is authoritative. The projection must not keep
+    // showing an older success once a later attempt is cancelled.
+    execution
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "build-attempt-1".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: "build".into(),
+            attempt: 1,
+            status: ExecutionStatus::Succeeded,
+            cost: deterministic_cost(&blueprint.items[0]),
+            evidence: "deterministic evidence one".into(),
+            error: None,
+        })
+        .unwrap();
+    execution
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "build-attempt-2".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: "build".into(),
+            attempt: 2,
+            status: ExecutionStatus::Cancelled,
+            cost: deterministic_cost(&blueprint.items[0]),
+            evidence: "deterministic evidence two".into(),
+            error: Some("operator cancelled".into()),
+        })
+        .unwrap();
+    execution
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "verify-running".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: "verify".into(),
+            attempt: 3,
+            status: ExecutionStatus::Running,
+            cost: deterministic_cost(&blueprint.items[1]),
+            evidence: "deterministic evidence running".into(),
+            error: None,
+        })
+        .unwrap();
+
+    let snapshot = collect_gantt_snapshot(&session_path).unwrap();
+    let content = snapshot.content();
+    assert!(content.contains("build  ready  12 LOC  status cancelled attempt 2"));
+    assert!(content.contains("verify  after 1  34 LOC  status running attempt 3"));
+}
+
+#[test]
+fn gantt_projection_does_not_create_a_missing_execution_store_and_stays_bounded() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let execution_path = zenpi::domain_execution::path_for_session(&session_path);
+    let items = (0..MAX_BLUEPRINT_ITEMS)
+        .map(|index| {
+            BlueprintItem::new(
+                format!("item-{index:03}-{}", "x".repeat(96)),
+                u32::try_from(index).unwrap(),
+            )
+        })
+        .collect();
+    let blueprint = Blueprint::new("pending-plan", "1", items).unwrap();
+    let mut domains = DomainStore::open(path_for_session(&session_path)).unwrap();
+    domains.put_blueprint(blueprint).unwrap();
+
+    assert!(!execution_path.exists());
+    let snapshot = collect_gantt_snapshot(&session_path).unwrap();
+    assert!(!execution_path.exists());
+    assert!(snapshot.content().len() <= MAX_GANTT_PANE_BYTES);
+    assert!(snapshot.content().lines().count() <= zenpi::tui::MAX_GANTT_PANE_ROWS);
+    assert!(snapshot.content().contains("status pending"));
+    assert!(snapshot.truncated());
 }
 
 #[test]

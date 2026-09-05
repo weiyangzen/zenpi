@@ -200,13 +200,23 @@ impl GanttPaneSnapshot {
 pub fn collect_gantt_snapshot(
     session_path: impl AsRef<std::path::Path>,
 ) -> Result<GanttPaneSnapshot, String> {
+    let session_path = session_path.as_ref();
     let path = crate::domain_store::path_for_session(session_path);
     let store = crate::domain_store::DomainStore::open_read_only(path)
         .map_err(|error| format!("domain snapshot unavailable: {error}"))?;
-    Ok(project_gantt_store(&store))
+    // The receipt store is deliberately read-only here. A Gantt refresh must
+    // never create execution state merely because a user opened the pane;
+    // `open_read_only` represents a missing store as an empty projection.
+    let execution_path = crate::domain_execution::path_for_session(session_path);
+    let execution = crate::domain_execution::ExecutionStore::open_read_only(execution_path)
+        .map_err(|error| format!("execution snapshot unavailable: {error}"))?;
+    Ok(project_gantt_store(&store, &execution))
 }
 
-fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSnapshot {
+fn project_gantt_store(
+    store: &crate::domain_store::DomainStore,
+    execution: &crate::domain_execution::ExecutionStore,
+) -> GanttPaneSnapshot {
     use std::fmt::Write as _;
 
     let blueprints = store.blueprints();
@@ -271,11 +281,17 @@ fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSna
                 } else {
                     format!("after {}", item.depends_on.len())
                 };
+                let execution_status =
+                    latest_execution_status(execution, &goals, blueprint, &item.id).map_or_else(
+                        || "pending".to_owned(),
+                        |(status, attempt)| format!("{} attempt {}", status.as_str(), attempt),
+                    );
                 let line = format!(
-                    "  - {}  {}  {} LOC\n",
+                    "  - {}  {}  {} LOC  status {}\n",
                     inline_token(&item.id, crate::domains::MAX_ID_BYTES),
                     dependency,
                     item.estimated_loc,
+                    execution_status,
                 );
                 if !append_gantt_line(&mut content, &line, &mut rows) {
                     truncated = true;
@@ -300,6 +316,34 @@ fn project_gantt_store(store: &crate::domain_store::DomainStore) -> GanttPaneSna
         goal_count: goals.len(),
         truncated,
     }
+}
+
+/// Return the newest receipt for an item across goals linked to this exact
+/// Blueprint version/digest. Receipts are goal-scoped, so unrelated goals or
+/// stale Blueprint versions must never make an item look complete. When more
+/// than one linked goal has the same attempt number, the stable goal order
+/// from the domain store wins; the compact pane intentionally shows one
+/// bounded status rather than duplicating rows for every goal.
+fn latest_execution_status(
+    execution: &crate::domain_execution::ExecutionStore,
+    goals: &[&crate::domains::Goal],
+    blueprint: &crate::domains::Blueprint,
+    item_id: &str,
+) -> Option<(crate::domain_execution::ExecutionStatus, u32)> {
+    let mut latest = None;
+    for goal in goals.iter().filter(|goal| {
+        goal.blueprint_id == blueprint.id
+            && goal.blueprint_version == blueprint.version
+            && goal.blueprint_digest == blueprint.digest
+    }) {
+        let Some(receipt) = execution.latest_receipt_for(goal, blueprint, item_id) else {
+            continue;
+        };
+        if latest.is_none_or(|(_, attempt)| receipt.attempt > attempt) {
+            latest = Some((receipt.status, receipt.attempt));
+        }
+    }
+    latest
 }
 
 fn append_gantt_line(content: &mut String, line: &str, rows: &mut usize) -> bool {
