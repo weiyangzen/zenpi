@@ -6,8 +6,8 @@
 
 use std::{
     collections::BTreeMap,
-    fs::{self, OpenOptions},
-    io::{self, Read, Write},
+    fs::{self, File, OpenOptions},
+    io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -554,6 +554,11 @@ impl SessionStore {
         handoff
             .validate()
             .map_err(|error| SessionError::InvalidRecord(error.to_string()))?;
+        if handoff.session_id != self.session_id() {
+            return Err(SessionError::InvalidRecord(
+                "handoff session does not match journal".into(),
+            ));
+        }
         self.append_json(&json!({ "kind": "handoff_record", "handoff": &handoff }))?;
         self.handoff_records.push(handoff);
         Ok(())
@@ -701,8 +706,18 @@ impl SessionStore {
         {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(&self.path, destination)?;
-        restrict_session_permissions(destination)?;
+        let inspected = Self::open_existing(&self.path)?;
+        require_clean_session(&inspected)?;
+        let bytes = read_session_bytes(&self.path).map_err(read_error)?;
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(unix)]
+        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        let mut file = options.open(destination)?;
+        if let Err(error) = file.write_all(&bytes).and_then(|()| file.sync_all()) {
+            let _ = fs::remove_file(destination);
+            return Err(error.into());
+        }
         if file_sha256(&self.path)? != file_sha256(destination)? {
             let _ = fs::remove_file(destination);
             return Err(SessionError::InvalidRecord(
@@ -722,23 +737,62 @@ impl SessionStore {
                 "fork destination already exists".into(),
             ));
         }
-        let mut fork = Self::open(destination)?;
-        for turn in &self.turns {
-            fork.append_turn(turn.clone())?;
+        require_clean_session(self)?;
+        if let Some(parent) = destination
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+        {
+            fs::create_dir_all(parent)?;
         }
-        for handoff in &self.handoffs {
-            fork.append_handoff(handoff.clone())?;
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        options.open(destination)?;
+        let result = (|| {
+            let mut fork = Self::open(destination)?;
+            for record in &self.records {
+                match record.kind.as_str() {
+                    "turn" => {
+                        fork.append_turn(serde_json::from_value(record.value["turn"].clone())?)?
+                    }
+                    "handoff" => fork
+                        .append_handoff(serde_json::from_value(record.value["handoff"].clone())?)?,
+                    "handoff_record" => {
+                        let mut handoff: HandoffRecord =
+                            serde_json::from_value(record.value["handoff"].clone())?;
+                        handoff.session_id = fork.session_id().to_owned();
+                        handoff.digest = handoff
+                            .compute_digest()
+                            .map_err(|error| SessionError::InvalidRecord(error.to_string()))?;
+                        fork.append_handoff_record(handoff)?;
+                    }
+                    "event" => {
+                        let mut event = record.value["event"].clone();
+                        let kind = event["type"].as_str().unwrap_or_default();
+                        // A fork copies history, never pending work or the original
+                        // session's transport/lifecycle ownership and request ledger.
+                        if kind.starts_with("operation_")
+                            || kind.starts_with("session_lifecycle")
+                            || kind.starts_with("mailbox_")
+                            || kind.starts_with("reconnect_")
+                            || kind.starts_with("protocol_")
+                            || kind.starts_with("request_")
+                        {
+                            continue;
+                        }
+                        remap_session_identity(&mut event, self.session_id(), fork.session_id());
+                        fork.append_event(event)?;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(fork)
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(destination);
         }
-        for record in &self.handoff_records {
-            fork.append_handoff_record(record.clone())?;
-        }
-        // Runtime intents are pending work for one external owner. Forking a
-        // session must not duplicate them under a new identity and risk a
-        // second execution; a caller can submit a fresh intent explicitly.
-        for event in &self.event_values {
-            fork.append_event(event.clone())?;
-        }
-        Ok(fork)
+        result
     }
 
     fn append_json(&mut self, value: &Value) -> Result<(), SessionError> {
@@ -913,9 +967,13 @@ fn now_ms() -> u64 {
 }
 
 fn generate_id(prefix: &str) -> String {
-    // Time plus process id is sufficient for one append-only file and avoids a
-    // heavyweight UUID dependency in the default binary.
-    format!("{prefix}-{}-{}", now_ms(), std::process::id())
+    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    format!(
+        "{prefix}-{}-{}-{}",
+        now_ms(),
+        std::process::id(),
+        SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    )
 }
 
 /// Exposed for callers that need a clock-compatible session timestamp.
@@ -957,18 +1015,24 @@ pub fn list_sessions(directory: impl AsRef<Path>) -> Result<Vec<SessionSummary>,
     if !metadata.is_dir() {
         return Err(SessionError::Directory(directory.to_owned()));
     }
-    let mut paths = fs::read_dir(directory)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
+    let mut paths = Vec::new();
+    for (index, entry) in fs::read_dir(directory)?.enumerate() {
+        if index >= MAX_GC_CANDIDATES {
+            return Err(SessionError::InvalidRecord(
+                "session directory entry limit exceeded".into(),
+            ));
+        }
+        let path = entry?.path();
         // A workspace-local domain store may live beside its session journal.
         // It is JSONL too, but it is not a session and opening it through
         // `SessionStore` would append a session header and corrupt the store.
-        .filter(|path| {
-            path.file_name().and_then(|name| name.to_str())
-                != Some(crate::domain_store::DOMAIN_STORE_FILE_NAME)
-        })
-        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
-        .collect::<Vec<_>>();
+        if path.file_name().and_then(|name| name.to_str())
+            != Some(crate::domain_store::DOMAIN_STORE_FILE_NAME)
+            && path.extension().and_then(|value| value.to_str()) == Some("jsonl")
+        {
+            paths.push(path);
+        }
+    }
     paths.sort();
     paths
         .into_iter()
@@ -1204,6 +1268,11 @@ pub fn garbage_collect_sessions_with_active(
                 "garbage collection cannot remove the active session".into(),
             ));
         }
+        if mailbox_path(path)?.try_exists()? {
+            return Err(SessionError::InvalidRecord(
+                "garbage collection cannot orphan a durable session mailbox".into(),
+            ));
+        }
     }
     for path in selected.iter() {
         fs::remove_file(path)?;
@@ -1240,4 +1309,868 @@ fn clean_owned_session(path: &Path) -> Result<bool, SessionError> {
         Err(SessionError::Symlink(path)) => Err(SessionError::Symlink(path)),
         Err(_) => Ok(false),
     }
+}
+
+fn require_clean_session(store: &SessionStore) -> Result<(), SessionError> {
+    if store
+        .records
+        .first()
+        .is_none_or(|record| record.kind != "session" || record.sequence != 0)
+        || !store.warnings.is_empty()
+    {
+        return Err(SessionError::InvalidRecord(
+            "operation requires a clean session journal".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_error(error: ReadSessionError) -> SessionError {
+    match error {
+        ReadSessionError::Io(error) => error.into(),
+        ReadSessionError::LimitExceeded { actual } => SessionError::LimitExceeded {
+            max: MAX_SESSION_BYTES,
+            actual,
+        },
+    }
+}
+
+fn remap_session_identity(value: &mut Value, source: &str, destination: &str) {
+    match value {
+        Value::Object(fields) => {
+            for (key, value) in fields {
+                if (key == "session_id" || key.ends_with("_session_id"))
+                    && value.as_str() == Some(source)
+                {
+                    *value = json!(destination);
+                } else {
+                    remap_session_identity(value, source, destination);
+                }
+            }
+        }
+        Value::Array(values) => values
+            .iter_mut()
+            .for_each(|value| remap_session_identity(value, source, destination)),
+        _ => {}
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionCatalogEntry {
+    pub summary: SessionSummary,
+    pub archived: bool,
+    pub last_activity_ms: u64,
+}
+
+impl SessionStore {
+    pub fn is_archived(&self) -> bool {
+        self.events()
+            .iter()
+            .rev()
+            .find(|event| event["type"] == "session_lifecycle")
+            .is_some_and(|event| event["archived"] == true)
+    }
+
+    pub fn catalog_entry(&self) -> SessionCatalogEntry {
+        SessionCatalogEntry {
+            summary: self.summary(),
+            archived: self.is_archived(),
+            last_activity_ms: self
+                .records
+                .iter()
+                .filter_map(|record| record.value["timestamp_ms"].as_u64())
+                .max()
+                .unwrap_or(self.header.created_at_ms),
+        }
+    }
+
+    pub fn set_archived(&mut self, archived: bool) -> Result<(), SessionError> {
+        require_clean_session(self)?;
+        if self.is_archived() != archived {
+            self.append_event(json!({"type": "session_lifecycle", "archived": archived}))?;
+        }
+        Ok(())
+    }
+}
+
+/// A local catalog, not a claim that these sessions have running agents.
+pub fn session_catalog(
+    directory: impl AsRef<Path>,
+    include_archived: bool,
+) -> Result<Vec<SessionCatalogEntry>, SessionError> {
+    let mut entries = Vec::new();
+    for summary in list_sessions(directory)? {
+        if entries.len() >= MAX_GC_CANDIDATES {
+            return Err(SessionError::InvalidRecord(
+                "session catalog limit exceeded".into(),
+            ));
+        }
+        let store = SessionStore::open_existing(summary.path)?;
+        require_clean_session(&store)?;
+        if include_archived || !store.is_archived() {
+            entries.push(store.catalog_entry());
+        }
+    }
+    entries.sort_by(|left, right| {
+        right
+            .last_activity_ms
+            .cmp(&left.last_activity_ms)
+            .then_with(|| left.summary.path.cmp(&right.summary.path))
+    });
+    Ok(entries)
+}
+
+pub fn resume_last_session(directory: impl AsRef<Path>) -> Result<SessionStore, SessionError> {
+    let latest = session_catalog(directory, false)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| SessionError::InvalidRecord("no unarchived session to resume".into()))?;
+    SessionStore::open_existing_writable(latest.summary.path)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum SessionLifecycleRequest {
+    List {
+        directory: PathBuf,
+        #[serde(default)]
+        include_archived: bool,
+    },
+    Agents {
+        directory: PathBuf,
+    },
+    Inspect {
+        path: PathBuf,
+    },
+    ResumeLast {
+        directory: PathBuf,
+    },
+    Fork {
+        source: PathBuf,
+        destination: PathBuf,
+    },
+    Export {
+        source: PathBuf,
+        destination: PathBuf,
+    },
+    Import {
+        source: PathBuf,
+        destination: PathBuf,
+    },
+    /// Migration writes a verified copy in the current schema, preserving
+    /// identity and source. Removing the source is a separate confirmed delete.
+    Migrate {
+        source: PathBuf,
+        destination: PathBuf,
+    },
+    Archive {
+        path: PathBuf,
+    },
+    Unarchive {
+        path: PathBuf,
+    },
+    Delete {
+        path: PathBuf,
+        #[serde(default)]
+        confirmed: bool,
+    },
+    Queue {
+        source: PathBuf,
+        recipient: PathBuf,
+        request_id: String,
+        payload: Value,
+        ttl_ms: u64,
+    },
+    Gc {
+        directory: PathBuf,
+        retain_newest: usize,
+        older_than_ms: u64,
+        #[serde(default)]
+        confirmed: bool,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SessionLifecycleReceipt {
+    Catalog {
+        sessions: Vec<SessionCatalogEntry>,
+    },
+    Inspection {
+        inspection: SessionInspection,
+    },
+    Session {
+        session: SessionCatalogEntry,
+    },
+    Deleted {
+        path: PathBuf,
+    },
+    Queued {
+        message: MailboxMessage,
+    },
+    GarbageCollected {
+        removed: Vec<PathBuf>,
+        inspected: usize,
+        skipped_unowned: usize,
+    },
+}
+
+pub fn execute_session_lifecycle(
+    request: SessionLifecycleRequest,
+    active_session: Option<&Path>,
+    now_ms: u64,
+) -> Result<SessionLifecycleReceipt, SessionError> {
+    use SessionLifecycleReceipt as Receipt;
+    use SessionLifecycleRequest as Request;
+    let session = match request {
+        Request::List {
+            directory,
+            include_archived,
+        } => {
+            return Ok(Receipt::Catalog {
+                sessions: session_catalog(directory, include_archived)?,
+            });
+        }
+        Request::Agents { directory } => {
+            return Ok(Receipt::Catalog {
+                sessions: session_catalog(directory, false)?,
+            });
+        }
+        Request::Inspect { path } => {
+            return Ok(Receipt::Inspection {
+                inspection: inspect_session(path)?,
+            });
+        }
+        Request::ResumeLast { directory } => resume_last_session(directory)?,
+        Request::Fork {
+            source,
+            destination,
+        } => SessionStore::open_existing(source)?.fork_to(destination)?,
+        Request::Export {
+            source,
+            destination,
+        } => {
+            SessionStore::open_existing(source)?.export_to(&destination)?;
+            SessionStore::open_existing(destination)?
+        }
+        Request::Import {
+            source,
+            destination,
+        }
+        | Request::Migrate {
+            source,
+            destination,
+        } => import_session(source, destination)?,
+        Request::Archive { path } => {
+            return Ok(Receipt::Session {
+                session: set_session_archived(path, true, active_session)?,
+            });
+        }
+        Request::Unarchive { path } => {
+            return Ok(Receipt::Session {
+                session: set_session_archived(path, false, active_session)?,
+            });
+        }
+        Request::Delete { path, confirmed } => {
+            if !confirmed {
+                return Err(SessionError::InvalidRecord(
+                    "delete requires explicit confirmation".into(),
+                ));
+            }
+            reject_active_session(&path, active_session)?;
+            let store = SessionStore::open_existing(&path)?;
+            require_clean_session(&store)?;
+            // Refuse to orphan durable communication. Archive is available
+            // until a separate mailbox retention decision has been made.
+            if mailbox_path(&path)?.exists() {
+                return Err(SessionError::InvalidRecord(
+                    "delete requires retaining or removing the session mailbox first".into(),
+                ));
+            }
+            fs::remove_file(&path)?;
+            return Ok(Receipt::Deleted { path });
+        }
+        Request::Queue {
+            source,
+            recipient,
+            request_id,
+            payload,
+            ttl_ms,
+        } => {
+            let sender = SessionStore::open_existing(source)?;
+            let mailbox = SessionMailbox::open(recipient)?;
+            return Ok(Receipt::Queued {
+                message: mailbox.enqueue(&sender, &request_id, payload, ttl_ms, now_ms)?,
+            });
+        }
+        Request::Gc {
+            directory,
+            retain_newest,
+            older_than_ms,
+            confirmed,
+        } => {
+            if !confirmed {
+                return Err(SessionError::InvalidRecord(
+                    "GC requires explicit confirmation".into(),
+                ));
+            }
+            let report = garbage_collect_sessions_with_active(
+                directory,
+                GarbageCollectionPolicy {
+                    retain_newest,
+                    older_than_ms,
+                },
+                active_session,
+                now_ms,
+            )?;
+            return Ok(Receipt::GarbageCollected {
+                removed: report.removed,
+                inspected: report.inspected,
+                skipped_unowned: report.skipped_unowned,
+            });
+        }
+    };
+    Ok(Receipt::Session {
+        session: session.catalog_entry(),
+    })
+}
+
+fn reject_active_session(path: &Path, active: Option<&Path>) -> Result<(), SessionError> {
+    if active.is_some_and(|active| same_file_or_path(path, active)) {
+        return Err(SessionError::InvalidRecord(
+            "operation cannot modify the active session lifecycle".into(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn set_session_archived(
+    path: impl AsRef<Path>,
+    archived: bool,
+    active: Option<&Path>,
+) -> Result<SessionCatalogEntry, SessionError> {
+    let path = path.as_ref();
+    if archived {
+        reject_active_session(path, active)?;
+    }
+    let mut session = SessionStore::open_existing_writable(path)?;
+    session.set_archived(archived)?;
+    Ok(session.catalog_entry())
+}
+
+pub const MAX_MAILBOX_PAYLOAD_BYTES: usize = 64 * 1024;
+pub const MAX_MAILBOX_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_MAILBOX_MESSAGES: usize = 256;
+pub const MAX_MAILBOX_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1000;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MailboxStatus {
+    Queued,
+    Acknowledged,
+    Claimed,
+    Succeeded,
+    Failed,
+    Expired,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MailboxMessage {
+    pub sender_session_id: String,
+    pub recipient_session_id: String,
+    pub request_id: String,
+    pub digest: String,
+    pub payload: Value,
+    pub created_at_ms: u64,
+    pub expires_at_ms: u64,
+    /// The first delivery sequence, stable across ACK and result updates.
+    pub sequence: u64,
+    pub status: MailboxStatus,
+    pub claim_token: Option<String>,
+    pub result: Option<Value>,
+}
+
+impl MailboxMessage {
+    fn digest(&self) -> Result<String, SessionError> {
+        use sha2::{Digest, Sha256};
+        let unsigned = json!({"sender": self.sender_session_id, "recipient": self.recipient_session_id,
+            "request_id": self.request_id, "payload": self.payload, "created_at_ms": self.created_at_ms,
+            "expires_at_ms": self.expires_at_ms, "sequence": self.sequence});
+        Ok(format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&unsigned)?)
+        ))
+    }
+
+    fn validate(&self, recipient: &str) -> Result<(), SessionError> {
+        mailbox_id(&self.sender_session_id)?;
+        mailbox_id(&self.recipient_session_id)?;
+        mailbox_id(&self.request_id)?;
+        validate_mailbox_payload(&self.payload)?;
+        if let Some(result) = &self.result {
+            validate_mailbox_payload(result)?;
+        }
+        if let Some(token) = &self.claim_token {
+            mailbox_id(token)?;
+        }
+        if self.recipient_session_id != recipient
+            || self.sequence == 0
+            || self.expires_at_ms <= self.created_at_ms
+            || self.expires_at_ms - self.created_at_ms > MAX_MAILBOX_TTL_MS
+            || self.digest != self.digest()?
+        {
+            return Err(SessionError::InvalidRecord(
+                "invalid mailbox identity, TTL, sequence, or digest".into(),
+            ));
+        }
+        let valid_state = match self.status {
+            MailboxStatus::Queued | MailboxStatus::Acknowledged => {
+                self.claim_token.is_none() && self.result.is_none()
+            }
+            MailboxStatus::Claimed => self.claim_token.is_some() && self.result.is_none(),
+            MailboxStatus::Succeeded | MailboxStatus::Failed => {
+                self.claim_token.is_some() && self.result.is_some()
+            }
+            MailboxStatus::Expired => false, // Expiration is a clock-derived view, not a new execution receipt.
+        };
+        if !valid_state {
+            return Err(SessionError::InvalidRecord("invalid mailbox state".into()));
+        }
+        Ok(())
+    }
+
+    fn at_time(mut self, now: u64) -> Self {
+        if now >= self.expires_at_ms
+            && !matches!(
+                self.status,
+                MailboxStatus::Succeeded | MailboxStatus::Failed
+            )
+        {
+            self.status = MailboxStatus::Expired;
+        }
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum MailboxAction {
+    Acknowledge,
+    Claim { token: String },
+    Complete { token: String, result: Value },
+    Fail { token: String, error: Value },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MailboxPage {
+    pub messages: Vec<MailboxMessage>,
+    /// Pass this value as `after_sequence` to read the following page.
+    pub next_sequence: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct MailboxRecord {
+    schema_version: u32,
+    sequence: u64,
+    message: MailboxMessage,
+}
+
+/// Private, local, addressed communication with no provider call or daemon.
+/// Every mutation takes the same inode lock, reloads the bounded journal, and
+/// appends one synced transition. A claimed message is never retried implicitly.
+#[derive(Debug)]
+pub struct SessionMailbox {
+    path: PathBuf,
+    recipient_path: PathBuf,
+    recipient_session_id: String,
+    workspace: PathBuf,
+}
+
+impl SessionMailbox {
+    pub fn open(recipient_path: impl AsRef<Path>) -> Result<Self, SessionError> {
+        let recipient_path = recipient_path.as_ref();
+        let recipient = SessionStore::open_existing(recipient_path)?;
+        require_clean_session(&recipient)?;
+        Ok(Self {
+            path: mailbox_path(recipient_path)?,
+            recipient_path: recipient_path.to_owned(),
+            recipient_session_id: recipient.session_id().to_owned(),
+            workspace: fs::canonicalize(&recipient.header.cwd)?,
+        })
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn check_access(&self, actor: &SessionStore, recipient_only: bool) -> Result<(), SessionError> {
+        let expected_actor = actor.session_id();
+        let actor = SessionStore::open_existing(actor.path())?;
+        let recipient = SessionStore::open_existing(&self.recipient_path)?;
+        require_clean_session(&actor)?;
+        require_clean_session(&recipient)?;
+        if actor.session_id() != expected_actor
+            || recipient.session_id() != self.recipient_session_id
+            || fs::canonicalize(&recipient.header.cwd)? != self.workspace
+            || fs::canonicalize(&actor.header.cwd)? != self.workspace
+            || (recipient_only && actor.session_id() != self.recipient_session_id)
+        {
+            return Err(SessionError::InvalidRecord(
+                "mailbox access requires the addressed session in the same workspace".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn enqueue(
+        &self,
+        sender: &SessionStore,
+        request_id: &str,
+        payload: Value,
+        ttl_ms: u64,
+        now: u64,
+    ) -> Result<MailboxMessage, SessionError> {
+        self.check_access(sender, false)?;
+        mailbox_id(request_id)?;
+        validate_mailbox_payload(&payload)?;
+        if ttl_ms == 0 || ttl_ms > MAX_MAILBOX_TTL_MS {
+            return Err(SessionError::InvalidRecord(
+                "mailbox TTL must be positive and at most seven days".into(),
+            ));
+        }
+        if SessionStore::open_existing(&self.recipient_path)?.is_archived() {
+            return Err(SessionError::InvalidRecord(
+                "cannot queue work for an archived session".into(),
+            ));
+        }
+        let mut journal = self.locked(true)?;
+        let (messages, next_sequence) = self.recover(&mut journal.file)?;
+        if let Some(existing) = messages.iter().find(|message| {
+            message.sender_session_id == sender.session_id() && message.request_id == request_id
+        }) {
+            if existing.payload != payload
+                || existing.expires_at_ms - existing.created_at_ms != ttl_ms
+            {
+                return Err(SessionError::InvalidRecord(
+                    "mailbox request ID conflicts with its durable payload or TTL".into(),
+                ));
+            }
+            return Ok(existing.clone().at_time(now));
+        }
+        if messages.len() >= MAX_MAILBOX_MESSAGES {
+            return Err(SessionError::InvalidRecord(
+                "mailbox message limit exceeded".into(),
+            ));
+        }
+        let mut message = MailboxMessage {
+            sender_session_id: sender.session_id().into(),
+            recipient_session_id: self.recipient_session_id.clone(),
+            request_id: request_id.into(),
+            digest: String::new(),
+            payload,
+            created_at_ms: now,
+            expires_at_ms: now
+                .checked_add(ttl_ms)
+                .ok_or_else(|| SessionError::InvalidRecord("mailbox expiry overflow".into()))?,
+            sequence: next_sequence,
+            status: MailboxStatus::Queued,
+            claim_token: None,
+            result: None,
+        };
+        message.digest = message.digest()?;
+        self.append(&mut journal.file, next_sequence, &message)?;
+        Ok(message)
+    }
+
+    pub fn list(
+        &self,
+        recipient: &SessionStore,
+        after_sequence: u64,
+        limit: usize,
+        now: u64,
+    ) -> Result<MailboxPage, SessionError> {
+        self.check_access(recipient, true)?;
+        if limit == 0 || limit > 64 {
+            return Err(SessionError::InvalidRecord(
+                "mailbox page limit must be 1..=64".into(),
+            ));
+        }
+        if !self.path.try_exists()? {
+            return Ok(MailboxPage {
+                messages: Vec::new(),
+                next_sequence: None,
+            });
+        }
+        let mut journal = self.locked(false)?;
+        let (messages, _) = self.recover(&mut journal.file)?;
+        let mut page = Vec::new();
+        let mut bytes = 0;
+        let mut next_sequence = None;
+        for message in messages
+            .into_iter()
+            .filter(|message| message.sequence > after_sequence)
+        {
+            let message = message.at_time(now);
+            let size = serde_json::to_vec(&message)?.len();
+            if page.len() >= limit || bytes + size > 256 * 1024 {
+                next_sequence = page.last().map(|message: &MailboxMessage| message.sequence);
+                break;
+            }
+            bytes += size;
+            page.push(message);
+        }
+        Ok(MailboxPage {
+            messages: page,
+            next_sequence,
+        })
+    }
+
+    pub fn update(
+        &self,
+        recipient: &SessionStore,
+        sender_session_id: &str,
+        request_id: &str,
+        action: MailboxAction,
+        now: u64,
+    ) -> Result<MailboxMessage, SessionError> {
+        self.check_access(recipient, true)?;
+        mailbox_id(sender_session_id)?;
+        mailbox_id(request_id)?;
+        let mut journal = self.locked(false)?;
+        let (messages, next_sequence) = self.recover(&mut journal.file)?;
+        let existing = messages
+            .iter()
+            .find(|message| {
+                message.sender_session_id == sender_session_id && message.request_id == request_id
+            })
+            .ok_or_else(|| SessionError::InvalidRecord("mailbox request not found".into()))?;
+        let mut updated = existing.clone();
+        match action {
+            MailboxAction::Acknowledge => updated.status = MailboxStatus::Acknowledged,
+            MailboxAction::Claim { token } => {
+                mailbox_id(&token)?;
+                updated.status = MailboxStatus::Claimed;
+                updated.claim_token = Some(token);
+            }
+            MailboxAction::Complete { token, result } => {
+                mailbox_id(&token)?;
+                validate_mailbox_payload(&result)?;
+                updated.status = MailboxStatus::Succeeded;
+                updated.claim_token = Some(token);
+                updated.result = Some(result);
+            }
+            MailboxAction::Fail { token, error } => {
+                mailbox_id(&token)?;
+                validate_mailbox_payload(&error)?;
+                updated.status = MailboxStatus::Failed;
+                updated.claim_token = Some(token);
+                updated.result = Some(error);
+            }
+        }
+        if updated == *existing {
+            return Ok(existing.clone().at_time(now));
+        }
+        if existing.clone().at_time(now).status == MailboxStatus::Expired {
+            return Err(SessionError::InvalidRecord(
+                "expired mailbox request cannot be executed or implicitly retried".into(),
+            ));
+        }
+        validate_mailbox_transition(existing, &updated)?;
+        self.append(&mut journal.file, next_sequence, &updated)?;
+        Ok(updated)
+    }
+
+    fn locked(&self, create: bool) -> Result<MailboxLock, SessionError> {
+        reject_session_symlink(&self.path)?;
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(create);
+        #[cfg(unix)]
+        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        let file = options.open(&self.path)?;
+        if !file.metadata()?.is_file() {
+            return Err(SessionError::InvalidRecord(
+                "mailbox is not a regular file".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
+            let metadata = file.metadata()?;
+            if metadata.mode() & 0o077 != 0 || metadata.uid() != unsafe { libc::geteuid() } {
+                return Err(SessionError::InvalidRecord(
+                    "mailbox must be private and owned by the current user".into(),
+                ));
+            }
+            // Nonblocking locks keep the headless and TUI owners responsive.
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+                return Err(io::Error::last_os_error().into());
+            }
+            Ok(MailboxLock { file })
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = file;
+            Err(SessionError::InvalidRecord(
+                "mailbox locking is unsupported on this platform".into(),
+            ))
+        }
+    }
+
+    fn recover(&self, file: &mut File) -> Result<(Vec<MailboxMessage>, u64), SessionError> {
+        if file.metadata()?.len() > MAX_MAILBOX_BYTES as u64 {
+            return Err(SessionError::LimitExceeded {
+                max: MAX_MAILBOX_BYTES,
+                actual: file.metadata()?.len(),
+            });
+        }
+        file.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::new();
+        file.take(MAX_MAILBOX_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_MAILBOX_BYTES {
+            return Err(SessionError::LimitExceeded {
+                max: MAX_MAILBOX_BYTES,
+                actual: bytes.len() as u64,
+            });
+        }
+        if !bytes.is_empty() && !bytes.ends_with(b"\n") {
+            return Err(SessionError::InvalidRecord(
+                "mailbox has an interrupted append; explicit repair required".into(),
+            ));
+        }
+        let mut messages: Vec<MailboxMessage> = Vec::new();
+        let mut next = 1;
+        for line in bytes
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            if line.len() > MAX_SESSION_RECORD_BYTES {
+                return Err(SessionError::InvalidRecord(
+                    "mailbox record limit exceeded".into(),
+                ));
+            }
+            let record: MailboxRecord = serde_json::from_slice(line)?;
+            if record.schema_version != 1 || record.sequence != next {
+                return Err(SessionError::InvalidRecord(
+                    "mailbox schema or sequence gap".into(),
+                ));
+            }
+            record.message.validate(&self.recipient_session_id)?;
+            if let Some(existing) = messages.iter_mut().find(|message| {
+                message.sender_session_id == record.message.sender_session_id
+                    && message.request_id == record.message.request_id
+            }) {
+                validate_mailbox_transition(existing, &record.message)?;
+                *existing = record.message;
+            } else {
+                if messages.len() >= MAX_MAILBOX_MESSAGES
+                    || record.message.status != MailboxStatus::Queued
+                    || record.message.sequence != next
+                {
+                    return Err(SessionError::InvalidRecord(
+                        "mailbox must start with a bounded queued envelope".into(),
+                    ));
+                }
+                messages.push(record.message);
+            }
+            next += 1;
+        }
+        Ok((messages, next))
+    }
+
+    fn append(
+        &self,
+        file: &mut File,
+        sequence: u64,
+        message: &MailboxMessage,
+    ) -> Result<(), SessionError> {
+        message.validate(&self.recipient_session_id)?;
+        let mut encoded = serde_json::to_vec(&MailboxRecord {
+            schema_version: 1,
+            sequence,
+            message: message.clone(),
+        })?;
+        encoded.push(b'\n');
+        if file.metadata()?.len() + encoded.len() as u64 > MAX_MAILBOX_BYTES as u64 {
+            return Err(SessionError::InvalidRecord(
+                "mailbox byte limit exceeded".into(),
+            ));
+        }
+        file.seek(SeekFrom::End(0))?;
+        file.write_all(&encoded)?;
+        file.sync_all()?;
+        Ok(())
+    }
+}
+
+struct MailboxLock {
+    file: File,
+}
+impl Drop for MailboxLock {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        {
+            use std::os::fd::AsRawFd;
+            unsafe {
+                libc::flock(self.file.as_raw_fd(), libc::LOCK_UN);
+            }
+        }
+    }
+}
+
+fn mailbox_path(session_path: &Path) -> Result<PathBuf, SessionError> {
+    let name = session_path.file_name().ok_or(SessionError::EmptyPath)?;
+    let mut name = name.to_os_string();
+    name.push(".mailbox");
+    Ok(session_path.with_file_name(name))
+}
+
+fn mailbox_id(id: &str) -> Result<(), SessionError> {
+    if id.is_empty()
+        || id.len() > 256
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:@-".contains(&byte))
+    {
+        return Err(SessionError::InvalidRecord(
+            "invalid mailbox identifier".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_mailbox_payload(payload: &Value) -> Result<(), SessionError> {
+    if serde_json::to_vec(payload)?.len() > MAX_MAILBOX_PAYLOAD_BYTES {
+        return Err(SessionError::InvalidRecord(
+            "mailbox payload exceeds 64 KiB".into(),
+        ));
+    }
+    if crate::security::redact_json(payload, &[]) != *payload {
+        return Err(SessionError::InvalidRecord(
+            "mailbox payload contains a credential or secret".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_mailbox_transition(
+    previous: &MailboxMessage,
+    next: &MailboxMessage,
+) -> Result<(), SessionError> {
+    use MailboxStatus as Status;
+    let valid = matches!(
+        (previous.status, next.status),
+        (Status::Queued, Status::Acknowledged | Status::Claimed)
+            | (Status::Acknowledged, Status::Claimed)
+            | (Status::Claimed, Status::Succeeded | Status::Failed)
+    );
+    if !valid
+        || previous.digest != next.digest
+        || (previous.claim_token.is_some() && previous.claim_token != next.claim_token)
+    {
+        return Err(SessionError::InvalidRecord(
+            "mailbox transition conflicts with its durable claim or envelope".into(),
+        ));
+    }
+    Ok(())
 }

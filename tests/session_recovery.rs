@@ -11,6 +11,364 @@ use zenpi::{
 };
 
 #[test]
+fn typed_lifecycle_archive_resume_migrate_and_delete_are_restart_safe() {
+    use zenpi::session::{
+        SessionLifecycleReceipt as Receipt, SessionLifecycleRequest as Request,
+        execute_session_lifecycle, session_catalog,
+    };
+    let dir = tempdir().unwrap();
+    let original = dir.path().join("original.jsonl");
+    let mut store = SessionStore::open(&original).unwrap();
+    store
+        .append_turn(Turn::new("u", TurnRole::User, "history"))
+        .unwrap();
+    let source_bytes = fs::read(&original).unwrap();
+    let migrated = dir.path().join("migrated.jsonl");
+    let receipt = execute_session_lifecycle(
+        Request::Migrate {
+            source: original.clone(),
+            destination: migrated.clone(),
+        },
+        None,
+        1,
+    )
+    .unwrap();
+    assert!(matches!(receipt, Receipt::Session { .. }));
+    assert_eq!(fs::read(&original).unwrap(), source_bytes);
+    assert_eq!(fs::read(&migrated).unwrap(), source_bytes);
+    execute_session_lifecycle(
+        Request::Archive {
+            path: migrated.clone(),
+        },
+        None,
+        2,
+    )
+    .unwrap();
+    assert!(
+        SessionStore::open_existing(&migrated)
+            .unwrap()
+            .is_archived()
+    );
+    assert_eq!(session_catalog(dir.path(), false).unwrap().len(), 1);
+    let resumed = execute_session_lifecycle(
+        Request::ResumeLast {
+            directory: dir.path().into(),
+        },
+        None,
+        3,
+    )
+    .unwrap();
+    assert!(
+        matches!(resumed, Receipt::Session { session } if session.summary.path == original.display().to_string())
+    );
+    execute_session_lifecycle(
+        Request::Unarchive {
+            path: migrated.clone(),
+        },
+        None,
+        4,
+    )
+    .unwrap();
+    assert!(
+        !SessionStore::open_existing(&migrated)
+            .unwrap()
+            .is_archived()
+    );
+    assert!(
+        execute_session_lifecycle(
+            Request::Delete {
+                path: migrated.clone(),
+                confirmed: false
+            },
+            None,
+            5
+        )
+        .is_err()
+    );
+    assert!(
+        execute_session_lifecycle(
+            Request::Delete {
+                path: original.clone(),
+                confirmed: true
+            },
+            Some(&original),
+            5
+        )
+        .is_err()
+    );
+    execute_session_lifecycle(
+        Request::Delete {
+            path: migrated.clone(),
+            confirmed: true,
+        },
+        Some(&original),
+        5,
+    )
+    .unwrap();
+    assert!(!migrated.exists());
+    assert_eq!(fs::read(original).unwrap(), source_bytes);
+}
+
+#[test]
+fn fork_remaps_signed_handoffs_and_preserves_order_without_pending_ownership() {
+    use zenpi::b3::HandoffRecord;
+    let dir = tempdir().unwrap();
+    let mut source = SessionStore::open(dir.path().join("source.jsonl")).unwrap();
+    let source_id = source.session_id().to_owned();
+    source.append_event(serde_json::json!({"type":"context", "session_id":source_id, "nested":{"owner_session_id":source_id}})).unwrap();
+    source
+        .append_turn(Turn::new("u", TurnRole::User, "after event"))
+        .unwrap();
+    source
+        .append_handoff_record(
+            HandoffRecord::new(
+                "sender",
+                "receiver",
+                "claim",
+                "handoff",
+                vec![],
+                &source_id,
+                "2026-09-05T00:00:00Z",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    source
+        .begin_operation(&InterruptedOperation {
+            operation_id: "pending".into(),
+            kind: OperationKind::Tool,
+            turn_id: "u".into(),
+            retry_requires_confirmation: true,
+        })
+        .unwrap();
+    let before = fs::read(source.path()).unwrap();
+    let fork_path = dir.path().join("fork.jsonl");
+    let fork = source.fork_to(&fork_path).unwrap();
+    assert_ne!(fork.session_id(), source_id);
+    assert_eq!(fork.records()[1].kind, "event");
+    assert_eq!(fork.records()[2].kind, "turn");
+    assert_eq!(fork.events()[0]["session_id"], fork.session_id());
+    assert_eq!(
+        fork.events()[0]["nested"]["owner_session_id"],
+        fork.session_id()
+    );
+    assert_eq!(fork.handoff_records()[0].session_id, fork.session_id());
+    fork.handoff_records()[0].validate().unwrap();
+    assert!(fork.interrupted_operations().is_empty());
+    let recovered = SessionStore::open_existing(&fork_path).unwrap();
+    assert!(recovered.recovery_warnings().is_empty());
+    assert_eq!(recovered.handoff_records().len(), 1);
+    assert_eq!(fs::read(source.path()).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn addressed_mailbox_deduplicates_and_persists_ack_claim_result() {
+    use zenpi::session::{MailboxAction, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    let payload = serde_json::json!({"instruction":"review patch"});
+    let queued = mailbox
+        .enqueue(&sender, "request-1", payload.clone(), 10_000, 1)
+        .unwrap();
+    let before = fs::read(mailbox.path()).unwrap();
+    assert_eq!(
+        mailbox
+            .enqueue(&sender, "request-1", payload, 10_000, 2)
+            .unwrap(),
+        queued
+    );
+    assert_eq!(fs::read(mailbox.path()).unwrap(), before);
+    assert!(
+        mailbox
+            .enqueue(
+                &sender,
+                "request-1",
+                serde_json::json!("different"),
+                10_000,
+                2
+            )
+            .is_err()
+    );
+    assert!(mailbox.list(&sender, 0, 10, 2).is_err());
+    let acked = mailbox
+        .update(
+            &recipient,
+            sender.session_id(),
+            "request-1",
+            MailboxAction::Acknowledge,
+            2,
+        )
+        .unwrap();
+    assert_eq!(acked.status, MailboxStatus::Acknowledged);
+    let claimed = mailbox
+        .update(
+            &recipient,
+            sender.session_id(),
+            "request-1",
+            MailboxAction::Claim {
+                token: "owner-1".into(),
+            },
+            3,
+        )
+        .unwrap();
+    assert_eq!(claimed.status, MailboxStatus::Claimed);
+    assert!(
+        mailbox
+            .update(
+                &recipient,
+                sender.session_id(),
+                "request-1",
+                MailboxAction::Claim {
+                    token: "owner-2".into()
+                },
+                4
+            )
+            .is_err()
+    );
+    let action = MailboxAction::Complete {
+        token: "owner-1".into(),
+        result: serde_json::json!({"review":"done"}),
+    };
+    mailbox
+        .update(
+            &recipient,
+            sender.session_id(),
+            "request-1",
+            action.clone(),
+            5,
+        )
+        .unwrap();
+    let before = fs::read(mailbox.path()).unwrap();
+    let reopened = SessionMailbox::open(recipient.path()).unwrap();
+    reopened
+        .update(&recipient, sender.session_id(), "request-1", action, 6)
+        .unwrap();
+    assert_eq!(fs::read(mailbox.path()).unwrap(), before);
+    let page = reopened.list(&recipient, 0, 10, 20_000).unwrap();
+    assert_eq!(page.messages.len(), 1);
+    assert_eq!(page.messages[0].status, MailboxStatus::Succeeded);
+    assert_eq!(page.messages[0].sequence, queued.sequence);
+    assert!(sender.turns().is_empty());
+    assert!(recipient.turns().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn mailbox_ttl_pagination_secrets_and_archive_fail_closed() {
+    use zenpi::session::{MailboxAction, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let mut recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    assert!(
+        mailbox
+            .enqueue(
+                &sender,
+                "secret",
+                serde_json::json!({"api_key":"private"}),
+                100,
+                1
+            )
+            .is_err()
+    );
+    assert!(
+        mailbox
+            .enqueue(&sender, "expired", serde_json::json!("x"), 0, 1)
+            .is_err()
+    );
+    for i in 0..3 {
+        mailbox
+            .enqueue(&sender, &format!("r-{i}"), serde_json::json!(i), 100, 1)
+            .unwrap();
+    }
+    let page = mailbox.list(&recipient, 0, 2, 2).unwrap();
+    assert_eq!(page.messages.len(), 2);
+    let next = mailbox
+        .list(&recipient, page.next_sequence.unwrap(), 2, 2)
+        .unwrap();
+    assert_eq!(next.messages.len(), 1);
+    assert!(next.next_sequence.is_none());
+    assert!(
+        mailbox
+            .update(
+                &recipient,
+                sender.session_id(),
+                "r-0",
+                MailboxAction::Claim {
+                    token: "owner".into()
+                },
+                101
+            )
+            .is_err()
+    );
+    assert!(
+        mailbox
+            .list(&recipient, 0, 3, 101)
+            .unwrap()
+            .messages
+            .iter()
+            .all(|message| message.status == MailboxStatus::Expired)
+    );
+    recipient.set_archived(true).unwrap();
+    assert!(
+        mailbox
+            .enqueue(&sender, "r-4", serde_json::json!(4), 100, 2)
+            .is_err()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn mailbox_lock_torn_tail_and_cross_workspace_access_are_rejected() {
+    use std::os::fd::AsRawFd;
+    use zenpi::session::SessionMailbox;
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    mailbox
+        .enqueue(&sender, "r", serde_json::json!("work"), 100, 1)
+        .unwrap();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(mailbox.path())
+        .unwrap();
+    assert_eq!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+        0
+    );
+    assert!(
+        mailbox
+            .enqueue(&sender, "r-2", serde_json::json!("work"), 100, 1)
+            .is_err()
+    );
+    assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_UN) }, 0);
+    let mut bytes = fs::read(mailbox.path()).unwrap();
+    bytes.extend_from_slice(b"{\"sequence\":");
+    fs::write(mailbox.path(), &bytes).unwrap();
+    assert!(
+        mailbox
+            .enqueue(&sender, "r-2", serde_json::json!("work"), 100, 1)
+            .is_err()
+    );
+    assert_eq!(fs::read(mailbox.path()).unwrap(), bytes);
+    let other = tempdir().unwrap();
+    let text = fs::read_to_string(sender.path()).unwrap();
+    let mut header: serde_json::Value = serde_json::from_str(text.trim()).unwrap();
+    header["cwd"] = serde_json::json!(other.path());
+    fs::write(sender.path(), format!("{header}\n")).unwrap();
+    assert!(
+        mailbox
+            .enqueue(&sender, "r-3", serde_json::json!("work"), 100, 1)
+            .is_err()
+    );
+}
+
+#[test]
 fn malformed_prefix_is_warned_and_append_remains_recoverable() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("recovery.jsonl");
