@@ -6,6 +6,7 @@
 //! to callers instead of hiding them behind booleans.
 
 use std::{
+    collections::{BTreeMap, BTreeSet},
     env,
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
@@ -32,6 +33,94 @@ use crate::{
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Host-supplied correlation, not an approval grant. The tool prohibition
+/// owner must enforce the referenced policy before enabling worker all-allow.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkerExecutionBinding {
+    pub blueprint_id: String,
+    pub blueprint_sha256: String,
+    pub goal_id: String,
+    pub item_id: String,
+    pub lease_id: String,
+    pub policy_digest: String,
+    pub expires_at_ms: u64,
+}
+
+impl WorkerExecutionBinding {
+    pub fn validate(&self) -> Result<(), AgentError> {
+        for value in [
+            &self.blueprint_id,
+            &self.goal_id,
+            &self.item_id,
+            &self.lease_id,
+        ] {
+            if value.trim().is_empty()
+                || value.len() > MAX_ID_BYTES
+                || value.chars().any(char::is_control)
+            {
+                return Err(AgentError::InvalidTurn("invalid worker binding ID".into()));
+            }
+        }
+        for value in [&self.blueprint_sha256, &self.policy_digest] {
+            if value.len() != 64
+                || !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            {
+                return Err(AgentError::InvalidTurn(
+                    "invalid worker binding digest".into(),
+                ));
+            }
+        }
+        if self.expires_at_ms <= unix_time_ms() {
+            return Err(AgentError::InvalidTurn("worker lease has expired".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UnknownToolOutcome {
+    pub operation_id: String,
+    pub turn_id: String,
+    pub call_id: String,
+    pub tool: String,
+    pub policy_digest: String,
+    pub worker_binding: Option<WorkerExecutionBinding>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolRecoveryDecision {
+    Retry,
+    Abandon,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ToolExecutionEvidence {
+    origin: &'static str,
+    policy_digest: String,
+    approval_policy_digest: String,
+    worker_binding: Option<WorkerExecutionBinding>,
+    prohibition_gate_enforced: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum ToolInvocationOutcome {
+    Succeeded,
+    Failed,
+    Denied,
+    Cancelled,
+    UnknownOutcome,
+}
+
+struct ToolInvocation {
+    result: crate::tools::ToolResult,
+    outcome: ToolInvocationOutcome,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -320,6 +409,7 @@ struct ToolRuntime {
     policy: SideEffectPolicy,
     approval: ApprovalCoordinator,
     approval_policy: ApprovalPolicy,
+    worker_binding: Option<WorkerExecutionBinding>,
 }
 
 impl std::fmt::Debug for Agent {
@@ -468,6 +558,7 @@ impl Agent {
             policy,
             approval: ApprovalCoordinator::new(),
             approval_policy: ApprovalPolicy::default(),
+            worker_binding: None,
         });
     }
 
@@ -481,6 +572,7 @@ impl Agent {
                 policy: SideEffectPolicy::read_only(),
                 approval: ApprovalCoordinator::new(),
                 approval_policy: ApprovalPolicy::default(),
+                worker_binding: None,
             });
         }
     }
@@ -545,6 +637,122 @@ impl Agent {
 
     pub fn approval_coordinator(&self) -> Option<ApprovalCoordinator> {
         self.tools.as_ref().map(|runtime| runtime.approval.clone())
+    }
+
+    /// Bind subsequent calls to one lease without granting capabilities or
+    /// changing interactive approval. The binding cannot change mid-turn.
+    pub fn set_worker_execution_binding(
+        &mut self,
+        binding: Option<WorkerExecutionBinding>,
+    ) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        if let Some(binding) = &binding {
+            binding.validate()?;
+        }
+        let runtime = self.tools.as_mut().ok_or_else(|| {
+            AgentError::InvalidTurn("worker binding requires a configured tool runtime".into())
+        })?;
+        runtime.worker_binding = binding;
+        Ok(())
+    }
+
+    /// A durable dispatch without a known result is not proof of failure or
+    /// success. In particular, acknowledging generic recovery never clears
+    /// this gate and cannot authorize a second side effect.
+    pub fn unknown_tool_outcomes(&self) -> Vec<UnknownToolOutcome> {
+        let mut pending = BTreeMap::<String, UnknownToolOutcome>::new();
+        for event in self.session.events() {
+            let Some(operation_id) = event.get("operation_id").and_then(Value::as_str) else {
+                continue;
+            };
+            match event.get("type").and_then(Value::as_str) {
+                Some("tool_execution_started" | "tool_unknown_outcome") => {
+                    if let Ok(outcome) = serde_json::from_value::<UnknownToolOutcome>(event.clone())
+                    {
+                        pending.insert(operation_id.to_owned(), outcome);
+                    }
+                }
+                Some("tool_execution_finished")
+                    if event.get("outcome").and_then(Value::as_str) != Some("unknown_outcome") =>
+                {
+                    pending.remove(operation_id);
+                }
+                Some("tool_recovery_decided") => {
+                    pending.remove(operation_id);
+                }
+                _ => {}
+            }
+        }
+        pending.into_values().collect()
+    }
+
+    /// Record an explicit host decision; `retry` permits a future user turn
+    /// but never reexecutes the call here or marks an external task complete.
+    pub fn resolve_tool_outcome(
+        &mut self,
+        operation_id: &str,
+        decision: ToolRecoveryDecision,
+    ) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let pending = self
+            .unknown_tool_outcomes()
+            .into_iter()
+            .find(|pending| pending.operation_id == operation_id)
+            .ok_or_else(|| AgentError::Recovery("unknown tool operation is not pending".into()))?;
+        // A crash before result persistence leaves an unmatched assistant
+        // call. Supply a truthful error, never an invented successful output.
+        if !self.session.turns().iter().any(|turn| {
+            turn.role == TurnRole::Tool
+                && turn
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.get("operation_id"))
+                    .and_then(Value::as_str)
+                    == Some(operation_id)
+        }) {
+            let result = tool_failure(
+                &crate::tools::ToolCall {
+                    id: pending.call_id.clone(),
+                    name: pending.tool.clone(),
+                    arguments: serde_json::json!({}),
+                },
+                crate::tools::ToolErrorCode::Internal,
+                "unknown_outcome: prior execution has no durable result; no automatic retry",
+                ToolInvocationOutcome::UnknownOutcome,
+            );
+            let mut turn = Turn::with_parent(
+                next_id("tool"),
+                &pending.turn_id,
+                TurnRole::Tool,
+                serde_json::to_string(&result.result)
+                    .map_err(|error| AgentError::Recovery(error.to_string()))?,
+            );
+            turn.metadata = Some(serde_json::json!({
+                "operation_id": operation_id,
+                "tool_call_id": pending.call_id,
+                "tool_name": pending.tool,
+                "policy_digest": pending.policy_digest,
+                "worker_binding": pending.worker_binding,
+                "outcome": "unknown_outcome",
+            }));
+            self.session.append_turn(turn)?;
+        }
+        self.session.append_event(serde_json::json!({
+            "type": "tool_recovery_decided",
+            "operation_id": operation_id,
+            "call_id": pending.call_id,
+            "policy_digest": pending.policy_digest,
+            "worker_binding": pending.worker_binding,
+            "decision": decision,
+            "execution_started": false,
+        }))?;
+        self.session
+            .finish_operation(operation_id, crate::session::OperationOutcome::Interrupted)?;
+        Ok(())
     }
 
     /// Resolve one pending tool approval and durably record the accepted host
@@ -728,6 +936,11 @@ impl Agent {
     pub fn submit(&mut self, request: TurnInputRequest) -> Result<TurnSubmission, AgentError> {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
+        }
+        if self.phase == AgentPhase::Idle && !self.unknown_tool_outcomes().is_empty() {
+            return Err(AgentError::Recovery(
+                "unknown_outcome requires explicit retry or abandon before a new turn".into(),
+            ));
         }
         if request.message.trim().is_empty() {
             let submission = TurnSubmission::NotSubmitted {
@@ -1111,8 +1324,6 @@ impl Agent {
                 } else {
                     crate::session::OperationOutcome::Failed
                 };
-                self.session
-                    .finish_operation(&provider_operation.operation_id, outcome)?;
                 self.last_error = Some(error.to_string());
                 self.phase = AgentPhase::Idle;
                 self.active_turn_id = None;
@@ -1120,6 +1331,8 @@ impl Agent {
                 self.events.push(AgentEvent::Error {
                     message: error.to_string(),
                 });
+                self.session
+                    .finish_operation(&provider_operation.operation_id, outcome)?;
                 return Err(error);
             }
         };
@@ -1292,7 +1505,7 @@ impl Agent {
                         provider_sink(event)?;
                         Ok(())
                     });
-            let completion = completion.map_err(AgentError::from)?;
+            let mut completion = completion.map_err(AgentError::from)?;
             if let Some(usage) = completion.usage
                 && let Some(governance) = self.governance.as_mut()
             {
@@ -1307,22 +1520,29 @@ impl Agent {
             if is_cancelled() {
                 return Err(BackendError::Cancelled.into());
             }
+            if let Some(refusal) = &completion.refusal {
+                // A refusal is terminal even if a malformed/custom backend
+                // bundles function calls with it.
+                completion.tool_calls.clear();
+                if completion.content.trim().is_empty() {
+                    completion.content = refusal.clone();
+                }
+                return Ok(completion);
+            }
             if completion.tool_calls.is_empty() {
                 return Ok(completion);
             }
             if iteration == max_iterations {
                 return Err(AgentError::ToolLoopLimit(max_iterations));
             }
-            let Some(runtime) = self.tools.as_mut() else {
+            if self.tools.is_none() {
                 return Err(AgentError::InvalidTurn(
                     "provider requested tools but no tool registry is configured".into(),
                 ));
-            };
+            }
             let calls = completion.tool_calls;
-            // Preserve the provider's assistant function-call message in the
-            // journal. Responses and Chat Completions both require that
-            // message to precede their corresponding tool outputs when a
-            // continuation request is issued.
+            validate_provider_calls(&calls, self.session.turns(), turn_id)?;
+            let evidence = self.tool_execution_evidence()?;
             let call_metadata = calls
                 .iter()
                 .map(|call| {
@@ -1330,427 +1550,421 @@ impl Agent {
                         "id": call.id,
                         "name": call.name,
                         "arguments": call.arguments,
+                        "execution": evidence,
+                        "policy_digest": evidence.policy_digest,
+                        "worker_binding": evidence.worker_binding,
                     })
                 })
                 .collect::<Vec<_>>();
             let mut assistant_call = Turn::with_parent(
                 next_id("assistant-tool-call"),
-                turn_id.to_owned(),
+                turn_id,
                 TurnRole::Assistant,
                 String::new(),
             );
             assistant_call.metadata = Some(serde_json::json!({ "tool_calls": call_metadata }));
             self.session.append_turn(assistant_call)?;
+            let mut stop = None;
             for call in calls {
-                if is_cancelled() {
-                    return Err(BackendError::Cancelled.into());
-                }
                 self.events.push(AgentEvent::ToolCall {
                     turn_id: turn_id.to_owned(),
                     call_id: call.id.clone(),
                     tool: call.name.clone(),
                 });
-                let tool_operation_id = format!("tool-{}", call.id);
+                let operation_id = tool_operation_id(turn_id, &call.id);
                 self.session
                     .begin_operation(&crate::session::InterruptedOperation {
-                        operation_id: tool_operation_id.clone(),
+                        operation_id: operation_id.clone(),
                         kind: crate::session::OperationKind::Tool,
                         turn_id: turn_id.to_owned(),
                         retry_requires_confirmation: true,
                     })?;
-                let definition = runtime.registry.definition(&call.name).cloned();
-                if let Some(governance) = self.governance.as_mut()
-                    && matches!(
-                        definition.as_ref().map(|definition| definition.side_effect),
-                        Some(crate::tools::ToolSideEffect::CommandExecution)
-                    )
-                {
-                    governance
-                        .charge(crate::governance::ResourceKind::Processes, 1)
-                        .map_err(|error| AgentError::Governance(error.to_string()))?;
-                }
-                if !self.skills.tool_allowed(&call.name) {
-                    let result = crate::tools::ToolResult::Error {
-                        call_id: call.id.clone(),
-                        tool: call.name.clone(),
-                        error: crate::tools::ToolFailure {
-                            code: crate::tools::ToolErrorCode::PolicyDenied,
-                            message: "tool denied by skill policy".into(),
-                        },
-                    };
-                    let serialized = serde_json::to_string(&result).map_err(|error| {
-                        AgentError::InvalidTurn(format!(
-                            "tool result serialization failed: {error}"
-                        ))
-                    })?;
-                    let mut tool_turn = Turn::with_parent(
-                        next_id("tool"),
-                        turn_id.to_owned(),
-                        TurnRole::Tool,
-                        serialized,
-                    );
-                    tool_turn.metadata = Some(serde_json::json!({
-                        "tool_call_id": call.id,
-                        "tool_name": call.name,
-                    }));
-                    self.session.append_turn(tool_turn)?;
-                    self.session.finish_operation(
-                        &tool_operation_id,
-                        crate::session::OperationOutcome::Failed,
-                    )?;
-                    self.events.push(AgentEvent::ToolResult {
-                        turn_id: turn_id.to_owned(),
-                        call_id: call.id,
-                        success: false,
-                    });
-                    continue;
-                }
-                let approval = definition.as_ref().and_then(|definition| {
-                    if runtime.policy.allows(definition.side_effect) {
-                        runtime
-                            .approval_policy
-                            .decide(definition.side_effect, &call.name)
-                    } else {
-                        Some(ApprovalDecision::Deny)
-                    }
-                });
-                let waited_for_approval = approval.is_none();
-                let mut approved_preview = None;
-                if approval == Some(ApprovalDecision::Deny) {
-                    let result = crate::tools::ToolResult::Error {
-                        call_id: call.id.clone(),
-                        tool: call.name.clone(),
-                        error: crate::tools::ToolFailure {
-                            code: crate::tools::ToolErrorCode::PolicyDenied,
-                            message: "tool approval denied".into(),
-                        },
-                    };
-                    let serialized = serde_json::to_string(&result).map_err(|error| {
-                        AgentError::InvalidTurn(format!(
-                            "tool result serialization failed: {error}"
-                        ))
-                    })?;
-                    let mut tool_turn = Turn::with_parent(
-                        next_id("tool"),
-                        turn_id.to_owned(),
-                        TurnRole::Tool,
-                        serialized,
-                    );
-                    tool_turn.metadata = Some(serde_json::json!({
-                        "tool_call_id": call.id,
-                        "tool_name": call.name,
-                    }));
-                    self.session.append_turn(tool_turn)?;
-                    self.events.push(AgentEvent::ToolResult {
-                        turn_id: turn_id.to_owned(),
-                        call_id: call.id,
-                        success: false,
-                    });
-                    self.session.finish_operation(
-                        &tool_operation_id,
-                        crate::session::OperationOutcome::Failed,
-                    )?;
-                    continue;
-                }
-                if approval.is_none() {
-                    let preview = match runtime.registry.approval_preview(&runtime.context, &call) {
-                        Ok(preview) => preview,
-                        Err(error) => {
-                            let result = crate::tools::ToolResult::Error {
-                                call_id: call.id.clone(),
-                                tool: call.name.clone(),
-                                error: crate::tools::ToolFailure {
-                                    code: error.code(),
-                                    message: format!("tool preview failed: {error}"),
-                                },
-                            };
-                            let serialized = serde_json::to_string(&result).map_err(|error| {
-                                AgentError::InvalidTurn(format!(
-                                    "tool result serialization failed: {error}"
-                                ))
-                            })?;
-                            let mut tool_turn = Turn::with_parent(
-                                next_id("tool"),
-                                turn_id.to_owned(),
-                                TurnRole::Tool,
-                                serialized,
-                            );
-                            tool_turn.metadata = Some(serde_json::json!({
-                                "tool_call_id": call.id,
-                                "tool_name": call.name,
-                                "preview_failed": true,
-                            }));
-                            self.session.append_turn(tool_turn)?;
-                            self.events.push(AgentEvent::ToolResult {
-                                turn_id: turn_id.to_owned(),
-                                call_id: call.id,
-                                success: false,
-                            });
-                            self.session.finish_operation(
-                                &tool_operation_id,
-                                crate::session::OperationOutcome::Failed,
-                            )?;
-                            continue;
-                        }
-                    };
-                    let preview_for_execution = preview.clone();
-                    let approval_request = ApprovalRequest {
-                        request_id: format!("approval-{}", call.id),
-                        turn_id: turn_id.to_owned(),
-                        call_id: call.id.clone(),
-                        tool: call.name.clone(),
-                        side_effect: definition
-                            .as_ref()
-                            .map(|item| item.side_effect)
-                            .unwrap_or(crate::tools::ToolSideEffect::ReadOnly),
-                        arguments: call.arguments.clone(),
-                        preview,
-                    };
-                    let coordinator = runtime.approval.clone();
-                    let response = coordinator.request_response(
-                        approval_request,
-                        &mut runtime.approval_policy,
-                        is_cancelled,
-                    );
-                    if response.is_ok() {
-                        let approval_id = format!("approval-{}", call.id);
-                        coordinator
-                            .persist_accepted(&approval_id, |accepted| {
-                                self.session.append_event(serde_json::json!({
-                                    "type": "approval_resolved",
-                                    "request_id": accepted.request.request_id,
-                                    "turn_id": accepted.request.turn_id,
-                                    "call_id": accepted.request.call_id,
-                                    "tool": accepted.request.tool,
-                                    "side_effect": accepted.request.side_effect,
-                                    "preview": accepted.request.preview.as_ref().map(|preview| {
-                                        let (path, changed, truncated, before_bytes, after_bytes, source_sha256) =
-                                            match preview {
-                                                crate::tools::ToolPreview::Diff {
-                                                    path,
-                                                    changed,
-                                                    truncated,
-                                                    before_bytes,
-                                                    after_bytes,
-                                                    source_sha256,
-                                                    ..
-                                                } => (
-                                                    path,
-                                                    changed,
-                                                    truncated,
-                                                    before_bytes,
-                                                    after_bytes,
-                                                    source_sha256,
-                                                ),
-                                            };
-                                        serde_json::json!({
-                                            "kind": "diff",
-                                            "path": path,
-                                            "changed": changed,
-                                            "truncated": truncated,
-                                            "before_bytes": before_bytes,
-                                            "after_bytes": after_bytes,
-                                            "source_sha256": source_sha256,
-                                        })
-                                    }),
-                                    "decision": accepted.response.decision,
-                                    "remember": accepted.response.remember,
-                                }))
-                            })
-                            .map_err(|error| match error {
-                                crate::approval::PersistApprovalError::Approval(error) => {
-                                    AgentError::Approval(error)
-                                }
-                                crate::approval::PersistApprovalError::Persistence(error) => {
-                                    AgentError::Session(error)
-                                }
-                            })?;
-                    }
-                    match response {
-                        Ok(response) => {
-                            approved_preview = preview_for_execution;
-                            // The host writes `approval_resolved` before waking
-                            // this worker.  Record consumption as a second
-                            // durable boundary before entering any side effect.
-                            self.session.append_event(serde_json::json!({
-                                "type": "approval_consumed",
-                                "request_id": response.request_id,
-                                "turn_id": turn_id,
-                                "call_id": call.id,
-                                "tool": call.name,
-                                "decision": response.decision,
-                                "remember": response.remember,
-                            }))?;
-                            if response.decision == ApprovalDecision::Deny {
-                                let result = crate::tools::ToolResult::Error {
-                                    call_id: call.id.clone(),
-                                    tool: call.name.clone(),
-                                    error: crate::tools::ToolFailure {
-                                        code: crate::tools::ToolErrorCode::PolicyDenied,
-                                        message: "tool approval denied or cancelled".into(),
-                                    },
-                                };
-                                let serialized =
-                                    serde_json::to_string(&result).map_err(|error| {
-                                        AgentError::InvalidTurn(format!(
-                                            "tool result serialization failed: {error}"
-                                        ))
-                                    })?;
-                                let mut tool_turn = Turn::with_parent(
-                                    next_id("tool"),
-                                    turn_id.to_owned(),
-                                    TurnRole::Tool,
-                                    serialized,
-                                );
-                                tool_turn.metadata = Some(serde_json::json!({
-                                    "tool_call_id": call.id,
-                                    "tool_name": call.name,
-                                }));
-                                self.session.append_turn(tool_turn)?;
-                                self.events.push(AgentEvent::ToolResult {
-                                    turn_id: turn_id.to_owned(),
-                                    call_id: call.id,
-                                    success: false,
-                                });
-                                self.session.finish_operation(
-                                    &tool_operation_id,
-                                    crate::session::OperationOutcome::Failed,
-                                )?;
-                                continue;
-                            }
-                        }
-                        Err(_) => {
-                            // A denied/cancelled approval is represented as a
-                            // normal bounded tool result so the provider can
-                            // explain it without executing the side effect.
-                            let result = crate::tools::ToolResult::Error {
-                                call_id: call.id.clone(),
-                                tool: call.name.clone(),
-                                error: crate::tools::ToolFailure {
-                                    code: crate::tools::ToolErrorCode::PolicyDenied,
-                                    message: "tool approval denied or cancelled".into(),
-                                },
-                            };
-                            let serialized = serde_json::to_string(&result).map_err(|error| {
-                                AgentError::InvalidTurn(format!(
-                                    "tool result serialization failed: {error}"
-                                ))
-                            })?;
-                            let mut tool_turn = Turn::with_parent(
-                                next_id("tool"),
-                                turn_id.to_owned(),
-                                TurnRole::Tool,
-                                serialized,
-                            );
-                            tool_turn.metadata = Some(serde_json::json!({
-                                "tool_call_id": call.id,
-                                "tool_name": call.name,
-                            }));
-                            self.session.append_turn(tool_turn)?;
-                            self.events.push(AgentEvent::ToolResult {
-                                turn_id: turn_id.to_owned(),
-                                call_id: call.id,
-                                success: false,
-                            });
-                            self.session.finish_operation(
-                                &tool_operation_id,
-                                crate::session::OperationOutcome::Failed,
-                            )?;
-                            continue;
-                        }
-                    }
-                }
-                let result = if call.name == "run_command"
-                    && runtime
-                        .policy
-                        .allows(crate::tools::ToolSideEffect::CommandExecution)
-                {
-                    match call.arguments.as_object() {
-                        Some(arguments) => match crate::tools::RunCommandTool::invoke_with_cancel(
-                            &runtime.context,
-                            arguments,
-                            is_cancelled,
-                        ) {
-                            Ok(output) => crate::tools::ToolResult::Success {
-                                call_id: call.id.clone(),
-                                tool: call.name.clone(),
-                                output,
-                            },
-                            Err(error) => crate::tools::ToolResult::Error {
-                                call_id: call.id.clone(),
-                                tool: call.name.clone(),
-                                error: crate::tools::ToolFailure {
-                                    code: error.code(),
-                                    message: error.to_string(),
-                                },
-                            },
-                        },
-                        None => runtime.registry.execute_compact(
-                            &runtime.context,
-                            runtime.policy,
-                            call.clone(),
-                        ),
-                    }
-                } else if waited_for_approval {
-                    runtime.registry.execute_approved(
-                        &runtime.context,
-                        runtime.policy,
-                        call.clone(),
-                        approved_preview.as_ref(),
+                let invocation = if stop.is_some() || is_cancelled() {
+                    tool_failure(
+                        &call,
+                        crate::tools::ToolErrorCode::Cancelled,
+                        "call was not executed because the turn stopped",
+                        ToolInvocationOutcome::Cancelled,
                     )
                 } else {
-                    runtime
-                        .registry
-                        .execute_compact(&runtime.context, runtime.policy, call.clone())
-                };
-                let result = crate::tools::compact_tool_result(&runtime.context, result)?;
-                if matches!(
-                    &result,
-                    crate::tools::ToolResult::Error {
-                        error: crate::tools::ToolFailure {
-                            code: crate::tools::ToolErrorCode::Cancelled,
-                            ..
-                        },
-                        ..
+                    match self.invoke_tool(turn_id, &call, &operation_id, &evidence, is_cancelled) {
+                        Ok(invocation) => invocation,
+                        Err(error) => {
+                            // No handler is entered on these pre-dispatch errors.
+                            let result = tool_failure(
+                                &call,
+                                crate::tools::ToolErrorCode::Internal,
+                                &error.to_string(),
+                                ToolInvocationOutcome::Failed,
+                            );
+                            stop = Some(error);
+                            result
+                        }
                     }
-                ) {
-                    self.session.finish_operation(
-                        &tool_operation_id,
-                        crate::session::OperationOutcome::Cancelled,
-                    )?;
-                    return Err(BackendError::Cancelled.into());
-                }
-                let success = result.is_success();
-                let serialized = serde_json::to_string(&result).map_err(|error| {
-                    AgentError::InvalidTurn(format!("tool result serialization failed: {error}"))
-                })?;
-                let mut tool_turn = Turn::with_parent(
-                    next_id("tool"),
-                    turn_id.to_owned(),
-                    TurnRole::Tool,
-                    serialized,
-                );
-                tool_turn.metadata = Some(serde_json::json!({
-                    "tool_call_id": call.id,
-                    "tool_name": call.name,
-                }));
-                self.session.append_turn(tool_turn)?;
-                self.events.push(AgentEvent::ToolResult {
-                    turn_id: turn_id.to_owned(),
-                    call_id: call.id,
-                    success,
-                });
-                self.session.finish_operation(
-                    &tool_operation_id,
-                    if success {
-                        crate::session::OperationOutcome::Succeeded
-                    } else {
-                        crate::session::OperationOutcome::Failed
-                    },
+                };
+                self.persist_tool_invocation(
+                    turn_id,
+                    &call,
+                    &operation_id,
+                    &evidence,
+                    &invocation,
                 )?;
+                match invocation.outcome {
+                    ToolInvocationOutcome::Cancelled if stop.is_none() => {
+                        stop = Some(BackendError::Cancelled.into());
+                    }
+                    ToolInvocationOutcome::UnknownOutcome if stop.is_none() => {
+                        stop = Some(AgentError::Recovery(format!(
+                            "unknown_outcome for {operation_id}; explicit retry or abandon required"
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(error) = stop {
+                return Err(error);
             }
         }
         Err(AgentError::ToolLoopLimit(max_iterations))
+    }
+
+    fn tool_execution_evidence(&self) -> Result<ToolExecutionEvidence, AgentError> {
+        use sha2::{Digest, Sha256};
+        let runtime = self.tools.as_ref().ok_or_else(|| {
+            AgentError::InvalidTurn("tool execution requires a configured registry".into())
+        })?;
+        let snapshot = serde_json::json!({
+            "workspace": runtime.context.workspace_root(),
+            "workspace_writes": runtime.policy.allows(crate::tools::ToolSideEffect::WorkspaceWrite),
+            "command_execution": runtime.policy.allows(crate::tools::ToolSideEffect::CommandExecution),
+            "approval": runtime.approval_policy,
+            "tools": runtime.registry.definitions().into_iter()
+                .filter(|definition| self.skills.tool_allowed(&definition.name)).collect::<Vec<_>>(),
+        });
+        let approval_policy_digest = format!(
+            "{:x}",
+            Sha256::digest(
+                serde_json::to_vec(&snapshot)
+                    .map_err(|error| AgentError::InvalidTurn(error.to_string()))?
+            )
+        );
+        Ok(ToolExecutionEvidence {
+            origin: if runtime.worker_binding.is_some() {
+                "blueprint_worker"
+            } else {
+                "agent_tool"
+            },
+            policy_digest: runtime.worker_binding.as_ref().map_or_else(
+                || approval_policy_digest.clone(),
+                |binding| binding.policy_digest.clone(),
+            ),
+            approval_policy_digest,
+            worker_binding: runtime.worker_binding.clone(),
+            // Correlation is not proof that a prohibition owner ran.
+            prohibition_gate_enforced: false,
+        })
+    }
+
+    fn invoke_tool<F: Fn() -> bool>(
+        &mut self,
+        turn_id: &str,
+        call: &crate::tools::ToolCall,
+        operation_id: &str,
+        evidence: &ToolExecutionEvidence,
+        is_cancelled: &F,
+    ) -> Result<ToolInvocation, AgentError> {
+        use crate::tools::{ToolErrorCode, ToolSideEffect};
+        let runtime = self
+            .tools
+            .as_mut()
+            .expect("registry checked before call admission");
+        let Some(definition) = runtime.registry.definition(&call.name).cloned() else {
+            return Ok(tool_failure(
+                call,
+                ToolErrorCode::UnknownTool,
+                "provider requested an unregistered tool",
+                ToolInvocationOutcome::Denied,
+            ));
+        };
+        if !self.skills.tool_allowed(&call.name) {
+            return Ok(tool_failure(
+                call,
+                ToolErrorCode::PolicyDenied,
+                "tool denied by skill policy",
+                ToolInvocationOutcome::Denied,
+            ));
+        }
+        if let Some(binding) = &runtime.worker_binding {
+            binding.validate()?;
+        }
+        let approval = if runtime.policy.allows(definition.side_effect) {
+            runtime
+                .approval_policy
+                .decide(definition.side_effect, &call.name)
+        } else {
+            Some(ApprovalDecision::Deny)
+        };
+        if approval == Some(ApprovalDecision::Deny) {
+            return Ok(tool_failure(
+                call,
+                ToolErrorCode::PolicyDenied,
+                "tool approval denied",
+                ToolInvocationOutcome::Denied,
+            ));
+        }
+        let mut approved_preview = None;
+        if approval.is_none() {
+            let preview = match runtime.registry.approval_preview(&runtime.context, call) {
+                Ok(preview) => preview,
+                Err(error) => {
+                    return Ok(tool_failure(
+                        call,
+                        error.code(),
+                        &format!("tool preview failed: {error}"),
+                        ToolInvocationOutcome::Failed,
+                    ));
+                }
+            };
+            let request = ApprovalRequest {
+                request_id: format!("approval-{}", call.id),
+                turn_id: turn_id.to_owned(),
+                call_id: call.id.clone(),
+                tool: call.name.clone(),
+                side_effect: definition.side_effect,
+                arguments: call.arguments.clone(),
+                preview: preview.clone(),
+            };
+            let coordinator = runtime.approval.clone();
+            let response = match coordinator.request_response(
+                request,
+                &mut runtime.approval_policy,
+                is_cancelled,
+            ) {
+                Ok(response) => response,
+                Err(ApprovalError::Cancelled) => {
+                    return Ok(tool_failure(
+                        call,
+                        ToolErrorCode::Cancelled,
+                        "approval wait cancelled; tool was not executed",
+                        ToolInvocationOutcome::Cancelled,
+                    ));
+                }
+                Err(error) => return Err(error.into()),
+            };
+            coordinator.persist_accepted(&response.request_id, |accepted| {
+                self.session.append_event(serde_json::json!({
+                    "type": "approval_resolved",
+                    "request_id": accepted.request.request_id,
+                    "turn_id": accepted.request.turn_id,
+                    "call_id": accepted.request.call_id,
+                    "tool": accepted.request.tool,
+                    "side_effect": accepted.request.side_effect,
+                    "preview": accepted.request.preview.as_ref().map(|preview| match preview {
+                        crate::tools::ToolPreview::Diff {
+                            path, changed, truncated, before_bytes, after_bytes, source_sha256, ..
+                        } => serde_json::json!({
+                            "kind": "diff", "path": path, "changed": changed, "truncated": truncated,
+                            "before_bytes": before_bytes, "after_bytes": after_bytes, "source_sha256": source_sha256,
+                        }),
+                    }),
+                    "decision": accepted.response.decision,
+                    "remember": accepted.response.remember,
+                    "execution": evidence,
+                }))
+            }).map_err(|error| match error {
+                crate::approval::PersistApprovalError::Approval(error) => AgentError::Approval(error),
+                crate::approval::PersistApprovalError::Persistence(error) => AgentError::Session(error),
+            })?;
+            self.session.append_event(serde_json::json!({
+                "type": "approval_consumed",
+                "request_id": response.request_id,
+                "turn_id": turn_id,
+                "call_id": call.id,
+                "tool": call.name,
+                "decision": response.decision,
+                "remember": response.remember,
+                "execution": evidence,
+            }))?;
+            if response.decision == ApprovalDecision::Deny {
+                return Ok(tool_failure(
+                    call,
+                    ToolErrorCode::PolicyDenied,
+                    "tool approval denied or cancelled",
+                    ToolInvocationOutcome::Denied,
+                ));
+            }
+            approved_preview = preview;
+        }
+        // Waiting for approval may outlive a lease or a host cancellation.
+        if is_cancelled() {
+            return Ok(tool_failure(
+                call,
+                ToolErrorCode::Cancelled,
+                "cancelled before dispatch",
+                ToolInvocationOutcome::Cancelled,
+            ));
+        }
+        if let Some(binding) = &runtime.worker_binding {
+            binding.validate()?;
+        }
+        if definition.side_effect == ToolSideEffect::CommandExecution
+            && let Some(governance) = self.governance.as_mut()
+        {
+            governance
+                .charge(crate::governance::ResourceKind::Processes, 1)
+                .and_then(|_| governance.persist(&mut self.session))
+                .map_err(|error| AgentError::Governance(error.to_string()))?;
+        }
+        // This marker precedes all handlers and survives a missing result.
+        self.session.append_event(serde_json::json!({
+            "type": "tool_execution_started",
+            "operation_id": operation_id,
+            "turn_id": turn_id,
+            "call_id": call.id,
+            "tool": call.name,
+            "policy_digest": evidence.policy_digest,
+            "worker_binding": evidence.worker_binding,
+            "execution": evidence,
+        }))?;
+        let result = if call.name == "run_command"
+            && definition.side_effect == ToolSideEffect::CommandExecution
+        {
+            match crate::tools::RunCommandTool::invoke_with_cancel(
+                &runtime.context,
+                call.arguments
+                    .as_object()
+                    .expect("validated call arguments"),
+                is_cancelled,
+            ) {
+                Ok(output) => crate::tools::ToolResult::Success {
+                    call_id: call.id.clone(),
+                    tool: call.name.clone(),
+                    output,
+                },
+                Err(error) => {
+                    tool_failure(
+                        call,
+                        error.code(),
+                        &error.to_string(),
+                        ToolInvocationOutcome::Failed,
+                    )
+                    .result
+                }
+            }
+        } else if approval.is_none() {
+            runtime.registry.execute_approved(
+                &runtime.context,
+                runtime.policy,
+                call.clone(),
+                approved_preview.as_ref(),
+            )
+        } else {
+            runtime
+                .registry
+                .execute(&runtime.context, runtime.policy, call.clone())
+        };
+        let result = match crate::tools::compact_tool_result(&runtime.context, result) {
+            Ok(result) => result,
+            Err(error) => {
+                tool_failure(
+                    call,
+                    error.code(),
+                    &format!("result persistence failed: {error}"),
+                    ToolInvocationOutcome::UnknownOutcome,
+                )
+                .result
+            }
+        };
+        let outcome = match &result {
+            crate::tools::ToolResult::Success { .. } => ToolInvocationOutcome::Succeeded,
+            crate::tools::ToolResult::Error { error, .. } => match error.code {
+                ToolErrorCode::Io
+                | ToolErrorCode::Internal
+                | ToolErrorCode::CommandTimeout
+                | ToolErrorCode::Cancelled
+                    if definition.side_effect != ToolSideEffect::ReadOnly =>
+                {
+                    ToolInvocationOutcome::UnknownOutcome
+                }
+                ToolErrorCode::Cancelled => ToolInvocationOutcome::Cancelled,
+                ToolErrorCode::PolicyDenied => ToolInvocationOutcome::Denied,
+                _ => ToolInvocationOutcome::Failed,
+            },
+        };
+        // Compaction errors from a registry must not replace the provider's
+        // stable call identity with the artifact writer's identity.
+        let result = match result {
+            crate::tools::ToolResult::Success { output, .. } => crate::tools::ToolResult::Success {
+                call_id: call.id.clone(),
+                tool: call.name.clone(),
+                output,
+            },
+            crate::tools::ToolResult::Error { error, .. } => crate::tools::ToolResult::Error {
+                call_id: call.id.clone(),
+                tool: call.name.clone(),
+                error,
+            },
+        };
+        Ok(ToolInvocation { result, outcome })
+    }
+
+    fn persist_tool_invocation(
+        &mut self,
+        turn_id: &str,
+        call: &crate::tools::ToolCall,
+        operation_id: &str,
+        evidence: &ToolExecutionEvidence,
+        invocation: &ToolInvocation,
+    ) -> Result<(), AgentError> {
+        let serialized = serde_json::to_string(&invocation.result).map_err(|error| {
+            AgentError::InvalidTurn(format!("tool result serialization failed: {error}"))
+        })?;
+        let mut tool_turn = Turn::with_parent(next_id("tool"), turn_id, TurnRole::Tool, serialized);
+        tool_turn.metadata = Some(serde_json::json!({
+            "tool_call_id": call.id,
+            "tool_name": call.name,
+            "operation_id": operation_id,
+            "policy_digest": evidence.policy_digest,
+            "worker_binding": evidence.worker_binding,
+            "execution": evidence,
+            "outcome": invocation.outcome,
+            "implementation_complete": false,
+        }));
+        if let Err(error) = self.session.append_turn(tool_turn) {
+            // Storage may be unavailable entirely. The already durable
+            // dispatch marker remains the authoritative recovery fallback.
+            let _ = self.session.append_event(serde_json::json!({
+                "type": "tool_unknown_outcome", "operation_id": operation_id,
+                "turn_id": turn_id, "call_id": call.id, "tool": call.name,
+                "policy_digest": evidence.policy_digest, "worker_binding": evidence.worker_binding,
+                "reason": "result_not_durable",
+            }));
+            return Err(error.into());
+        }
+        self.session.append_event(serde_json::json!({
+            "type": "tool_execution_finished",
+            "operation_id": operation_id,
+            "outcome": invocation.outcome,
+            "policy_digest": evidence.policy_digest,
+            "worker_binding": evidence.worker_binding,
+        }))?;
+        self.events.push(AgentEvent::ToolResult {
+            turn_id: turn_id.to_owned(),
+            call_id: call.id.clone(),
+            success: invocation.result.is_success(),
+        });
+        self.session.finish_operation(
+            operation_id,
+            match invocation.outcome {
+                ToolInvocationOutcome::Succeeded => crate::session::OperationOutcome::Succeeded,
+                ToolInvocationOutcome::Cancelled => crate::session::OperationOutcome::Cancelled,
+                ToolInvocationOutcome::UnknownOutcome => {
+                    crate::session::OperationOutcome::Interrupted
+                }
+                _ => crate::session::OperationOutcome::Failed,
+            },
+        )?;
+        Ok(())
     }
 
     /// Rebuild the latest explicit slash checkpoint from the durable journal.
@@ -2719,6 +2933,99 @@ pub fn run() -> Result<(), ZenpiError> {
 
 fn display_option(value: Option<&str>) -> &str {
     value.unwrap_or("<not configured>")
+}
+
+fn tool_failure(
+    call: &crate::tools::ToolCall,
+    code: crate::tools::ToolErrorCode,
+    message: &str,
+    outcome: ToolInvocationOutcome,
+) -> ToolInvocation {
+    let mut message = message.to_owned();
+    if message.len() > 4096 {
+        let mut boundary = 4096;
+        while !message.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        message.truncate(boundary);
+    }
+    ToolInvocation {
+        result: crate::tools::ToolResult::Error {
+            call_id: call.id.clone(),
+            tool: call.name.clone(),
+            error: crate::tools::ToolFailure { code, message },
+        },
+        outcome,
+    }
+}
+
+fn tool_operation_id(turn_id: &str, call_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut digest = Sha256::new();
+    digest.update(turn_id.as_bytes());
+    digest.update([0]);
+    digest.update(call_id.as_bytes());
+    format!("tool-{:x}", digest.finalize())
+}
+
+fn validate_provider_calls(
+    calls: &[crate::tools::ToolCall],
+    history: &[Turn],
+    turn_id: &str,
+) -> Result<(), AgentError> {
+    let invalid = |message: &str| AgentError::InvalidTurn(message.to_owned());
+    if calls.len() > 32 {
+        return Err(invalid("provider tool batch exceeds 32 calls"));
+    }
+    let mut seen = BTreeSet::new();
+    for turn in history
+        .iter()
+        .filter(|turn| turn.parent_id.as_deref() == Some(turn_id))
+    {
+        if let Some(prior) = turn
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("tool_calls"))
+            .and_then(Value::as_array)
+        {
+            for call in prior {
+                if let Some(id) = call.get("id").and_then(Value::as_str) {
+                    seen.insert(id.to_owned());
+                }
+            }
+        }
+    }
+    let mut bytes = 0_usize;
+    for call in calls {
+        for (value, maximum) in [
+            (call.id.as_str(), crate::tools::MAX_TOOL_ID_BYTES),
+            (call.name.as_str(), crate::tools::MAX_TOOL_NAME_BYTES),
+        ] {
+            if value.trim().is_empty()
+                || value.len() > maximum
+                || value.chars().any(char::is_control)
+            {
+                return Err(invalid("provider tool call ID or name is invalid"));
+            }
+        }
+        if !seen.insert(call.id.clone()) {
+            return Err(invalid("provider reused a tool call ID in the same turn"));
+        }
+        if !call.arguments.is_object() {
+            return Err(invalid("provider tool call arguments must be an object"));
+        }
+        let size = serde_json::to_vec(call)
+            .map_err(|error| invalid(&error.to_string()))?
+            .len();
+        if size > crate::tools::MAX_TOOL_CALL_BYTES {
+            return Err(invalid("provider tool call exceeds its byte limit"));
+        }
+        bytes = bytes.saturating_add(size);
+        if bytes > 256 * 1024 {
+            return Err(invalid("provider tool batch exceeds 256 KiB"));
+        }
+    }
+    Ok(())
 }
 
 fn command_source_destination(options: &CliOptions) -> Result<(&str, &str), ZenpiError> {
