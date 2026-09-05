@@ -473,7 +473,11 @@ recovery and Goal completion, and asserts that no provider request occurred.
 This executable evidence supersedes the older shorthand in the V2-205/V2-305
 row text; the remaining gaps listed in those rows are still intentionally open.
 
-The following tests are mandatory evidence, not illustrative examples:
+The installed production smoke now covers `/blueprint run` as well as session
+GC: it persists a valid Blueprint and linked Goal, executes two dependency-
+ordered items across two processes, verifies private receipt recovery and Goal
+completion, and asserts that no provider request occurred. The following tests
+are mandatory evidence, not illustrative examples:
 
 | Experience | Positive proof | Failure/edge proof |
 |---|---|---|
