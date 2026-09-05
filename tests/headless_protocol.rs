@@ -1509,6 +1509,73 @@ fn session_slash_list_and_open_use_real_session_owner_paths() {
 }
 
 #[test]
+fn headless_session_lifecycle_and_queue_slash_commands_use_typed_owner() {
+    let dir = tempdir().unwrap();
+    let active_path = dir.path().join("active.jsonl");
+    let source_path = dir.path().join("source.jsonl");
+    let recipient_path = dir.path().join("recipient.jsonl");
+    let source = SessionStore::open(&source_path).unwrap();
+    let recipient = SessionStore::open(&recipient_path).unwrap();
+    let recipient_id = recipient.session_id().to_owned();
+    drop(source);
+    drop(recipient);
+    let mut agent = Agent::with_echo(SessionStore::open(&active_path).unwrap());
+    let input = [
+        serde_json::json!({
+            "type":"command",
+            "id":"archive",
+            "text":format!("/session archive {} --yes", source_path.display()),
+        }),
+        serde_json::json!({
+            "type":"command",
+            "id":"unarchive",
+            "text":format!("/session unarchive {}", source_path.display()),
+        }),
+        serde_json::json!({
+            "type":"command",
+            "id":"queue",
+            "text":format!(
+                "/session queue {} {} request-1 1000 '{{\"text\":\"hello\"}}'",
+                active_path.display(),
+                recipient_path.display(),
+            ),
+        }),
+        serde_json::json!({"type":"shutdown","id":"shutdown"}),
+    ]
+    .into_iter()
+    .map(|value| serde_json::to_string(&value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n")
+        + "\n";
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.into_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    for id in ["archive", "unarchive", "queue"] {
+        let response = records.iter().find(|record| record["id"] == id).unwrap();
+        assert_eq!(response["success"], true, "{id} should succeed");
+        assert!(
+            !response
+                .to_string()
+                .contains(dir.path().to_string_lossy().as_ref())
+        );
+    }
+    assert_eq!(
+        records
+            .iter()
+            .find(|record| record["id"] == "queue")
+            .unwrap()["data"]["action"],
+        "queue"
+    );
+    let recipient = SessionStore::open_existing(&recipient_path).unwrap();
+    let mailbox = zenpi::session::SessionMailbox::open(&recipient_path).unwrap();
+    let page = mailbox
+        .list(&recipient, 0, 10, zenpi::session::unix_time_ms())
+        .unwrap();
+    assert_eq!(page.messages.len(), 1);
+    assert_eq!(page.messages[0].recipient_session_id, recipient_id);
+}
+
+#[test]
 fn inspection_responses_redact_paths_and_reject_domain_escape() {
     let dir = tempdir().unwrap();
     let session_path = dir.path().join("inspection.jsonl");
