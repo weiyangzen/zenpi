@@ -2145,9 +2145,16 @@ where
                     let value = args.next().ok_or_else(|| {
                         ZenpiError::arguments("--retain-newest requires a number")
                     })?;
-                    options.retain_newest = Some(value.parse().map_err(|_| {
+                    let parsed = value.parse::<usize>().map_err(|_| {
                         ZenpiError::arguments("--retain-newest must be a non-negative integer")
-                    })?);
+                    })?;
+                    if parsed > crate::slash::MAX_SESSION_GC_RETAIN_NEWEST {
+                        return Err(ZenpiError::arguments(format!(
+                            "--retain-newest must be at most {}",
+                            crate::slash::MAX_SESSION_GC_RETAIN_NEWEST
+                        )));
+                    }
+                    options.retain_newest = Some(parsed);
                 }
                 "--older-than-seconds"
                     if matches!(options.command, Some(CliCommand::SessionGc)) =>
@@ -2155,9 +2162,16 @@ where
                     let value = args.next().ok_or_else(|| {
                         ZenpiError::arguments("--older-than-seconds requires a number")
                     })?;
-                    options.older_than_seconds = Some(value.parse().map_err(|_| {
+                    let parsed = value.parse::<u64>().map_err(|_| {
                         ZenpiError::arguments("--older-than-seconds must be a non-negative integer")
-                    })?);
+                    })?;
+                    if parsed > crate::slash::MAX_SESSION_GC_AGE_SECONDS {
+                        return Err(ZenpiError::arguments(format!(
+                            "--older-than-seconds must be at most {}",
+                            crate::slash::MAX_SESSION_GC_AGE_SECONDS
+                        )));
+                    }
+                    options.older_than_seconds = Some(parsed);
                 }
                 value
                     if matches!(

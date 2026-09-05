@@ -115,6 +115,41 @@ fn session_gc_requires_complete_confirmation_and_retention_policy() {
 }
 
 #[test]
+fn session_gc_cli_enforces_bounded_retention_values() {
+    let home = tempdir().unwrap();
+    assert!(
+        !zenpi(home.path())
+            .args([
+                "session",
+                "gc",
+                "--retain-newest",
+                "4097",
+                "--older-than-seconds",
+                "1",
+                "--yes",
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        !zenpi(home.path())
+            .args([
+                "session",
+                "gc",
+                "--retain-newest",
+                "1",
+                "--older-than-seconds",
+                "18446744073709551615",
+                "--yes",
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
+#[test]
 fn session_cli_lists_legacy_default_root_journal() {
     let home = tempdir().unwrap();
     let fallback = home.path().join(".zenpi/session.jsonl");
