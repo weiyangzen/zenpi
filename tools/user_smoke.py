@@ -1561,8 +1561,52 @@ def assert_tui_slash_completion(binary: Path, root: Path) -> None:
         raise AssertionError(f"completed local slash command reached provider: {journal!r}")
 
 
+def assert_tui_signal_cleanup(binary: Path, root: Path) -> None:
+    """OS termination must restore raw mode, cursor, paste, and alternate screen."""
+    for termination_signal in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT):
+        session = root / f"tui-signal-{termination_signal}.jsonl"
+        command = [str(binary), "--mode", "tui", "--backend", "echo", "--session", str(session)]
+        env = isolated_env(root / f"tui-signal-home-{termination_signal}")
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.execve(command[0], command, env)
+        exited = False
+        output = bytearray()
+        try:
+            fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and b"Prompt" not in output:
+                drain_pty(fd, output, 0.05)
+            if b"Prompt" not in output:
+                raise AssertionError(f"signal fixture did not reach prompt: {output!r}")
+            if termios.tcgetattr(fd)[3] & termios.ICANON:
+                raise AssertionError("signal fixture never entered raw mode")
+            os.kill(pid, termination_signal)
+            exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
+            exited = True
+            output.extend(trailing)
+            restored_flags = termios.tcgetattr(fd)[3]
+            for flag in (termios.ICANON, termios.ECHO, termios.ISIG):
+                if not restored_flags & flag:
+                    raise AssertionError(f"signal {termination_signal} left terminal in raw mode")
+            for sequence in (b"\x1b[?1049l", b"\x1b[?2004l", b"\x1b[?25h"):
+                if sequence not in output:
+                    raise AssertionError(f"signal {termination_signal} missing cleanup {sequence!r}")
+            if exit_code != 0:
+                raise AssertionError(f"signal {termination_signal} did not exit gracefully: {output!r}")
+            records = json_lines(session.read_text(encoding="utf-8"))
+            if any(record.get("kind") == "turn" for record in records):
+                raise AssertionError("OS signal created an unexpected model turn")
+        finally:
+            if not exited:
+                terminate_pty_child(pid)
+            os.close(fd)
+
+
 def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
     """Drive the production TUI against a deliberately slow Responses stream."""
+    release_stream = threading.Event()
+
     class SlowHandler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
             length = int(self.headers.get("content-length", "0"))
@@ -1579,7 +1623,7 @@ def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
             self.end_headers()
             self.wfile.write(first)
             self.wfile.flush()
-            time.sleep(0.5)
+            release_stream.wait(timeout=5)
             try:
                 self.wfile.write(tail)
                 self.wfile.flush()
@@ -1621,13 +1665,28 @@ def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
                 output.extend(os.read(fd, 65536))
         if b"streaming" not in strip_ansi(bytes(output)):
             raise AssertionError("TUI did not render a provider delta")
+        # An unfinished draft must remain editable while provider I/O owns
+        # the agent, without becoming a second request or stopping resize.
+        os.write(fd, b"editable draft")
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 22, 90, 0, 0))
+        os.kill(pid, signal.SIGWINCH)
+        deadline = time.monotonic() + 2
+        # Ratatui can skip the unchanged blank cell between these words.
+        draft_pattern = rb"editable\s*draft"
+        while time.monotonic() < deadline and not re.search(draft_pattern, strip_ansi(bytes(output))):
+            drain_pty(fd, output, 0.05)
+        if not re.search(draft_pattern, strip_ansi(bytes(output))):
+            raise AssertionError(f"TUI could not edit during provider streaming: {output!r}")
         os.write(fd, b"\x03")
         time.sleep(0.15)
+        release_stream.set()
+        os.write(fd, b"\x7f" * len(b"editable draft"))
         os.write(fd, b"\x04")
         exit_code, trailing = read_pty_until_exit(pid, fd, time.monotonic() + 10)
         exited = True
         output.extend(trailing)
     finally:
+        release_stream.set()
         if not exited:
             terminate_pty_child(pid)
         os.close(fd)
@@ -1635,6 +1694,14 @@ def assert_tui_interrupt_while_streaming(binary: Path, root: Path) -> None:
         server.server_close()
     if exit_code != 0 or b"\x1b[?1049l" not in output:
         raise AssertionError(f"streaming TUI did not restore terminal: {output!r}")
+    records = json_lines(session.read_text(encoding="utf-8"))
+    user_turns = [
+        record["turn"]
+        for record in records
+        if record.get("kind") == "turn" and record.get("turn", {}).get("role") == "user"
+    ]
+    if len(user_turns) != 1 or user_turns[0].get("content") != "slow request":
+        raise AssertionError(f"concurrent draft became a provider request: {user_turns!r}")
 
 
 def main() -> int:
@@ -1710,11 +1777,12 @@ def main() -> int:
         assert_tui(binary, root)
         assert_tui_multiline_paste(binary, root)
         assert_tui_slash_completion(binary, root)
+        assert_tui_signal_cleanup(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
         "user smoke passed: production install/provider/tool approval/EOF drain/session GC/Blueprint execution, echo fixture, "
         "durable slash/runtime intents, resume, TUI resize/multiline paste/slash completion, streaming interrupt, "
-        "and terminal restoration"
+        "OS signal cleanup, and terminal restoration"
     )
     return 0
 

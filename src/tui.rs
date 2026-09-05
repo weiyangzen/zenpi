@@ -51,6 +51,7 @@ pub const MAX_GANTT_PANE_ROWS: usize = 96;
 /// large deltas, so a count-only mailbox is not a sufficient memory bound.
 pub const MAX_TUI_PROVIDER_EVENTS: usize = 4_096;
 pub const MAX_TUI_PROVIDER_BYTES: usize = 1024 * 1024;
+pub const MAX_SESSION_PANE_RECORDS: usize = 32;
 /// Maximum number of visual rows reserved for the editable prompt.  Longer
 /// prompts remain editable; the input viewport scrolls to keep the cursor
 /// visible instead of growing without bound and starving the transcript.
@@ -111,6 +112,66 @@ enum GanttPaneStatus {
     Refreshing,
     Ready,
     Failed(String),
+}
+
+/// Read-only journal evidence. A journal sequence is not a transport ACK or
+/// a mailbox delivery receipt; those require their own durable owners.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionPaneSnapshot {
+    session_id: String,
+    journal_next_sequence: u64,
+    turn_count: usize,
+    warning_count: usize,
+    timeline: Vec<String>,
+    earlier_records: usize,
+}
+
+impl SessionPaneSnapshot {
+    pub fn from_session(session: &crate::session::SessionStore) -> Self {
+        let records = session.records();
+        let start = records.len().saturating_sub(MAX_SESSION_PANE_RECORDS);
+        let timeline = records[start..]
+            .iter()
+            .map(|record| {
+                // Project envelope identity only. Never expose arbitrary event
+                // payloads, shell output, or credentials in this side pane.
+                let label = match record.kind.as_str() {
+                    "event" => record
+                        .value
+                        .get("event")
+                        .and_then(|value| value.get("type"))
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("event"),
+                    kind => kind,
+                };
+                format!("{} {}", record.sequence, inline_token(label, 64))
+            })
+            .collect();
+        Self {
+            session_id: inline_token(session.session_id(), 128),
+            journal_next_sequence: session.next_sequence(),
+            turn_count: session.turns().len(),
+            warning_count: session.recovery_warnings().len(),
+            timeline,
+            earlier_records: start,
+        }
+    }
+
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
+    pub const fn journal_next_sequence(&self) -> u64 {
+        self.journal_next_sequence
+    }
+
+    pub fn timeline(&self) -> &[String] {
+        &self.timeline
+    }
+
+    pub const fn earlier_records(&self) -> usize {
+        self.earlier_records
+    }
 }
 
 /// Immutable, bounded projection consumed by the Gantt pane. Domain JSONL is
@@ -467,6 +528,7 @@ pub struct TuiState {
     /// happen on a dedicated bounded worker in the production host.
     gantt_snapshot: Option<GanttPaneSnapshot>,
     gantt_status: GanttPaneStatus,
+    session_snapshot: Option<SessionPaneSnapshot>,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -506,6 +568,7 @@ impl TuiState {
             resource_status: ResourcePaneStatus::Idle,
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
+            session_snapshot: None,
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -517,6 +580,20 @@ impl TuiState {
 
     pub fn messages(&self) -> impl Iterator<Item = &TuiMessage> {
         self.messages.iter()
+    }
+
+    pub fn session_snapshot(&self) -> Option<&SessionPaneSnapshot> {
+        self.session_snapshot.as_ref()
+    }
+
+    /// Refresh only from the current session owner, never from provider text.
+    /// This touches at most the last 32 validated envelopes and performs no I/O.
+    pub fn refresh_session_snapshot(&mut self, session: &crate::session::SessionStore) {
+        let snapshot = SessionPaneSnapshot::from_session(session);
+        if self.session_snapshot.as_ref() != Some(&snapshot) {
+            self.session_snapshot = Some(snapshot);
+            self.dirty = true;
+        }
     }
 
     pub fn input(&self) -> &str {
@@ -1851,6 +1928,9 @@ impl TuiState {
         let content = match id {
             PaneId::Gantt => self.gantt_pane_content(),
             PaneId::Resources => self.resource_pane_content(),
+            PaneId::SessionList => self.session_pane_content(),
+            PaneId::ReplayControls => self.replay_pane_content(),
+            PaneId::EventTimeline => self.session_timeline_content(),
             PaneId::GoalConversation
             | PaneId::ProjectConversation
             | PaneId::LearnConversation
@@ -1863,9 +1943,6 @@ impl TuiState {
             | PaneId::Checks
             | PaneId::ApprovalQueue
             | PaneId::Diff
-            | PaneId::SessionList
-            | PaneId::ReplayControls
-            | PaneId::EventTimeline
             | PaneId::Browser
             | PaneId::Terminal => "-".into(),
         };
@@ -1880,6 +1957,40 @@ impl TuiState {
                 .wrap(Wrap { trim: true }),
             area,
         );
+    }
+
+    fn session_pane_content(&self) -> String {
+        match &self.session_snapshot {
+            Some(snapshot) => format!(
+                "Active session\n{}\nTurns {}\nRecovery warnings {}\nMailbox: owner required",
+                snapshot.session_id, snapshot.turn_count, snapshot.warning_count,
+            ),
+            None => "Session unavailable\nMailbox: owner required".into(),
+        }
+    }
+
+    fn replay_pane_content(&self) -> String {
+        match &self.session_snapshot {
+            Some(snapshot) => format!(
+                "Journal next sequence: {}\nTransport ACK: unavailable\nReconnect: owner required",
+                snapshot.journal_next_sequence,
+            ),
+            None => "Journal cursor unavailable\nReconnect: owner required".into(),
+        }
+    }
+
+    fn session_timeline_content(&self) -> String {
+        let Some(snapshot) = &self.session_snapshot else {
+            return "Journal unavailable".into();
+        };
+        let mut content = snapshot.timeline.join("\n");
+        if snapshot.earlier_records > 0 {
+            content.push_str(&format!(
+                "\n{} earlier records omitted",
+                snapshot.earlier_records
+            ));
+        }
+        content
     }
 
     fn resource_pane_content(&self) -> String {
@@ -2602,6 +2713,7 @@ pub fn dispatch_slash_command(
                     if sequence.is_none() {
                         reload_state_from_agent(state, agent);
                     }
+                    state.refresh_session_snapshot(agent.session());
                     state.push_message(
                         MessageRole::System,
                         format!(
@@ -3127,6 +3239,7 @@ fn reload_state_from_agent(state: &mut TuiState, agent: &crate::core::Agent) {
         };
         state.push_message(role, &turn.content);
     }
+    state.refresh_session_snapshot(agent.session());
 }
 
 fn format_history(
@@ -3621,6 +3734,7 @@ pub fn run_async_with_profile(
             };
             state.push_message(role, &turn.content);
         }
+        state.refresh_session_snapshot(agent.session());
     }
     let mut layout_persistence = TuiLayoutPersistence::discover(profile);
     if let Err(error) = layout_persistence.restore(&mut state) {
@@ -3685,6 +3799,9 @@ pub fn run_async_with_profile(
     let mut pending_approvals = VecDeque::new();
     let loop_result = (|| -> Result<(), crate::error::ZenpiError> {
         'outer: loop {
+            if guard.termination_requested() {
+                break;
+            }
             // The worker holds the agent mutex while provider I/O is in flight;
             // use a non-blocking drain so lifecycle events become visible as soon
             // as that mutex is released without freezing keyboard/render polling.
@@ -4256,6 +4373,10 @@ pub fn run_async_with_profile(
         state.clear_layout_dirty();
         state.clear_layout_reset_tabs();
     }
+    // Restore the terminal before waiting for provider cancellation. A second
+    // OS signal can then use the original disposition without stranding raw
+    // mode even when an uncooperative network operation delays the join.
+    guard.leave();
     // Terminal I/O can fail while a provider job is still active. Always
     // cancel and join the owned runtime before returning that error; relying
     // on `Drop` would detach a worker when its command queue is full.
@@ -4265,7 +4386,6 @@ pub fn run_async_with_profile(
     if let Ok(mut agent) = shared.lock() {
         agent.close();
     }
-    guard.leave();
     match loop_result {
         Err(error) => {
             let _ = join_result;
@@ -4312,6 +4432,9 @@ where
     let mut last_tick = Instant::now();
 
     'outer: loop {
+        if guard.termination_requested() {
+            break;
+        }
         let now = Instant::now();
         if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
             state.tick();
@@ -4395,17 +4518,39 @@ where
 
 struct TerminalGuard {
     active: bool,
+    #[cfg(unix)]
+    signals: Option<terminal_signals::SignalGuard>,
 }
 
 impl TerminalGuard {
     fn enter() -> Result<Self, TuiError> {
+        #[cfg(unix)]
+        let signals = terminal_signals::SignalGuard::install()?;
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         if let Err(error) = execute!(stdout, EnterAlternateScreen, EnableBracketedPaste, Hide) {
+            let _ = execute!(stdout, Show, DisableBracketedPaste, LeaveAlternateScreen);
             let _ = disable_raw_mode();
             return Err(TuiError::Io(error));
         }
-        Ok(Self { active: true })
+        Ok(Self {
+            active: true,
+            #[cfg(unix)]
+            signals: Some(signals),
+        })
+    }
+
+    fn termination_requested(&self) -> bool {
+        #[cfg(unix)]
+        {
+            self.signals
+                .as_ref()
+                .is_some_and(terminal_signals::SignalGuard::requested)
+        }
+        #[cfg(not(unix))]
+        {
+            false
+        }
     }
 
     fn leave(&mut self) {
@@ -4415,12 +4560,83 @@ impl TerminalGuard {
             let _ = disable_raw_mode();
             self.active = false;
         }
+        #[cfg(unix)]
+        drop(self.signals.take());
     }
 }
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         self.leave();
+    }
+}
+
+#[cfg(unix)]
+mod terminal_signals {
+    use std::io;
+    use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+
+    static OWNED: AtomicBool = AtomicBool::new(false);
+    static SIGNAL: AtomicI32 = AtomicI32::new(0);
+
+    // The handler performs no allocation, locks, I/O, or terminal work. The
+    // normal bounded poll loop observes this flag and runs owned cleanup.
+    extern "C" fn request_stop(signal: libc::c_int) {
+        SIGNAL.store(signal, Ordering::Relaxed);
+    }
+
+    pub(super) struct SignalGuard {
+        previous: Vec<(libc::c_int, libc::sigaction)>,
+    }
+
+    impl SignalGuard {
+        pub(super) fn install() -> io::Result<Self> {
+            if OWNED
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "a TUI already owns terminal signal handling",
+                ));
+            }
+            SIGNAL.store(0, Ordering::Relaxed);
+            let mut guard = Self {
+                previous: Vec::with_capacity(4),
+            };
+            for signal in [libc::SIGINT, libc::SIGTERM, libc::SIGHUP, libc::SIGQUIT] {
+                // Both structures are fully initialized before the OS reads
+                // them; libc writes the previous disposition on success.
+                let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+                let mut previous: libc::sigaction = unsafe { std::mem::zeroed() };
+                action.sa_sigaction = request_stop as *const () as usize;
+                action.sa_flags = libc::SA_RESTART;
+                unsafe {
+                    libc::sigemptyset(&mut action.sa_mask);
+                }
+                if unsafe { libc::sigaction(signal, &action, &mut previous) } != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                guard.previous.push((signal, previous));
+            }
+            Ok(guard)
+        }
+
+        pub(super) fn requested(&self) -> bool {
+            SIGNAL.load(Ordering::Relaxed) != 0
+        }
+    }
+
+    impl Drop for SignalGuard {
+        fn drop(&mut self) {
+            for (signal, previous) in self.previous.iter().rev() {
+                // Restore only dispositions installed by this scoped owner.
+                unsafe {
+                    libc::sigaction(*signal, previous, std::ptr::null_mut());
+                }
+            }
+            OWNED.store(false, Ordering::Release);
+        }
     }
 }
 
@@ -4435,6 +4651,7 @@ fn drain_agent_tool_events(shared: &Arc<Mutex<crate::core::Agent>>, state: &mut 
     for event in agent.take_events() {
         apply_agent_tool_event(state, event);
     }
+    state.refresh_session_snapshot(agent.session());
 }
 
 fn apply_agent_tool_event(state: &mut TuiState, event: crate::core::AgentEvent) {
