@@ -2058,6 +2058,63 @@ pub fn run_blueprint_next(agent: &mut Agent, target: &str) -> Result<serde_json:
     Ok(value)
 }
 
+/// Queue one declarative Blueprint task for an external b3ehive owner. This
+/// never runs the instruction, shell, provider, or acceptance commands.
+pub fn handoff_blueprint_next(
+    agent: &mut Agent,
+    target: &str,
+) -> Result<serde_json::Value, String> {
+    if agent.phase() != crate::core::AgentPhase::Idle {
+        return Err("blueprint handoff is available only while the agent is idle".into());
+    }
+    let (blueprint_id, version) = target
+        .split_once('@')
+        .map_or((target, None), |(id, version)| (id, Some(version)));
+    let store = DomainStore::open_read_only(domain_store::path_for_session(agent.session().path()))
+        .map_err(|error| error.to_string())?;
+    let blueprint = if let Some(version) = version {
+        store.blueprint(blueprint_id, version).cloned()
+    } else {
+        let versions = store.blueprint_versions(blueprint_id);
+        (versions.len() == 1).then(|| versions[0].clone())
+    }
+    .ok_or_else(|| format!("blueprint `{target}` is not found or needs an explicit version"))?;
+    let goal = store
+        .goals()
+        .into_iter()
+        .find(|goal| {
+            goal.blueprint_id == blueprint.id
+                && goal.blueprint_version == blueprint.version
+                && goal.blueprint_digest == blueprint.digest
+        })
+        .cloned()
+        .ok_or_else(|| format!("no Goal is linked to blueprint `{target}`"))?;
+    let execution = crate::domain_execution::ExecutionStore::open(
+        crate::domain_execution::path_for_session(agent.session().path()),
+    )
+    .map_err(|error| error.to_string())?;
+    let mut handoffs = crate::domain_execution::HandoffStore::open(
+        crate::domain_execution::handoff_path_for_session(agent.session().path()),
+    )
+    .map_err(|error| error.to_string())?;
+    let owner = crate::domain_execution::BlueprintExecutor::new(execution);
+    let outcome = owner
+        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .map_err(|error| error.to_string())?;
+    Ok(json!({
+        "command": "blueprint",
+        "route": "external_owner",
+        "accepted": true,
+        "action": "handoff",
+        "target": target,
+        "handoff": outcome.request,
+        "already_queued": outcome.already_queued,
+        "execution_scope": "external_owner_required",
+        "zenpi_started": false,
+        "status": "queued",
+    }))
+}
+
 /// Reconcile the durable Goal state after a receipt owner call.  Receipts are
 /// written first, so a crash between the two snapshots is recoverable: a
 /// later `/blueprint run` sees the existing receipt and finishes the Goal
@@ -4774,6 +4831,7 @@ fn execute_headless_slash(
                 BlueprintAction::Validate { .. } => "validate",
                 BlueprintAction::Put { .. } => "put",
                 BlueprintAction::Run { .. } => "run",
+                BlueprintAction::Handoff { .. } => "handoff",
                 BlueprintAction::Open { .. } => "open",
             };
             match action {
@@ -4841,6 +4899,21 @@ fn execute_headless_slash(
                         .map(SlashExecution::Response)
                         .map_err(|message| SlashDispatchError {
                             code: "blueprint_execution_error",
+                            message,
+                        })
+                }
+                BlueprintAction::Handoff { target } => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "blueprint handoff is unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    handoff_blueprint_next(agent, &target)
+                        .map(SlashExecution::Response)
+                        .map_err(|message| SlashDispatchError {
+                            code: "blueprint_handoff_error",
                             message,
                         })
                 }

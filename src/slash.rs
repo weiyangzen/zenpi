@@ -236,6 +236,8 @@ pub enum BlueprintAction {
     Put { path: String },
     /// Ask the runtime host to execute one bounded blueprint target.
     Run { target: String },
+    /// Queue one declarative task for an external b3ehive owner.
+    Handoff { target: String },
     /// Open a blueprint path in the host's resource view.
     Open { path: String },
 }
@@ -376,7 +378,7 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "blueprint",
         aliases: BLUEPRINT_ALIASES,
         route: SlashRoute::Local,
-        usage: "/blueprint [show|status|validate|put|run|open]",
+        usage: "/blueprint [show|status|validate|put|run|handoff|open]",
         summary: "inspect and control the first-class blueprint",
     },
     SlashCommandSpec {
@@ -1002,6 +1004,21 @@ fn parse_blueprint(args: &[String]) -> Result<BlueprintAction, SlashError> {
                 });
             }
             Ok(BlueprintAction::Run {
+                target: args[1].clone(),
+            })
+        }
+        "handoff" => {
+            if args.len() < 2 {
+                return Err(SlashError::MissingArgument {
+                    command: "blueprint handoff",
+                });
+            }
+            if args.len() > 2 {
+                return Err(SlashError::UnexpectedArgument {
+                    command: "blueprint",
+                });
+            }
+            Ok(BlueprintAction::Handoff {
                 target: args[1].clone(),
             })
         }

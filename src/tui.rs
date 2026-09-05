@@ -2790,6 +2790,27 @@ pub fn dispatch_slash_command(
                         "blueprint execution is unavailable while the agent is busy",
                     ),
                 },
+                BlueprintAction::Handoff { target } => match agent.as_deref_mut() {
+                    Some(agent) => match crate::headless::handoff_blueprint_next(agent, &target) {
+                        Ok(data) => state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "blueprint handoff:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("blueprint handoff failed: {error}"),
+                        ),
+                    },
+                    None => state.push_message(
+                        MessageRole::Error,
+                        "blueprint handoff is unavailable while the agent is busy",
+                    ),
+                },
                 BlueprintAction::Open { path: target } => {
                     state.push_message(
                         MessageRole::Error,
@@ -3164,6 +3185,7 @@ fn blueprint_action_display(action: &BlueprintAction) -> String {
         ),
         BlueprintAction::Put { path } => format!("put {}", bounded_display(path)),
         BlueprintAction::Run { target } => format!("run {}", bounded_display(target)),
+        BlueprintAction::Handoff { target } => format!("handoff {}", bounded_display(target)),
         BlueprintAction::Open { path } => format!("open {}", bounded_display(path)),
     }
 }

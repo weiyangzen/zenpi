@@ -253,7 +253,9 @@ pub struct BlueprintHandoff {
     pub blueprint_digest: String,
     pub item_id: String,
     pub attempt: u32,
+    #[serde(default)]
     pub depends_on: Vec<String>,
+    #[serde(default)]
     pub estimated_loc: u32,
     pub instruction: String,
     pub acceptance_commands: Vec<String>,
