@@ -567,6 +567,9 @@ impl OpenAiCompatibleBackend {
                 "API key must be non-empty and contain no control characters".into(),
             ));
         }
+        if let Some(key) = api_key.as_deref() {
+            crate::security::register_secret_value(key);
+        }
         for (name, value) in [
             ("reasoning effort", reasoning_effort.as_deref()),
             ("verbosity", verbosity.as_deref()),

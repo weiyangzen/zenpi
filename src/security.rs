@@ -11,6 +11,7 @@ use serde_json::Value;
 
 const MAX_REGISTERED_SECRETS: usize = 128;
 const MAX_SECRET_BYTES: usize = 16 * 1024;
+const REGISTERED_SECRET_TTL_MS: u64 = 10 * 60 * 1000;
 
 #[derive(Debug)]
 struct SecretMaterial {
@@ -175,6 +176,11 @@ fn secret_registry() -> &'static Mutex<Vec<Weak<SecretMaterial>>> {
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+fn legacy_secret_registry() -> &'static Mutex<Vec<(Arc<SecretMaterial>, u64)>> {
+    static REGISTRY: OnceLock<Mutex<Vec<(Arc<SecretMaterial>, u64)>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
+}
+
 fn register_secret(material: &Arc<SecretMaterial>) {
     let Ok(mut registry) = secret_registry().lock() else {
         return;
@@ -182,6 +188,30 @@ fn register_secret(material: &Arc<SecretMaterial>) {
     registry.retain(|entry| entry.strong_count() > 0);
     if registry.len() < MAX_REGISTERED_SECRETS {
         registry.push(Arc::downgrade(material));
+    }
+}
+
+/// Register a credential held by a legacy host API (for example the existing
+/// `Option<String>` backend constructor) for bounded process-local redaction.
+/// New worker paths should prefer [`SecretHandle`], which does not need this
+/// compatibility registry.
+pub(crate) fn register_secret_value(value: &str) {
+    if value.len() < 4 || value.len() > MAX_SECRET_BYTES || value.chars().any(char::is_control) {
+        return;
+    }
+    let material = Arc::new(SecretMaterial {
+        value: Mutex::new(value.as_bytes().to_vec()),
+        policy_digest: "0".repeat(64),
+        expires_at_ms: Some(now_ms().saturating_add(REGISTERED_SECRET_TTL_MS)),
+        revoked: std::sync::atomic::AtomicBool::new(false),
+    });
+    let Ok(mut registry) = legacy_secret_registry().lock() else {
+        return;
+    };
+    let now = now_ms();
+    registry.retain(|(_, expiry)| *expiry > now);
+    if registry.len() < MAX_REGISTERED_SECRETS {
+        registry.push((material, now.saturating_add(REGISTERED_SECRET_TTL_MS)));
     }
 }
 
@@ -201,6 +231,20 @@ fn registered_secret_values() -> Vec<String> {
         }
         true
     });
+    if let Ok(mut registry) = legacy_secret_registry().lock() {
+        let now = now_ms();
+        registry.retain(|(material, expiry)| {
+            if *expiry <= now {
+                return false;
+            }
+            if let Ok(value) = material.value.lock()
+                && let Ok(value) = std::str::from_utf8(&value)
+            {
+                values.push(value.to_owned());
+            }
+            true
+        });
+    }
     values
 }
 

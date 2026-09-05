@@ -616,6 +616,9 @@ pub fn resolve(
     {
         return Err(ConfigError::Invalid("API key is invalid".into()));
     }
+    if let Some(key) = &api_key {
+        crate::security::register_secret_value(key);
+    }
     Ok(EffectiveConfig {
         profile,
         backend,
@@ -1451,6 +1454,9 @@ pub fn load_auth(paths: &ConfigPaths) -> Result<AuthFile, ConfigError> {
         && (key.trim().is_empty() || key.chars().any(char::is_control))
     {
         return Err(ConfigError::Invalid("OPENAI_API_KEY is invalid".into()));
+    }
+    if let Some(key) = auth.openai_api_key() {
+        crate::security::register_secret_value(key);
     }
     Ok(auth)
 }
