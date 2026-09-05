@@ -3424,22 +3424,155 @@ pub fn run(agent: &mut crate::core::Agent) -> Result<(), crate::error::ZenpiErro
     .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TuiRequestKind {
+    Model,
+    UserShell,
+}
+
+enum TuiJobResult {
+    Model(crate::core::ProcessResult),
+    UserShell(serde_json::Value),
+}
+
 struct TuiRequest {
     text: String,
+    kind: TuiRequestKind,
     provider_events: Arc<Mutex<TuiProviderEventBuffer>>,
 }
 
 impl TuiRequest {
     fn new(text: String) -> (Self, Arc<Mutex<TuiProviderEventBuffer>>) {
+        Self::with_kind(text, TuiRequestKind::Model)
+    }
+
+    fn with_kind(text: String, kind: TuiRequestKind) -> (Self, Arc<Mutex<TuiProviderEventBuffer>>) {
         let provider_events = Arc::new(Mutex::new(TuiProviderEventBuffer::default()));
         (
             Self {
                 text,
+                kind,
                 provider_events: Arc::clone(&provider_events),
             },
             provider_events,
         )
     }
+}
+
+const MAX_TUI_PENDING_INPUTS: usize = 16;
+const MAX_TUI_PENDING_INPUT_BYTES: usize = 256 * 1024;
+
+/// Shell input must not steer a provider turn, and typing during a shell must
+/// not cancel it. Keep this FIFO separate from the runtime's model steer lane.
+#[derive(Default)]
+struct TuiPendingInputs {
+    inputs: VecDeque<(TuiRequestKind, String)>,
+    bytes: usize,
+}
+
+impl TuiPendingInputs {
+    fn should_queue(&self, kind: TuiRequestKind, active: Option<TuiRequestKind>) -> bool {
+        (kind == TuiRequestKind::UserShell && active.is_some())
+            || active == Some(TuiRequestKind::UserShell)
+            || !self.inputs.is_empty()
+    }
+
+    fn push(&mut self, kind: TuiRequestKind, text: String) -> Result<(), &'static str> {
+        if self.inputs.len() >= MAX_TUI_PENDING_INPUTS
+            || self.bytes.saturating_add(text.len()) > MAX_TUI_PENDING_INPUT_BYTES
+        {
+            return Err("Input queue full; input was not submitted");
+        }
+        self.bytes += text.len();
+        self.inputs.push_back((kind, text));
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Option<(TuiRequestKind, String)> {
+        let input = self.inputs.pop_front()?;
+        self.bytes -= input.1.len();
+        Some(input)
+    }
+
+    fn cancel(&mut self, state: &mut TuiState) {
+        let count = self.inputs.len();
+        self.inputs.clear();
+        self.bytes = 0;
+        if count != 0 {
+            state.push_message(
+                MessageRole::System,
+                format!("Cancelled {count} queued input(s)"),
+            );
+        }
+    }
+
+    fn admit(&mut self, kind: TuiRequestKind, text: String, state: &mut TuiState) {
+        match self.push(kind, text) {
+            Ok(()) => {
+                state.push_message(
+                    MessageRole::System,
+                    format!("Input queued ({})", self.inputs.len()),
+                );
+            }
+            Err(error) => state.push_message(MessageRole::Error, error),
+        }
+    }
+}
+
+fn render_user_shell_result(state: &mut TuiState, result: &serde_json::Value) {
+    if let Some(help) = result.get("help").and_then(serde_json::Value::as_str) {
+        state.push_message(MessageRole::System, help);
+        state.set_status("Ready");
+        return;
+    }
+    let cancelled = result.get("cancelled").and_then(serde_json::Value::as_bool) == Some(true);
+    let timed_out = result.get("timed_out").and_then(serde_json::Value::as_bool) == Some(true);
+    let exit_code = result.get("exit_code").and_then(serde_json::Value::as_i64);
+    let signal = result.get("signal").and_then(serde_json::Value::as_i64);
+    let status = if cancelled {
+        "Local shell cancelled".to_owned()
+    } else if timed_out {
+        "Local shell timed out".to_owned()
+    } else if let Some(signal) = signal {
+        format!("Local shell terminated by signal {signal}")
+    } else {
+        format!(
+            "Local shell exit {}",
+            exit_code.map_or_else(|| "unknown".into(), |code| code.to_string())
+        )
+    };
+    let mut output = status.clone();
+    for key in ["stdout", "stderr"] {
+        if let Some(text) = result.get(key).and_then(serde_json::Value::as_str)
+            && !text.is_empty()
+        {
+            output.push_str(&format!(
+                "\n{key}:\n{}",
+                crate::security::redact_text(text, &[])
+            ));
+        }
+    }
+    if result.get("truncated").and_then(serde_json::Value::as_bool) == Some(true)
+        || result
+            .get("stdout_truncated")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+        || result
+            .get("stderr_truncated")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true)
+    {
+        output.push_str("\nLocal shell output truncated");
+    }
+    state.push_message(
+        if cancelled || timed_out || signal.is_some() || exit_code != Some(0) {
+            MessageRole::Error
+        } else {
+            MessageRole::System
+        },
+        output,
+    );
+    state.set_status(status);
 }
 
 /// Provider deltas are produced on the worker thread while the terminal loop
@@ -3630,7 +3763,7 @@ pub fn run_async_with_profile(
     agent: crate::core::Agent,
     profile: Option<String>,
 ) -> Result<(), crate::error::ZenpiError> {
-    use crate::core::{AgentError, ProcessResult};
+    use crate::core::AgentError;
     use crate::runtime::{BackgroundRunner, JobOutcome, RuntimeConfig, RuntimeEvent};
 
     let shared = Arc::new(Mutex::new(agent));
@@ -3642,23 +3775,33 @@ pub fn run_async_with_profile(
     // Keep provider events bounded independently of the transcript. A slow
     // terminal must not turn an unbounded stream into unbounded memory.
     let runner = BackgroundRunner::spawn(
-        move |request: TuiRequest, token| -> Result<ProcessResult, AgentError> {
+        move |request: TuiRequest, token| -> Result<TuiJobResult, AgentError> {
             if token.is_cancelled() {
                 return Err(AgentError::Backend(crate::backend::BackendError::Cancelled));
             }
             let mut agent = worker_state
                 .lock()
                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
-            let result = agent.process_with_cancel_and_events(
-                crate::core::TurnInputRequest::new(request.text),
-                || token.is_cancelled(),
-                &mut |event| {
-                    if let Ok(mut pending) = request.provider_events.lock() {
-                        pending.push(event, MAX_TUI_PROVIDER_EVENTS);
-                    }
-                    Ok(())
-                },
-            )?;
+            let result = match request.kind {
+                TuiRequestKind::Model => {
+                    TuiJobResult::Model(agent.process_with_cancel_and_events(
+                        crate::core::TurnInputRequest::new(request.text),
+                        || token.is_cancelled(),
+                        &mut |event| {
+                            if let Ok(mut pending) = request.provider_events.lock() {
+                                pending.push(event, MAX_TUI_PROVIDER_EVENTS);
+                            }
+                            Ok(())
+                        },
+                    )?)
+                }
+                TuiRequestKind::UserShell => {
+                    let command = request.text;
+                    let result =
+                        agent.run_user_shell_with_cancel(&command, || token.is_cancelled())?;
+                    TuiJobResult::UserShell(result)
+                }
+            };
             // The core has crossed its durable completion boundary when it
             // returns a successful ProcessResult. Mark it before returning to
             // the runtime so a late shutdown/cancel cannot report a persisted
@@ -3794,6 +3937,8 @@ pub fn run_async_with_profile(
     let mut resize_pending = false;
     let mut last_tick = Instant::now();
     let mut active_job = None;
+    let mut active_job_kind = None;
+    let mut pending_inputs = TuiPendingInputs::default();
     let mut stream_buffers: HashMap<crate::runtime::JobId, Arc<Mutex<TuiProviderEventBuffer>>> =
         HashMap::new();
     let mut pending_approvals = VecDeque::new();
@@ -3925,6 +4070,7 @@ pub fn run_async_with_profile(
                         .as_ref()
                         .map(|preview| format!("\n\nProposed change:\n{}", preview.display_text()))
                         .unwrap_or_default();
+                    let safe_arguments = crate::security::redact_json(&request.arguments, &[]);
                     state.push_message(
                         // Keep the approval prompt visible while tool logs are
                         // folded; hiding it would leave the user with no way to
@@ -3932,7 +4078,7 @@ pub fn run_async_with_profile(
                         MessageRole::System,
                         format!(
                             "Approval required: {} {}\nRequest: {}\nPolicy: {}{preview}\nType y to allow once, n to deny.",
-                            request.tool, request.arguments, request.request_id,
+                            request.tool, safe_arguments, request.request_id,
                             request.policy_digest.as_deref().unwrap_or("unbound"),
                         ),
                     );
@@ -3971,10 +4117,11 @@ pub fn run_async_with_profile(
                         // stale y/n response.
                         pending_approvals.clear();
                         active_job = None;
+                        active_job_kind = None;
                         state.set_busy(false);
                         drain_agent_tool_events(&shared, &mut state);
                         match outcome {
-                            JobOutcome::Succeeded(result) => {
+                            JobOutcome::Succeeded(TuiJobResult::Model(result)) => {
                                 if let Some(assistant) = result.assistant {
                                     state.finish_stream_for_job(
                                         id.get(),
@@ -3985,6 +4132,9 @@ pub fn run_async_with_profile(
                                     state.discard_stream();
                                 }
                                 state.set_status("Ready");
+                            }
+                            JobOutcome::Succeeded(TuiJobResult::UserShell(result)) => {
+                                render_user_shell_result(&mut state, &result);
                             }
                             JobOutcome::Failed(error) => {
                                 state.discard_stream();
@@ -4016,6 +4166,7 @@ pub fn run_async_with_profile(
                         // the next user turn.
                         pending_approvals.clear();
                         active_job = None;
+                        active_job_kind = None;
                         state.discard_stream();
                         state.set_busy(false);
                         state.push_message(MessageRole::Error, reason.to_string());
@@ -4033,6 +4184,43 @@ pub fn run_async_with_profile(
                     }
                     RuntimeEvent::Closed => break,
                     _ => {}
+                }
+            }
+            // Admit exactly one queued input after the previous job has crossed
+            // its terminal boundary. FIFO admission prevents a later prompt
+            // from overtaking a local shell command and never calls the model
+            // for a `!` request.
+            if active_job.is_none()
+                && let Some((kind, text)) = pending_inputs.pop()
+            {
+                let display = if kind == TuiRequestKind::UserShell {
+                    format!("!{text}")
+                } else {
+                    text.clone()
+                };
+                let request_text = if kind == TuiRequestKind::UserShell {
+                    format!("!{text}")
+                } else {
+                    text
+                };
+                let (request, events) = TuiRequest::with_kind(request_text, kind);
+                match runner.try_submit(request) {
+                    Ok(id) => {
+                        stream_buffers.insert(id, events);
+                        if kind == TuiRequestKind::Model {
+                            state.begin_stream_for_job(id.get());
+                        } else {
+                            state.push_message(MessageRole::User, display);
+                            state.set_status("Local shell running");
+                        }
+                        active_job = Some(id);
+                        active_job_kind = Some(kind);
+                        state.set_busy(true);
+                    }
+                    Err(error) => {
+                        state.push_message(MessageRole::Error, error.to_string());
+                        state.set_status("Request rejected");
+                    }
                 }
             }
             let now = Instant::now();
@@ -4159,7 +4347,7 @@ pub fn run_async_with_profile(
                                         }
                                     }
                                     scheduler.request();
-                                    continue;
+                                    continue 'outer;
                                 }
                                 let action = match shared.try_lock() {
                                     Ok(mut agent) => dispatch_slash_command(
@@ -4171,6 +4359,7 @@ pub fn run_async_with_profile(
                                 };
                                 match action {
                                     SlashDispatchAction::Interrupt => {
+                                        pending_inputs.cancel(&mut state);
                                         if let Some(id) = active_job {
                                             let cancel_result = runner.try_cancel(id);
                                             if !matches!(
@@ -4209,6 +4398,49 @@ pub fn run_async_with_profile(
                                     state.gantt_refresh_started();
                                 }
                             }
+                            Ok(InputRoute::UserShell(command)) => {
+                                // The parser preserves the leading marker for
+                                // auditability; the worker receives it again
+                                // when this normalized command is submitted.
+                                let command = command
+                                    .strip_prefix('!')
+                                    .unwrap_or(command.as_str())
+                                    .to_owned();
+                                if pending_inputs
+                                    .should_queue(TuiRequestKind::UserShell, active_job_kind)
+                                {
+                                    pending_inputs.admit(
+                                        TuiRequestKind::UserShell,
+                                        command,
+                                        &mut state,
+                                    );
+                                } else {
+                                    let (request, events) = TuiRequest::with_kind(
+                                        format!("!{command}"),
+                                        TuiRequestKind::UserShell,
+                                    );
+                                    match runner.try_submit(request) {
+                                        Ok(id) => {
+                                            stream_buffers.insert(id, events);
+                                            state.push_message(
+                                                MessageRole::User,
+                                                format!("!{command}"),
+                                            );
+                                            state.set_busy(true);
+                                            state.set_status("Local shell running");
+                                            active_job = Some(id);
+                                            active_job_kind = Some(TuiRequestKind::UserShell);
+                                        }
+                                        Err(error) => {
+                                            state.push_message(
+                                                MessageRole::Error,
+                                                error.to_string(),
+                                            );
+                                            state.set_status("Local shell rejected");
+                                        }
+                                    }
+                                }
+                            }
                             Ok(InputRoute::Prompt(text)) => {
                                 if let Some(request) = pending_approvals.pop_front() {
                                     let normalized = text.trim().to_ascii_lowercase();
@@ -4221,13 +4453,28 @@ pub fn run_async_with_profile(
                                         }
                                         _ => {
                                             pending_approvals.push_front(request);
-                                            state.push_message(
-                                                MessageRole::Error,
-                                                "Type y to allow once or n to deny",
-                                            );
+                                            // While a local shell approval is on
+                                            // screen, ordinary text is queued
+                                            // rather than accidentally consumed
+                                            // as a response or steering shell.
+                                            if pending_approvals
+                                                .front()
+                                                .is_some_and(|item| item.tool == "user_shell")
+                                            {
+                                                pending_inputs.admit(
+                                                    TuiRequestKind::Model,
+                                                    text,
+                                                    &mut state,
+                                                );
+                                            } else {
+                                                state.push_message(
+                                                    MessageRole::Error,
+                                                    "Type y to allow once or n to deny",
+                                                );
+                                            }
                                             state.set_status("Approval required");
                                             scheduler.request();
-                                            continue;
+                                            continue 'outer;
                                         }
                                     };
                                     let response_result =
@@ -4264,7 +4511,14 @@ pub fn run_async_with_profile(
                                         }
                                     }
                                     scheduler.request();
-                                    continue;
+                                    continue 'outer;
+                                }
+                                if pending_inputs
+                                    .should_queue(TuiRequestKind::Model, active_job_kind)
+                                {
+                                    pending_inputs.admit(TuiRequestKind::Model, text, &mut state);
+                                    scheduler.request();
+                                    continue 'outer;
                                 }
                                 state.push_message(MessageRole::User, &text);
                                 if let Some(id) = active_job {
@@ -4285,6 +4539,7 @@ pub fn run_async_with_profile(
                                             state.discard_stream();
                                             state.begin_stream_for_job(id.get());
                                             active_job = Some(id);
+                                            active_job_kind = Some(TuiRequestKind::Model);
                                             state.set_busy(true);
                                             state.set_status("Steering");
                                         }
@@ -4303,6 +4558,7 @@ pub fn run_async_with_profile(
                                             stream_buffers.insert(id, events);
                                             state.begin_stream_for_job(id.get());
                                             active_job = Some(id);
+                                            active_job_kind = Some(TuiRequestKind::Model);
                                             state.set_busy(true);
                                             state.set_status("Working");
                                         }
@@ -4319,6 +4575,7 @@ pub fn run_async_with_profile(
                         }
                     }
                     TuiAction::Interrupt => {
+                        pending_inputs.cancel(&mut state);
                         if let Some(id) = active_job {
                             let cancel_result = runner.try_cancel(id);
                             if !matches!(cancel_result, Err(crate::runtime::SubmitError::QueueFull))
@@ -4493,6 +4750,13 @@ where
                             }
                             SlashDispatchAction::Continue => {}
                         }
+                    }
+                    Ok(InputRoute::UserShell(_command)) => {
+                        state.push_message(
+                            MessageRole::Error,
+                            "local shell is unavailable in the synchronous TUI host; use the production TUI",
+                        );
+                        state.set_status("Local shell unavailable");
                     }
                     Ok(InputRoute::Prompt(prompt)) => {
                         state.push_message(MessageRole::User, &prompt);
@@ -5159,5 +5423,47 @@ mod tests {
         buffer.push(oversized, MAX_TUI_PROVIDER_EVENTS);
         assert!(buffer.events.is_empty());
         assert_eq!(buffer.dropped, 1);
+    }
+
+    #[test]
+    fn pending_shell_fifo_is_bounded_and_preserves_kind() {
+        let mut queue = TuiPendingInputs::default();
+        assert!(!queue.should_queue(TuiRequestKind::UserShell, None));
+        queue
+            .push(TuiRequestKind::UserShell, "echo one".into())
+            .expect("first shell input");
+        assert!(queue.should_queue(TuiRequestKind::Model, Some(TuiRequestKind::UserShell)));
+        assert_eq!(
+            queue.pop(),
+            Some((TuiRequestKind::UserShell, "echo one".into()))
+        );
+        for index in 0..MAX_TUI_PENDING_INPUTS {
+            queue
+                .push(TuiRequestKind::Model, format!("prompt-{index}"))
+                .expect("bounded queue slot");
+        }
+        assert!(
+            queue
+                .push(TuiRequestKind::UserShell, "overflow".into())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn user_shell_result_renders_nonzero_status_and_redacted_output() {
+        let mut state = TuiState::default();
+        let result = serde_json::json!({
+            "origin": "user_shell",
+            "stdout": "api_key=secret-value",
+            "stderr": "permission denied",
+            "exit_code": 1,
+            "cancelled": false,
+            "timed_out": false,
+        });
+        render_user_shell_result(&mut state, &result);
+        assert_eq!(state.status(), "Local shell exit 1");
+        assert!(state.messages().any(|message| {
+            message.text.contains("Local shell exit 1") && !message.text.contains("secret-value")
+        }));
     }
 }

@@ -1227,7 +1227,8 @@ fn unowned_session_controls_are_fail_closed_without_session_or_provider_effects(
     let mut output = Vec::new();
     run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
     let records = json_lines(&output);
-    for (id, version) in [("shell", 2)] {
+    {
+        let (id, version) = ("shell", 2);
         let responses: Vec<_> = records
             .iter()
             .filter(|record| record["id"] == id && record["type"] == "response")

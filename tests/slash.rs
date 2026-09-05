@@ -123,6 +123,36 @@ fn route_input_keeps_slash_commands_out_of_prompt_path() {
 }
 
 #[test]
+fn route_input_classifies_explicit_user_shell_before_provider() {
+    assert_eq!(
+        route_input("  !echo 'hello' | wc -c  \n").unwrap(),
+        InputRoute::UserShell("!echo 'hello' | wc -c".into())
+    );
+    assert_eq!(route_input("!").unwrap(), InputRoute::UserShell("!".into()));
+    assert!(matches!(
+        route_input("!!echo hidden"),
+        Err(SlashError::UnsupportedUserShellExtension)
+    ));
+    assert!(matches!(
+        route_input("!echo \u{0}"),
+        Err(SlashError::UserShellControlCharacter)
+    ));
+    assert!(matches!(
+        route_input(&format!(
+            "!{}",
+            "x".repeat(zenpi::slash::MAX_USER_SHELL_INPUT_BYTES)
+        )),
+        Err(SlashError::UserShellTooLong)
+    ));
+    // Shell-looking ordinary prompt text remains a prompt when it does not
+    // begin with the explicit bang escape.
+    assert_eq!(
+        route_input("please run !echo hi").unwrap(),
+        InputRoute::Prompt("please run !echo hi".into())
+    );
+}
+
+#[test]
 fn common_workflow_commands_have_typed_arguments_and_metadata() {
     assert_eq!(
         parse("/plan sketch a safe migration").unwrap(),

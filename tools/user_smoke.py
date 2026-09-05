@@ -1736,6 +1736,16 @@ def main() -> int:
         assert_openai_fixture(production_binary, root)
         assert_headless_eof_drains_slow_provider(production_binary, root)
         assert_headless_tool_approval(production_binary, root)
+        shell_smoke = run(
+            [
+                "python3",
+                str(ROOT / "tools" / "tui_user_shell_smoke.py"),
+                "--binary",
+                str(production_binary),
+            ],
+            timeout=90,
+        )
+        assert_success(shell_smoke, "installed local shell allow/deny and journal")
 
         features = os.environ.get("ZENPI_SMOKE_FEATURES", "dev-fixtures")
         feature_args = ["--features", features] if features else []
@@ -1780,7 +1790,7 @@ def main() -> int:
         assert_tui_signal_cleanup(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: production install/provider/tool approval/EOF drain/session GC/Blueprint execution, echo fixture, "
+        "user smoke passed: production install/provider/tool approval/local shell allow/deny/EOF drain/session GC/Blueprint execution, echo fixture, "
         "durable slash/runtime intents, resume, TUI resize/multiline paste/slash completion, streaming interrupt, "
         "OS signal cleanup, and terminal restoration"
     )

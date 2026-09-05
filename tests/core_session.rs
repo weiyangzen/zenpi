@@ -104,6 +104,228 @@ fn closed_agent_rejects_without_a_write() {
     assert_eq!(agent.history().len(), 0);
 }
 
+#[cfg(unix)]
+fn shell_agent(root: &std::path::Path, backend: Box<dyn Backend>) -> Agent {
+    let mut agent = Agent::new(
+        SessionStore::open(root.join("shell.jsonl")).unwrap(),
+        backend,
+    );
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(root).unwrap(),
+        SideEffectPolicy::all_builtins(),
+    );
+    let mut policy = zenpi::approval::ApprovalPolicy::default();
+    policy.remember("user_shell", zenpi::approval::ApprovalDecision::Allow);
+    agent.set_approval_policy(policy);
+    agent
+}
+
+#[cfg(unix)]
+#[test]
+fn user_shell_is_local_and_persists_next_turn_context() {
+    struct ContextBackend;
+    impl Backend for ContextBackend {
+        fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+            let shell = request
+                .turns
+                .iter()
+                .find(|turn| {
+                    turn.metadata
+                        .as_ref()
+                        .is_some_and(|meta| meta["origin"] == "user_shell")
+                })
+                .unwrap();
+            assert_eq!(shell.role, TurnRole::User);
+            assert!(shell.content.contains("HELLO SHELL"));
+            assert!(shell.content.contains("untrusted data"));
+            assert!(!request.turns.iter().any(|turn| turn.role == TurnRole::Tool));
+            Ok(Completion::text("saw local output"))
+        }
+    }
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(ContextBackend));
+    let help = agent.run_user_shell_with_cancel(" !  ", || false).unwrap();
+    assert_eq!(help["status"], "help");
+    assert!(agent.history().is_empty());
+    let result = agent
+        .run_user_shell_with_cancel(
+            " !printf 'hello shell' | tr a-z A-Z > output; cat output ",
+            || false,
+        )
+        .unwrap();
+    assert_eq!(result["stdout"], "HELLO SHELL");
+    assert_eq!(result["exit_code"], 0);
+    assert_eq!(result["origin"], "user_shell");
+    assert_eq!(result["child_reaped"], true);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("output")).unwrap(),
+        "HELLO SHELL"
+    );
+    assert_eq!(agent.history().len(), 1);
+    assert_eq!(agent.phase(), zenpi::core::AgentPhase::Idle);
+    assert!(agent.unknown_tool_outcomes().is_empty());
+    let events = agent.session().events();
+    assert!(
+        events
+            .iter()
+            .any(|event| event["type"] == "user_shell_input")
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| event["type"] == "tool_execution_finished"
+                && event["origin"] == "user_shell")
+    );
+    let restored = SessionStore::open(agent.session().path()).unwrap();
+    assert_eq!(restored.turns()[0], agent.history()[0]);
+    assert_eq!(
+        agent
+            .process(TurnInputRequest::new("explain output"))
+            .unwrap()
+            .assistant
+            .unwrap()
+            .content,
+        "saw local output"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn user_shell_preserves_nonzero_signal_and_cancellation_evidence() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(FailingBackend));
+    let nonzero = agent
+        .run_user_shell_with_cancel("!printf out; printf err >&2; exit 7", || false)
+        .unwrap();
+    assert_eq!(nonzero["stdout"], "out");
+    assert_eq!(nonzero["stderr"], "err");
+    assert_eq!(nonzero["exit_code"], 7);
+    assert_eq!(nonzero["child_reaped"], true);
+    let signal = agent
+        .run_user_shell_with_cancel("!kill -TERM $$", || false)
+        .unwrap();
+    assert_eq!(signal["signal"], libc::SIGTERM);
+    assert_eq!(signal["exit_code"], Value::Null);
+    let start = std::time::Instant::now();
+    let cancelled = agent
+        .run_user_shell_with_cancel(
+            "!(trap '' TERM; sleep 1; printf leaked > leaked) & wait",
+            || start.elapsed() > std::time::Duration::from_millis(50),
+        )
+        .unwrap();
+    assert_eq!(cancelled["cancelled"], true);
+    assert_eq!(cancelled["child_reaped"], true);
+    assert_eq!(cancelled["process_group_terminated"], true);
+    assert!(start.elapsed() < std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    assert!(!dir.path().join("leaked").exists());
+    assert!(agent.unknown_tool_outcomes().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn user_shell_separate_approval_and_precancel_never_spawn() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(FailingBackend));
+    let mut policy = zenpi::approval::ApprovalPolicy {
+        mode: zenpi::approval::ApprovalMode::Headless,
+        ..Default::default()
+    };
+    policy.remember("run_command", zenpi::approval::ApprovalDecision::Allow);
+    agent.set_approval_policy(policy);
+    assert!(matches!(
+        agent.run_user_shell_with_cancel("!printf leak > denied", || false),
+        Err(AgentError::Tool(ToolError::PolicyDenied { .. }))
+    ));
+    assert!(!dir.path().join("denied").exists());
+    assert!(agent.history().is_empty());
+    let mut policy = zenpi::approval::ApprovalPolicy::default();
+    policy.remember("user_shell", zenpi::approval::ApprovalDecision::Allow);
+    agent.set_approval_policy(policy);
+    assert!(matches!(
+        agent.run_user_shell_with_cancel("!printf leak > cancelled", || true),
+        Err(AgentError::Tool(ToolError::Cancelled))
+    ));
+    assert!(!dir.path().join("cancelled").exists());
+    assert!(agent.unknown_tool_outcomes().is_empty());
+    assert!(matches!(
+        agent.process(TurnInputRequest::new("!echo not-a-provider-prompt")),
+        Err(AgentError::InvalidTurn(_))
+    ));
+    assert!(agent.history().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn user_shell_caps_both_streams_before_journaling_control_bytes() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(FailingBackend));
+    let output = agent
+        .run_user_shell_with_cancel(
+            "!head -c 300000 /dev/zero; head -c 300000 /dev/zero >&2",
+            || false,
+        )
+        .unwrap();
+    assert_eq!(output["stdout"].as_str().unwrap().len(), 12 * 1024);
+    assert_eq!(output["stderr"].as_str().unwrap().len(), 12 * 1024);
+    assert_eq!(output["stdout_truncated"], true);
+    assert_eq!(output["stderr_truncated"], true);
+    assert!(agent.history()[0].content.len() < zenpi::protocol::MAX_TEXT_BYTES);
+    assert!(agent.unknown_tool_outcomes().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn user_shell_crash_recovery_never_invents_a_model_tool_call() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(FailingBackend));
+    agent
+        .session_mut()
+        .append_event(json!({
+            "type": "tool_execution_started", "operation_id": "user-shell-crash",
+            "turn_id": "user-shell-crash", "call_id": "user-shell-crash", "tool": "user_shell",
+            "policy_digest": "d".repeat(64), "worker_binding": null, "origin": "user_shell",
+        }))
+        .unwrap();
+    assert!(matches!(
+        agent.run_user_shell_with_cancel("!printf duplicate > duplicate", || false),
+        Err(AgentError::Recovery(_))
+    ));
+    assert!(!dir.path().join("duplicate").exists());
+    agent
+        .resolve_tool_outcome(
+            "user-shell-crash",
+            zenpi::core::ToolRecoveryDecision::Abandon,
+        )
+        .unwrap();
+    assert_eq!(agent.history()[0].role, TurnRole::User);
+    assert!(agent.history()[0].content.contains("unknown_outcome"));
+    assert!(agent.unknown_tool_outcomes().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn unbound_worker_cannot_escape_through_user_shell_origin() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(FailingBackend));
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(dir.path())
+            .unwrap()
+            .with_origin(zenpi::tools::ToolOrigin::BlueprintWorker),
+        SideEffectPolicy::all_builtins(),
+    );
+    let mut policy = zenpi::approval::ApprovalPolicy::default();
+    policy.remember("user_shell", zenpi::approval::ApprovalDecision::Allow);
+    agent.set_approval_policy(policy);
+    assert!(matches!(
+        agent.run_user_shell_with_cancel("!printf escaped > escaped", || false),
+        Err(AgentError::Tool(ToolError::GateDenied { .. }))
+    ));
+    assert!(!dir.path().join("escaped").exists());
+}
+
 #[test]
 fn backend_failure_keeps_the_user_turn_and_returns_idle() {
     let dir = tempdir().unwrap();

@@ -255,21 +255,59 @@ impl StdioRequest {
         match self.kind.as_str() {
             "command" | "slash" => {
                 let input = bounded_text(self.text.or(self.message), "command")?;
+                if input.trim_start().starts_with('!') {
+                    if !self.attachments.is_empty()
+                        || self.mode.is_some()
+                        || self.expected_turn_id.is_some()
+                    {
+                        return Err(ProtocolError::InvalidField {
+                            field: "user_shell",
+                        });
+                    }
+                    return Ok(Command::UserShell(parse_user_shell_input(
+                        input, "command",
+                    )?));
+                }
                 if !input.trim_start().starts_with('/') {
                     return Err(ProtocolError::InvalidField { field: "command" });
                 }
                 Ok(Command::Slash { input })
             }
-            "prompt" => Ok(Command::Prompt {
-                text: bounded_text(self.text.or(self.message), "prompt")?,
-                mode: self.mode.unwrap_or_default(),
-                expected_turn_id: self.expected_turn_id,
-                attachments: validate_attachments(self.attachments)?,
-            }),
-            "steer" => Ok(Command::Steer {
-                text: bounded_text(self.text.or(self.message), "steer")?,
-                expected_turn_id: self.expected_turn_id,
-            }),
+            "prompt" => {
+                let text = bounded_text(self.text.or(self.message), "prompt")?;
+                if text.trim_start().starts_with('!') {
+                    if !self.attachments.is_empty()
+                        || self.mode.is_some()
+                        || self.expected_turn_id.is_some()
+                    {
+                        return Err(ProtocolError::InvalidField {
+                            field: "user_shell",
+                        });
+                    }
+                    return Ok(Command::UserShell(parse_user_shell_input(text, "prompt")?));
+                }
+                Ok(Command::Prompt {
+                    text,
+                    mode: self.mode.unwrap_or_default(),
+                    expected_turn_id: self.expected_turn_id,
+                    attachments: validate_attachments(self.attachments)?,
+                })
+            }
+            "steer" => {
+                let text = bounded_text(self.text.or(self.message), "steer")?;
+                if text.trim_start().starts_with('!') {
+                    if self.expected_turn_id.is_some() {
+                        return Err(ProtocolError::InvalidField {
+                            field: "user_shell",
+                        });
+                    }
+                    return Ok(Command::UserShell(parse_user_shell_input(text, "steer")?));
+                }
+                Ok(Command::Steer {
+                    text,
+                    expected_turn_id: self.expected_turn_id,
+                })
+            }
             "cancel" => {
                 let target_id = self
                     .target_id
@@ -350,20 +388,11 @@ impl StdioRequest {
                         field: "user_shell",
                     });
                 }
-                let input = bounded_text(self.text.or(self.message), "user_shell")?;
-                if input.len() > MAX_USER_SHELL_BYTES {
-                    return Err(ProtocolError::FieldTooLong {
-                        field: "user_shell",
-                        max: MAX_USER_SHELL_BYTES,
-                    });
-                }
-                let trimmed = input.trim_start();
-                if !trimmed.starts_with('!') || trimmed.starts_with("!!") {
-                    return Err(ProtocolError::InvalidField {
-                        field: "user_shell",
-                    });
-                }
-                Ok(Command::UserShell(UserShellRequest { input }))
+                let input = bounded_text_allow_bare_bang(self.text.or(self.message), "user_shell")?;
+                Ok(Command::UserShell(parse_user_shell_input(
+                    input,
+                    "user_shell",
+                )?))
             }
             "approve" | "approval" => {
                 let approval_id = self.approval_id.ok_or(ProtocolError::MissingField {
@@ -534,6 +563,53 @@ fn bounded_text(value: Option<String>, field: &'static str) -> Result<String, Pr
     Ok(value)
 }
 
+fn bounded_text_allow_bare_bang(
+    value: Option<String>,
+    field: &'static str,
+) -> Result<String, ProtocolError> {
+    // A bare `!` is a valid local-shell help request, unlike ordinary text
+    // fields which reject whitespace-only values.
+    let value = value.ok_or(ProtocolError::MissingField { field })?;
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(ProtocolError::FieldTooLong {
+            field,
+            max: MAX_TEXT_BYTES,
+        });
+    }
+    if value.contains('\0') {
+        return Err(ProtocolError::InvalidField { field });
+    }
+    Ok(value)
+}
+
+fn parse_user_shell_input(
+    input: String,
+    field: &'static str,
+) -> Result<UserShellRequest, ProtocolError> {
+    if input.len() > MAX_USER_SHELL_BYTES {
+        return Err(ProtocolError::FieldTooLong {
+            field,
+            max: MAX_USER_SHELL_BYTES,
+        });
+    }
+    let trimmed = input.trim();
+    if !trimmed.starts_with('!') {
+        return Err(ProtocolError::InvalidField { field });
+    }
+    if trimmed.starts_with("!!") {
+        return Err(ProtocolError::UnsupportedUserShellExtension);
+    }
+    if trimmed
+        .chars()
+        .any(|character| character != '\n' && character != '\t' && character.is_control())
+    {
+        return Err(ProtocolError::InvalidField { field });
+    }
+    Ok(UserShellRequest {
+        input: trimmed.to_owned(),
+    })
+}
+
 fn validate_attachments(
     attachments: Vec<InputAttachment>,
 ) -> Result<Vec<InputAttachment>, ProtocolError> {
@@ -566,6 +642,8 @@ pub enum ProtocolError {
     FieldTooLong { field: &'static str, max: usize },
     #[error("field `{field}` contains invalid characters")]
     InvalidField { field: &'static str },
+    #[error("`!!` is not supported; use a single `!` for a local shell command")]
+    UnsupportedUserShellExtension,
     #[error("too many handoff artifacts (maximum {max})")]
     TooManyArtifacts { max: usize },
     #[error("too many attachments (maximum {max})")]
@@ -591,6 +669,7 @@ impl ProtocolError {
             Self::EmptyField { .. } => "empty_field",
             Self::FieldTooLong { .. } => "field_too_long",
             Self::InvalidField { .. } => "invalid_field",
+            Self::UnsupportedUserShellExtension => "unsupported_user_shell_extension",
             Self::TooManyArtifacts { .. } => "too_many_artifacts",
             Self::TooManyAttachments { .. } => "too_many_attachments",
             Self::LineTooLong { .. } => "line_too_long",

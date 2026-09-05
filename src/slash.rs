@@ -13,6 +13,8 @@ use crate::layout::{PaneId, TabId};
 
 /// Maximum UTF-8 bytes accepted for one slash command.
 pub const MAX_SLASH_INPUT_BYTES: usize = 16 * 1024;
+/// Maximum raw UTF-8 bytes accepted for an explicit user-shell input.
+pub const MAX_USER_SHELL_INPUT_BYTES: usize = 16 * 1024;
 
 /// Keep retention parsing bounded before a host touches the filesystem.
 /// Session directories are intentionally capped below this value as well;
@@ -523,6 +525,12 @@ pub enum SlashError {
     TooLong,
     #[error("slash command contains an unsupported control character")]
     ControlCharacter,
+    #[error("user-shell input exceeds {MAX_USER_SHELL_INPUT_BYTES} bytes")]
+    UserShellTooLong,
+    #[error("user-shell input contains an unsupported control character")]
+    UserShellControlCharacter,
+    #[error("`!!` is not supported; use a single `!` for a local shell command")]
+    UnsupportedUserShellExtension,
     #[error("unterminated quoted argument")]
     UnterminatedQuote,
     #[error("trailing escape in slash command")]
@@ -578,18 +586,39 @@ pub enum SlashError {
 /// Classification result for an input buffer before it reaches the model.
 ///
 /// Hosts should call [`route_input`] at their input boundary.  A `Slash`
-/// value is control-plane data and must be handled by the host; only a
-/// `Prompt` value is eligible for provider submission.  Keeping this small
+/// value is control-plane data and a `UserShell` value is an explicit local
+/// execution request; only a `Prompt` value is eligible for provider submission.
+/// Keeping this small
 /// enum next to the parser makes it difficult for one transport to silently
 /// treat an unknown slash command as ordinary model text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputRoute {
     Prompt(String),
     Slash(SlashCommand),
+    /// Trimmed raw input including the leading `!`. A bare `!` requests help.
+    /// Shell syntax is preserved for the authorized shell owner, not parsed
+    /// as slash-command arguments or executed by this routing layer.
+    UserShell(String),
 }
 
 /// Classify one user input without executing it.
 pub fn route_input(input: &str) -> Result<InputRoute, SlashError> {
+    let trimmed = input.trim();
+    if trimmed.starts_with('!') {
+        if input.len() > MAX_USER_SHELL_INPUT_BYTES {
+            return Err(SlashError::UserShellTooLong);
+        }
+        if input
+            .chars()
+            .any(|character| character != '\n' && character != '\t' && character.is_control())
+        {
+            return Err(SlashError::UserShellControlCharacter);
+        }
+        if trimmed.starts_with("!!") {
+            return Err(SlashError::UnsupportedUserShellExtension);
+        }
+        return Ok(InputRoute::UserShell(trimmed.to_owned()));
+    }
     match parse(input)? {
         Some(command) => Ok(InputRoute::Slash(command)),
         None => Ok(InputRoute::Prompt(input.to_owned())),
@@ -598,9 +627,10 @@ pub fn route_input(input: &str) -> Result<InputRoute, SlashError> {
 
 /// Parse an input buffer.
 ///
-/// `Ok(None)` means the input is ordinary model text.  A leading slash after
-/// optional whitespace is always treated as a control command; malformed or
-/// unknown commands return an error instead of silently reaching the model.
+/// `Ok(None)` means the input is not a slash command. Call [`route_input`] to
+/// distinguish ordinary model text from an explicit user-shell request. A
+/// leading slash after optional whitespace is always a control command;
+/// malformed or unknown commands never silently reach the model.
 pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
     if input.trim().is_empty() {
         return Ok(None);
