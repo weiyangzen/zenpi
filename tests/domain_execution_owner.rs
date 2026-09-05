@@ -4,8 +4,8 @@ use tempfile::tempdir;
 use zenpi::{
     b3::ResourceBudget,
     domain_execution::{
-        BlueprintExecutor, ExecutionError, ExecutionStatus, ExecutionStore, RunOutcome,
-        deterministic_cost,
+        BlueprintExecutor, ExecutionError, ExecutionReceipt, ExecutionStatus, ExecutionStore,
+        RunOutcome, deterministic_cost,
     },
     domains::{Blueprint, BlueprintItem, Goal},
 };
@@ -206,4 +206,38 @@ fn deterministic_cost_is_bounded_by_item_estimate() {
     let item = BlueprintItem::new("item", 42);
     assert_eq!(deterministic_cost(&item).tokens, 42);
     assert_eq!(deterministic_cost(&item).attempts, 1);
+}
+
+#[test]
+fn store_rejects_duplicate_goal_blueprint_item_attempt_even_with_new_execution_id() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("execution.json");
+    let (blueprint, goal) = fixture();
+    let item = &blueprint.items[0];
+    let mut store = ExecutionStore::open(&path).unwrap();
+    let receipt = ExecutionReceipt {
+        execution_id: "first-execution-id".into(),
+        goal_id: goal.id.clone(),
+        blueprint_id: blueprint.id.clone(),
+        blueprint_version: blueprint.version.clone(),
+        blueprint_digest: blueprint.digest.clone(),
+        item_id: item.id.clone(),
+        attempt: 1,
+        status: ExecutionStatus::Running,
+        cost: deterministic_cost(item),
+        evidence: "deterministic_local_evidence pending".into(),
+        error: None,
+    };
+    assert_eq!(
+        store.upsert_receipt(receipt.clone()).unwrap(),
+        zenpi::domain_execution::ExecutionStoreChange::Inserted
+    );
+
+    let mut duplicate = receipt;
+    duplicate.execution_id = "second-execution-id".into();
+    let error = store.upsert_receipt(duplicate).unwrap_err();
+    assert!(matches!(error, ExecutionError::ReceiptConflict { .. }));
+    assert_eq!(store.receipts().len(), 1);
+    assert_eq!(store.receipts()[0].execution_id, "first-execution-id");
+    assert_eq!(ExecutionStore::open(&path).unwrap().receipts().len(), 1);
 }
