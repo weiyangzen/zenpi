@@ -1406,7 +1406,7 @@ fn parse_mailbox(args: &[String]) -> Result<MailboxAction, SlashError> {
         "claim" if args.len() == 2 => Ok(MailboxAction::Claim {
             message_id: args[1].clone(),
         }),
-        "complete" if (4..=5).contains(&args.len()) => {
+        "complete" if (3..=4).contains(&args.len()) => {
             let outcome = match args[2].to_ascii_lowercase().as_str() {
                 "succeeded" | "success" => crate::protocol::MailboxOutcome::Succeeded,
                 "failed" | "failure" => crate::protocol::MailboxOutcome::Failed,
