@@ -120,6 +120,11 @@ pub enum SlashCommand {
     Session {
         action: SessionAction,
     },
+    /// Inspect or mutate the active session's durable mailbox. The mailbox
+    /// owner remains the session host; parsing never opens a journal.
+    Mailbox {
+        action: MailboxAction,
+    },
     /// Replay or recover a bounded event suffix.
     Resume {
         sequence: Option<u64>,
@@ -162,11 +167,79 @@ pub enum SlashCommand {
 #[serde(rename_all = "snake_case")]
 pub enum SessionAction {
     List,
-    Open { path: String },
-    Fork { source: String, destination: String },
-    Export { source: String, destination: String },
-    Import { source: String, destination: String },
-    Gc { policy: SessionGcPolicy },
+    Agents,
+    Inspect {
+        path: String,
+    },
+    Open {
+        path: String,
+    },
+    ResumeLast,
+    Fork {
+        source: String,
+        destination: String,
+    },
+    Export {
+        source: String,
+        destination: String,
+    },
+    Import {
+        source: String,
+        destination: String,
+    },
+    Migrate {
+        source: String,
+        destination: String,
+    },
+    Archive {
+        path: String,
+    },
+    Unarchive {
+        path: String,
+    },
+    Delete {
+        path: String,
+        confirmed: bool,
+    },
+    Queue {
+        source: String,
+        recipient: String,
+        request_id: String,
+        payload: serde_json::Value,
+        ttl_ms: u64,
+    },
+    Gc {
+        policy: SessionGcPolicy,
+    },
+}
+
+/// Slash projection of the typed protocol mailbox request. This keeps TUI
+/// and headless hosts on the same command grammar while preserving the
+/// protocol's bounded payload and explicit lifecycle transitions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailboxAction {
+    Send {
+        recipient_session_id: String,
+        message_id: String,
+        text: String,
+        ttl_ms: u64,
+    },
+    List {
+        after_sequence: u64,
+        limit: u16,
+    },
+    Acknowledge {
+        message_id: String,
+    },
+    Claim {
+        message_id: String,
+    },
+    Complete {
+        message_id: String,
+        outcome: crate::protocol::MailboxOutcome,
+        result: Option<String>,
+    },
 }
 
 /// Explicit retention and confirmation policy for `/session gc`.
@@ -273,6 +346,7 @@ impl SlashCommand {
             Self::Layout { .. } => "layout",
             Self::Pane { .. } => "pane",
             Self::Session { .. } => "session",
+            Self::Mailbox { .. } => "mailbox",
             Self::Resume { .. } => "resume",
             Self::Compact => "compact",
             Self::Diff { .. } => "diff",
@@ -305,6 +379,8 @@ impl SlashCommand {
                 | Self::LearnResume { .. }
                 | Self::Layout { .. }
                 | Self::Pane { .. }
+                | Self::Session { .. }
+                | Self::Mailbox { .. }
         )
     }
 
@@ -422,8 +498,15 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "session",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/session [list|open PATH|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|gc --retain-newest N --older-than-seconds N --yes]",
+        usage: "/session [list|agents|inspect PATH|open PATH|resume-last|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|migrate SOURCE DEST|archive PATH --yes|unarchive PATH|delete PATH --yes|queue SOURCE RECIPIENT ID TTL_MS JSON|gc ...]",
         summary: "navigate durable sessions",
+    },
+    SlashCommandSpec {
+        name: "mailbox",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/mailbox [send RECIPIENT ID TTL_MS TEXT|list [AFTER] [LIMIT]|ack ID|claim ID|complete ID succeeded|failed|abandoned [RESULT]]",
+        summary: "exchange durable session messages",
     },
     SlashCommandSpec {
         name: "resume",
@@ -555,6 +638,16 @@ pub enum SlashError {
     MissingSessionPath { action: &'static str },
     #[error("/session {action} received an unexpected argument")]
     UnexpectedSessionArgument { action: &'static str },
+    #[error("/session {action} requires explicit confirmation")]
+    MissingSessionConfirmation { action: &'static str },
+    #[error("/session queue payload must be valid JSON")]
+    InvalidSessionPayload,
+    #[error("/session queue TTL must be a positive bounded integer")]
+    InvalidSessionTtl,
+    #[error("/mailbox {action} received invalid arguments")]
+    InvalidMailboxArgument { action: &'static str },
+    #[error("/mailbox complete outcome must be succeeded, failed, or abandoned")]
+    InvalidMailboxOutcome,
     #[error("/session gc {flag} must be a non-negative integer")]
     InvalidSessionGcValue { flag: &'static str },
     #[error("/session gc requires --retain-newest N --older-than-seconds N --yes")]
@@ -718,6 +811,9 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         },
         "session" => SlashCommand::Session {
             action: parse_session(args)?,
+        },
+        "mailbox" => SlashCommand::Mailbox {
+            action: parse_mailbox(args)?,
         },
         "resume" => {
             if args.len() > 1 {
@@ -1159,9 +1255,26 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
             }
             Ok(SessionAction::List)
         }
+        "agents" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedSessionArgument { action: "agents" });
+            }
+            Ok(SessionAction::Agents)
+        }
+        "inspect" => Ok(SessionAction::Inspect {
+            path: required_session_path(args, "inspect")?,
+        }),
         "open" => Ok(SessionAction::Open {
             path: required_session_path(args, "open")?,
         }),
+        "resume-last" | "resume_last" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedSessionArgument {
+                    action: "resume-last",
+                });
+            }
+            Ok(SessionAction::ResumeLast)
+        }
         "fork" => {
             let (source, destination) = required_session_pair(args, "fork")?;
             Ok(SessionAction::Fork {
@@ -1183,10 +1296,130 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
                 destination,
             })
         }
+        "migrate" => {
+            let (source, destination) = required_session_pair(args, "migrate")?;
+            Ok(SessionAction::Migrate {
+                source,
+                destination,
+            })
+        }
+        "archive" => {
+            let path = required_session_path_with_yes(args, "archive")?;
+            Ok(SessionAction::Archive { path })
+        }
+        "unarchive" => Ok(SessionAction::Unarchive {
+            path: required_session_path(args, "unarchive")?,
+        }),
+        "delete" => {
+            let path = required_session_path_with_yes(args, "delete")?;
+            Ok(SessionAction::Delete {
+                path,
+                confirmed: true,
+            })
+        }
+        "queue" => parse_session_queue(args),
         "gc" => parse_session_gc(args),
         _ => Err(SlashError::UnknownSessionAction {
             action: action.clone(),
         }),
+    }
+}
+
+fn required_session_path_with_yes(
+    args: &[String],
+    action: &'static str,
+) -> Result<String, SlashError> {
+    if args.len() != 3 || args[2] != "--yes" {
+        return if args.len() < 2 {
+            Err(SlashError::MissingSessionPath { action })
+        } else {
+            Err(SlashError::MissingSessionConfirmation { action })
+        };
+    }
+    if args[1].trim().is_empty() {
+        return Err(SlashError::MissingSessionPath { action });
+    }
+    Ok(args[1].clone())
+}
+
+fn parse_session_queue(args: &[String]) -> Result<SessionAction, SlashError> {
+    if args.len() < 6 {
+        return Err(SlashError::MissingSessionPath { action: "queue" });
+    }
+    let ttl_ms = args[4]
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0 && *value <= crate::session::MAX_MAILBOX_TTL_MS)
+        .ok_or(SlashError::InvalidSessionTtl)?;
+    let payload_text = args[5..].join(" ");
+    let payload =
+        serde_json::from_str(&payload_text).map_err(|_| SlashError::InvalidSessionPayload)?;
+    Ok(SessionAction::Queue {
+        source: args[1].clone(),
+        recipient: args[2].clone(),
+        request_id: args[3].clone(),
+        payload,
+        ttl_ms,
+    })
+}
+
+fn parse_mailbox(args: &[String]) -> Result<MailboxAction, SlashError> {
+    let action = args.first().map(String::as_str).unwrap_or("list");
+    match action.to_ascii_lowercase().as_str() {
+        "send" if args.len() >= 5 => {
+            let ttl_ms = args[3]
+                .parse::<u64>()
+                .ok()
+                .filter(|value| *value > 0 && *value <= crate::protocol::MAX_MAILBOX_TTL_MS)
+                .ok_or(SlashError::InvalidSessionTtl)?;
+            Ok(MailboxAction::Send {
+                recipient_session_id: args[1].clone(),
+                message_id: args[2].clone(),
+                ttl_ms,
+                text: args[4..].join(" "),
+            })
+        }
+        "list" if args.len() <= 3 => {
+            let after_sequence = args
+                .get(1)
+                .map(|value| value.parse::<u64>())
+                .transpose()
+                .map_err(|_| SlashError::InvalidMailboxArgument { action: "list" })?
+                .unwrap_or(0);
+            let limit = args
+                .get(2)
+                .map(|value| value.parse::<u16>())
+                .transpose()
+                .map_err(|_| SlashError::InvalidMailboxArgument { action: "list" })?
+                .unwrap_or(64);
+            if limit == 0 || limit > 64 {
+                return Err(SlashError::InvalidMailboxArgument { action: "list" });
+            }
+            Ok(MailboxAction::List {
+                after_sequence,
+                limit,
+            })
+        }
+        "ack" | "acknowledge" if args.len() == 2 => Ok(MailboxAction::Acknowledge {
+            message_id: args[1].clone(),
+        }),
+        "claim" if args.len() == 2 => Ok(MailboxAction::Claim {
+            message_id: args[1].clone(),
+        }),
+        "complete" if (4..=5).contains(&args.len()) => {
+            let outcome = match args[2].to_ascii_lowercase().as_str() {
+                "succeeded" | "success" => crate::protocol::MailboxOutcome::Succeeded,
+                "failed" | "failure" => crate::protocol::MailboxOutcome::Failed,
+                "abandoned" | "abandon" => crate::protocol::MailboxOutcome::Abandoned,
+                _ => return Err(SlashError::InvalidMailboxOutcome),
+            };
+            Ok(MailboxAction::Complete {
+                message_id: args[1].clone(),
+                outcome,
+                result: args.get(3).cloned(),
+            })
+        }
+        _ => Err(SlashError::InvalidMailboxArgument { action: "mailbox" }),
     }
 }
 
@@ -1515,5 +1748,47 @@ mod tests {
             }
         ));
         assert!(parse("/session gc --retain-newest 0 --older-than-seconds 0 --yes").is_err());
+    }
+
+    #[test]
+    fn session_lifecycle_and_mailbox_commands_are_typed() {
+        assert_eq!(
+            parse("/session resume-last").unwrap(),
+            Some(SlashCommand::Session {
+                action: SessionAction::ResumeLast,
+            })
+        );
+        assert_eq!(
+            parse("/session archive child.jsonl --yes").unwrap(),
+            Some(SlashCommand::Session {
+                action: SessionAction::Archive {
+                    path: "child.jsonl".into(),
+                },
+            })
+        );
+        assert!(matches!(
+            parse("/session delete child.jsonl").unwrap_err(),
+            SlashError::MissingSessionConfirmation { action: "delete" }
+        ));
+        assert_eq!(
+            parse("/mailbox list 4 12").unwrap(),
+            Some(SlashCommand::Mailbox {
+                action: MailboxAction::List {
+                    after_sequence: 4,
+                    limit: 12,
+                },
+            })
+        );
+        assert_eq!(
+            parse("/mailbox send recipient request-1 1000 hello world").unwrap(),
+            Some(SlashCommand::Mailbox {
+                action: MailboxAction::Send {
+                    recipient_session_id: "recipient".into(),
+                    message_id: "request-1".into(),
+                    text: "hello world".into(),
+                    ttl_ms: 1000,
+                },
+            })
+        );
     }
 }

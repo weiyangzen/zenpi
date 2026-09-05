@@ -2657,10 +2657,42 @@ pub fn dispatch_slash_command(
                     "session cannot be opened while the agent is busy",
                 ),
             },
-            action @ (crate::slash::SessionAction::Fork { .. }
+            crate::slash::SessionAction::ResumeLast => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::resume_last_session_view(agent) {
+                    Ok(data) => {
+                        reload_state_from_agent(state, agent);
+                        state.push_message(
+                            MessageRole::System,
+                            format!(
+                                "session resumed:\n{}",
+                                bounded_display(
+                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                                )
+                            ),
+                        );
+                    }
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("session resume-last failed: {error}"),
+                    ),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "session resume-last requires the session owner",
+                ),
+            },
+            action @ (crate::slash::SessionAction::Agents
+            | crate::slash::SessionAction::Inspect { .. }
+            | crate::slash::SessionAction::Fork { .. }
             | crate::slash::SessionAction::Export { .. }
-            | crate::slash::SessionAction::Import { .. }) => {
-                match crate::headless::session_maintenance_view(&action) {
+            | crate::slash::SessionAction::Import { .. }
+            | crate::slash::SessionAction::Migrate { .. }
+            | crate::slash::SessionAction::Archive { .. }
+            | crate::slash::SessionAction::Unarchive { .. }
+            | crate::slash::SessionAction::Delete { .. }
+            | crate::slash::SessionAction::Queue { .. }) => {
+                let active_path = agent.as_deref().map(|value| value.session().path());
+                match crate::headless::session_lifecycle_view(&action, active_path) {
                     Ok(data) => state.push_message(
                         MessageRole::System,
                         format!(
@@ -2696,6 +2728,26 @@ pub fn dispatch_slash_command(
                     "session gc is unavailable while the agent is busy",
                 ),
             },
+        },
+        SlashCommand::Mailbox { action } => match agent.as_deref() {
+            Some(agent) => match crate::headless::mailbox_slash_view(agent, &action) {
+                Ok(data) => state.push_message(
+                    MessageRole::System,
+                    format!(
+                        "mailbox:\n{}",
+                        bounded_display(
+                            &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                        )
+                    ),
+                ),
+                Err(error) => {
+                    state.push_message(MessageRole::Error, format!("mailbox failed: {error}"))
+                }
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "mailbox command requires the session owner",
+            ),
         },
         SlashCommand::Resume { sequence } => {
             let Some(agent) = agent.as_deref_mut() else {
@@ -3306,10 +3358,18 @@ fn blueprint_action_display(action: &BlueprintAction) -> String {
 fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
     match action {
         crate::slash::SessionAction::List => "list",
+        crate::slash::SessionAction::Agents => "agents",
+        crate::slash::SessionAction::Inspect { .. } => "inspect",
         crate::slash::SessionAction::Open { .. } => "open",
+        crate::slash::SessionAction::ResumeLast => "resume-last",
         crate::slash::SessionAction::Fork { .. } => "fork",
         crate::slash::SessionAction::Export { .. } => "export",
         crate::slash::SessionAction::Import { .. } => "import",
+        crate::slash::SessionAction::Migrate { .. } => "migrate",
+        crate::slash::SessionAction::Archive { .. } => "archive",
+        crate::slash::SessionAction::Unarchive { .. } => "unarchive",
+        crate::slash::SessionAction::Delete { .. } => "delete",
+        crate::slash::SessionAction::Queue { .. } => "queue",
         crate::slash::SessionAction::Gc { .. } => "gc",
     }
 }

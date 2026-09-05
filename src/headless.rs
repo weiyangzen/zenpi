@@ -1424,6 +1424,260 @@ pub fn session_maintenance_view(
     }))
 }
 
+/// Execute the complete typed session lifecycle owner behind the shared slash
+/// dispatcher.  The session module owns locking, identity and confirmation
+/// checks; this adapter only resolves bounded host paths and projects a
+/// secret-free receipt for TUI/headless callers.
+pub fn session_lifecycle_view(
+    action: &crate::slash::SessionAction,
+    active_session: Option<&Path>,
+) -> Result<serde_json::Value, String> {
+    use crate::session::{
+        SessionLifecycleReceipt as Receipt, SessionLifecycleRequest as Request,
+        execute_session_lifecycle,
+    };
+    use crate::slash::SessionAction;
+
+    let paths = crate::config::ConfigPaths::discover().map_err(|error| error.to_string())?;
+    let request = match action {
+        SessionAction::List => Request::List {
+            directory: paths.sessions,
+            include_archived: false,
+        },
+        SessionAction::Agents => Request::Agents {
+            directory: paths.sessions,
+        },
+        SessionAction::Inspect { path } => Request::Inspect {
+            path: validate_existing_session_path(path)?,
+        },
+        SessionAction::ResumeLast => Request::ResumeLast {
+            directory: paths.sessions,
+        },
+        SessionAction::Fork {
+            source,
+            destination,
+        } => Request::Fork {
+            source: validate_existing_session_path(source)?,
+            destination: validate_session_destination_path(destination)?,
+        },
+        SessionAction::Export {
+            source,
+            destination,
+        } => Request::Export {
+            source: validate_existing_session_path(source)?,
+            destination: validate_session_destination_path(destination)?,
+        },
+        SessionAction::Import {
+            source,
+            destination,
+        } => Request::Import {
+            source: validate_existing_session_path(source)?,
+            destination: validate_session_destination_path(destination)?,
+        },
+        SessionAction::Migrate {
+            source,
+            destination,
+        } => Request::Migrate {
+            source: validate_existing_session_path(source)?,
+            destination: validate_session_destination_path(destination)?,
+        },
+        SessionAction::Archive { path } => Request::Archive {
+            path: validate_existing_session_path(path)?,
+        },
+        SessionAction::Unarchive { path } => Request::Unarchive {
+            path: validate_existing_session_path(path)?,
+        },
+        SessionAction::Delete { path, confirmed } => Request::Delete {
+            path: validate_existing_session_path(path)?,
+            confirmed: *confirmed,
+        },
+        SessionAction::Queue {
+            source,
+            recipient,
+            request_id,
+            payload,
+            ttl_ms,
+        } => Request::Queue {
+            source: validate_existing_session_path(source)?,
+            recipient: validate_existing_session_path(recipient)?,
+            request_id: request_id.clone(),
+            payload: payload.clone(),
+            ttl_ms: *ttl_ms,
+        },
+        SessionAction::Gc { policy } => Request::Gc {
+            directory: paths.sessions,
+            retain_newest: policy.retain_newest,
+            older_than_ms: policy.older_than_seconds.saturating_mul(1_000),
+            confirmed: policy.confirm,
+        },
+        SessionAction::Open { .. } => {
+            return Err("session open must use the active session owner".into());
+        }
+    };
+    let receipt = execute_session_lifecycle(request, active_session, unix_time_ms())
+        .map_err(|error| error.to_string())?;
+    let data = match receipt {
+        Receipt::Catalog { sessions } => json!({
+            "sessions": sessions.iter().map(serialized_catalog_entry).collect::<Vec<_>>()
+        }),
+        Receipt::Inspection { inspection } => json!({
+            "session": serialized_session_summary(&inspection.summary),
+            "turn_count": inspection.turns.len(),
+            "event_count": inspection.events.len(),
+            "recovery_warnings": inspection.recovery_warnings.len(),
+        }),
+        Receipt::Session { session } => json!({
+            "session": serialized_catalog_entry(&session)
+        }),
+        Receipt::Deleted { path } => json!({
+            "path": redact_session_path(&path.display().to_string())
+        }),
+        Receipt::Queued { message } => json!({
+            "message_id": message.digest,
+            "message": message,
+            "execution_started": false,
+        }),
+        Receipt::GarbageCollected {
+            removed,
+            inspected,
+            skipped_unowned,
+        } => json!({
+            "removed": removed.iter().map(|path| redact_session_path(&path.display().to_string())).collect::<Vec<_>>(),
+            "inspected": inspected,
+            "skipped_unowned": skipped_unowned,
+        }),
+    };
+    let mut response = json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": session_action_name(action),
+        "durable": true,
+        "receipt": data,
+    });
+    // Keep the compatibility shape for callers that expect a top-level
+    // catalog/session field while retaining the typed receipt projection.
+    if let Some(object) = response.as_object_mut()
+        && let Some(receipt_object) = data.as_object()
+    {
+        for key in ["sessions", "session", "message_id", "message", "removed"] {
+            if let Some(value) = receipt_object.get(key) {
+                object.insert(key.into(), value.clone());
+            }
+        }
+    }
+    Ok(response)
+}
+
+fn serialized_catalog_entry(entry: &crate::session::SessionCatalogEntry) -> serde_json::Value {
+    let mut value = serialized_session_summary(&entry.summary);
+    if let Some(object) = value.as_object_mut() {
+        object.insert("archived".into(), json!(entry.archived));
+        object.insert("last_activity_ms".into(), json!(entry.last_activity_ms));
+    }
+    value
+}
+
+fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
+    use crate::slash::SessionAction;
+    match action {
+        SessionAction::List => "list",
+        SessionAction::Agents => "agents",
+        SessionAction::Inspect { .. } => "inspect",
+        SessionAction::Open { .. } => "open",
+        SessionAction::ResumeLast => "resume_last",
+        SessionAction::Fork { .. } => "fork",
+        SessionAction::Export { .. } => "export",
+        SessionAction::Import { .. } => "import",
+        SessionAction::Migrate { .. } => "migrate",
+        SessionAction::Archive { .. } => "archive",
+        SessionAction::Unarchive { .. } => "unarchive",
+        SessionAction::Delete { .. } => "delete",
+        SessionAction::Queue { .. } => "queue",
+        SessionAction::Gc { .. } => "gc",
+    }
+}
+
+/// `/session resume-last` must replace the active agent, not merely open and
+/// drop a temporary store. This helper is intentionally separate from the
+/// immutable lifecycle receipt adapter above.
+pub fn resume_last_session_view(agent: &mut Agent) -> Result<serde_json::Value, String> {
+    if agent.phase() != crate::core::AgentPhase::Idle {
+        return Err("session resume-last is available only while the agent is idle".into());
+    }
+    let paths = crate::config::ConfigPaths::discover().map_err(|error| error.to_string())?;
+    let store =
+        crate::session::resume_last_session(&paths.sessions).map_err(|error| error.to_string())?;
+    let path = store.path().to_owned();
+    agent
+        .resume_session(path)
+        .map_err(|error| error.to_string())?;
+    Ok(json!({
+        "command": "session",
+        "route": "local",
+        "accepted": true,
+        "action": "resume_last",
+        "durable": true,
+        "session": serialized_session_summary(&agent.snapshot().session),
+    }))
+}
+
+/// Map the protocol mailbox request onto the shared session mailbox owner.
+pub fn mailbox_slash_view(
+    agent: &Agent,
+    action: &crate::slash::MailboxAction,
+) -> Result<serde_json::Value, String> {
+    let request = match action {
+        crate::slash::MailboxAction::Send {
+            recipient_session_id,
+            message_id,
+            text,
+            ttl_ms,
+        } => crate::protocol::MailboxRequest::Send {
+            recipient_session_id: recipient_session_id.clone(),
+            message_id: message_id.clone(),
+            text: text.clone(),
+            ttl_ms: *ttl_ms,
+        },
+        crate::slash::MailboxAction::List {
+            after_sequence,
+            limit,
+        } => crate::protocol::MailboxRequest::Receive {
+            after_sequence: *after_sequence,
+            limit: *limit,
+        },
+        crate::slash::MailboxAction::Acknowledge { message_id } => {
+            crate::protocol::MailboxRequest::Acknowledge {
+                message_id: message_id.clone(),
+            }
+        }
+        crate::slash::MailboxAction::Claim { message_id } => {
+            crate::protocol::MailboxRequest::Claim {
+                message_id: message_id.clone(),
+            }
+        }
+        crate::slash::MailboxAction::Complete {
+            message_id,
+            outcome,
+            result,
+        } => crate::protocol::MailboxRequest::Complete {
+            message_id: message_id.clone(),
+            outcome: *outcome,
+            result: result.clone(),
+        },
+    };
+    execute_mailbox(agent.session(), &request)
+        .map(|mut value| {
+            if let Some(object) = value.as_object_mut() {
+                object.insert("command".into(), json!("mailbox"));
+                object.insert("route".into(), json!("local"));
+                object.insert("accepted".into(), json!(true));
+            }
+            value
+        })
+        .map_err(|error| error.to_string())
+}
+
 /// Execute the explicitly confirmed session-retention owner for both TUI and
 /// headless hosts. The active journal is excluded by identity, and the
 /// session module performs the final ownership/symlink checks before removal.
@@ -5073,14 +5327,38 @@ fn execute_headless_slash(
                         message,
                     })
             }
-            action @ (crate::slash::SessionAction::Fork { .. }
+            crate::slash::SessionAction::ResumeLast => {
+                let Some(agent) = agent else {
+                    return Err(SlashDispatchError {
+                        code: "agent_busy",
+                        message: "session resume-last requires the session owner".into(),
+                    });
+                };
+                resume_last_session_view(agent)
+                    .map(SlashExecution::Response)
+                    .map_err(|message| SlashDispatchError {
+                        code: "session_resume_failed",
+                        message,
+                    })
+            }
+            action @ (crate::slash::SessionAction::Agents
+            | crate::slash::SessionAction::Inspect { .. }
+            | crate::slash::SessionAction::Fork { .. }
             | crate::slash::SessionAction::Export { .. }
-            | crate::slash::SessionAction::Import { .. }) => session_maintenance_view(&action)
-                .map(SlashExecution::Response)
-                .map_err(|message| SlashDispatchError {
-                    code: "session_maintenance_failed",
-                    message,
-                }),
+            | crate::slash::SessionAction::Import { .. }
+            | crate::slash::SessionAction::Migrate { .. }
+            | crate::slash::SessionAction::Archive { .. }
+            | crate::slash::SessionAction::Unarchive { .. }
+            | crate::slash::SessionAction::Delete { .. }
+            | crate::slash::SessionAction::Queue { .. }) => {
+                let active_path = agent.as_deref().map(|value| value.session().path());
+                session_lifecycle_view(&action, active_path)
+                    .map(SlashExecution::Response)
+                    .map_err(|message| SlashDispatchError {
+                        code: "session_lifecycle_failed",
+                        message,
+                    })
+            }
             crate::slash::SessionAction::Gc { policy } => {
                 let Some(agent) = agent else {
                     return Err(SlashDispatchError {
@@ -5096,6 +5374,20 @@ fn execute_headless_slash(
                     })
             }
         },
+        SlashCommand::Mailbox { action } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "mailbox command requires the session owner".into(),
+                });
+            };
+            mailbox_slash_view(agent, &action)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "mailbox_failed",
+                    message,
+                })
+        }
         SlashCommand::Resume { sequence } => {
             let Some(agent) = agent else {
                 return Err(SlashDispatchError {
