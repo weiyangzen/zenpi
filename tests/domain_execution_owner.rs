@@ -154,6 +154,50 @@ fn handoff_store_rejects_tampering_and_does_not_execute_acceptance_commands() {
 }
 
 #[test]
+fn control_plane_success_does_not_unblock_a_dependent_external_handoff() {
+    let dir = tempdir().unwrap();
+    let blueprint = Blueprint::new(
+        "handoff-dependencies",
+        "1",
+        vec![
+            BlueprintItem::new("build", 10)
+                .with_task(BlueprintTask::new("build", vec!["true".into()]).unwrap()),
+            BlueprintItem::new("verify", 10)
+                .with_dependencies(["build"])
+                .with_task(BlueprintTask::new("verify", vec!["true".into()]).unwrap()),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new(
+        "handoff-dependencies-goal",
+        &blueprint,
+        ResourceBudget {
+            tokens: 100,
+            wall_clock_ms: 10,
+            attempts: 4,
+            disk_bytes: 2_000,
+        },
+        None,
+    )
+    .unwrap();
+    let execution_path = dir.path().join("execution.json");
+    let mut local = BlueprintExecutor::new(ExecutionStore::open(&execution_path).unwrap());
+    let RunOutcome::Executed { receipt, .. } = local.run_next(&goal, &blueprint, || false).unwrap()
+    else {
+        panic!("expected local control-plane receipt");
+    };
+    assert!(!receipt.external_work_executed);
+
+    let mut handoffs = HandoffStore::open(dir.path().join("handoff.json")).unwrap();
+    let owner = BlueprintExecutor::new(ExecutionStore::open(&execution_path).unwrap());
+    let queued = owner
+        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .unwrap();
+    assert_eq!(queued.request.item_id, "build");
+    assert_eq!(queued.request.attempt, 2);
+}
+
+#[test]
 fn owner_selects_dependencies_and_persists_running_then_terminal_receipts() {
     let dir = tempdir().unwrap();
     let store = ExecutionStore::open(dir.path().join("execution.json")).unwrap();
