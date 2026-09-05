@@ -549,3 +549,371 @@ fn large_tool_results_become_private_retrievable_artifacts() {
         );
     }
 }
+
+fn worker_policy() -> tools::BlueprintPolicySpec {
+    tools::BlueprintPolicySpec {
+        blueprint_digest: "a".repeat(64),
+        goal_digest: "b".repeat(64),
+        item_id: "CF-404".into(),
+        allowed_tools: [
+            "read_file",
+            "list_directory",
+            "search_text",
+            "write_file",
+            "edit_file",
+            "run_command",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
+        readable_paths: [".".into()].into(),
+        writable_paths: ["src".into()].into(),
+        denied_paths: ["private".into()].into(),
+        protected_paths: ["policy.json".into()].into(),
+        allowed_commands: ["echo safe", "true"].map(str::to_owned).into(),
+        denied_commands: Default::default(),
+        network_hosts: Default::default(),
+        max_actions: 100,
+        max_command_timeout_ms: 1000,
+        max_command_output_bytes: 1024,
+    }
+}
+
+fn worker_context(
+    root: &std::path::Path,
+    spec: tools::BlueprintPolicySpec,
+) -> (ToolContext, tools::BlueprintRevocation) {
+    let context = ToolContext::new(root).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let lease = tools::BlueprintLease {
+        lease_id: "lease-1".into(),
+        issued_at_ms: now,
+        expires_at_ms: now + 10_000,
+    };
+    let (gate, revoke) = tools::BlueprintGate::compile(&context, spec, lease, now).unwrap();
+    (context.with_blueprint_gate(gate).unwrap(), revoke)
+}
+
+#[test]
+fn worker_gate_is_immutable_digest_bound_and_deny_over_allow() {
+    let root = tempdir().unwrap();
+    fs::create_dir(root.path().join("private")).unwrap();
+    fs::write(root.path().join("private/secret.txt"), "hidden").unwrap();
+    fs::write(root.path().join(".env"), "SECRET=hidden").unwrap();
+    let mut spec = worker_policy();
+    let (context, _) = worker_context(root.path(), spec.clone());
+    spec.denied_paths.clear();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    for path in ["private/secret.txt", "./private/secret.txt", ".env"] {
+        let result = registry.execute(
+            &context,
+            SideEffectPolicy::all_builtins(),
+            call("read_file", json!({"path": path})),
+        );
+        assert_eq!(error_code(result), ToolErrorCode::PolicyDenied);
+    }
+    for path in ["outside.txt", "src/.env", "src/Blueprint.md", "policy.json"] {
+        assert_eq!(
+            error_code(registry.execute(
+                &context,
+                SideEffectPolicy::all_builtins(),
+                call("write_file", json!({"path": path,"content":"denied"}))
+            )),
+            ToolErrorCode::PolicyDenied
+        );
+        assert!(!root.path().join(path).exists());
+    }
+    let result = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("write_file", json!({"path":"src/ok.txt","content":"ok"})),
+    ));
+    assert_eq!(
+        fs::read_to_string(root.path().join("src/ok.txt")).unwrap(),
+        "ok"
+    );
+    let evidence = context.policy_evidence().unwrap();
+    assert_eq!(evidence.policy_digest.len(), 64);
+    assert_eq!(
+        result["policy_evidence"]["policy_digest"],
+        evidence.policy_digest
+    );
+    assert_eq!(result["policy_evidence"]["lease_id"], "lease-1");
+    assert_eq!(result["policy_evidence"]["origin"], "blueprint_worker");
+}
+
+#[test]
+fn worker_gate_rejects_unbound_origin_cross_origin_and_revocation() {
+    let root = tempdir().unwrap();
+    fs::write(root.path().join("ok.txt"), "ok").unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let unbound = ToolContext::new(root.path())
+        .unwrap()
+        .with_origin(tools::ToolOrigin::BlueprintWorker);
+    assert_eq!(
+        error_code(registry.execute(
+            &unbound,
+            SideEffectPolicy::all_builtins(),
+            call("read_file", json!({"path":"ok.txt"}))
+        )),
+        ToolErrorCode::PolicyDenied
+    );
+    let (worker, revoke) = worker_context(root.path(), worker_policy());
+    for origin in [tools::ToolOrigin::AgentTool, tools::ToolOrigin::UserShell] {
+        assert_eq!(
+            error_code(registry.execute(
+                &worker.clone().with_origin(origin),
+                SideEffectPolicy::all_builtins(),
+                call("read_file", json!({"path":"ok.txt"}))
+            )),
+            ToolErrorCode::PolicyDenied
+        );
+    }
+    revoke.revoke();
+    assert_eq!(
+        error_code(registry.execute(
+            &worker,
+            SideEffectPolicy::all_builtins(),
+            call("read_file", json!({"path":"ok.txt"}))
+        )),
+        ToolErrorCode::PolicyDenied
+    );
+}
+
+#[test]
+fn worker_preflight_rejects_unknown_effects_network_and_general_shell() {
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let lease = tools::BlueprintLease {
+        lease_id: "lease".into(),
+        issued_at_ms: now,
+        expires_at_ms: now + 1000,
+    };
+    let mut unknown = worker_policy();
+    unknown.allowed_tools.insert("external_agent".into());
+    let mut network = worker_policy();
+    network.network_hosts.insert("example.com".into());
+    for spec in [unknown, network] {
+        assert!(tools::BlueprintGate::compile(&context, spec, lease.clone(), now).is_err());
+    }
+    for command in [
+        "rm -rf src",
+        "curl example.com",
+        "codex",
+        "sh -c true",
+        "echo $(touch evil)",
+        "echo safe > out",
+        "echo safe; true",
+        "echo safe\ntrue",
+    ] {
+        let mut spec = worker_policy();
+        spec.allowed_commands.insert(command.into());
+        assert!(
+            tools::BlueprintGate::compile(&context, spec, lease.clone(), now).is_err(),
+            "admitted {command}"
+        );
+    }
+    let mut expired = lease.clone();
+    expired.expires_at_ms = now;
+    assert!(tools::BlueprintGate::compile(&context, worker_policy(), expired, now).is_err());
+    let (gate, _) = tools::BlueprintGate::compile(&context, worker_policy(), lease, now).unwrap();
+    let other = tempdir().unwrap();
+    assert!(
+        ToolContext::new(other.path())
+            .unwrap()
+            .with_blueprint_gate(gate)
+            .is_err()
+    );
+}
+
+#[test]
+fn worker_search_listing_and_compaction_do_not_leak_prohibited_paths() {
+    let root = tempdir().unwrap();
+    fs::write(root.path().join("ok.txt"), "needle visible").unwrap();
+    fs::write(root.path().join(".env"), "needle hidden").unwrap();
+    fs::create_dir(root.path().join("private")).unwrap();
+    fs::write(root.path().join("private/secret"), "needle hidden").unwrap();
+    let (context, _) = worker_context(root.path(), worker_policy());
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let output = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("list_directory", json!({})),
+    ));
+    assert_eq!(output["entries"].as_array().unwrap().len(), 1);
+    let output = successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("search_text", json!({"query":"needle"})),
+    ));
+    assert_eq!(output["matches"].as_array().unwrap().len(), 1);
+    assert!(!output.to_string().contains("hidden"));
+    fs::write(root.path().join("large.txt"), "a".repeat(100_000)).unwrap();
+    let output = successful_output(registry.execute_compact(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("read_file", json!({"path":"large.txt"})),
+    ));
+    assert_eq!(output["truncated"], true);
+    assert!(output["artifact"].is_null());
+    assert!(!root.path().join(".zenpi").exists());
+}
+
+#[test]
+fn worker_action_budget_is_shared_across_context_clones_and_direct_invocation() {
+    let root = tempdir().unwrap();
+    fs::write(root.path().join("ok.txt"), "ok").unwrap();
+    let mut spec = worker_policy();
+    spec.max_actions = 1;
+    let (context, _) = worker_context(root.path(), spec);
+    let arguments = json!({"path":"ok.txt"});
+    tools::ReadFileTool
+        .invoke(&context, arguments.as_object().unwrap())
+        .unwrap();
+    let error = tools::ReadFileTool
+        .invoke(&context.clone(), arguments.as_object().unwrap())
+        .unwrap_err();
+    assert_eq!(error.code(), ToolErrorCode::PolicyDenied);
+    assert!(error.to_string().contains("action_budget_exhausted"));
+}
+
+#[cfg(unix)]
+#[test]
+fn worker_gate_refuses_symlinks_and_hardlinks_even_inside_workspace() {
+    use std::os::unix::fs::symlink;
+    let root = tempdir().unwrap();
+    fs::write(root.path().join("secret.key"), "secret").unwrap();
+    symlink("secret.key", root.path().join("alias")).unwrap();
+    fs::hard_link(
+        root.path().join("secret.key"),
+        root.path().join("hardalias"),
+    )
+    .unwrap();
+    let (context, _) = worker_context(root.path(), worker_policy());
+    for path in ["alias", "hardalias"] {
+        let error = tools::ReadFileTool
+            .invoke(&context, json!({"path":path}).as_object().unwrap())
+            .unwrap_err();
+        assert_eq!(error.code(), ToolErrorCode::PolicyDenied);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn worker_commands_are_declared_direct_argv_with_no_shell_expansion() {
+    let root = tempdir().unwrap();
+    let mut spec = worker_policy();
+    spec.denied_commands.insert("true".into());
+    let (context, _) = worker_context(root.path(), spec);
+    let output = tools::RunCommandTool::invoke_with_cancel(
+        &context,
+        json!({"command":"echo safe"}).as_object().unwrap(),
+        &|| false,
+    )
+    .unwrap();
+    assert_eq!(output["stdout"], "safe\n");
+    assert_eq!(output["origin"], "blueprint_worker");
+    for command in ["true", "echo other", "echo safe; touch marker"] {
+        let error = tools::RunCommandTool::invoke_with_cancel(
+            &context,
+            json!({"command":command}).as_object().unwrap(),
+            &|| false,
+        )
+        .unwrap_err();
+        assert_eq!(error.code(), ToolErrorCode::PolicyDenied);
+    }
+    assert!(!root.path().join("marker").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn precancelled_command_does_not_spawn_and_user_shell_keeps_exit_evidence() {
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    let error = tools::RunCommandTool::invoke_with_cancel(
+        &context,
+        json!({"command":"printf ran > marker"})
+            .as_object()
+            .unwrap(),
+        &|| true,
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), ToolErrorCode::Cancelled);
+    assert!(!root.path().join("marker").exists());
+    let context = context.with_origin(tools::ToolOrigin::UserShell);
+    let output = tools::RunCommandTool::invoke_user_shell_with_cancel(
+        &context,
+        json!({"command":"printf out; printf err >&2; exit 7"})
+            .as_object()
+            .unwrap(),
+        &|| false,
+    )
+    .unwrap();
+    assert_eq!(output["origin"], "user_shell");
+    assert_eq!(output["exit_code"], 7);
+    assert_eq!(output["stdout"], "out");
+    assert_eq!(output["stderr"], "err");
+    assert_eq!(output["child_reaped"], true);
+    assert_eq!(output["process_group_terminated"], true);
+}
+
+#[cfg(unix)]
+#[test]
+fn successful_shell_cannot_leave_background_process_or_hold_pipe_forever() {
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    for command in [
+        "(sleep 0.5; printf leaked > marker) & exit 0",
+        "(sleep 0.5; printf leaked > marker) >/dev/null 2>&1 & exit 0",
+    ] {
+        let start = std::time::Instant::now();
+        tools::RunCommandTool::invoke_with_cancel(
+            &context,
+            json!({"command":command,"timeout_ms":100})
+                .as_object()
+                .unwrap(),
+            &|| false,
+        )
+        .unwrap();
+        assert!(start.elapsed() < std::time::Duration::from_millis(400));
+        std::thread::sleep(std::time::Duration::from_millis(550));
+        assert!(!root.path().join("marker").exists());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn term_resistant_descendants_die_after_timeout_and_host_cancel() {
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    for host_cancel in [false, true] {
+        let start = std::time::Instant::now();
+        let command = "(trap '' TERM; sleep 0.3; printf leaked > marker) & wait";
+        let error = tools::RunCommandTool::invoke_with_cancel(
+            &context,
+            json!({"command":command,"timeout_ms":30})
+                .as_object()
+                .unwrap(),
+            &|| host_cancel && start.elapsed() > std::time::Duration::from_millis(20),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.code(),
+            if host_cancel {
+                ToolErrorCode::Cancelled
+            } else {
+                ToolErrorCode::CommandTimeout
+            }
+        );
+        assert!(start.elapsed() < std::time::Duration::from_millis(400));
+        std::thread::sleep(std::time::Duration::from_millis(350));
+        assert!(!root.path().join("marker").exists());
+    }
+}

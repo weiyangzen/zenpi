@@ -7,13 +7,16 @@
 //! explicit policy grants and are guarded by the host approval boundary.
 
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Component, Path, PathBuf},
     process::{Command, Stdio},
-    sync::atomic::{AtomicU64, Ordering},
-    time::{Duration, Instant},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
@@ -81,6 +84,380 @@ impl SideEffectPolicy {
             allow_workspace_writes: true,
             allow_command_execution: true,
         }
+    }
+}
+
+/// Set by the host route, never parsed from model-supplied tool arguments.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolOrigin {
+    #[default]
+    AgentTool,
+    UserShell,
+    BlueprintWorker,
+}
+
+/// Mutable input to preflight. The compiled gate retains a private snapshot.
+/// An allow list cannot override the built-in credential/prohibition rules.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlueprintPolicySpec {
+    pub blueprint_digest: String,
+    pub goal_digest: String,
+    pub item_id: String,
+    pub allowed_tools: BTreeSet<String>,
+    pub readable_paths: BTreeSet<String>,
+    pub writable_paths: BTreeSet<String>,
+    pub denied_paths: BTreeSet<String>,
+    pub protected_paths: BTreeSet<String>,
+    pub allowed_commands: BTreeSet<String>,
+    pub denied_commands: BTreeSet<String>,
+    pub network_hosts: BTreeSet<String>,
+    pub max_actions: u64,
+    pub max_command_timeout_ms: u64,
+    pub max_command_output_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlueprintLease {
+    pub lease_id: String,
+    pub issued_at_ms: u64,
+    pub expires_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyEvidence {
+    pub origin: ToolOrigin,
+    pub policy_digest: String,
+    pub blueprint_digest: String,
+    pub goal_digest: String,
+    pub item_id: String,
+    pub lease_id: String,
+    pub expires_at_ms: u64,
+    pub prohibition_gate_enforced: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlueprintGate {
+    policy: BlueprintPolicySpec,
+    lease: BlueprintLease,
+    workspace_root: PathBuf,
+    digest: String,
+    revoked: Arc<AtomicBool>,
+    actions: Arc<AtomicU64>,
+}
+
+/// Host-owned cancellation capability. Workers receive only the compiled gate.
+#[derive(Debug, Clone)]
+pub struct BlueprintRevocation(Arc<AtomicBool>);
+
+impl BlueprintRevocation {
+    pub fn revoke(&self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+}
+
+impl BlueprintGate {
+    pub fn compile(
+        context: &ToolContext,
+        policy: BlueprintPolicySpec,
+        lease: BlueprintLease,
+        now_ms: u64,
+    ) -> Result<(Self, BlueprintRevocation), ToolError> {
+        let invalid = |reason: &str| ToolError::InvalidDefinition(reason.into());
+        for digest in [&policy.blueprint_digest, &policy.goal_digest] {
+            if digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err(invalid(
+                    "Blueprint and Goal digests must be lowercase SHA-256",
+                ));
+            }
+        }
+        validate_identifier(&policy.item_id, "Blueprint item", MAX_TOOL_ID_BYTES)?;
+        validate_identifier(&lease.lease_id, "Blueprint lease", MAX_TOOL_ID_BYTES)?;
+        if lease.issued_at_ms > now_ms
+            || lease.expires_at_ms <= now_ms
+            || lease.expires_at_ms.saturating_sub(lease.issued_at_ms) > 86_400_000
+        {
+            return Err(invalid(
+                "Blueprint lease must be current and at most 24 hours",
+            ));
+        }
+        if policy.max_actions == 0
+            || policy.max_actions > 1_000_000
+            || !(1..=120_000).contains(&policy.max_command_timeout_ms)
+            || !(1..=MAX_COMMAND_OUTPUT_BYTES).contains(&policy.max_command_output_bytes)
+        {
+            return Err(invalid(
+                "Blueprint budgets are missing or exceed host limits",
+            ));
+        }
+        if policy.allowed_tools.is_empty()
+            || policy
+                .allowed_tools
+                .iter()
+                .any(|name| builtin_effect(name).is_none())
+        {
+            return Err(invalid("Blueprint policy contains unknown tool effects"));
+        }
+        for paths in [
+            &policy.readable_paths,
+            &policy.writable_paths,
+            &policy.denied_paths,
+            &policy.protected_paths,
+        ] {
+            if paths.len() > 256 {
+                return Err(invalid("Blueprint path list exceeds 256 entries"));
+            }
+            for path in paths {
+                validate_relative_path(path)?;
+                if path.len() > 4096 || normalized_relative(path) != *path {
+                    return Err(invalid(
+                        "Blueprint paths must be bounded workspace-relative paths",
+                    ));
+                }
+            }
+        }
+        // No supported builtin can enforce arbitrary network access. Refuse a
+        // grant rather than treating a declared hostname as a network sandbox.
+        if !policy.network_hosts.is_empty() {
+            return Err(invalid(
+                "network grants require an unavailable confined executor",
+            ));
+        }
+        if policy.allowed_commands.len() > 128 || policy.denied_commands.len() > 128 {
+            return Err(invalid("Blueprint command list exceeds 128 entries"));
+        }
+        for command in &policy.allowed_commands {
+            confined_command(command)
+                .map_err(|_| invalid("worker command requires an unavailable confined executor"))?;
+        }
+        let encoded = serde_json::to_vec(&(&policy, &lease, context.workspace_root()))
+            .map_err(ToolError::Json)?;
+        if encoded.len() > MAX_TOOL_CALL_BYTES {
+            return Err(invalid("Blueprint policy exceeds 64 KiB"));
+        }
+        let mut digest = Sha256::new();
+        digest.update(b"zenpi-blueprint-prohibition-v1\0");
+        digest.update(encoded);
+        let revoked = Arc::new(AtomicBool::new(false));
+        let revocation = BlueprintRevocation(Arc::clone(&revoked));
+        let gate = Self {
+            policy,
+            lease,
+            workspace_root: context.workspace_root().to_owned(),
+            digest: format!("{:x}", digest.finalize()),
+            revoked,
+            actions: Arc::new(AtomicU64::new(0)),
+        };
+        Ok((gate, revocation))
+    }
+
+    pub fn evidence(&self) -> PolicyEvidence {
+        PolicyEvidence {
+            origin: ToolOrigin::BlueprintWorker,
+            policy_digest: self.digest.clone(),
+            blueprint_digest: self.policy.blueprint_digest.clone(),
+            goal_digest: self.policy.goal_digest.clone(),
+            item_id: self.policy.item_id.clone(),
+            lease_id: self.lease.lease_id.clone(),
+            expires_at_ms: self.lease.expires_at_ms,
+            prohibition_gate_enforced: true,
+        }
+    }
+
+    fn deny(&self, reason: &str) -> ToolError {
+        ToolError::GateDenied {
+            reason: reason.into(),
+            policy_digest: self.digest.clone(),
+            lease_id: self.lease.lease_id.clone(),
+        }
+    }
+
+    fn check_live(&self) -> Result<(), ToolError> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| self.deny("clock_before_epoch"))?
+            .as_millis();
+        if self.revoked.load(Ordering::SeqCst) {
+            return Err(self.deny("lease_revoked"));
+        }
+        if now < u128::from(self.lease.issued_at_ms) || now >= u128::from(self.lease.expires_at_ms)
+        {
+            return Err(self.deny("lease_expired_or_clock_rollback"));
+        }
+        Ok(())
+    }
+
+    fn check_path(&self, requested: &str, write: bool) -> Result<(), ToolError> {
+        self.check_live()?;
+        validate_relative_path(requested)?;
+        let normalized = normalized_relative(requested);
+        let path = Path::new(&normalized);
+        let matches = |paths: &BTreeSet<String>| {
+            paths
+                .iter()
+                .any(|entry| entry == "." || path.starts_with(entry))
+        };
+        let denied_matches = |paths: &BTreeSet<String>| {
+            let lower = normalized.to_ascii_lowercase();
+            paths.iter().any(|entry| {
+                entry == "." || Path::new(&lower).starts_with(entry.to_ascii_lowercase())
+            })
+        };
+        if credential_path(path)
+            || denied_matches(&self.policy.denied_paths)
+            || (write
+                && (denied_matches(&self.policy.protected_paths)
+                    || path.components().any(|part| {
+                        part.as_os_str()
+                            .to_string_lossy()
+                            .to_ascii_lowercase()
+                            .contains("blueprint")
+                    })))
+        {
+            return Err(self.deny("prohibited_path"));
+        }
+        let allowed = if write {
+            &self.policy.writable_paths
+        } else {
+            &self.policy.readable_paths
+        };
+        if !matches(allowed) {
+            return Err(self.deny("undeclared_path"));
+        }
+        // Worker file tools do not accept aliases to another ownership scope.
+        // Refuse links in every existing component, including dangling links.
+        let mut current = self.workspace_root.clone();
+        for component in path.components() {
+            current.push(component);
+            match fs::symlink_metadata(&current) {
+                Ok(metadata) if metadata.file_type().is_symlink() => {
+                    return Err(self.deny("symlink_path"));
+                }
+                Ok(metadata) => {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::MetadataExt;
+                        if metadata.is_file() && metadata.nlink() > 1 {
+                            return Err(self.deny("hardlinked_file"));
+                        }
+                    }
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => break,
+                Err(error) => return Err(ToolError::Io(error)),
+            }
+        }
+        Ok(())
+    }
+
+    fn check_call(
+        &self,
+        name: &str,
+        effect: ToolSideEffect,
+        arguments: &Map<String, Value>,
+    ) -> Result<(), ToolError> {
+        self.check_live()?;
+        if builtin_effect(name) != Some(effect) || !self.policy.allowed_tools.contains(name) {
+            return Err(self.deny("unknown_or_undeclared_tool_effect"));
+        }
+        match effect {
+            ToolSideEffect::ReadOnly | ToolSideEffect::WorkspaceWrite => {
+                let path = optional_string(arguments, "path", ".", 4096)?;
+                self.check_path(path, effect == ToolSideEffect::WorkspaceWrite)?;
+            }
+            ToolSideEffect::CommandExecution => {
+                let command = required_string(arguments, "command", MAX_COMMAND_BYTES)?;
+                if self.policy.denied_commands.contains(command) {
+                    return Err(self.deny("prohibited_command"));
+                }
+                if !self.policy.allowed_commands.contains(command) {
+                    return Err(self.deny("undeclared_command"));
+                }
+                confined_command(command).map_err(|_| self.deny("unknown_command_effect"))?;
+                let timeout = arguments
+                    .get("timeout_ms")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(self.policy.max_command_timeout_ms);
+                if timeout > self.policy.max_command_timeout_ms {
+                    return Err(self.deny("command_timeout_budget"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn builtin_effect(name: &str) -> Option<ToolSideEffect> {
+    match name {
+        "read_file" | "list_directory" | "search_text" => Some(ToolSideEffect::ReadOnly),
+        "write_file" | "edit_file" => Some(ToolSideEffect::WorkspaceWrite),
+        "run_command" => Some(ToolSideEffect::CommandExecution),
+        _ => None,
+    }
+}
+
+fn credential_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy().to_ascii_lowercase();
+        matches!(
+            name.as_str(),
+            ".git"
+                | ".zenpi"
+                | ".ssh"
+                | ".aws"
+                | ".azure"
+                | ".config"
+                | ".codex"
+                | ".claude"
+                | ".netrc"
+                | ".npmrc"
+                | "credentials"
+                | "credentials.json"
+                | "auth.json"
+                | "id_rsa"
+                | "id_ed25519"
+        ) || name == ".env"
+            || name.starts_with(".env.")
+            || name.ends_with(".pem")
+            || name.ends_with(".key")
+            || name.ends_with(".p12")
+    })
+}
+
+fn normalized_relative(path: &str) -> String {
+    let normalized: PathBuf = Path::new(path)
+        .components()
+        .filter(|component| *component != Component::CurDir)
+        .collect();
+    relative_display(&normalized)
+}
+
+/// Closed, effect-free argv profiles, not a shell-language denylist. Shells,
+/// interpreters, scripts and general-purpose executables require OS confinement
+/// which is deliberately not inferred from an operator-supplied command string.
+fn confined_command(command: &str) -> Result<(&'static str, Vec<&str>), ToolError> {
+    let invalid = || ToolError::InvalidArguments("unsupported confined command".into());
+    if command.is_empty()
+        || command.len() > MAX_COMMAND_BYTES
+        || !command
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b" _-.,:/".contains(&b))
+    {
+        return Err(invalid());
+    }
+    let mut words = command.split_ascii_whitespace();
+    let name = words.next().ok_or_else(invalid)?;
+    let args: Vec<_> = words.collect();
+    match name {
+        "echo" => Ok(("/bin/echo", args)),
+        "true" if args.is_empty() => Ok(("/usr/bin/true", args)),
+        "false" if args.is_empty() => Ok(("/usr/bin/false", args)),
+        _ => Err(invalid()),
     }
 }
 
@@ -294,6 +671,12 @@ pub enum ToolError {
         tool: String,
         side_effect: ToolSideEffect,
     },
+    #[error("Blueprint gate denied: {reason}; policy={policy_digest}; lease={lease_id}")]
+    GateDenied {
+        reason: String,
+        policy_digest: String,
+        lease_id: String,
+    },
     #[error("workspace path is denied: {0}")]
     PathDenied(String),
     #[error("path does not exist: {0}")]
@@ -327,7 +710,7 @@ impl ToolError {
             Self::InvalidCall(_) => ToolErrorCode::InvalidCall,
             Self::InvalidArguments(_) => ToolErrorCode::InvalidArguments,
             Self::UnknownTool(_) => ToolErrorCode::UnknownTool,
-            Self::PolicyDenied { .. } => ToolErrorCode::PolicyDenied,
+            Self::PolicyDenied { .. } | Self::GateDenied { .. } => ToolErrorCode::PolicyDenied,
             Self::PathDenied(_) => ToolErrorCode::PathDenied,
             Self::NotFound(_) => ToolErrorCode::NotFound,
             Self::NotAFile(_) => ToolErrorCode::NotAFile,
@@ -348,6 +731,8 @@ impl ToolError {
 #[derive(Debug, Clone)]
 pub struct ToolContext {
     workspace_root: PathBuf,
+    origin: ToolOrigin,
+    blueprint_gate: Option<Arc<BlueprintGate>>,
 }
 
 impl ToolContext {
@@ -361,11 +746,92 @@ impl ToolContext {
         }
         Ok(Self {
             workspace_root: root,
+            origin: ToolOrigin::AgentTool,
+            blueprint_gate: None,
         })
     }
 
     pub fn workspace_root(&self) -> &Path {
         &self.workspace_root
+    }
+
+    pub fn origin(&self) -> ToolOrigin {
+        self.origin
+    }
+
+    /// Changing origin never removes a gate or transfers a worker grant to the
+    /// user's shell. A mismatched origin fails at the next action boundary.
+    pub fn with_origin(mut self, origin: ToolOrigin) -> Self {
+        self.origin = origin;
+        self
+    }
+
+    pub fn with_blueprint_gate(mut self, gate: BlueprintGate) -> Result<Self, ToolError> {
+        if self.blueprint_gate.is_some() || gate.workspace_root != self.workspace_root {
+            return Err(gate.deny("gate_replacement_or_workspace_mismatch"));
+        }
+        gate.check_live()?;
+        self.origin = ToolOrigin::BlueprintWorker;
+        self.blueprint_gate = Some(Arc::new(gate));
+        Ok(self)
+    }
+
+    pub fn policy_evidence(&self) -> Option<PolicyEvidence> {
+        self.blueprint_gate.as_ref().map(|gate| gate.evidence())
+    }
+
+    fn checked_gate(&self) -> Result<Option<&BlueprintGate>, ToolError> {
+        match (self.origin, self.blueprint_gate.as_deref()) {
+            (ToolOrigin::BlueprintWorker, Some(gate)) => {
+                gate.check_live()?;
+                Ok(Some(gate))
+            }
+            (_, Some(gate)) => Err(gate.deny("worker_grant_origin_mismatch")),
+            (ToolOrigin::BlueprintWorker, None) => Err(ToolError::GateDenied {
+                reason: "worker_preflight_required".into(),
+                policy_digest: "unbound".into(),
+                lease_id: "unbound".into(),
+            }),
+            (_, None) => Ok(None),
+        }
+    }
+
+    /// Preview/approval callers use the same prohibition check as execution.
+    /// This does not consume an action or grant an approval decision.
+    pub fn check_call_gate(
+        &self,
+        name: &str,
+        effect: ToolSideEffect,
+        arguments: &Map<String, Value>,
+    ) -> Result<Option<PolicyEvidence>, ToolError> {
+        let Some(gate) = self.checked_gate()? else {
+            return Ok(None);
+        };
+        gate.check_call(name, effect, arguments)?;
+        Ok(Some(gate.evidence()))
+    }
+
+    fn admit_builtin(&self, name: &str, arguments: &Map<String, Value>) -> Result<(), ToolError> {
+        let effect = builtin_effect(name).ok_or_else(|| ToolError::UnknownTool(name.into()))?;
+        self.check_call_gate(name, effect, arguments)?;
+        if let Some(gate) = self.blueprint_gate.as_deref()
+            && gate
+                .actions
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
+                    (count < gate.policy.max_actions).then_some(count.saturating_add(1))
+                })
+                .is_err()
+        {
+            return Err(gate.deny("action_budget_exhausted"));
+        }
+        Ok(())
+    }
+
+    fn check_path_gate(&self, requested: &str, write: bool) -> Result<(), ToolError> {
+        if let Some(gate) = self.checked_gate()? {
+            gate.check_path(requested, write)?;
+        }
+        Ok(())
     }
 
     /// Resolve a model-independent user attachment inside the fixed workspace.
@@ -395,9 +861,11 @@ impl ToolContext {
     }
 
     fn resolve_for_write(&self, requested: &str) -> Result<PathBuf, ToolError> {
+        self.check_path_gate(requested, true)?;
         validate_relative_path(requested)?;
         let candidate = self.workspace_root.join(requested);
         if candidate.exists() {
+            self.check_path_gate(requested, false)?;
             let canonical = candidate
                 .canonicalize()
                 .map_err(|error| map_path_io(&candidate, error))?;
@@ -424,6 +892,7 @@ impl ToolContext {
     }
 
     fn resolve_existing(&self, requested: &str) -> Result<ResolvedPath, ToolError> {
+        self.check_path_gate(requested, false)?;
         validate_relative_path(requested)?;
         let candidate = self.workspace_root.join(requested);
         let canonical = candidate
@@ -460,6 +929,7 @@ pub trait Tool: Send + Sync {
 struct RegisteredTool {
     definition: ToolDefinition,
     handler: Box<dyn Tool>,
+    builtin: bool,
 }
 
 #[derive(Default)]
@@ -483,18 +953,28 @@ impl ToolRegistry {
 
     pub fn with_read_only_builtins() -> Result<Self, ToolError> {
         let mut registry = Self::new();
-        registry.register(ReadFileTool)?;
-        registry.register(ListDirectoryTool)?;
-        registry.register(SearchTextTool)?;
+        registry.register_builtin(ReadFileTool)?;
+        registry.register_builtin(ListDirectoryTool)?;
+        registry.register_builtin(SearchTextTool)?;
         Ok(registry)
     }
 
     pub fn with_all_builtins() -> Result<Self, ToolError> {
         let mut registry = Self::with_read_only_builtins()?;
-        registry.register(WriteFileTool)?;
-        registry.register(EditFileTool)?;
-        registry.register(RunCommandTool)?;
+        registry.register_builtin(WriteFileTool)?;
+        registry.register_builtin(EditFileTool)?;
+        registry.register_builtin(RunCommandTool)?;
         Ok(registry)
+    }
+
+    fn register_builtin<T: Tool + 'static>(&mut self, tool: T) -> Result<(), ToolError> {
+        let name = tool.definition().name;
+        self.register(tool)?;
+        self.tools
+            .get_mut(&name)
+            .expect("just registered builtin")
+            .builtin = true;
+        Ok(())
     }
 
     pub fn register<T>(&mut self, tool: T) -> Result<(), ToolError>
@@ -514,6 +994,7 @@ impl ToolRegistry {
             RegisteredTool {
                 definition,
                 handler: Box::new(tool),
+                builtin: false,
             },
         );
         Ok(())
@@ -533,6 +1014,7 @@ impl ToolRegistry {
             RegisteredTool {
                 definition,
                 handler: tool,
+                builtin: false,
             },
         );
         Ok(())
@@ -562,6 +1044,10 @@ impl ToolRegistry {
             .tools
             .get(&call.name)
             .ok_or_else(|| ToolError::UnknownTool(call.name.clone()))?;
+        let arguments = call.arguments.as_object().ok_or_else(|| {
+            ToolError::InvalidArguments("tool arguments must be a JSON object".into())
+        })?;
+        context.check_call_gate(&call.name, registered.definition.side_effect, arguments)?;
         if registered.definition.side_effect != ToolSideEffect::WorkspaceWrite {
             return Ok(None);
         }
@@ -682,7 +1168,20 @@ impl ToolRegistry {
         let arguments = call.arguments.as_object().ok_or_else(|| {
             ToolError::InvalidArguments("tool arguments must be a JSON object".into())
         })?;
-        let output = registered.handler.invoke(context, arguments)?;
+        context.check_call_gate(&call.name, registered.definition.side_effect, arguments)?;
+        if let Some(gate) = context.checked_gate()?
+            && !registered.builtin
+        {
+            return Err(gate.deny("untrusted_tool_implementation"));
+        }
+        let mut output = registered.handler.invoke(context, arguments)?;
+        if let (Some(evidence), Some(object)) = (context.policy_evidence(), output.as_object_mut())
+        {
+            object.insert(
+                "policy_evidence".into(),
+                serde_json::to_value(evidence).map_err(ToolError::Json)?,
+            );
+        }
         let output_size = serde_json::to_vec(&output).map_err(ToolError::Json)?.len();
         if output_size > MAX_TOOL_RESULT_BYTES {
             return Err(ToolError::LimitExceeded(format!(
@@ -711,6 +1210,18 @@ pub fn compact_tool_result(
             call_id,
             tool,
             output,
+        });
+    }
+    if context.checked_gate()?.is_some() {
+        return Ok(ToolResult::Success {
+            call_id,
+            tool,
+            output: json!({
+                "preview": truncate_utf8(&String::from_utf8_lossy(&encoded), 4096),
+                "bytes": encoded.len(), "truncated": true, "compacted": false,
+                "artifact": null, "reason": "worker_artifact_write_not_granted",
+                "policy_evidence": context.policy_evidence(),
+            }),
         });
     }
     use sha2::{Digest, Sha256};
@@ -766,6 +1277,7 @@ impl Tool for ReadFileTool {
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
+        context.admit_builtin("read_file", arguments)?;
         reject_unknown(arguments, &["path", "max_bytes"])?;
         let requested = required_string(arguments, "path", 4_096)?;
         let max_bytes = bounded_usize(
@@ -822,6 +1334,7 @@ impl Tool for ListDirectoryTool {
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
+        context.admit_builtin("list_directory", arguments)?;
         reject_unknown(arguments, &["path", "max_entries"])?;
         let requested = optional_string(arguments, "path", ".", 4_096)?;
         let max_entries = bounded_usize(
@@ -849,6 +1362,13 @@ impl Tool for ListDirectoryTool {
             let metadata = fs::symlink_metadata(entry.path())?;
             let name = entry.file_name().to_string_lossy().into_owned();
             let relative = path.relative.join(&name);
+            if let Some(gate) = context.checked_gate()?
+                && gate
+                    .check_path(&relative_display(&relative), false)
+                    .is_err()
+            {
+                continue;
+            }
             let value = json!({
                 "name": name.clone(),
                 "path": relative_display(&relative),
@@ -907,6 +1427,7 @@ impl Tool for SearchTextTool {
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
+        context.admit_builtin("search_text", arguments)?;
         reject_unknown(
             arguments,
             &["query", "path", "case_sensitive", "max_matches"],
@@ -936,6 +1457,14 @@ impl Tool for SearchTextTool {
         let mut node_limit_reached = false;
 
         while let Some(current) = queue.pop_front() {
+            if let Some(gate) = context.checked_gate()? {
+                let relative = current
+                    .strip_prefix(context.workspace_root())
+                    .map_err(|_| gate.deny("search_path_escape"))?;
+                if gate.check_path(&relative_display(relative), false).is_err() {
+                    continue;
+                }
+            }
             if nodes_visited >= MAX_SEARCH_NODES {
                 node_limit_reached = true;
                 break;
@@ -1100,6 +1629,7 @@ impl Tool for WriteFileTool {
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
+        context.admit_builtin("write_file", arguments)?;
         reject_unknown(arguments, &["path", "content"])?;
         let requested = required_string(arguments, "path", 4_096)?;
         let content = string_argument(arguments, "content", MAX_WRITE_BYTES, true)?;
@@ -1112,6 +1642,7 @@ impl Tool for WriteFileTool {
         let relative = relative_path_for_output(context, &path, requested)?;
         let (diff, diff_truncated) =
             render_unified_diff(&relative, &before, content, source_truncated);
+        context.check_path_gate(requested, true)?;
         atomic_write_text(&path, content.as_bytes())?;
         Ok(json!({
             "path": relative,
@@ -1193,6 +1724,7 @@ impl Tool for EditFileTool {
         context: &ToolContext,
         arguments: &Map<String, Value>,
     ) -> Result<Value, ToolError> {
+        context.admit_builtin("edit_file", arguments)?;
         reject_unknown(arguments, &["path", "old", "new"])?;
         let requested = required_string(arguments, "path", 4_096)?;
         let old = required_string(arguments, "old", MAX_WRITE_BYTES)?;
@@ -1220,6 +1752,7 @@ impl Tool for EditFileTool {
         }
         let relative = relative_path_for_output(context, &path, requested)?;
         let (diff, diff_truncated) = render_unified_diff(&relative, &original, &edited, false);
+        context.check_path_gate(requested, true)?;
         atomic_write_text(&path, edited.as_bytes())?;
         Ok(json!({
             "path": relative,
@@ -1242,91 +1775,220 @@ impl RunCommandTool {
         arguments: &Map<String, Value>,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<Value, ToolError> {
+        let outcome = Self::run_supervised(context, arguments, cancelled)?;
+        if outcome.cancelled {
+            return Err(ToolError::Cancelled);
+        }
+        if outcome.timed_out {
+            return Err(ToolError::CommandTimeout(outcome.timeout_ms));
+        }
+        if outcome.exit_code != Some(0) {
+            return Err(ToolError::CommandFailed(format!(
+                "exit={:?}; signal={:?}; stderr={}",
+                outcome.exit_code, outcome.signal, outcome.stderr
+            )));
+        }
+        serde_json::to_value(outcome).map_err(ToolError::Json)
+    }
+
+    /// A user-shell owner can retain nonzero exit, signal and cancellation
+    /// evidence instead of converting it into a model-tool error. Host approval
+    /// is still required before calling this API; an origin is not a grant.
+    pub fn invoke_user_shell_with_cancel(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Value, ToolError> {
+        if context.origin() != ToolOrigin::UserShell {
+            return Err(ToolError::InvalidArguments(
+                "user-shell origin required".into(),
+            ));
+        }
+        let outcome = Self::run_supervised(context, arguments, cancelled)?;
+        serde_json::to_value(outcome).map_err(ToolError::Json)
+    }
+
+    #[cfg(not(unix))]
+    fn run_supervised(
+        _context: &ToolContext,
+        _arguments: &Map<String, Value>,
+        _cancelled: &dyn Fn() -> bool,
+    ) -> Result<CommandOutcome, ToolError> {
+        Err(ToolError::InvalidArguments(
+            "command containment is unavailable on this platform".into(),
+        ))
+    }
+
+    #[cfg(unix)]
+    fn run_supervised(
+        context: &ToolContext,
+        arguments: &Map<String, Value>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<CommandOutcome, ToolError> {
+        use std::os::unix::process::{CommandExt, ExitStatusExt};
+
+        context.admit_builtin("run_command", arguments)?;
         reject_unknown(arguments, &["command", "timeout_ms"])?;
         let command = required_string(arguments, "command", MAX_COMMAND_BYTES)?;
+        if command.as_bytes().contains(&0) {
+            return Err(ToolError::InvalidArguments("command contains NUL".into()));
+        }
+        let gate = context.checked_gate()?;
+        let default_timeout = gate.map_or(DEFAULT_COMMAND_TIMEOUT_MS, |gate| {
+            gate.policy.max_command_timeout_ms
+        });
         let timeout_ms = bounded_usize(
             arguments,
             "timeout_ms",
-            DEFAULT_COMMAND_TIMEOUT_MS as usize,
+            default_timeout as usize,
             1,
             120_000,
         )? as u64;
-        let mut builder = Command::new(if cfg!(windows) { "cmd" } else { "sh" });
-        if cfg!(windows) {
-            builder.args(["/C", command]);
+        let output_cap = gate.map_or(MAX_COMMAND_OUTPUT_BYTES, |gate| {
+            gate.policy.max_command_output_bytes
+        });
+        if cancelled() {
+            return Err(ToolError::Cancelled);
+        }
+        let mut builder = if gate.is_some() {
+            let (program, argv) = confined_command(command)?;
+            let mut builder = Command::new(program);
+            builder.args(argv);
+            builder
         } else {
+            let mut builder = Command::new("/bin/sh");
             builder.args(["-c", command]);
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            // Create a fresh process group so timeout/cancellation can reap
-            // descendants launched by the shell, not just the shell itself.
-            builder.process_group(0);
-        }
+            builder
+        };
+        builder.process_group(0);
         let builder = builder.current_dir(context.workspace_root());
         builder.env_clear();
         for (key, value) in crate::security::child_environment() {
             builder.env(key, value);
         }
-        let mut child = builder
+        let child = builder
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(ToolError::Io)?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| ToolError::CommandFailed("command stdout pipe unavailable".into()))?;
-        let stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| ToolError::CommandFailed("command stderr pipe unavailable".into()))?;
+        let mut child = SupervisedChild {
+            child,
+            cleaned: false,
+        };
+        let stdout =
+            child.child.stdout.take().ok_or_else(|| {
+                ToolError::CommandFailed("command stdout pipe unavailable".into())
+            })?;
+        let stderr =
+            child.child.stderr.take().ok_or_else(|| {
+                ToolError::CommandFailed("command stderr pipe unavailable".into())
+            })?;
+        make_pipe_nonblocking(&stdout)?;
+        make_pipe_nonblocking(&stderr)?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let stdout_stop = Arc::clone(&stop);
+        let stderr_stop = Arc::clone(&stop);
         let stdout_thread =
-            std::thread::spawn(move || read_limited_stream(stdout, MAX_COMMAND_OUTPUT_BYTES));
+            std::thread::spawn(move || read_limited_stream(stdout, output_cap, &stdout_stop));
         let stderr_thread =
-            std::thread::spawn(move || read_limited_stream(stderr, MAX_COMMAND_OUTPUT_BYTES));
+            std::thread::spawn(move || read_limited_stream(stderr, output_cap, &stderr_stop));
         let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-        loop {
-            if cancelled() {
-                terminate_process_tree(&mut child);
-                let _ = child.wait();
-                let _ = stdout_thread.join();
-                let _ = stderr_thread.join();
-                return Err(ToolError::Cancelled);
+        let mut was_cancelled = false;
+        let mut timed_out = false;
+        let status = loop {
+            if cancelled() || gate.is_some_and(|gate| gate.check_live().is_err()) {
+                was_cancelled = true;
+                break Ok(None);
             }
-            if let Some(status) = child.try_wait().map_err(ToolError::Io)? {
-                let stdout = stdout_thread
-                    .join()
-                    .map_err(|_| ToolError::CommandFailed("stdout reader panicked".into()))??;
-                let stderr = stderr_thread
-                    .join()
-                    .map_err(|_| ToolError::CommandFailed("stderr reader panicked".into()))??;
-                let stdout = String::from_utf8_lossy(&stdout).into_owned();
-                let stderr = String::from_utf8_lossy(&stderr).into_owned();
-                if !status.success() {
-                    return Err(ToolError::CommandFailed(format!(
-                        "exit={status}; stderr={}",
-                        truncate_utf8(&stderr, MAX_COMMAND_OUTPUT_BYTES)
-                    )));
-                }
-                return Ok(json!({
-                    "status": "ok",
-                    "exit_code": status.code(),
-                    "stdout": truncate_utf8(&stdout, MAX_COMMAND_OUTPUT_BYTES),
-                    "stderr": truncate_utf8(&stderr, MAX_COMMAND_OUTPUT_BYTES)
-                }));
+            match child.child.try_wait() {
+                Ok(Some(status)) => break Ok(Some(status)),
+                Ok(None) => {}
+                Err(error) => break Err(ToolError::Io(error)),
             }
             if Instant::now() >= deadline {
-                terminate_process_tree(&mut child);
-                let _ = child.wait();
-                let _ = stdout_thread.join();
-                let _ = stderr_thread.join();
-                return Err(ToolError::CommandTimeout(timeout_ms));
+                timed_out = true;
+                break Ok(None);
             }
             std::thread::sleep(Duration::from_millis(5));
+        };
+        // A command's descendants do not outlive its operation, even if the
+        // shell exits successfully or closes its own stdout before they do.
+        child.cleanup();
+        stop.store(true, Ordering::SeqCst);
+        let stdout = stdout_thread
+            .join()
+            .map_err(|_| ToolError::CommandFailed("stdout reader panicked".into()))?;
+        let stderr = stderr_thread
+            .join()
+            .map_err(|_| ToolError::CommandFailed("stderr reader panicked".into()))?;
+        let (stdout, stdout_truncated) = stdout?;
+        let (stderr, stderr_truncated) = stderr?;
+        let status = status?;
+        Ok(CommandOutcome {
+            status: if was_cancelled {
+                "cancelled"
+            } else if timed_out {
+                "timed_out"
+            } else if status.is_some_and(|s| s.success()) {
+                "ok"
+            } else {
+                "failed"
+            }
+            .into(),
+            origin: context.origin(),
+            exit_code: status.and_then(|status| status.code()),
+            signal: status.and_then(|status| status.signal()),
+            stdout: truncate_utf8(&String::from_utf8_lossy(&stdout), output_cap),
+            stderr: truncate_utf8(&String::from_utf8_lossy(&stderr), output_cap),
+            stdout_truncated,
+            stderr_truncated,
+            timed_out,
+            cancelled: was_cancelled,
+            timeout_ms,
+            child_reaped: true,
+            process_group_terminated: true,
+            policy_evidence: context.policy_evidence(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandOutcome {
+    pub status: String,
+    pub origin: ToolOrigin,
+    pub exit_code: Option<i32>,
+    pub signal: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    pub timed_out: bool,
+    pub cancelled: bool,
+    pub timeout_ms: u64,
+    pub child_reaped: bool,
+    pub process_group_terminated: bool,
+    pub policy_evidence: Option<PolicyEvidence>,
+}
+
+struct SupervisedChild {
+    child: std::process::Child,
+    cleaned: bool,
+}
+
+impl SupervisedChild {
+    fn cleanup(&mut self) {
+        if !self.cleaned {
+            terminate_process_tree(&mut self.child);
+            let _ = self.child.wait();
+            self.cleaned = true;
         }
+    }
+}
+
+impl Drop for SupervisedChild {
+    fn drop(&mut self) {
+        self.cleanup();
     }
 }
 
@@ -1574,11 +2236,10 @@ fn terminate_process_tree(child: &mut std::process::Child) {
                 libc::kill(-pid, libc::SIGTERM);
             }
             std::thread::sleep(Duration::from_millis(50));
-            if child.try_wait().ok().flatten().is_none() {
-                // SAFETY: same process-group invariant as the SIGTERM call.
-                unsafe {
-                    libc::kill(-pid, libc::SIGKILL);
-                }
+            // The leader may have died while a descendant ignored SIGTERM.
+            // SAFETY: same process-group invariant as the SIGTERM call.
+            unsafe {
+                libc::kill(-pid, libc::SIGKILL);
             }
         }
     }
@@ -1649,19 +2310,56 @@ fn truncate_utf8(text: &str, max: usize) -> String {
     if text.len() <= max {
         return text.to_owned();
     }
-    let mut end = max;
+    let marker = "\n[output truncated]";
+    let mut end = max.saturating_sub(marker.len());
     while !text.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}\n[output truncated]", &text[..end])
+    if max < marker.len() {
+        text.chars()
+            .scan(0, |bytes, character| {
+                *bytes += character.len_utf8();
+                (*bytes <= max).then_some(character)
+            })
+            .collect()
+    } else {
+        format!("{}{marker}", &text[..end])
+    }
 }
 
-fn read_limited_stream<R: Read>(mut reader: R, max: usize) -> Result<Vec<u8>, ToolError> {
+#[cfg(unix)]
+fn make_pipe_nonblocking(pipe: &impl std::os::fd::AsRawFd) -> Result<(), ToolError> {
+    let fd = pipe.as_raw_fd();
+    // SAFETY: the borrowed pipe owns an open descriptor for both fcntl calls.
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+        return Err(ToolError::Io(io::Error::last_os_error()));
+    }
+    Ok(())
+}
+
+fn read_limited_stream<R: Read>(
+    mut reader: R,
+    max: usize,
+    stop: &AtomicBool,
+) -> Result<(Vec<u8>, bool), ToolError> {
     let mut bytes = Vec::with_capacity(max.min(64 * 1024));
     let mut buffer = [0_u8; 8192];
     let mut truncated = false;
     loop {
-        let count = reader.read(&mut buffer)?;
+        if stop.load(Ordering::SeqCst) {
+            truncated = true;
+            break;
+        }
+        let count = match reader.read(&mut buffer) {
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(2));
+                continue;
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(ToolError::Io(error)),
+        };
         if count == 0 {
             break;
         }
@@ -1673,10 +2371,7 @@ fn read_limited_stream<R: Read>(mut reader: R, max: usize) -> Result<Vec<u8>, To
             truncated = true;
         }
     }
-    if truncated {
-        bytes.extend_from_slice(b"\n[output truncated]");
-    }
-    Ok(bytes)
+    Ok((bytes, truncated))
 }
 
 fn validate_call(call: &ToolCall) -> Result<(), ToolError> {
