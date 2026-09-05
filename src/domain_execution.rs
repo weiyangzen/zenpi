@@ -255,6 +255,7 @@ impl ExecutionStore {
                 if !metadata.is_file() {
                     return Err(ExecutionError::Directory(path));
                 }
+                crate::security::restrict_private_file(&path)?;
                 let bytes = read_bounded(&path)?;
                 if bytes.iter().all(u8::is_ascii_whitespace) {
                     return Err(ExecutionError::MissingSnapshot);
@@ -532,6 +533,8 @@ impl BlueprintExecutor {
         }
 
         let (receipt, resumed_running) = if let Some(running) = selection.running {
+            let used = self.spent_for(goal, blueprint);
+            ensure_budget(goal.budget, used, ResourceBudget::default())?;
             (running, true)
         } else {
             let cost = deterministic_cost(selection.item);
@@ -588,14 +591,18 @@ impl BlueprintExecutor {
                 continue;
             }
             let running = latest.filter(|receipt| receipt.status == ExecutionStatus::Running);
-            let attempt = latest.map_or(Ok(1), |receipt| {
-                receipt
-                    .attempt
-                    .checked_add(1)
-                    .ok_or(ExecutionError::BudgetOverflow {
-                        field: "execution_attempt",
-                    })
-            })?;
+            let attempt = if let Some(running) = running {
+                running.attempt
+            } else {
+                latest.map_or(Ok(1), |receipt| {
+                    receipt
+                        .attempt
+                        .checked_add(1)
+                        .ok_or(ExecutionError::BudgetOverflow {
+                            field: "execution_attempt",
+                        })
+                })?
+            };
             return Ok(Some(Selection {
                 item,
                 attempt,
