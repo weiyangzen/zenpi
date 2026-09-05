@@ -404,6 +404,7 @@ pub struct SlashCommandSpec {
 const NO_ALIASES: &[&str] = &[];
 const HELP_ALIASES: &[&str] = &["?"];
 const BLUEPRINT_ALIASES: &[&str] = &["bp"];
+const SESSION_ALIASES: &[&str] = &["sessions", "agents"];
 const EXIT_ALIASES: &[&str] = &["quit", "q"];
 
 /// Commands exposed by the current control plane.  `compete` and `loop` are
@@ -496,7 +497,7 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
     },
     SlashCommandSpec {
         name: "session",
-        aliases: NO_ALIASES,
+        aliases: SESSION_ALIASES,
         route: SlashRoute::Local,
         usage: "/session [list|agents|inspect PATH|open PATH|resume-last|fork SOURCE DEST|export SOURCE DEST|import SOURCE DEST|migrate SOURCE DEST|archive PATH --yes|unarchive PATH|delete PATH --yes|queue SOURCE RECIPIENT ID TTL_MS JSON|gc ...]",
         summary: "navigate durable sessions",
@@ -809,8 +810,15 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         "pane" => SlashCommand::Pane {
             action: parse_pane(args)?,
         },
-        "session" => SlashCommand::Session {
+        "session" | "sessions" => SlashCommand::Session {
             action: parse_session(args)?,
+        },
+        "agents" => SlashCommand::Session {
+            action: if args.is_empty() {
+                SessionAction::Agents
+            } else {
+                return Err(SlashError::UnexpectedSessionArgument { action: "agents" });
+            },
         },
         "mailbox" => SlashCommand::Mailbox {
             action: parse_mailbox(args)?,
