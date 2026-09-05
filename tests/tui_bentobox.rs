@@ -211,6 +211,8 @@ fn gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt
             status: ExecutionStatus::Succeeded,
             cost: deterministic_cost(&blueprint.items[0]),
             evidence: "deterministic evidence one".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
             error: None,
         })
         .unwrap();
@@ -226,6 +228,8 @@ fn gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt
             status: ExecutionStatus::Cancelled,
             cost: deterministic_cost(&blueprint.items[0]),
             evidence: "deterministic evidence two".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
             error: Some("operator cancelled".into()),
         })
         .unwrap();
@@ -241,6 +245,8 @@ fn gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt
             status: ExecutionStatus::Running,
             cost: deterministic_cost(&blueprint.items[1]),
             evidence: "deterministic evidence running".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
             error: None,
         })
         .unwrap();

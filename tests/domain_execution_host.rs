@@ -158,6 +158,8 @@ fn blueprint_run_does_not_finish_goal_from_an_older_success_when_latest_attempt_
                 status,
                 cost: deterministic_cost(first),
                 evidence: "deterministic_local_evidence seeded".into(),
+                external_work_executed: false,
+                manifest_checksum: None,
                 error: error.map(str::to_owned),
             })
             .unwrap();

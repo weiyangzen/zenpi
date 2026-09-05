@@ -5,9 +5,9 @@ use zenpi::{
     b3::ResourceBudget,
     domain_execution::{
         BlueprintExecutor, ExecutionError, ExecutionReceipt, ExecutionStatus, ExecutionStore,
-        RunOutcome, deterministic_cost,
+        HandoffStore, RunOutcome, deterministic_cost,
     },
-    domains::{Blueprint, BlueprintItem, Goal},
+    domains::{Blueprint, BlueprintItem, BlueprintTask, Goal, GoalStatus},
 };
 
 fn fixture() -> (Blueprint, Goal) {
@@ -33,6 +33,124 @@ fn fixture() -> (Blueprint, Goal) {
     )
     .unwrap();
     (blueprint, goal)
+}
+
+#[test]
+fn external_handoff_is_bounded_idempotent_and_never_marks_work_done() {
+    let dir = tempdir().unwrap();
+    let execution = ExecutionStore::open(dir.path().join("execution.json")).unwrap();
+    let handoff_path = dir.path().join("handoff.json");
+    let mut handoffs = HandoffStore::open(&handoff_path).unwrap();
+    let blueprint = Blueprint::new(
+        "handoff-plan",
+        "1",
+        vec![
+            BlueprintItem::new("build", 120).with_task(
+                BlueprintTask::new(
+                    "Implement the bounded build task",
+                    vec!["cargo test --locked".into()],
+                )
+                .unwrap(),
+            ),
+            BlueprintItem::new("verify", 80)
+                .with_dependencies(["build"])
+                .with_task(
+                    BlueprintTask::new("Verify the build result", vec!["cargo check".into()])
+                        .unwrap(),
+                ),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new(
+        "handoff-goal",
+        &blueprint,
+        ResourceBudget {
+            tokens: 500,
+            wall_clock_ms: 100,
+            attempts: 2,
+            disk_bytes: 10_000,
+        },
+        None,
+    )
+    .unwrap();
+    let owner = BlueprintExecutor::new(execution);
+
+    let first = owner
+        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .unwrap();
+    assert!(!first.already_queued);
+    assert_eq!(first.request.item_id, "build");
+    assert_eq!(
+        first.request.status,
+        zenpi::domain_execution::HandoffStatus::Queued
+    );
+    assert_eq!(
+        first.request.acceptance_commands,
+        vec!["cargo test --locked"]
+    );
+    first.request.validate_against(&goal, &blueprint).unwrap();
+    assert!(owner.store().receipts().is_empty());
+    assert_eq!(goal.status, GoalStatus::Queued);
+
+    let retry = owner
+        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .unwrap();
+    assert!(retry.already_queued);
+    assert_eq!(retry.request, first.request);
+    assert_eq!(handoffs.requests().len(), 1);
+    assert_eq!(
+        HandoffStore::open(&handoff_path).unwrap().requests().len(),
+        1
+    );
+}
+
+#[test]
+fn handoff_store_rejects_tampering_and_does_not_execute_acceptance_commands() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("handoff.json");
+    let mut store = HandoffStore::open(&path).unwrap();
+    let (blueprint_without_task, goal_without_task) = fixture();
+    let owner =
+        BlueprintExecutor::new(ExecutionStore::open(dir.path().join("execution.json")).unwrap());
+    let result = owner.handoff_next(&mut store, &goal_without_task, &blueprint_without_task);
+    assert!(matches!(
+        result,
+        Err(ExecutionError::HandoffTaskMissing { .. })
+    ));
+    assert!(store.requests().is_empty());
+
+    let blueprint = Blueprint::new(
+        "handoff-tamper",
+        "1",
+        vec![
+            BlueprintItem::new("build", 20)
+                .with_task(BlueprintTask::new("queued only", vec!["false".into()]).unwrap()),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new(
+        "handoff-tamper-goal",
+        &blueprint,
+        ResourceBudget {
+            tokens: 100,
+            wall_clock_ms: 10,
+            attempts: 2,
+            disk_bytes: 1_000,
+        },
+        None,
+    )
+    .unwrap();
+    let owner =
+        BlueprintExecutor::new(ExecutionStore::open(dir.path().join("execution-2.json")).unwrap());
+    owner.handoff_next(&mut store, &goal, &blueprint).unwrap();
+    let mut bytes = fs::read(&path).unwrap();
+    let last_mutable = bytes.len() - 2;
+    bytes[last_mutable] ^= 1;
+    fs::write(&path, bytes).unwrap();
+    assert!(matches!(
+        HandoffStore::open(&path),
+        Err(ExecutionError::HandoffDigestMismatch) | Err(ExecutionError::Json(_))
+    ));
 }
 
 #[test]
@@ -186,6 +304,8 @@ fn running_receipt_is_resumed_in_place_without_duplicate_attempt() {
             status: ExecutionStatus::Running,
             cost: deterministic_cost(item),
             evidence: "deterministic_local_evidence pending".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
             error: None,
         })
         .unwrap();
@@ -228,6 +348,8 @@ fn store_rejects_duplicate_goal_blueprint_item_attempt_even_with_new_execution_i
         status: ExecutionStatus::Running,
         cost: deterministic_cost(item),
         evidence: "deterministic_local_evidence pending".into(),
+        external_work_executed: false,
+        manifest_checksum: None,
         error: None,
     };
     assert_eq!(

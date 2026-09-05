@@ -24,7 +24,7 @@ use thiserror::Error;
 
 use crate::b3::ResourceBudget;
 use crate::domains::{
-    Blueprint, BlueprintItem, DomainError, Goal, GoalStatus, MAX_DOMAIN_RECORD_BYTES,
+    Blueprint, BlueprintItem, BlueprintTask, DomainError, Goal, GoalStatus, MAX_DOMAIN_RECORD_BYTES,
 };
 
 /// On-disk schema for the bounded execution snapshot.
@@ -36,10 +36,19 @@ pub const EXECUTION_SCHEMA_VERSION: u16 = 1;
 pub const EXECUTION_STORE_ENV: &str = "ZENPI_EXECUTION_STORE";
 /// Filename used when no explicit execution-store override is configured.
 pub const EXECUTION_STORE_FILE_NAME: &str = "execution.json";
+/// Filename for immutable handoff requests consumed by an external worker.
+/// The local owner writes requests but never claims that they were executed.
+pub const HANDOFF_STORE_FILE_NAME: &str = "handoff.json";
+/// Optional process-level override for the external-owner handoff snapshot.
+pub const HANDOFF_STORE_ENV: &str = "ZENPI_HANDOFF_STORE";
 /// A malformed execution path must not turn startup into an unbounded read.
 pub const MAX_EXECUTION_STORE_BYTES: usize = 16 * 1024 * 1024;
 /// One goal can have many retries, but the owner still needs a hard ceiling.
 pub const MAX_EXECUTION_RECEIPTS: usize = 4_096;
+/// Keep queued external work bounded even if a host repeatedly retries.
+pub const MAX_HANDOFF_REQUESTS: usize = 4_096;
+/// Handoff snapshots have the same conservative read/write bound as receipts.
+pub const MAX_HANDOFF_STORE_BYTES: usize = 16 * 1024 * 1024;
 /// Cost charged for the deterministic local evidence operation.  These are
 /// accounting units, not provider tokens or an estimate of wall time.
 pub const DETERMINISTIC_WALL_CLOCK_MS: u64 = 1;
@@ -88,6 +97,14 @@ pub enum ExecutionError {
     BudgetOverflow { field: &'static str },
     #[error("execution receipt identity conflicts with an existing receipt: {execution_id}")]
     ReceiptConflict { execution_id: String },
+    #[error("Blueprint item `{item_id}` has no declarative task to hand off")]
+    HandoffTaskMissing { item_id: String },
+    #[error("handoff request identity conflicts with an existing request: {handoff_id}")]
+    HandoffConflict { handoff_id: String },
+    #[error("handoff store has too many requests (maximum {max})")]
+    TooManyHandoffs { max: usize },
+    #[error("handoff store digest does not match its requests")]
+    HandoffDigestMismatch,
 }
 
 impl ExecutionError {
@@ -99,6 +116,11 @@ impl ExecutionError {
                 "execution_budget_exceeded"
             }
             Self::ReceiptConflict { .. } => "execution_receipt_conflict",
+            Self::HandoffTaskMissing { .. } => "execution_task_missing",
+            Self::HandoffConflict { .. } => "execution_handoff_conflict",
+            Self::TooManyHandoffs { .. } | Self::HandoffDigestMismatch => {
+                "execution_handoff_store_error"
+            }
             Self::InvalidReceipt(_) => "execution_invalid_receipt",
             _ => "execution_store_error",
         }
@@ -149,6 +171,12 @@ pub struct ExecutionReceipt {
     pub status: ExecutionStatus,
     pub cost: ResourceBudget,
     pub evidence: String,
+    /// Set only after an external b3 worker imports a validated result
+    /// manifest. The local receipt owner never sets this flag.
+    #[serde(default)]
+    pub external_work_executed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_checksum: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -176,6 +204,16 @@ impl ExecutionReceipt {
             ));
         }
         bounded_text(&self.evidence, "evidence", MAX_DOMAIN_RECORD_BYTES)?;
+        match (self.external_work_executed, &self.manifest_checksum) {
+            (false, None) => {}
+            (true, Some(checksum))
+                if checksum.len() == 64 && checksum.bytes().all(|b| b.is_ascii_hexdigit()) => {}
+            _ => {
+                return Err(ExecutionError::InvalidReceipt(
+                    "external evidence must carry a SHA-256 manifest checksum".into(),
+                ));
+            }
+        }
         if let Some(error) = &self.error {
             bounded_text(error, "error", 4_096)?;
         }
@@ -201,6 +239,97 @@ impl ExecutionReceipt {
     }
 }
 
+/// A request for an external b3ehive/agent owner to execute one declarative
+/// [`BlueprintTask`].  This is intentionally a handoff, not a completion
+/// receipt: zenpi never executes the instruction or its acceptance commands
+/// while creating this record.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BlueprintHandoff {
+    pub handoff_id: String,
+    pub goal_id: String,
+    pub blueprint_id: String,
+    pub blueprint_version: String,
+    pub blueprint_digest: String,
+    pub item_id: String,
+    pub attempt: u32,
+    pub depends_on: Vec<String>,
+    pub estimated_loc: u32,
+    pub instruction: String,
+    pub acceptance_commands: Vec<String>,
+    /// Always `queued` for requests emitted by zenpi. An external owner may
+    /// copy this record into its own result protocol without mutating zenpi's
+    /// immutable request snapshot.
+    pub status: HandoffStatus,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HandoffStatus {
+    Queued,
+}
+
+impl BlueprintHandoff {
+    pub fn validate(&self) -> Result<(), ExecutionError> {
+        bounded_id(&self.handoff_id, "handoff_id")?;
+        bounded_id(&self.goal_id, "goal_id")?;
+        bounded_id(&self.blueprint_id, "blueprint_id")?;
+        bounded_id(&self.blueprint_version, "blueprint_version")?;
+        bounded_id(&self.item_id, "item_id")?;
+        validate_digest(&self.blueprint_digest)?;
+        BlueprintItem::new(&self.item_id, self.estimated_loc)
+            .with_dependencies(self.depends_on.clone())
+            .with_task(BlueprintTask {
+                instruction: self.instruction.clone(),
+                acceptance_commands: self.acceptance_commands.clone(),
+            })
+            .validate()
+            .map_err(ExecutionError::Domain)?;
+        if self.status != HandoffStatus::Queued {
+            return Err(ExecutionError::InvalidReceipt(
+                "unknown handoff status".into(),
+            ));
+        }
+        let encoded = serde_json::to_vec(self)?;
+        if encoded.len() > MAX_DOMAIN_RECORD_BYTES {
+            return Err(ExecutionError::InvalidReceipt(format!(
+                "handoff exceeds {} bytes",
+                MAX_DOMAIN_RECORD_BYTES
+            )));
+        }
+        Ok(())
+    }
+
+    /// Confirm that the request still refers to exactly the immutable source
+    /// task. External consumers should perform this check before admission.
+    pub fn validate_against(
+        &self,
+        goal: &Goal,
+        blueprint: &Blueprint,
+    ) -> Result<(), ExecutionError> {
+        self.validate()?;
+        goal.validate_against(blueprint)?;
+        let item = blueprint
+            .items
+            .iter()
+            .find(|item| item.id == self.item_id)
+            .ok_or_else(|| ExecutionError::InvalidReceipt("handoff item is missing".into()))?;
+        let task = item
+            .task
+            .as_ref()
+            .ok_or_else(|| ExecutionError::HandoffTaskMissing {
+                item_id: item.id.clone(),
+            })?;
+        let expected = make_handoff_request(goal, blueprint, item, 1, task)?;
+        if self != &expected {
+            return Err(ExecutionError::HandoffConflict {
+                handoff_id: self.handoff_id.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Result of one call to [`BlueprintExecutor::run_next`]. These outcomes
 /// describe receipt-owner progress, not completion of external product work.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,6 +352,15 @@ pub enum RunOutcome {
     },
     /// Every item has a successful durable receipt.
     Complete,
+}
+
+/// Result of admitting one declarative task to an external worker owner.
+/// Nothing in this outcome implies that the instruction or acceptance command
+/// ran locally.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HandoffOutcome {
+    pub request: BlueprintHandoff,
+    pub already_queued: bool,
 }
 
 /// A bounded result for an idempotent store mutation.
@@ -254,6 +392,221 @@ pub struct ExecutionStore {
     receipts: Vec<ExecutionReceipt>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HandoffSnapshot {
+    schema_version: u16,
+    generation: u64,
+    digest: String,
+    requests: Vec<BlueprintHandoff>,
+}
+
+#[derive(Debug, Serialize)]
+struct UnsignedHandoffSnapshot<'a> {
+    requests: &'a [BlueprintHandoff],
+}
+
+/// Private, bounded persistence for immutable requests to an external worker.
+/// A separate snapshot keeps receipt compatibility stable while making the
+/// handoff boundary explicit and inspectable by a future b3ehive adapter.
+#[derive(Debug, Clone)]
+pub struct HandoffStore {
+    path: PathBuf,
+    generation: u64,
+    requests: Vec<BlueprintHandoff>,
+}
+
+impl HandoffStore {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, ExecutionError> {
+        let path = normalize_path(path.as_ref())?;
+        ensure_parent(&path)?;
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(ExecutionError::Symlink(path));
+                }
+                if !metadata.is_file() {
+                    return Err(ExecutionError::Directory(path));
+                }
+                crate::security::restrict_private_file(&path)?;
+                let bytes = read_bounded_with_limit(&path, MAX_HANDOFF_STORE_BYTES)?;
+                if bytes.iter().all(u8::is_ascii_whitespace) {
+                    return Err(ExecutionError::MissingSnapshot);
+                }
+                Self::decode(path, &bytes)
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                let store = Self::empty(path);
+                store.persist_snapshot()?;
+                Ok(store)
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    pub fn open_read_only(path: impl AsRef<Path>) -> Result<Self, ExecutionError> {
+        let path = normalize_path(path.as_ref())?;
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(ExecutionError::Symlink(path));
+                }
+                if !metadata.is_file() {
+                    return Err(ExecutionError::Directory(path));
+                }
+                let bytes = read_bounded_with_limit(&path, MAX_HANDOFF_STORE_BYTES)?;
+                Self::decode(path, &bytes)
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Self::empty(path)),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn requests(&self) -> &[BlueprintHandoff] {
+        &self.requests
+    }
+
+    pub fn find(&self, handoff_id: &str) -> Option<&BlueprintHandoff> {
+        self.requests
+            .iter()
+            .find(|request| request.handoff_id == handoff_id)
+    }
+
+    /// Insert one immutable request. Repeating the exact request is
+    /// idempotent; changing any field under the same identity fails closed.
+    pub fn insert(
+        &mut self,
+        request: BlueprintHandoff,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        request.validate()?;
+        if let Some(existing) = self.find(&request.handoff_id) {
+            if existing == &request {
+                return Ok(ExecutionStoreChange::Unchanged);
+            }
+            return Err(ExecutionError::HandoffConflict {
+                handoff_id: request.handoff_id,
+            });
+        }
+        if self.requests.len() >= MAX_HANDOFF_REQUESTS {
+            return Err(ExecutionError::TooManyHandoffs {
+                max: MAX_HANDOFF_REQUESTS,
+            });
+        }
+        if self.requests.iter().any(|existing| {
+            existing.goal_id == request.goal_id
+                && existing.blueprint_id == request.blueprint_id
+                && existing.blueprint_version == request.blueprint_version
+                && existing.blueprint_digest == request.blueprint_digest
+                && existing.item_id == request.item_id
+                && existing.attempt == request.attempt
+        }) {
+            return Err(ExecutionError::HandoffConflict {
+                handoff_id: request.handoff_id,
+            });
+        }
+        let mut next = self.clone();
+        next.requests.push(request);
+        next.commit()?;
+        *self = next;
+        Ok(ExecutionStoreChange::Inserted)
+    }
+
+    fn empty(path: PathBuf) -> Self {
+        Self {
+            path,
+            generation: 0,
+            requests: Vec::new(),
+        }
+    }
+
+    fn commit(&mut self) -> Result<(), ExecutionError> {
+        self.generation = self
+            .generation
+            .checked_add(1)
+            .ok_or(ExecutionError::BudgetOverflow {
+                field: "handoff_store_generation",
+            })?;
+        if let Err(error) = self.persist_snapshot() {
+            self.generation = self.generation.saturating_sub(1);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn persist_snapshot(&self) -> Result<(), ExecutionError> {
+        for request in &self.requests {
+            request.validate()?;
+        }
+        let snapshot = HandoffSnapshot {
+            schema_version: EXECUTION_SCHEMA_VERSION,
+            generation: self.generation,
+            digest: digest_handoffs(&self.requests)?,
+            requests: self.requests.clone(),
+        };
+        let bytes = serde_json::to_vec(&snapshot)?;
+        if bytes.len() > MAX_HANDOFF_STORE_BYTES {
+            return Err(ExecutionError::StoreTooLong {
+                max: MAX_HANDOFF_STORE_BYTES,
+                actual: bytes.len() as u64,
+            });
+        }
+        atomic_replace_with_limit(&self.path, &bytes, MAX_HANDOFF_STORE_BYTES)
+    }
+
+    fn decode(path: PathBuf, bytes: &[u8]) -> Result<Self, ExecutionError> {
+        let snapshot: HandoffSnapshot = serde_json::from_slice(bytes)?;
+        if snapshot.schema_version != EXECUTION_SCHEMA_VERSION {
+            return Err(ExecutionError::SchemaVersion {
+                found: snapshot.schema_version,
+                expected: EXECUTION_SCHEMA_VERSION,
+            });
+        }
+        if snapshot.requests.len() > MAX_HANDOFF_REQUESTS {
+            return Err(ExecutionError::TooManyHandoffs {
+                max: MAX_HANDOFF_REQUESTS,
+            });
+        }
+        let mut ids = std::collections::BTreeSet::new();
+        let mut attempts = std::collections::BTreeSet::new();
+        for request in &snapshot.requests {
+            request.validate()?;
+            if !ids.insert(request.handoff_id.as_str()) {
+                return Err(ExecutionError::InvalidReceipt(
+                    "duplicate handoff_id".into(),
+                ));
+            }
+            let identity = (
+                request.goal_id.as_str(),
+                request.blueprint_id.as_str(),
+                request.blueprint_version.as_str(),
+                request.blueprint_digest.as_str(),
+                request.item_id.as_str(),
+                request.attempt,
+            );
+            if !attempts.insert(identity) {
+                return Err(ExecutionError::HandoffConflict {
+                    handoff_id: request.handoff_id.clone(),
+                });
+            }
+        }
+        if snapshot.digest != digest_handoffs(&snapshot.requests)? {
+            return Err(ExecutionError::HandoffDigestMismatch);
+        }
+        Ok(Self {
+            path,
+            generation: snapshot.generation,
+            requests: snapshot.requests,
+        })
+    }
+}
+
 /// Resolve the receipt store associated with one session journal.
 ///
 /// A caller may set [`EXECUTION_STORE_ENV`] to an explicit path (useful for a
@@ -279,6 +632,30 @@ pub fn path_for_session(session_path: impl AsRef<Path>) -> PathBuf {
         .filter(|parent| !parent.as_os_str().is_empty())
         .map(|parent| parent.join(EXECUTION_STORE_FILE_NAME))
         .unwrap_or_else(|| PathBuf::from(EXECUTION_STORE_FILE_NAME))
+}
+
+/// Resolve the immutable external-owner request store associated with one
+/// session journal. An explicit override keeps host tests and worker adapters
+/// from touching the user's global directory.
+pub fn handoff_path_for_session(session_path: impl AsRef<Path>) -> PathBuf {
+    if let Ok(path) = std::env::var(HANDOFF_STORE_ENV)
+        && !path.trim().is_empty()
+    {
+        return PathBuf::from(path);
+    }
+    let session_path = session_path.as_ref();
+    let default_session = crate::session::SessionStore::default_path();
+    if session_path == default_session {
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return home.join(".zenpi").join(HANDOFF_STORE_FILE_NAME);
+    }
+    session_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(|parent| parent.join(HANDOFF_STORE_FILE_NAME))
+        .unwrap_or_else(|| PathBuf::from(HANDOFF_STORE_FILE_NAME))
 }
 
 impl ExecutionStore {
@@ -339,6 +716,12 @@ impl ExecutionStore {
 
     pub fn receipts(&self) -> &[ExecutionReceipt] {
         &self.receipts
+    }
+
+    pub fn receipt(&self, execution_id: &str) -> Option<&ExecutionReceipt> {
+        self.receipts
+            .iter()
+            .find(|receipt| receipt.execution_id == execution_id)
     }
 
     /// Return the highest-attempt receipt for one item in the exact immutable
@@ -433,6 +816,44 @@ impl ExecutionStore {
         let replacement = Self::open(&self.path)?;
         *self = replacement;
         Ok(())
+    }
+
+    /// Attach one validated external result manifest to a terminal receipt.
+    /// This is the only path that can turn control-plane bookkeeping into
+    /// externally evidenced work; the local executor cannot set the flag.
+    pub fn attach_external_manifest(
+        &mut self,
+        execution_id: &str,
+        manifest_checksum: String,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        let Some(index) = self
+            .receipts
+            .iter()
+            .position(|receipt| receipt.execution_id == execution_id)
+        else {
+            return Err(ExecutionError::InvalidReceipt(
+                "execution receipt is not found".into(),
+            ));
+        };
+        let mut next = self.receipts[index].clone();
+        if next.external_work_executed
+            && next.manifest_checksum.as_deref() == Some(&manifest_checksum)
+        {
+            return Ok(ExecutionStoreChange::Unchanged);
+        }
+        if next.external_work_executed || !next.status.is_terminal() {
+            return Err(ExecutionError::ReceiptConflict {
+                execution_id: execution_id.to_owned(),
+            });
+        }
+        next.external_work_executed = true;
+        next.manifest_checksum = Some(manifest_checksum);
+        next.validate()?;
+        let mut replacement = self.clone();
+        replacement.receipts[index] = next;
+        replacement.commit(ExecutionStoreChange::Updated)?;
+        *self = replacement;
+        Ok(ExecutionStoreChange::Updated)
     }
 
     fn empty(path: PathBuf) -> Self {
@@ -530,6 +951,60 @@ impl BlueprintExecutor {
 
     pub fn into_store(self) -> ExecutionStore {
         self.store
+    }
+
+    /// Admit one dependency-ready declarative task for an external owner.
+    ///
+    /// This method deliberately does not create an execution receipt or
+    /// change Goal status. A retry of the same immutable item/attempt returns
+    /// the existing queued request, while the actual worker and acceptance
+    /// evidence must be supplied through a separate b3ehive adapter.
+    pub fn handoff_next(
+        &self,
+        handoffs: &mut HandoffStore,
+        goal: &Goal,
+        blueprint: &Blueprint,
+    ) -> Result<HandoffOutcome, ExecutionError> {
+        goal.validate_against(blueprint)
+            .map_err(|error| match error {
+                DomainError::BlueprintLinkMismatch => ExecutionError::BlueprintLinkMismatch,
+                other => ExecutionError::Domain(other),
+            })?;
+        if !matches!(goal.status, GoalStatus::Queued | GoalStatus::Running) {
+            return Err(ExecutionError::GoalNotRunnable {
+                status: goal.status,
+            });
+        }
+        let Some(selection) = self.select_item(goal, blueprint)? else {
+            // A control-plane receipt is not external acceptance evidence.
+            // Refuse to claim a later item is ready until a future importer
+            // records that evidence; never turn this into a fake completion.
+            return Err(ExecutionError::InvalidReceipt(
+                "no dependency-ready Blueprint item; external acceptance evidence is required"
+                    .into(),
+            ));
+        };
+        let task =
+            selection
+                .item
+                .task
+                .as_ref()
+                .ok_or_else(|| ExecutionError::HandoffTaskMissing {
+                    item_id: selection.item.id.clone(),
+                })?;
+        let request =
+            make_handoff_request(goal, blueprint, selection.item, selection.attempt, task)?;
+        if let Some(existing) = handoffs.find(&request.handoff_id) {
+            return Ok(HandoffOutcome {
+                request: existing.clone(),
+                already_queued: true,
+            });
+        }
+        handoffs.insert(request.clone())?;
+        Ok(HandoffOutcome {
+            request,
+            already_queued: false,
+        })
     }
 
     /// Select and record at most one dependency-ready item.
@@ -746,10 +1221,37 @@ fn make_running_receipt(
             "control_plane_only external_work_executed=false blueprint={} item={} estimated_loc={}",
             blueprint.digest, item.id, item.estimated_loc
         ),
+        external_work_executed: false,
+        manifest_checksum: None,
         error: None,
     };
     receipt.validate()?;
     Ok(receipt)
+}
+
+fn make_handoff_request(
+    goal: &Goal,
+    blueprint: &Blueprint,
+    item: &BlueprintItem,
+    attempt: u32,
+    task: &BlueprintTask,
+) -> Result<BlueprintHandoff, ExecutionError> {
+    let request = BlueprintHandoff {
+        handoff_id: handoff_id(goal, blueprint, item, attempt),
+        goal_id: goal.id.clone(),
+        blueprint_id: blueprint.id.clone(),
+        blueprint_version: blueprint.version.clone(),
+        blueprint_digest: blueprint.digest.clone(),
+        item_id: item.id.clone(),
+        attempt,
+        depends_on: item.depends_on.clone(),
+        estimated_loc: item.estimated_loc,
+        instruction: task.instruction.clone(),
+        acceptance_commands: task.acceptance_commands.clone(),
+        status: HandoffStatus::Queued,
+    };
+    request.validate()?;
+    Ok(request)
 }
 
 fn execution_id(goal: &Goal, blueprint: &Blueprint, item: &BlueprintItem, attempt: u32) -> String {
@@ -770,6 +1272,24 @@ fn execution_id(goal: &Goal, blueprint: &Blueprint, item: &BlueprintItem, attemp
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     format!("exec-{short}")
+}
+
+fn handoff_id(goal: &Goal, blueprint: &Blueprint, item: &BlueprintItem, attempt: u32) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"handoff\0");
+    hasher.update(goal.id.as_bytes());
+    hasher.update([0]);
+    hasher.update(blueprint.digest.as_bytes());
+    hasher.update([0]);
+    hasher.update(item.id.as_bytes());
+    hasher.update([0]);
+    hasher.update(attempt.to_be_bytes());
+    let digest = hasher.finalize();
+    let short = digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    format!("handoff-{short}")
 }
 
 fn ensure_budget(
@@ -892,6 +1412,14 @@ fn digest_receipts(receipts: &[ExecutionReceipt]) -> Result<String, ExecutionErr
         .collect())
 }
 
+fn digest_handoffs(requests: &[BlueprintHandoff]) -> Result<String, ExecutionError> {
+    let bytes = serde_json::to_vec(&UnsignedHandoffSnapshot { requests })?;
+    Ok(Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
 fn bounded_text(value: &str, field: &'static str, max: usize) -> Result<(), ExecutionError> {
     if value.trim().is_empty() {
         return Err(ExecutionError::InvalidReceipt(format!(
@@ -952,24 +1480,28 @@ fn ensure_parent(path: &Path) -> Result<(), ExecutionError> {
 }
 
 fn read_bounded(path: &Path) -> Result<Vec<u8>, ExecutionError> {
+    read_bounded_with_limit(path, MAX_EXECUTION_STORE_BYTES)
+}
+
+fn read_bounded_with_limit(path: &Path, max_bytes: usize) -> Result<Vec<u8>, ExecutionError> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
     options.custom_flags(libc::O_NOFOLLOW);
     let file = options.open(path)?;
     let metadata = file.metadata()?;
-    if metadata.len() > MAX_EXECUTION_STORE_BYTES as u64 {
+    if metadata.len() > max_bytes as u64 {
         return Err(ExecutionError::StoreTooLong {
-            max: MAX_EXECUTION_STORE_BYTES,
+            max: max_bytes,
             actual: metadata.len(),
         });
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_EXECUTION_STORE_BYTES as u64).saturating_add(1))
+    file.take((max_bytes as u64).saturating_add(1))
         .read_to_end(&mut bytes)?;
-    if bytes.len() > MAX_EXECUTION_STORE_BYTES {
+    if bytes.len() > max_bytes {
         return Err(ExecutionError::StoreTooLong {
-            max: MAX_EXECUTION_STORE_BYTES,
+            max: max_bytes,
             actual: bytes.len() as u64,
         });
     }
@@ -977,9 +1509,17 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>, ExecutionError> {
 }
 
 fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), ExecutionError> {
-    if bytes.len() > MAX_EXECUTION_STORE_BYTES {
+    atomic_replace_with_limit(path, bytes, MAX_EXECUTION_STORE_BYTES)
+}
+
+fn atomic_replace_with_limit(
+    path: &Path,
+    bytes: &[u8],
+    max_bytes: usize,
+) -> Result<(), ExecutionError> {
+    if bytes.len() > max_bytes {
         return Err(ExecutionError::StoreTooLong {
-            max: MAX_EXECUTION_STORE_BYTES,
+            max: max_bytes,
             actual: bytes.len() as u64,
         });
     }
