@@ -31,6 +31,8 @@ _ZENPI_ENV_KEYS = {
     "ZENPI_API_KEY",
     "ZENPI_BACKEND",
     "ZENPI_BASE_URL",
+    "ZENPI_DOMAIN_STORE",
+    "ZENPI_EXECUTION_STORE",
     "ZENPI_HOME",
     "ZENPI_MODEL",
     "ZENPI_PROFILE",
@@ -806,6 +808,236 @@ def assert_production_session_gc(binary: Path, root: Path) -> None:
         raise AssertionError("session gc removed a recent, newest, or unowned journal")
 
 
+def assert_production_blueprint_execution(binary: Path, root: Path) -> None:
+    """Prove the installed local Blueprint owner survives a process restart.
+
+    This is intentionally a two-process control-plane check rather than a
+    Cargo-unit test.  The Blueprint and Goal are authored as ordinary JSON
+    files, admitted through the public ``put`` slash commands, and then one
+    dependency-ready item is run in each process.  A local endpoint that
+    returns an error is kept behind the configured provider URL; any request
+    reaching it means the control commands accidentally started a model turn.
+    """
+    workspace = root / "blueprint-execution-workspace"
+    workspace.mkdir()
+    blueprint_id = "installed-smoke-plan"
+    version = "1"
+    items = [
+        {"id": "compile", "depends_on": [], "estimated_loc": 120},
+        {"id": "verify", "depends_on": ["compile"], "estimated_loc": 80},
+    ]
+    canonical = json.dumps(
+        {"id": blueprint_id, "version": version, "items": items},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    digest = hashlib.sha256(canonical).hexdigest()
+    blueprint_path = workspace / "blueprint.json"
+    blueprint_path.write_text(
+        json.dumps(
+            {
+                "id": blueprint_id,
+                "version": version,
+                "items": items,
+                "digest": digest,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    goal_path = workspace / "goal.json"
+    goal_path.write_text(
+        json.dumps(
+            {
+                "id": "installed-smoke-goal",
+                "blueprint_id": blueprint_id,
+                "blueprint_version": version,
+                "blueprint_digest": digest,
+                "status": "queued",
+                "budget": {
+                    "tokens": 1_000,
+                    "wall_clock_ms": 10_000,
+                    "attempts": 2,
+                    "disk_bytes": 2_000,
+                },
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+
+    class FailingProviderHandler(BaseHTTPRequestHandler):
+        requests: list[tuple[str, bytes]] = []
+
+        def _reject(self) -> None:
+            length = int(self.headers.get("content-length", "0"))
+            body = self.rfile.read(length)
+            FailingProviderHandler.requests.append((self.path, body))
+            self.send_error(503, "provider must not be contacted by Blueprint control commands")
+
+        def do_GET(self) -> None:  # noqa: N802 - stdlib handler API
+            self._reject()
+
+        def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
+            self._reject()
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    FailingProviderHandler.requests = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), FailingProviderHandler)
+    server.daemon_threads = True
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    session = workspace / "session.jsonl"
+    env = isolated_env(
+        root / "blueprint-execution-home",
+        ZENPI_BASE_URL=f"http://127.0.0.1:{server.server_port}/v1",
+        ZENPI_API_KEY="blueprint-smoke-key",
+        ZENPI_WIRE_API="responses",
+        ZENPI_MODEL="model-must-not-run",
+    )
+
+    def invoke(payload: list[dict[str, Any]], context: str) -> dict[str, dict[str, Any]]:
+        text = "\n".join(json.dumps(value, separators=(",", ":")) for value in payload) + "\n"
+        result = run(
+            [
+                str(binary),
+                "--mode",
+                "headless",
+                "--backend",
+                "openai",
+                "--session",
+                str(session),
+            ],
+            input_text=text,
+            env=env,
+            cwd=workspace,
+        )
+        assert_success(result, context)
+        responses = {
+            record["id"]: record
+            for record in json_lines(result.stdout)
+            if record.get("type") == "response" and record.get("id")
+        }
+        for request_id in (value["id"] for value in payload):
+            response = responses.get(request_id, {})
+            if response.get("schema_version") != 2 or response.get("success") is not True:
+                raise AssertionError(
+                    f"{context} missing successful response {request_id}: {responses!r}"
+                )
+        return responses
+
+    first = invoke(
+        [
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "blueprint-put",
+                "text": "/blueprint put blueprint.json",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "goal-put",
+                "text": "/goal put goal.json",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "run-first",
+                "text": f"/blueprint run {blueprint_id}@{version}",
+            },
+            {"schema_version": 2, "type": "shutdown", "id": "shutdown-first"},
+        ],
+        "installed Blueprint admission/first execution",
+    )
+    if first["blueprint-put"]["data"].get("change") != "inserted":
+        raise AssertionError(f"installed Blueprint put was not durable: {first!r}")
+    if first["goal-put"]["data"].get("change") != "inserted":
+        raise AssertionError(f"installed Goal put was not durable: {first!r}")
+    first_run = first["run-first"]["data"]
+    if not (
+        first_run.get("action") == "run"
+        and first_run.get("target") == f"{blueprint_id}@{version}"
+        and first_run.get("status") == "succeeded"
+        and first_run.get("goal_status") == "running"
+        and first_run.get("receipt", {}).get("item_id") == "compile"
+        and first_run.get("receipt", {}).get("status") == "succeeded"
+        and first_run.get("receipt_count") == 1
+    ):
+        raise AssertionError(f"first installed Blueprint step was not dependency-ready: {first!r}")
+
+    execution_path = workspace / "execution.json"
+    if not execution_path.is_file():
+        raise AssertionError("first Blueprint process did not persist execution.json")
+    first_snapshot = json.loads(execution_path.read_text(encoding="utf-8"))
+    first_receipts = first_snapshot.get("receipts", [])
+    if len(first_receipts) != 1 or first_receipts[0].get("item_id") != "compile":
+        raise AssertionError(f"first execution receipt was not durable: {first_snapshot!r}")
+
+    second = invoke(
+        [
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "run-second",
+                "text": f"/blueprint run {blueprint_id}@{version}",
+            },
+            {
+                "schema_version": 2,
+                "type": "command",
+                "id": "goal-status",
+                "text": "/goal status installed-smoke-goal",
+            },
+            {"schema_version": 2, "type": "shutdown", "id": "shutdown-second"},
+        ],
+        "installed Blueprint restart/resume execution",
+    )
+    second_run = second["run-second"]["data"]
+    if not (
+        second_run.get("action") == "run"
+        and second_run.get("status") == "succeeded"
+        and second_run.get("goal_status") == "done"
+        and second_run.get("receipt", {}).get("item_id") == "verify"
+        and second_run.get("receipt", {}).get("status") == "succeeded"
+        and second_run.get("receipt_count") == 2
+    ):
+        raise AssertionError(f"restart did not execute the dependency successor: {second!r}")
+    if second["goal-status"]["data"].get("goal", {}).get("status") != "done":
+        raise AssertionError(f"Goal status was not durable across restart: {second!r}")
+
+    second_snapshot = json.loads(execution_path.read_text(encoding="utf-8"))
+    receipts = second_snapshot.get("receipts", [])
+    if not (
+        second_snapshot.get("schema_version") == 1
+        and len(receipts) == 2
+        and [receipt.get("item_id") for receipt in receipts] == ["compile", "verify"]
+        and all(receipt.get("status") == "succeeded" for receipt in receipts)
+        and all(receipt.get("blueprint_digest") == digest for receipt in receipts)
+    ):
+        raise AssertionError(
+            "restart receipt snapshot is incomplete or out of order: "
+            f"{second_snapshot!r}"
+        )
+
+    server.shutdown()
+    server.server_close()
+    server_thread.join(timeout=3)
+    if server_thread.is_alive():
+        raise AssertionError("provider-failure fixture did not shut down")
+    if FailingProviderHandler.requests:
+        raise AssertionError(
+            "Blueprint control commands contacted the provider endpoint: "
+            f"{FailingProviderHandler.requests!r}"
+        )
+    journal = json_lines(session.read_text(encoding="utf-8"))
+    if any(record.get("kind") == "turn" for record in journal):
+        raise AssertionError(
+            "Blueprint control commands unexpectedly created model turns: "
+            f"{journal!r}"
+        )
+
+
 def assert_headless_tool_approval(binary: Path, root: Path) -> None:
     """Run provider -> approval -> real write -> provider continuation end to end."""
     workspace = root / "production-tool-workspace"
@@ -1378,6 +1610,7 @@ def main() -> int:
         assert_success(production_help, "installed production help")
         assert_production_rejects_echo(production_binary, root)
         assert_production_session_gc(production_binary, root)
+        assert_production_blueprint_execution(production_binary, root)
         assert_openai_fixture(production_binary, root)
         assert_headless_eof_drains_slow_provider(production_binary, root)
         assert_headless_tool_approval(production_binary, root)
@@ -1423,7 +1656,7 @@ def main() -> int:
         assert_tui_multiline_paste(binary, root)
         assert_tui_interrupt_while_streaming(binary, root)
     print(
-        "user smoke passed: production install/provider/tool approval/EOF drain/session GC, echo fixture, "
+        "user smoke passed: production install/provider/tool approval/EOF drain/session GC/Blueprint execution, echo fixture, "
         "durable slash/runtime intents, resume, TUI resize/multiline paste, streaming interrupt, "
         "and terminal restoration"
     )
