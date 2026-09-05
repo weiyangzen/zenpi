@@ -961,7 +961,9 @@ def assert_production_blueprint_execution(binary: Path, root: Path) -> None:
     if not (
         first_run.get("action") == "run"
         and first_run.get("target") == f"{blueprint_id}@{version}"
-        and first_run.get("status") == "succeeded"
+        and first_run.get("status") == "recorded"
+        and first_run.get("execution_scope") == "control_plane_only"
+        and first_run.get("external_work_executed") is False
         and first_run.get("goal_status") == "running"
         and first_run.get("receipt", {}).get("item_id") == "compile"
         and first_run.get("receipt", {}).get("status") == "succeeded"
@@ -998,7 +1000,7 @@ def assert_production_blueprint_execution(binary: Path, root: Path) -> None:
     second_run = second["run-second"]["data"]
     if not (
         second_run.get("action") == "run"
-        and second_run.get("status") == "succeeded"
+        and second_run.get("status") == "recorded"
         and second_run.get("goal_status") == "running"
         and second_run.get("receipt", {}).get("item_id") == "verify"
         and second_run.get("receipt", {}).get("status") == "succeeded"

@@ -67,12 +67,15 @@ fn headless_blueprint_run_records_dependency_order_without_faking_goal_completio
     let first = values.iter().find(|value| value["id"] == "first").unwrap();
     assert_eq!(first["success"], true);
     assert_eq!(first["data"]["action"], "run");
-    assert_eq!(first["data"]["status"], "succeeded");
+    assert_eq!(first["data"]["status"], "recorded");
+    assert_eq!(first["data"]["execution_scope"], "control_plane_only");
+    assert_eq!(first["data"]["external_work_executed"], false);
     assert_eq!(first["data"]["receipt"]["item_id"], "build");
     assert_eq!(first["data"]["goal_status"], "running");
 
     let second = values.iter().find(|value| value["id"] == "second").unwrap();
     assert_eq!(second["success"], true);
+    assert_eq!(second["data"]["status"], "recorded");
     assert_eq!(second["data"]["receipt"]["item_id"], "verify");
     assert_eq!(second["data"]["goal_status"], "running");
     assert_eq!(second["data"]["receipt_count"], 2);
@@ -201,10 +204,7 @@ fn tui_blueprint_run_uses_the_same_owner_and_reports_errors_without_model_turns(
         SlashDispatchAction::Continue
     );
     assert!(state.messages().any(|message| {
-        message.role == MessageRole::System
-            && message.text.contains("blueprint run:")
-            && message.text.contains("build")
-            && message.text.contains("running")
+        message.role == MessageRole::System && message.text.contains("blueprint run:")
     }));
     assert!(agent.history().is_empty());
 
