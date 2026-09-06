@@ -1,7 +1,40 @@
 # zenpi Execution Blueprint
 
-> **Frozen v1 execution receipt.** This file records the historical v1
-> checklist and is retained for migration/audit; its checkmarks are not proof
+## Slash and persona revision (2026-09-06)
+
+The interactive surface is one unified workspace; project, goal, learn, review,
+and session are slash-command projections. `/yolo on|off` and
+`/approval ask|always|never` are explicit, host-gated controls. `/goal` is
+zenpi's bounded b3ehive goal owner and is not claimed to be Codex CLI's
+internal goal primitive. MBTI retains all 16 labels while grouping them into
+Analysts, Diplomats, Sentinels, and Explorers with stable coding/work profiles.
+
+### Project-tab correction (2026-09-06)
+
+The five identifiers below are pane presets, not the product's project tabs.
+The intended model is one tab per project (Wave Terminal style), with goal,
+learn, review, and session exposed as commands/panes inside that project. The
+existing `TabId` compatibility layer must therefore be replaced by a durable
+project-tab owner before this design is considered complete; no implementation
+row may claim that the current five presets satisfy project isolation.
+
+- [ ] **ZP-013** | layer `workspace` | Replace functional tabs with Wave Terminal-style project tabs | Depends: ZP-004,ZP-107 | Owner scope: Rust/TUI/Session | Owned paths: `src/layout.rs`, `src/tui.rs`, `src/session.rs`, tests, docs | Validators: the top strip contains projects only and exposes a create affordance; Goal/Learn/Review/Session render as one unified workspace's commands/panes, never peer tabs; create/switch/close two project tabs; each keeps independent session, transcript, cwd, layout and approval projection; project checkpoint API preserves selected project and tab list across host restart | Rollback: retain legacy pane presets behind migration flag | Estimate: 1.5d | Estimated LOC: 1800
+
+Live development receipt: `tools/live_user_smoke.py` passed against the local
+Codex profile, including streaming response, approved read/write continuation,
+restart recovery, and `!echo`. A separate headless slash smoke also passed
+`/approval ask`, `/yolo on`, `/help goal`, and shutdown with unique request IDs.
+The latest complete receipt is `/private/tmp/zenpi-live-out-5/live-abu_hej_/report.json`.
+The latest receipt additionally covers live `/status`, `/review`, `/session list`, and `/resume`: `/private/tmp/zenpi-live-out-10/live-6bzbeysm/report.json`.
+
+- [x] **ZP-011** | layer `slash` | Align unified workspace slash projections and explicit approval posture controls | Depends: ZP-004,ZP-107 | Owner scope: Rust/TUI/Core | Owned paths: `src/slash.rs`, `src/tui.rs`, `src/headless.rs`, `src/core.rs`, `tests/slash.rs`, `Docs/research/codex-slash-parity.md` | Validators: parity audit, parser/help/dispatch tests, host-gated policy mutation, full target suite, and live provider receipt `tools/live_user_smoke.py` | Rollback: restore prior command grammar | Estimate: 1d | Estimated LOC: 1200
+- [x] **ZP-012** | layer `persona` | Integrate four MBTI coding/work families without removing 16 selectable personas | Depends: ZP-004,ZP-107 | Owner scope: Rust/TUI/Docs | Owned paths: `src/persona.rs`, `tests/tui_interaction.rs`, `Docs/research/mbti-coding-agents.md` | Validators: family research and persona implementation | Rollback: restore communication-only profiles | Estimate: 0.75d | Estimated LOC: 400
+
+> **v1 execution receipt with 2.1 contract rows reopened.** This file records
+> the historical v1 checklist and is retained for migration/audit; eleven CF
+> contract rows were reopened and CF-408, CF-409, CF-505, and CF-506 were
+> added as explicit acceptance items, all currently `[ ]`.
+> Earlier checkmarks are not proof
 > of end-user product usability. The v2 review draft is the current product
 > status document until its Master acceptance gate passes. This remains the
 > only mutable v1 requirement and state surface. Workers never write `[x]`. A
@@ -63,6 +96,81 @@ nested_agents: forbidden
   notes are English. The user-facing `README.md` must contain English,
   Simplified Chinese, and Japanese sections.
 
+## 2.1 revision: worker allowance, sessions, and local shell
+
+This revision changes requirements and acceptance state only. It does not
+authorize a worker launch, remove the execution Spec's transport/isolation
+rules, or accept existing implementation slices. The proposed work matrix and
+contract migration map are in sections 7.E and 9.1 of
+`Docs/Zenpi_Execution_Blueprint_v2.md`; the CF rows here are the executable
+checklist, including work that must be implemented again.
+
+### Worker all-allow after Blueprint prohibition preflight
+
+The proposal is **full automatic allowance inside the item's frozen scope**,
+not a globally unrestricted process and not a new approval prompt for every
+tool. Before admission, the Master must publish the item/Goal/Blueprint
+identity, owned read/write paths, tools and effects, command execution scope,
+network destinations, credential handles, resource limits, and explicit
+prohibitions. These fields are proposed contract data, not evidence that the
+current parser/runtime already enforces them.
+
+| Stage | Required behavior |
+|---|---|
+| Blueprint preparation | Declare prohibited paths/actions before work starts: credentials and private homes, non-owned files, canonical Blueprint/status edits, undeclared network destinations, publication/spend/destructive effects without a separate grant, policy or identity mutation, and nested workers/daemons/schedulers. Unknown effects are denied. |
+| Host preflight | Validate dependencies, identity/digests, actual isolation support, exclusive write ownership, bounded resource reservations, and a revocable lease. Reject contradictory or unenforceable declarations before launching a worker. |
+| Worker execution | All declared operations passing the frozen gate run without repeated approval. Host and Blueprint prohibitions always win; switching from `blueprint_worker` to `agent_tool` or `user_shell` cannot remove the gate. |
+| Each side effect | Check current lease/revocation, policy digest, effect confinement, and durable budget reservation before dispatch. A prompt-only prohibition list or command-name filter is not filesystem/network confinement. |
+| Scope change and stop | An out-of-scope action returns `blocked`/`denied`; only the Master can revise the Blueprint and issue a fresh lease. Expiry, budget exhaustion, and host cancel stop admission and terminate/reap owned children. |
+| Acceptance | Prove a real declared edit/build/test workflow completes without per-action approval, and prove prohibited effects cannot occur. An executor restricted to `echo`/`true`/`false` cannot satisfy worker all-allow by denying every useful operation. |
+
+The host retains provider credentials and gives workers only policy-bound
+handles. An allow profile cannot grant raw keys or override host prohibitions.
+The permitted operation set is the declared item scope minus explicit denies;
+the execution host must enforce it outside worker-editable code. The worker
+does not receive a way to disable its own sandbox or mark its item `[x]`.
+
+### Session breakpoint and communication contracts
+
+- A breakpoint identifies session, owner epoch, durable journal/event cursor,
+  request/attempt identity, and pending operation/result state. Transcript
+  replay, context compaction, and transport reconnect are different operations.
+- Restart must preserve known results and deduplication state. A missing
+  external result is `unknown_outcome`, not success or an automatic retry;
+  explicit retry/abandon must be available through both hosts.
+- Session messages use addressed, bounded, authenticated envelopes. Durable
+  enqueue, recipient ACK, execution claim, and completed result are distinct
+  states. An offline message remains queued and never silently launches work.
+- A live recipient consumes messages only at an owned admission boundary;
+  queued follow-up does not implicitly steer/cancel active work. Explicit
+  steering/interruption needs its own authorization and correlated receipt.
+- Live-agent status must come from owner/liveness evidence, not merely a list
+  of journal files. Fork/import must not copy live ownership, outstanding
+  execution claims, or approvals; migration/delete/GC must handle session
+  sidecars and retained deduplication state explicitly.
+- CF-307/CF-503/CF-504 reopen existing recovery/lifecycle behavior. CF-505
+  separately owns the durable mailbox contract; CF-506 adds real recipient
+  dispatch, wait/result, and live-owner communication that a mailbox alone
+  does not provide. No hidden server, scheduler, or recursive worker spawning
+  is introduced by these contracts.
+
+### Explicit `!` shell contract and acceptance status
+
+`!echo hi` is a local user request, parsed before provider submission, not a
+model-generated `run_command` call. CF-408 requires shell syntax, fixed cwd,
+scrubbed environment, bounded stdout/stderr, exit/signal/timeout/cancel/reap,
+durable history and next-turn untrusted context, and equivalent TUI/headless
+behavior. Ordinary `echo hi` remains a prompt. `!` cannot bypass worker gates.
+Empty bang and `!!` handling must be explicit; undocumented Codex behavior
+must not be invented as a parity requirement.
+
+Current slices are not a usability receipt. The earlier TUI and installed
+resume failures are tracked under CF-305/CF-307/CF-705 in
+`Docs/quality/blocker-cleanup-2026-09-05.md`. That repair distinguishes
+ambiguous completion, journal-only checkpoint capabilities, and replay of a
+previous status request from a fresh status query. Passing those regressions
+does not accept the remaining worker, session, or cross-platform contracts.
+
 ## R0 — Research and frozen decisions
 
 - [x] **ZP-001** | layer `research` | Inventory the official `pi-agent` TypeScript implementation and map only the behaviors zenpi will preserve | Deliverables: source/revision matrix covering coding-agent core, session persistence, event flow, terminal cleanup, input handling, and TUI rendering; explicit omissions including print mode | Depends: — | Owner scope: Research/Master | Owned paths: `Docs/research/pi-agent-ts.md` | Validators: file is non-empty; records `/Users/mac/Github/pi-mono` revision and inspected paths; every preserved behavior has an evidence link/line and a test implication; no copied source or credentials | Rollback: remove research note only | Estimate: 0.5d | Estimated LOC: 0
@@ -121,29 +229,33 @@ nested_agents: forbidden
 - [x] **CF-302** | layer `runtime` | Emit a common typed event model | Deliverables: monotonic v2 envelopes for provider, lifecycle, tools, usage, warning, error, and terminal state | Depends: CF-301 | Owner scope: Rust/Runtime | Owned paths: `src/backend.rs`, `src/core.rs`, `src/protocol.rs`, `src/headless.rs` | Validators: every event has `type`, sequence, request correlation, and turn correlation where known | Rollback: retain v1 terminal responses | Estimate: 1d | Estimated LOC: 1400
 - [x] **CF-303** | layer `runtime` | Propagate cooperative cancellation | Deliverables: headless cancel and TUI interrupt through provider frames, retry backoff, tool loop, persistence boundary, and child wait | Depends: CF-301,CF-302 | Owner scope: Rust/Runtime | Owned paths: `src/runtime.rs`, `src/core.rs`, `src/backend.rs`, `src/headless.rs`, `src/tui.rs`, `src/tools.rs` | Validators: cancelled turns persist no assistant completion and active child is reaped | Rollback: stop accepting new work and drain active operation | Estimate: 1.5d | Estimated LOC: 2100
 - [x] **CF-304** | layer `runtime` | Implement true live steer semantics | Deliverables: queued, superseding, stale-ID, cancel/reissue, and native continuation behavior | Depends: CF-302,CF-303 | Owner scope: Rust/Core | Owned paths: `src/runtime.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `tests/runtime.rs` | Validators: steer during streaming neither loses nor duplicates a user message | Rollback: explicitly reject live steer | Estimate: 1.5d | Estimated LOC: 2300
-- [x] **CF-305** | layer `tui` | Complete the asynchronous TUI interaction contract | Deliverables: streamed transcript, concurrent editing, approvals, resize, reconnect, signal cleanup, and testable interruption | Depends: CF-302,CF-303,CF-304 | Owner scope: Rust/TUI | Owned paths: `src/tui.rs`, `tests/tui_resize.rs`, `tools/user_smoke.py` | Validators: PTY covers typing during stream, cancel, approve/deny, resize, and terminal restoration | Rollback: restore terminal and preserve journal | Estimate: 1.5d | Estimated LOC: 2800
-- [x] **CF-306** | layer `headless` | Finish JSONL protocol v2 | Deliverables: prompt, steer, cancel, status, approval, resume, shutdown, v1 projection, typed progress events | Depends: CF-302,CF-303,CF-304 | Owner scope: Rust/Headless | Owned paths: `src/protocol.rs`, `src/headless.rs`, `tests/headless_protocol.rs`, `tools/headless_smoke.sh` | Validators: all commands remain readable in-flight and every accepted request gets exactly one terminal response | Rollback: reject incompatible version before state mutation | Estimate: 1.5d | Estimated LOC: 2400
-- [x] **CF-307** | layer `headless` | Add reconnect and replay protection | Deliverables: resume-from-sequence, deterministic replay, duplicate request-ID suppression | Depends: CF-302,CF-306 | Owner scope: Rust/Headless | Owned paths: `src/headless.rs`, `src/session.rs`, `tests/headless_protocol.rs` | Validators: reconnect receives no duplicate event or provider/tool side effect | Rollback: require a new process/session | Estimate: 1d | Estimated LOC: 1300
+- [ ] **CF-305** | layer `tui` | Complete the asynchronous TUI interaction contract | Deliverables: streamed transcript, concurrent editing, approvals, resize, durable cross-process reconnect cursor, session mailbox projection, signal cleanup, and testable interruption | Depends: CF-302,CF-303,CF-304 | Owner scope: Rust/TUI | Owned paths: `src/tui.rs`, `tests/tui_resize.rs`, `tools/user_smoke.py` | Validators: PTY covers typing during stream, cancel, approve/deny, resize, terminal restoration, reconnect cursor, and inter-session envelope parity | Rollback: restore terminal and preserve journal | Estimate: 1.5d | Estimated LOC: 2800
+- [ ] **CF-306** | layer `headless` | Finish JSONL protocol v2 | Deliverables: prompt, steer, cancel, status, approval, resume, shutdown, v1 projection, typed progress events, durable checkpoint cursor, mailbox request/response, and explicit user-shell request parity | Depends: CF-302,CF-303,CF-304 | Owner scope: Rust/Headless | Owned paths: `src/protocol.rs`, `src/headless.rs`, `tests/headless_protocol.rs`, `tools/headless_smoke.sh` | Validators: all commands remain readable in-flight, every accepted request gets exactly one terminal response, reconnect cursors and `!echo` responses have TUI parity | Rollback: reject incompatible version before state mutation | Estimate: 1.5d | Estimated LOC: 2400
+- [ ] **CF-307** | layer `headless` | Add durable reconnect and replay protection | Deliverables: resume-from-sequence, durable outbound event envelopes, owner epoch/single-writer protection, deterministic replay, gap signaling, and duplicate request-ID suppression | Depends: CF-302,CF-306 | Owner scope: Rust/Headless | Owned paths: `src/headless.rs`, `src/session.rs`, `tests/headless_protocol.rs` | Validators: kill/restart reconnect proves no duplicate response admission, gap detection, or repeated idempotent tool admission; provider side effects use an idempotency key and are not claimed exactly-once without provider evidence | Rollback: require a new process/session | Estimate: 1d | Estimated LOC: 1300
 - [x] **CF-401** | layer `tools` | Define the bounded typed tool registry | Deliverables: JSON schemas, side-effect metadata, local validation, provider mapping, count/size limits | Depends: CF-201,CF-302 | Owner scope: Rust/Tools | Owned paths: `src/tools.rs`, `src/backend.rs`, `tests/tools.rs` | Validators: malformed calls are rejected before handler execution and only registered tools are advertised | Rollback: expose no tools | Estimate: 1d | Estimated LOC: 1200
-- [x] **CF-402** | layer `tools` | Run provider tool continuations to a bounded final response | Deliverables: call/result journal records, approval boundary, continuation history, cancellation, refusal, and iteration limit | Depends: CF-401,CF-303 | Owner scope: Rust/Core | Owned paths: `src/core.rs`, `src/backend.rs`, `src/approval.rs`, `tests/core_session.rs` | Validators: stable call IDs and one terminal result per call; loop ends on final output, cancellation, refusal, or limit | Rollback: return a bounded tool error to provider | Estimate: 1.5d | Estimated LOC: 2600
+- [ ] **CF-402** | layer `tools` | Run provider tool continuations to a bounded final response | Deliverables: call/result journal records, worker lease and policy digest, approval boundary, continuation history, cancellation, unknown-outcome state, refusal, and iteration limit | Depends: CF-401,CF-303 | Owner scope: Rust/Core | Owned paths: `src/core.rs`, `src/backend.rs`, `src/approval.rs`, `tests/core_session.rs` | Validators: stable call IDs, policy digest on every call/result, one terminal result per call, explicit unknown outcome, and no implicit implementation completion; loop ends on final output, cancellation, refusal, or limit | Rollback: return a bounded tool error to provider | Estimate: 1.5d | Estimated LOC: 2600
 - [x] **CF-403** | layer `tools` | Implement confined file tools | Deliverables: read, list, search, write, edit, atomic replacement, preview, UTF-8, binary, size, and symlink limits | Depends: CF-401,CF-402 | Owner scope: Rust/Tools | Owned paths: `src/tools.rs`, `tests/tools.rs` | Validators: absolute, parent, symlink escapes and oversized inputs fail closed; failed write preserves previous file | Rollback: deny writes and retain read-only tools | Estimate: 1.5d | Estimated LOC: 2500
-- [x] **CF-404** | layer `tools` | Finish shell/process isolation | Deliverables: allow/deny policy, scrubbed environment, cwd confinement, timeout, output cap, process-group termination, and descendant reaping | Depends: CF-401,CF-402 | Owner scope: Rust/Tools | Owned paths: `src/tools.rs`, `tests/tools.rs` | Validators: SIGTERM/SIGKILL escalation and descendant cleanup pass cross-platform tests | Rollback: disable `run_command` | Estimate: 1.5d | Estimated LOC: 3200
-- [x] **CF-405** | layer `tools` | Implement approval policy and host rendezvous | Deliverables: always, read-only, trusted-workspace, per-tool, and headless decisions with TUI/headless responses | Depends: CF-303,CF-404 | Owner scope: Rust/Approval | Owned paths: `src/approval.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `tests/headless_protocol.rs` | Validators: deny never starts a side effect; pending ID is correlated; remembered decisions store no credentials | Rollback: deny all side effects | Estimate: 1d | Estimated LOC: 1800
+- [ ] **CF-404** | layer `tools` | Finish shell/process isolation and Blueprint prohibition gates | Deliverables: worker-scoped all-allow lease, immutable deny-over-allow policy, scrubbed environment, cwd confinement, timeout, output cap, process-group termination, descendant reaping, and explicit `user_shell` origin | Depends: CF-401,CF-402 | Owner scope: Rust/Tools | Owned paths: `src/tools.rs`, `tests/tools.rs` | Validators: preflight and per-action gates reject undeclared paths, commands, network, credentials, destructive effects, nested workers, and unknown effects; SIGTERM/SIGKILL escalation and descendant cleanup pass cross-platform tests | Rollback: disable `run_command` and user-shell routes | Estimate: 1.5d | Estimated LOC: 3200
+- [ ] **CF-405** | layer `tools` | Implement approval policy and host rendezvous | Deliverables: worker-allow-after-preflight, deny-over-allow, always, read-only, trusted-workspace, per-tool, and headless decisions with TUI/headless responses, policy digest, and host emergency cancel | Depends: CF-303,CF-404 | Owner scope: Rust/Approval | Owned paths: `src/approval.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `tests/headless_protocol.rs` | Validators: deny never starts a side effect; pending ID and policy digest are correlated; remembered decisions store no credentials; host cancellation kills and reaps children | Rollback: deny all side effects | Estimate: 1d | Estimated LOC: 1800
 - [x] **CF-406** | layer `tools` | Compact large tool results into retrievable workspace artifacts | Deliverables: bounded provider representation, repository-relative artifact reference, cleanup and audit trail | Depends: CF-402,CF-405 | Owner scope: Rust/Tools | Owned paths: `src/tools.rs`, `src/session.rs`, `tests/tools.rs` | Validators: outputs above configured budget remain retrievable without oversized prompts | Rollback: truncate and mark result | Estimate: 1d | Estimated LOC: 1600
 - [x] **CF-407** | layer `extensions` | Register MCP-compatible local process tools behind a trust boundary | Deliverables: manifest validation, framed child I/O, least-privilege capabilities, restart and bounded shutdown | Depends: CF-401,CF-405 | Owner scope: Rust/Extensions | Owned paths: `src/extensions.rs`, `src/tools.rs`, `tests/extensions.rs` | Validators: untrusted process cannot receive provider auth or access undeclared paths | Rollback: disable extension before spawn | Estimate: 1.5d | Estimated LOC: 3000
+- [ ] **CF-408** | layer `tools` | Implement the Codex-style local `!` user-shell escape | Deliverables: single-leading-`!` route (including `!echo hi`), empty-bang help, trimmed command, explicit `user_shell` origin, bounded stdout/stderr/exit/signal/timeout/cancel/reap, journaled input/output, next-turn context event, and TUI/headless parity; `!!` is not a special Codex feature | Depends: CF-306,CF-404,CF-405 | Owner scope: Rust/Shell | Owned paths: `src/slash.rs`, `src/core.rs`, `src/tools.rs`, `src/headless.rs`, `src/tui.rs`, `src/protocol.rs`, `tests/` | Validators: PTY and JSONL prove `!echo hi` runs locally with zero provider calls, policy denial fails closed, output is bounded and available to the next model turn, ordinary shell-looking prompts do not execute, child processes are cancelled/reaped, and terminal state is restored | Rollback: disable the bang route and retain ordinary prompt parsing | Estimate: 1.5d | Estimated LOC: 2600
+- [ ] **CF-409** | layer `governance` | Wire production worker all-allow admission to immutable Blueprint prohibitions | Deliverables: typed per-item policy declaration, host preflight, atomic gate/binding/budget installation, revocable lease, and durable policy evidence before worker dispatch; no change to the execution Spec transport or nesting limits | Depends: CF-404,CF-405,CF-701,CF-703 | Owner scope: Rust/WorkerHost | Owned paths: `src/domains.rs`, `src/domain_execution.rs`, `src/core.rs`, `src/config.rs`, `src/tools.rs`, `src/governance.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | Validators: installed hosts complete a declared edit/build/test workflow without repeated approval; preflight and per-action negative tests reject prohibited or unknown effects, stale leases, scope/origin changes, missing enforcement, and exhausted budgets before side effects; echo-only success cannot pass | Rollback: refuse worker admission and preserve evidence | Estimate: 2d | Estimated LOC: 3000
 - [x] **CF-501** | layer `context` | Account for context and token budgets | Deliverables: provider usage plus approximate local estimates and context-window metadata per turn | Depends: CF-201,CF-302 | Owner scope: Rust/Context | Owned paths: `src/context.rs`, `src/core.rs`, `src/backend.rs`, `tests/context.rs` | Validators: over-budget requests require a typed compaction/rejection decision | Rollback: reject over-budget request | Estimate: 1d | Estimated LOC: 1300
 - [x] **CF-502** | layer `context` | Implement deterministic context compaction | Deliverables: protected records, summary checkpoint, source sequence range and digest, cancellation-safe replacement | Depends: CF-501,CF-406 | Owner scope: Rust/Context | Owned paths: `src/context.rs`, `src/session.rs`, `tests/context.rs` | Validators: replay produces the same bounded prompt and cancellation preserves prior checkpoint | Rollback: retain uncompressed valid prefix | Estimate: 1.5d | Estimated LOC: 2400
-- [x] **CF-503** | layer `session` | Complete session administration | Deliverables: list, inspect, fork, export, import, and retention-based garbage collection | Depends: CF-101,CF-502 | Owner scope: Rust/Session | Owned paths: `src/session.rs`, `src/core.rs`, `tests/session_recovery.rs` | Validators: fork has a new ID; source is never overwritten; imported sequence/digest validates; GC is explicit | Rollback: leave source and destination untouched | Estimate: 1.5d | Estimated LOC: 2200
-- [x] **CF-504** | layer `session` | Recover interrupted streams, tools, and compaction | Deliverables: durable operation markers and resumable/retryable state without side-effect duplication | Depends: CF-302,CF-402,CF-502 | Owner scope: Rust/Session | Owned paths: `src/session.rs`, `src/core.rs`, `tests/session_recovery.rs` | Validators: kill/restart fixtures mark interruption and preserve exactly-once effects | Rollback: require explicit retry | Estimate: 1.5d | Estimated LOC: 2200
+- [ ] **CF-503** | layer `session` | Complete session administration and Codex-style lifecycle | Deliverables: agents/session list, inspect, resume-last, queue, fork, archive, delete, unarchive, migrate, export, import, and retention-based garbage collection | Depends: CF-101,CF-502 | Owner scope: Rust/Session | Owned paths: `src/session.rs`, `src/core.rs`, `tests/session_recovery.rs` | Validators: lifecycle commands are typed and restart-safe; fork has a new ID and remaps embedded ownership; source is never overwritten; imported sequence/digest validates; destructive actions are explicit; GC is explicit | Rollback: leave source and destination untouched | Estimate: 1.5d | Estimated LOC: 2200
+- [ ] **CF-504** | layer `session` | Recover interrupted streams, tools, and compaction | Deliverables: durable operation markers, idempotency keys, resumable/retryable state, and explicit `unknown_outcome` requiring a retry/abandon decision without claiming arbitrary side-effect exactly-once | Depends: CF-302,CF-402,CF-502 | Owner scope: Rust/Session | Owned paths: `src/session.rs`, `src/core.rs`, `tests/session_recovery.rs` | Validators: kill/restart fixtures preserve journal append exactly-once, classify unknown provider/tool outcomes, and require explicit retry for non-idempotent effects; no receipt silently implies completion | Rollback: require explicit retry or abandon | Estimate: 1.5d | Estimated LOC: 2200
+- [ ] **CF-505** | layer `session` | Complete durable inter-session mailbox and offline queue | Deliverables: bounded sender/recipient session envelope, owner-bound sender identity, request ID/digest, ordered sequence, TTL, enqueue/ACK/claim/result/failure states, deduplication, conflict rejection, locks, retention, and TUI/headless parity | Depends: CF-306,CF-307,CF-503,CF-504 | Owner scope: Rust/SessionIPC | Owned paths: `src/session.rs`, `src/b3.rs`, `src/protocol.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | Validators: two independent session processes exchange a message and correlated result; offline delivery survives restart; duplicate/conflicting IDs, expired messages, forged senders, double claims, torn writes, and cross-workspace access fail closed; ACK never implies work completion; lifecycle maintenance preserves or explicitly retires mailbox sidecars | Rollback: stop delivery without dropping retained envelopes or claims | Estimate: 2d | Estimated LOC: 2400
+- [ ] **CF-506** | layer `session` | Dispatch session communication through the actual live recipient owner | Deliverables: live-owner registry distinct from session history, bounded follow-up admission, explicit steer/interrupt routing, wait/status/result linkage, and restart-safe claim reconciliation; external hosts own worker creation | Depends: CF-305,CF-505,CF-409 | Owner scope: Rust/SessionHost | Owned paths: `src/runtime.rs`, `src/session.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `src/protocol.rs`, `tests/`, `tools/user_smoke.py` | Validators: session A sends to active B, B executes one permitted request at an owned boundary and A receives its result; active work is not implicitly interrupted; dead/offline B remains visibly queued or unknown; retry requires a fresh authorized attempt; live status cannot be fabricated from journal filenames; mailbox delivery does not spawn a hidden scheduler | Rollback: disable live dispatch and retain explicit queue/status inspection | Estimate: 2d | Estimated LOC: 2800
 - [x] **CF-601** | layer `skills` | Load project and user skills | Deliverables: manifest with name, version, instructions, tools, precedence project over user over built-in | Depends: CF-101,CF-401 | Owner scope: Rust/Skills | Owned paths: `src/skills.rs`, `tests/skills.rs` | Validators: traversal, duplicate IDs, malformed manifest, and precedence tests fail closed | Rollback: ignore invalid skill and report it | Estimate: 1d | Estimated LOC: 1700
 - [x] **CF-602** | layer `skills` | Execute bounded skill lifecycle hooks | Deliverables: prompt preparation, tool policy, compaction, session-close order and isolation | Depends: CF-601,CF-502 | Owner scope: Rust/Skills | Owned paths: `src/skills.rs`, `src/core.rs`, `tests/skills.rs` | Validators: hooks cannot mutate auth and optional failures do not corrupt session | Rollback: disable failing skill | Estimate: 1.5d | Estimated LOC: 2200
 - [x] **CF-603** | layer `extensions` | Complete extension lifecycle | Deliverables: version, permissions, install, list, remove, disable, compatibility and upgrade flow | Depends: CF-407,CF-601 | Owner scope: Rust/Extensions | Owned paths: `src/extensions.rs`, `src/core.rs`, `tests/extensions.rs` | Validators: incompatible/disabled extensions never spawn or receive events | Rollback: retain disabled manifest | Estimate: 1d | Estimated LOC: 1900
 - [x] **CF-604** | layer `extensions` | Broker scoped capabilities without raw provider keys | Deliverables: redacted handles and revocation for skill/extension requests | Depends: CF-103,CF-603 | Owner scope: Rust/Extensions | Owned paths: `src/extensions.rs`, `src/config.rs`, `tests/extensions.rs` | Validators: logs contain no key and revocation invalidates outstanding handle | Rollback: deny capability request | Estimate: 1d | Estimated LOC: 1900
-- [x] **CF-701** | layer `security` | Centralize secrets, redaction, permissions, and memory/log hygiene | Deliverables: auth loading, header/URL/JSON redaction, secure files, child environment filtering, panic hygiene | Depends: CF-101,CF-103,CF-404 | Owner scope: Rust/Security | Owned paths: `src/config.rs`, `src/backend.rs`, `src/tools.rs`, `tests/config.rs` | Validators: fixture key never appears in logs, sessions, handoffs, artifacts, errors, or diagnostics | Rollback: suppress diagnostics and deny startup | Estimate: 1d | Estimated LOC: 1800
+- [ ] **CF-701** | layer `security` | Centralize secrets, redaction, permissions, and memory/log hygiene | Deliverables: auth loading, header/URL/JSON redaction, secure files, child environment filtering, non-exportable secret handles, policy digest binding, and panic hygiene | Depends: CF-101,CF-103,CF-404 | Owner scope: Rust/Security | Owned paths: `src/config.rs`, `src/backend.rs`, `src/tools.rs`, `tests/config.rs` | Validators: fixture key never appears in logs, sessions, handoffs, artifacts, errors, diagnostics, worker environment, or user-shell output; raw credentials are never granted by all-allow; policy digest is verified | Rollback: suppress diagnostics and deny startup | Estimate: 1d | Estimated LOC: 1800
 - [x] **CF-702** | layer `observability` | Add structured opt-in diagnostics and bounded metrics | Deliverables: provider/tool/session correlation, redacted tracing, quiet defaults and bounded-cardinality counters | Depends: CF-302,CF-701 | Owner scope: Rust/Observability | Owned paths: `src/diagnostics.rs`, `src/core.rs`, `tests/diagnostics.rs` | Validators: traces correlate IDs without prompt/key leakage | Rollback: disable opt-in tracing | Estimate: 1d | Estimated LOC: 1600
-- [x] **CF-703** | layer `governance` | Enforce token, time, disk, process, concurrency, and network budgets | Deliverables: durable accounting and typed budget terminal events | Depends: CF-205,CF-402,CF-406 | Owner scope: Rust/Governance | Owned paths: `src/governance.rs`, `src/core.rs`, `src/session.rs`, `tests/governance.rs` | Validators: retries and tools cannot bypass exhausted budget; resume restores accounting | Rollback: cancel work at first exceeded budget | Estimate: 1.5d | Estimated LOC: 2200
+- [ ] **CF-703** | layer `governance` | Enforce token, time, disk, process, concurrency, and network budgets | Deliverables: durable accounting for worker lease, prohibition-gate decisions, network hosts, credentials, processes, concurrency, time, disk, and token use, plus typed budget terminal events | Depends: CF-205,CF-402,CF-406 | Owner scope: Rust/Governance | Owned paths: `src/governance.rs`, `src/core.rs`, `src/session.rs`, `tests/governance.rs` | Validators: retries, tools, workers, and user-shell routes cannot bypass exhausted budgets; policy digest and lease accounting survive resume; budget exhaustion cancels and reaps owned work | Rollback: cancel work at first exceeded budget | Estimate: 1.5d | Estimated LOC: 2200
 - [x] **CF-704** | layer `release` | Publish reproducible cross-platform binaries, checksums, and SBOM | Deliverables: macOS arm64/x86_64, Linux arm64/x86_64, Windows artifacts and upgrade-safe installer | Depends: CF-003,CF-701 | Owner scope: Release/CI | Owned paths: `.github/workflows/release.yml`, `tools/release.sh`, `Docs/quality/release.md` | Validators: clean-machine packaged binary smoke; signature/checksum/SBOM verification; no fixtures or credentials | Rollback: do not publish incomplete artifacts | Estimate: 1.5d | Estimated LOC: 2500
-- [x] **CF-705** | layer `acceptance` | Close the complete end-to-end matrix and migration documentation | Deliverables: real Responses, Codex import, tools/approval, cancel/steer, compaction/recovery, skills/extensions, reconnect, and packaged install | Depends: CF-105,CF-305,CF-306,CF-402,CF-503,CF-704 | Owner scope: QA/Master | Owned paths: `README.md`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`, `tools/user_smoke.py` | Validators: all CF dependencies and scenarios pass in CI and all incomplete rows are master accepted | Rollback: keep exact failed rows open and do not call the framework complete | Estimate: 1d | Estimated LOC: 900
+- [ ] **CF-705** | layer `acceptance` | Close the complete end-to-end matrix and migration documentation | Deliverables: real Responses, Codex import, worker allow/prohibition gates, tools/approval, cancel/steer, compaction/recovery, session checkpoint/mailbox/lifecycle/live-recipient dispatch, explicit `!echo`, skills/extensions, reconnect, and packaged install | Depends: CF-105,CF-305,CF-306,CF-307,CF-402,CF-408,CF-409,CF-503,CF-504,CF-505,CF-506,CF-704 | Owner scope: QA/Master | Owned paths: `README.md`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`, `tools/user_smoke.py` | Validators: all CF dependencies, V2-112--V2-119 scenarios, and reopened rows pass in CI; all incomplete rows remain visibly unaccepted; no compile-only receipt calls the framework complete | Rollback: keep exact failed rows open and do not call the framework complete | Estimate: 1d | Estimated LOC: 900
 
 ## Parallel execution envelopes
 
@@ -161,13 +273,16 @@ nested_agents: forbidden
 
 ## Historical v1 completion checklist
 
-Writing this file is not current product acceptance. The historical v1
-workflow receipt was complete only when all
-required rows, including all `CF-*` complete-framework rows, are `[x]`, every
-row carries a strict `Estimated LOC < 5000`
-value with durable validation evidence, no `[ ]` or `[_]`/repair/integration
-remains, the Gantt projection is current, the binary exposes only `tui` and
-`headless`, and the `weiyangzen/zenpi` draft2repo receipt proves the remote
-while the local source remains present. Aggregate repository LOC may be
-reported for visibility but is not this Blueprint's acceptance cap. Current
-end-user usability is governed by the v2 audit and its `V2-999` gate.
+Writing this file is not current product acceptance. The earlier historical
+v1 workflow receipt was complete only when all required rows, including all
+`CF-*` complete-framework rows, were `[x]`. Version 2.1 has deliberately
+reopened eleven CF contract rows and added CF-408, CF-409, CF-505, and CF-506,
+so the current receipt has 15 `[ ]` rows;
+the Gantt projection and validator summary reflect that state. Completion
+still requires every row to carry a strict `Estimated LOC < 5000` value with
+durable validation evidence, no `[ ]` or `[_]`/repair/integration remains, the
+binary exposes only `tui` and `headless`, and the `weiyangzen/zenpi` draft2repo
+receipt proves the remote while the local source remains present. Aggregate
+repository LOC may be reported for visibility but is not this Blueprint's
+acceptance cap. Current end-user usability is governed by the v2 audit and
+its `V2-999` gate.

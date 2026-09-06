@@ -530,6 +530,28 @@ impl Agent {
         }
     }
 
+    pub fn persona(&self) -> &str {
+        self.session
+            .events()
+            .iter()
+            .rev()
+            .find(|event| event["type"] == "persona_selected")
+            .and_then(|event| event["persona"].as_str())
+            .and_then(crate::persona::normalize)
+            .unwrap_or("INTJ")
+    }
+
+    pub fn set_persona(&mut self, name: &str) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let name = crate::persona::normalize(name)
+            .ok_or_else(|| AgentError::InvalidTurn("unknown MBTI persona".into()))?;
+        self.session
+            .append_event(serde_json::json!({"type":"persona_selected", "persona":name}))?;
+        Ok(())
+    }
+
     /// Alias used by the TUI and lightweight embedders for a single
     /// synchronous prompt.  It intentionally goes through the same typed
     /// admission path as headless mode.
@@ -637,6 +659,12 @@ impl Agent {
 
     pub fn approval_coordinator(&self) -> Option<ApprovalCoordinator> {
         self.tools.as_ref().map(|runtime| runtime.approval.clone())
+    }
+
+    pub fn approval_policy(&self) -> Option<ApprovalPolicy> {
+        self.tools
+            .as_ref()
+            .map(|runtime| runtime.approval_policy.clone())
     }
 
     /// Bind subsequent calls to one lease without granting capabilities or
@@ -1002,7 +1030,7 @@ impl Agent {
                 "help": "!<command> runs a local shell command after host approval; !echo hi",
             }));
         }
-        if !self.unknown_tool_outcomes().is_empty() {
+        if !self.unknown_tool_outcomes().is_empty() || !self.operation_recovery().is_empty() {
             return Err(AgentError::Recovery(
                 "unknown_outcome requires explicit retry or abandon before a user shell command"
                     .into(),
@@ -1016,8 +1044,8 @@ impl Agent {
         // Cloning preserves a worker gate: changing origin cannot remove it or
         // inherit the worker's all-allow lease. Its per-action check fails closed.
         let context = runtime.context.clone().with_origin(ToolOrigin::UserShell);
-        let args = serde_json::json!({"command": command});
-        let args = args.as_object().expect("command object");
+        let args = serde_json::Map::from_iter([("command".into(), Value::String(command.into()))]);
+        let args = &args;
         let policy_digest =
             format!("{:x}", Sha256::digest(serde_json::to_vec(&serde_json::json!({
             "origin": "user_shell", "workspace": context.workspace_root(),
@@ -1611,10 +1639,8 @@ impl Agent {
             turn_id: turn_id.clone(),
             retry_requires_confirmation: false,
         };
-        self.session.begin_operation_with_key(
-            &provider_operation,
-            &provider_idempotency_key(&turn_id),
-        )?;
+        self.session
+            .begin_operation_with_key(&provider_operation, &provider_idempotency_key(&turn_id))?;
         const MAX_TOOL_ITERATIONS: usize = 8;
         let completion = match self.complete_with_tools(
             &turn_id,
@@ -1810,7 +1836,11 @@ impl Agent {
                 self.session
                     .finish_operation(&operation_id, crate::session::OperationOutcome::Succeeded)?;
             }
-            let instructions = self.skills.effective_instructions();
+            let instructions = format!(
+                "{}\n{}",
+                self.skills.effective_instructions(),
+                crate::persona::instructions(self.persona())
+            );
             let request = CompletionRequest::new(
                 turn_id,
                 &prepared.turns,

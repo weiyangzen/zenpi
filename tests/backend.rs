@@ -273,6 +273,53 @@ fn retry_reuses_a_stable_idempotency_key() {
 }
 
 #[test]
+fn provider_identity_distinguishes_continuation_payloads_within_one_turn() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = thread::spawn(move || -> Result<Vec<String>, String> {
+        let mut keys = Vec::new();
+        for _ in 0..3 {
+            let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            let request = read_headers(&mut stream)?;
+            keys.push(header_value(&request, "x-idempotency-key")?);
+            write_sse_completion(&mut stream, "ok")?;
+        }
+        Ok(keys)
+    });
+    let backend = OpenAiCompatibleBackend::new_with_wire_api(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::Responses,
+    )
+    .unwrap()
+    .with_max_retries(0)
+    .unwrap();
+    let initial = vec![Turn::new("user-1", TurnRole::User, "inspect file")];
+    let mut continued = initial.clone();
+    continued.push(Turn::new(
+        "assistant-1",
+        TurnRole::Assistant,
+        "file inspected",
+    ));
+    for history in [&initial, &initial, &continued] {
+        let request = CompletionRequest::new("outer-turn-1", history, None, &[]);
+        backend
+            .complete_with_control(request, &|| false, &mut |_| Ok(()))
+            .unwrap();
+    }
+    let keys = server.join().unwrap().unwrap();
+    assert_eq!(
+        keys[0], keys[1],
+        "identical requests must keep their identity"
+    );
+    assert_ne!(
+        keys[1], keys[2],
+        "changed continuation must not reuse a cached result"
+    );
+}
+
+#[test]
 fn retry_matrix_honors_retry_after_and_keeps_one_idempotency_key() {
     for status in [408_u16, 409, 425, 429, 500, 502, 503] {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
@@ -640,7 +687,7 @@ fn circuit_breaker_opens_and_recovers_after_cooldown() {
         Ok(())
     });
     let backend = retry_backend(port, 0)
-        .with_circuit_breaker(1, Duration::from_millis(100))
+        .with_circuit_breaker(1, Duration::from_secs(1))
         .unwrap();
     let dir = tempdir().unwrap();
     let mut agent = Agent::new(
@@ -648,12 +695,24 @@ fn circuit_breaker_opens_and_recovers_after_cooldown() {
         Box::new(backend),
     );
     assert!(agent.process(TurnInputRequest::new("first")).is_err());
+    assert!(matches!(
+        agent.process(TurnInputRequest::new("blocked until reconciled")),
+        Err(zenpi::core::AgentError::Recovery(_))
+    ));
+    let recovery = agent.operation_recovery();
+    assert_eq!(recovery.len(), 1);
+    agent
+        .resolve_operation_recovery(
+            &recovery[0].operation_id,
+            zenpi::core::ToolRecoveryDecision::Abandon,
+        )
+        .unwrap();
     let second = agent.process(TurnInputRequest::new("second")).unwrap_err();
     assert!(matches!(
         second,
         zenpi::core::AgentError::Backend(BackendError::CircuitOpen { .. })
     ));
-    let cooldown_deadline = std::time::Instant::now() + Duration::from_secs(2);
+    let cooldown_deadline = std::time::Instant::now() + Duration::from_secs(3);
     let recovered = loop {
         match agent.process(TurnInputRequest::new("third")) {
             Ok(result) => break result,

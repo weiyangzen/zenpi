@@ -15,6 +15,7 @@ pub mod extensions;
 pub mod governance;
 pub mod headless;
 pub mod layout;
+pub mod persona;
 pub mod protocol;
 pub mod render;
 pub mod resources;

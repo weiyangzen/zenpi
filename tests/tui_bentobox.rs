@@ -108,8 +108,14 @@ fn production_workspace_renders_tabs_and_existing_transcript_prompt() {
         .draw(|frame| state.render_bentobox(frame, "zenpi"))
         .unwrap();
     let output = rendered(&terminal);
-    assert!(output.contains("1:project"));
-    assert!(output.contains("2:goal"));
+    assert!(output.contains("project"));
+    // Goal is an in-workspace command/pane, not a peer top-level tab.
+    assert!(!output.contains("1:project"));
+    assert!(output.contains("projects:"));
+    assert!(!output.contains("/goal"));
+    assert!(!output.contains("/learn"));
+    assert!(!output.contains("/review"));
+    assert!(!output.contains("/session"));
     assert!(output.contains("Conversation"));
     assert!(output.contains("Resources"));
     assert!(output.contains("Gantt"));
@@ -338,7 +344,7 @@ fn ctrl_number_switches_workspace_tab_without_submitting_prompt() {
     state.set_input("draft");
     let action = state.handle_key(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::CONTROL));
     assert_eq!(action, TuiAction::Redraw);
-    assert_eq!(state.workspace_tab(), TabId::Goal);
+    assert_eq!(state.active_project(), "default");
     assert_eq!(state.input(), "draft");
 }
 

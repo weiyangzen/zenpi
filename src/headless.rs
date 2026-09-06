@@ -423,11 +423,34 @@ fn request_fingerprint(request: &StdioRequest) -> Result<String, HeadlessError> 
         normalized.text = normalized.message.clone();
     }
     normalized.message = None;
+    if is_runtime_intent_request(request) {
+        // Runtime intent identity predates the transport WAL and is shared by
+        // the two supported wire projections and command/slash aliases.
+        normalized.schema_version = crate::protocol::LEGACY_PROTOCOL_VERSION;
+    }
     let bytes = serde_json::to_vec(&normalized)?;
     let mut digest = Sha256::new();
     digest.update(b"zenpi-headless-request-v1\0");
     digest.update(bytes);
     Ok(format!("{:x}", digest.finalize()))
+}
+
+fn is_runtime_intent_request(request: &StdioRequest) -> bool {
+    matches!(request.clone().into_command(), Ok(Command::Slash { input })
+        if crate::slash::parse(&input).ok().flatten().is_some_and(|command| command.is_runtime()))
+}
+
+fn replay_terminal_line(line: &str, version: u16) -> Result<String, HeadlessError> {
+    let mut response: serde_json::Value = serde_json::from_str(line)?;
+    if response["data"]["route"] != "runtime_intent" {
+        return Ok(line.to_owned());
+    }
+    response["schema_version"] = json!(version);
+    if response["data"].get("idempotent_replay").is_some() {
+        response["data"]["idempotent_replay"] = json!(true);
+        response["data"]["created"] = json!(false);
+    }
+    Ok(serde_json::to_string(&response)? + "\n")
 }
 
 #[derive(Debug, Error)]
@@ -526,7 +549,7 @@ pub fn run_headless<R: BufRead, W: Write>(
                 if let Some(request_id) = id.as_deref()
                     && let Some(cached) = replay.cached_line(request_id)
                 {
-                    output.write_all(cached.as_bytes())?;
+                    output.write_all(replay_terminal_line(cached, request_version)?.as_bytes())?;
                     output.flush()?;
                     continue;
                 }
@@ -537,7 +560,11 @@ pub fn run_headless<R: BufRead, W: Write>(
                     StdioResponse::error_with_code(
                         id.clone(),
                         command_kind,
-                        "request_id_conflict",
+                        if is_runtime_intent_request(&request) {
+                            "runtime_intent_conflict"
+                        } else {
+                            "request_id_conflict"
+                        },
                         "request ID was already used for a different request",
                     )
                     .for_version(request_version),
@@ -1499,6 +1526,10 @@ pub fn session_lifecycle_view(
             path: validate_existing_session_path(path)?,
             confirmed: *confirmed,
         },
+        SessionAction::RetireMailbox { path, confirmed } => Request::RetireMailbox {
+            path: validate_existing_session_path(path)?,
+            confirmed: *confirmed,
+        },
         SessionAction::Queue {
             source,
             recipient,
@@ -1621,6 +1652,7 @@ fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
         SessionAction::Archive { .. } => "archive",
         SessionAction::Unarchive { .. } => "unarchive",
         SessionAction::Delete { .. } => "delete",
+        SessionAction::RetireMailbox { .. } => "retire-mailbox",
         SessionAction::Queue { .. } => "queue",
         SessionAction::Gc { .. } => "gc",
     }
@@ -1648,6 +1680,72 @@ pub fn resume_last_session_view(agent: &mut Agent) -> Result<serde_json::Value, 
         "durable": true,
         "session": serialized_session_summary(&agent.snapshot().session),
     }))
+}
+
+/// Inspect or resolve recovery through the same owner in both transports.
+pub fn recovery_view(
+    agent: &mut Agent,
+    action: &crate::slash::RecoveryAction,
+) -> Result<serde_json::Value, String> {
+    use crate::core::ToolRecoveryDecision;
+    use crate::slash::RecoveryAction;
+
+    if agent.phase() != crate::core::AgentPhase::Idle {
+        return Err("recovery requires an idle session owner".into());
+    }
+    let resolution = match action {
+        RecoveryAction::Inspect => None,
+        RecoveryAction::Retry { operation_id } => Some((operation_id, ToolRecoveryDecision::Retry)),
+        RecoveryAction::Abandon { operation_id } => {
+            Some((operation_id, ToolRecoveryDecision::Abandon))
+        }
+    };
+    if let Some((id, decision)) = resolution {
+        if let Some(previous) =
+            agent.session().events().iter().rev().find(|event| {
+                event["type"] == "tool_recovery_decided" && event["operation_id"] == *id
+            })
+            && previous["decision"] != json!(decision)
+        {
+            return Err("recovery decision conflicts with durable decision".into());
+        }
+        if agent
+            .unknown_tool_outcomes()
+            .iter()
+            .any(|pending| pending.operation_id == *id)
+        {
+            agent
+                .resolve_tool_outcome(id, decision)
+                .map_err(|error| error.to_string())?;
+        }
+        // Resolve generic markers too: they deliberately cannot be cleared by
+        // merely acknowledging the startup warning or completing a tool reply.
+        if agent
+            .operation_recovery()
+            .iter()
+            .any(|pending| pending.operation_id == *id)
+            || !agent.session().events().iter().any(|event| {
+                event["type"] == "tool_recovery_decided" && event["operation_id"] == *id
+            })
+        {
+            agent
+                .resolve_operation_recovery(id, decision)
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    let operations = agent.operation_recovery();
+    let tools = agent.unknown_tool_outcomes();
+    let pending_count = operations.len().saturating_add(tools.len());
+    let value = json!({
+        "command": "recovery", "route": "local", "accepted": true,
+        "action": action, "execution_started": false, "automatic_retry": false,
+        "pending_count": pending_count,
+        "operations": operations.iter().take(64).collect::<Vec<_>>(),
+        "tools": tools.iter().take(64).collect::<Vec<_>>(),
+        "truncated": operations.len() > 64 || tools.len() > 64,
+        "new_attempt_required": matches!(action, RecoveryAction::Retry { .. }),
+    });
+    Ok(crate::security::redact_json(&value, &[]))
 }
 
 /// Map the protocol mailbox request onto the shared session mailbox owner.
@@ -3818,7 +3916,7 @@ where
             if let Some(request_id) = id.as_deref()
                 && let Some(cached) = replay.cached_line(request_id)
             {
-                output.write_all(cached.as_bytes())?;
+                output.write_all(replay_terminal_line(cached, request_version)?.as_bytes())?;
                 output.flush()?;
                 return Ok(());
             }
@@ -3829,7 +3927,11 @@ where
                 StdioResponse::error_with_code(
                     id,
                     name,
-                    "request_id_conflict",
+                    if is_runtime_intent_request(&request) {
+                        "runtime_intent_conflict"
+                    } else {
+                        "request_id_conflict"
+                    },
                     "request ID was already used for a different request",
                 )
                 .for_version(request_version),
@@ -5145,6 +5247,52 @@ fn execute_headless_slash(
     use crate::slash::{BlueprintAction, SlashCommand};
 
     match command {
+        SlashCommand::Project { action } => Ok(SlashExecution::Response(
+            json!({ "command": "project", "action": action }),
+        )),
+        SlashCommand::Yolo { enabled } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "yolo command cannot run while the agent is busy".into(),
+                });
+            };
+            let mut policy = agent.approval_policy().unwrap_or_default();
+            policy.mode = if enabled {
+                crate::approval::ApprovalMode::Never
+            } else {
+                crate::approval::ApprovalMode::ReadOnly
+            };
+            agent.set_approval_policy(policy);
+            Ok(SlashExecution::Response(
+                json!({ "command": "yolo", "enabled": enabled }),
+            ))
+        }
+        SlashCommand::Approval { mode } => {
+            let mode = mode.to_ascii_lowercase();
+            if !matches!(mode.as_str(), "ask" | "always" | "never") {
+                return Err(SlashDispatchError {
+                    code: "invalid_approval_mode",
+                    message: "approval mode must be ask, always, or never".into(),
+                });
+            }
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "approval command cannot run while the agent is busy".into(),
+                });
+            };
+            let mut policy = agent.approval_policy().unwrap_or_default();
+            policy.mode = match mode.as_str() {
+                "ask" => crate::approval::ApprovalMode::ReadOnly,
+                "always" => crate::approval::ApprovalMode::Always,
+                _ => crate::approval::ApprovalMode::Never,
+            };
+            agent.set_approval_policy(policy);
+            Ok(SlashExecution::Response(
+                json!({ "command": "approval", "mode": mode }),
+            ))
+        }
         SlashCommand::Help { topic } => {
             let text = crate::slash::help(topic.as_deref()).ok_or_else(|| SlashDispatchError {
                 code: "unknown_help_topic",
@@ -5174,6 +5322,21 @@ fn execute_headless_slash(
                 "command": "model",
                 "model": agent.snapshot().model,
             })))
+        }
+        SlashCommand::Persona { name } => {
+            let agent = agent.ok_or_else(|| SlashDispatchError {
+                code: "agent_busy",
+                message: "persona requires an idle owner".into(),
+            })?;
+            if let Some(name) = name {
+                agent.set_persona(&name).map_err(|e| SlashDispatchError {
+                    code: "persona_error",
+                    message: e.to_string(),
+                })?;
+            }
+            Ok(SlashExecution::Response(
+                json!({"command":"persona", "persona":agent.persona(), "available":crate::persona::TYPES}),
+            ))
         }
         SlashCommand::Models => {
             let entries =
@@ -5382,6 +5545,7 @@ fn execute_headless_slash(
             | crate::slash::SessionAction::Archive { .. }
             | crate::slash::SessionAction::Unarchive { .. }
             | crate::slash::SessionAction::Delete { .. }
+            | crate::slash::SessionAction::RetireMailbox { .. }
             | crate::slash::SessionAction::Queue { .. }) => {
                 let active_path = agent.as_deref().map(|value| value.session().path());
                 session_lifecycle_view(&action, active_path)
@@ -5406,6 +5570,18 @@ fn execute_headless_slash(
                     })
             }
         },
+        SlashCommand::Recovery { action } => {
+            let agent = agent.ok_or_else(|| SlashDispatchError {
+                code: "agent_busy",
+                message: "recovery requires the idle session owner".into(),
+            })?;
+            recovery_view(agent, &action)
+                .map(SlashExecution::Response)
+                .map_err(|message| SlashDispatchError {
+                    code: "recovery_failed",
+                    message,
+                })
+        }
         SlashCommand::Mailbox { action } => {
             let Some(agent) = agent else {
                 return Err(SlashDispatchError {
@@ -6175,8 +6351,8 @@ pub fn inspect_checkpoint(agent: &Agent) -> crate::protocol::CheckpointInspectio
             next_sequence: agent.session().next_sequence(),
         },
         cursor_scope: crate::protocol::CheckpointCursorScope::SessionJournal,
-        reconnect_supported: true,
-        acknowledgement_supported: true,
+        reconnect_supported: false,
+        acknowledgement_supported: false,
     }
 }
 
@@ -6209,6 +6385,10 @@ fn checkpoint_response(
     let data = match request {
         CheckpointRequest::Inspect => {
             let mut value = serde_json::to_value(inspect_checkpoint(agent))?;
+            // A transcript-only view has no transport owner. Advertise these
+            // capabilities only on the host holding the durable replay WAL.
+            value["reconnect_supported"] = json!(replay.journal.is_some());
+            value["acknowledgement_supported"] = json!(replay.journal.is_some());
             value["acknowledged_next_sequence"] = json!(replay.acknowledged);
             value["transport"] = json!({
                 "cursor_scope": "outbound_events", "session_id": agent.session().session_id(),

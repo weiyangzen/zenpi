@@ -7,6 +7,7 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt::Display;
 use std::io;
@@ -15,8 +16,8 @@ use std::time::{Duration, Instant};
 
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{
-    self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
-    KeyModifiers,
+    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use crossterm::execute;
 use crossterm::terminal::{
@@ -26,7 +27,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 use thiserror::Error;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -72,14 +73,13 @@ pub enum MessageRole {
 impl MessageRole {
     fn label(self) -> &'static str {
         match self {
-            Self::User => "you",
-            Self::Assistant => "zenpi",
+            Self::User => "user",
+            Self::Assistant => "assistant",
             Self::Tool => "tool",
-            Self::System => "info",
+            Self::System => "system",
             Self::Error => "error",
         }
     }
-
     fn style(self) -> Style {
         let color = match self {
             Self::User => Color::Cyan,
@@ -96,6 +96,34 @@ impl MessageRole {
 pub struct TuiMessage {
     pub role: MessageRole,
     pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProjectTabMetadata {
+    pub cwd: String,
+    pub session_path: Option<String>,
+    #[serde(default)]
+    pub approval_mode: crate::approval::ApprovalMode,
+}
+
+impl ProjectTabMetadata {
+    pub fn from_session(session: &crate::session::SessionStore) -> Self {
+        Self {
+            cwd: session.header().cwd.clone(),
+            session_path: Some(session.path().display().to_string()),
+            approval_mode: crate::approval::ApprovalMode::Always,
+        }
+    }
+}
+
+impl Default for ProjectTabMetadata {
+    fn default() -> Self {
+        Self {
+            cwd: String::new(),
+            session_path: None,
+            approval_mode: crate::approval::ApprovalMode::Always,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -479,6 +507,10 @@ impl ToolRunStatus {
 #[derive(Debug, Clone)]
 pub struct TuiState {
     messages: VecDeque<TuiMessage>,
+    /// Goal has an explicit transcript lane rather than borrowing the active
+    /// conversation's scroll state. Hosts may populate it as Goal execution
+    /// events arrive.
+    goal_messages: VecDeque<TuiMessage>,
     input: String,
     cursor: usize,
     status: String,
@@ -529,6 +561,32 @@ pub struct TuiState {
     gantt_snapshot: Option<GanttPaneSnapshot>,
     gantt_status: GanttPaneStatus,
     session_snapshot: Option<SessionPaneSnapshot>,
+    /// Stable project identity for the Wave-style top-level workspace tab.
+    /// Feature projections (goal/learn/review/session) live inside it.
+    project_name: String,
+    /// Wave-style top-level project tabs. Feature tabs remain projections
+    /// within the selected project.
+    project_tabs: Vec<String>,
+    active_project: usize,
+    project_transcripts: BTreeMap<String, VecDeque<TuiMessage>>,
+    project_layouts: BTreeMap<String, LayoutModel>,
+    project_metadata: BTreeMap<String, ProjectTabMetadata>,
+    project_checkpoint_dirty: bool,
+    persona: String,
+    palette_index: usize,
+    palette_dismissed: bool,
+    model_choices: Vec<String>,
+    workspace_area: Rect,
+    palette_area: Rect,
+    project_hits: Vec<(Rect, usize)>,
+    dragging_split: Option<(
+        crate::layout::Column,
+        crate::layout::Column,
+        u16,
+        crate::layout::ColumnRatios,
+    )>,
+    dragging_row: Option<(PaneId, PaneId, u16, u16, u16, u16)>,
+    pane_scroll: BTreeMap<PaneId, u16>,
     max_messages: usize,
     max_history: usize,
     spinner_tick: usize,
@@ -547,6 +605,7 @@ impl TuiState {
     pub fn new(max_messages: usize) -> Self {
         Self {
             messages: VecDeque::new(),
+            goal_messages: VecDeque::new(),
             input: String::new(),
             cursor: 0,
             status: "Ready".into(),
@@ -569,6 +628,23 @@ impl TuiState {
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
             session_snapshot: None,
+            project_name: "default".into(),
+            project_tabs: vec!["default".into()],
+            active_project: 0,
+            project_transcripts: BTreeMap::new(),
+            project_layouts: BTreeMap::new(),
+            project_metadata: BTreeMap::new(),
+            project_checkpoint_dirty: false,
+            persona: "INTJ".into(),
+            palette_index: 0,
+            palette_dismissed: false,
+            model_choices: Vec::new(),
+            workspace_area: Rect::default(),
+            palette_area: Rect::default(),
+            project_hits: Vec::new(),
+            dragging_split: None,
+            dragging_row: None,
+            pane_scroll: BTreeMap::new(),
             max_messages: max_messages.max(1),
             max_history: 100,
             spinner_tick: 0,
@@ -589,6 +665,19 @@ impl TuiState {
     /// Refresh only from the current session owner, never from provider text.
     /// This touches at most the last 32 validated envelopes and performs no I/O.
     pub fn refresh_session_snapshot(&mut self, session: &crate::session::SessionStore) {
+        // Goal execution messages belong to the old owner/session. Clear the
+        // lane before projecting the replacement journal.
+        self.clear_goal_messages();
+        self.persona = session
+            .events()
+            .iter()
+            .rev()
+            .find(|event| event["type"] == "persona_selected")
+            .and_then(|event| event["persona"].as_str())
+            .and_then(crate::persona::normalize)
+            .unwrap_or("INTJ")
+            .into();
+        self.cached_transcript = None;
         let snapshot = SessionPaneSnapshot::from_session(session);
         if self.session_snapshot.as_ref() != Some(&snapshot) {
             self.session_snapshot = Some(snapshot);
@@ -625,6 +714,302 @@ impl TuiState {
         self.workspace_layout.tab
     }
 
+    /// Set the top-level project label without changing any feature pane.
+    pub fn set_project_name(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if !name.trim().is_empty() && name != self.project_name {
+            // Project identity is the top-level tab identity. Keep the
+            // legacy setter from creating a label that is absent from the
+            // project strip.
+            let _ = self.rename_project_tab(&self.project_name.clone(), name);
+        }
+    }
+
+    pub fn project_tabs(&self) -> &[String] {
+        &self.project_tabs
+    }
+
+    pub fn project_index(&self, name: &str) -> Option<usize> {
+        self.project_tabs.iter().position(|item| item == name)
+    }
+
+    pub fn active_project(&self) -> &str {
+        &self.project_tabs[self.active_project]
+    }
+
+    /// Create a project tab and select it. Each project owns its session and
+    /// workspace in the host; this view layer only tracks stable tab labels.
+    pub fn open_project_tab(&mut self, name: impl Into<String>) -> bool {
+        let name = name.into();
+        if name.trim().is_empty() || self.project_tabs.iter().any(|item| item == &name) {
+            return false;
+        }
+        self.project_tabs.push(name);
+        let project_name = self.project_tabs.last().unwrap().clone();
+        self.project_transcripts
+            .insert(project_name.clone(), VecDeque::new());
+        self.project_layouts
+            .insert(project_name.clone(), self.workspace_layout.clone());
+        self.project_metadata
+            .entry(project_name)
+            .or_insert_with(ProjectTabMetadata::default);
+        self.active_project = self.project_tabs.len() - 1;
+        self.project_name = self.project_tabs[self.active_project].clone();
+        self.dirty = true;
+        self.project_checkpoint_dirty = true;
+        true
+    }
+
+    pub fn select_project_tab(&mut self, index: usize) -> bool {
+        if index >= self.project_tabs.len() {
+            return false;
+        }
+        let old = self.project_tabs[self.active_project].clone();
+        self.project_transcripts
+            .insert(old, std::mem::take(&mut self.messages));
+        let old_name = self.project_tabs[self.active_project].clone();
+        let old_layout =
+            std::mem::replace(&mut self.workspace_layout, LayoutModel::new(TabId::Project));
+        self.project_layouts.insert(old_name, old_layout);
+        self.active_project = index;
+        self.project_name = self.project_tabs[index].clone();
+        self.messages = self
+            .project_transcripts
+            .remove(&self.project_name)
+            .unwrap_or_default();
+        self.workspace_layout = self
+            .project_layouts
+            .remove(&self.project_name)
+            .unwrap_or_else(|| LayoutModel::new(TabId::Project));
+        self.dirty = true;
+        self.project_checkpoint_dirty = true;
+        true
+    }
+
+    pub fn close_project_tab(&mut self, name: &str) -> bool {
+        if self.project_tabs.len() <= 1 {
+            return false;
+        }
+        let Some(index) = self.project_tabs.iter().position(|item| item == name) else {
+            return false;
+        };
+        self.project_tabs.remove(index);
+        self.project_transcripts.remove(name);
+        self.project_layouts.remove(name);
+        self.project_metadata.remove(name);
+        if index < self.active_project {
+            self.active_project = self.active_project.saturating_sub(1);
+        }
+        if self.active_project >= self.project_tabs.len() {
+            self.active_project = self.project_tabs.len() - 1;
+        }
+        self.project_name = self.project_tabs[self.active_project].clone();
+        self.dirty = true;
+        self.project_checkpoint_dirty = true;
+        true
+    }
+
+    pub fn project_tab_count(&self) -> usize {
+        self.project_tabs.len()
+    }
+
+    pub fn active_project_index(&self) -> usize {
+        self.active_project
+    }
+
+    /// Return a project tab and its metadata without exposing mutable state.
+    pub fn project_tab_context(&self, index: usize) -> Option<(&str, Option<&ProjectTabMetadata>)> {
+        let name = self.project_tabs.get(index)?;
+        Some((name.as_str(), self.project_metadata.get(name)))
+    }
+
+    pub fn next_project_tab(&mut self, backwards: bool) -> bool {
+        if self.project_tabs.len() < 2 {
+            return false;
+        }
+        let next = if backwards {
+            (self.active_project + self.project_tabs.len() - 1) % self.project_tabs.len()
+        } else {
+            (self.active_project + 1) % self.project_tabs.len()
+        };
+        self.select_project_tab(next)
+    }
+
+    /// Expose the project strip in display order for renderers/hosts.
+    pub fn project_tab_labels(&self) -> Vec<String> {
+        self.project_tabs.clone()
+    }
+
+    /// Switch project and return the metadata the host must bind next.
+    pub fn project_switch_context(&mut self, index: usize) -> Option<ProjectTabMetadata> {
+        if !self.select_project_tab(index) {
+            return None;
+        }
+        Some(
+            self.project_metadata(self.active_project())
+                .cloned()
+                .unwrap_or_default(),
+        )
+    }
+
+    /// Rename a project tab without changing its identity or stored view.
+    pub fn rename_project_tab(&mut self, old: &str, new: impl Into<String>) -> bool {
+        let new = new.into();
+        if new.trim().is_empty() || self.project_tabs.iter().any(|item| item == &new) {
+            return false;
+        }
+        let Some(index) = self.project_tabs.iter().position(|item| item == old) else {
+            return false;
+        };
+        self.project_tabs[index] = new.clone();
+        if let Some(value) = self.project_transcripts.remove(old) {
+            self.project_transcripts.insert(new.clone(), value);
+        }
+        if let Some(value) = self.project_layouts.remove(old) {
+            self.project_layouts.insert(new.clone(), value);
+        }
+        if let Some(value) = self.project_metadata.remove(old) {
+            self.project_metadata.insert(new.clone(), value);
+        }
+        if self.active_project == index {
+            self.project_name = new;
+        }
+        self.dirty = true;
+        true
+    }
+
+    /// Persist the project-tab strip as a small JSON projection. The host can
+    /// store this beside its session and restore it on the next launch.
+    pub fn project_tabs_json(&self) -> serde_json::Value {
+        serde_json::json!({ "projects": self.project_tabs, "active": self.active_project, "project_name": self.project_name, "metadata": self.project_metadata })
+    }
+
+    /// Persist project identity independently from the pane-layout preference
+    /// file. Hosts can checkpoint this projection beside their session index.
+    pub fn project_checkpoint(&self) -> serde_json::Value {
+        self.project_tabs_json()
+    }
+
+    pub fn project_checkpoint_dirty(&self) -> bool {
+        self.project_checkpoint_dirty
+    }
+    pub fn clear_project_checkpoint_dirty(&mut self) {
+        self.project_checkpoint_dirty = false;
+    }
+
+    /// Human-readable navigation contract used by status/help surfaces.
+    pub fn project_navigation_model() -> &'static str {
+        "top-level tabs are projects; Goal, Learn, Review, and Session are panes inside the active project workspace"
+    }
+
+    pub fn restore_project_tabs(&mut self, value: &serde_json::Value) -> bool {
+        let Some(projects) = value.get("projects").and_then(|v| v.as_array()) else {
+            return false;
+        };
+        // Keep the persisted strip deterministic even if an older host wrote
+        // duplicate or blank project names.
+        let mut names = Vec::new();
+        for name in projects.iter().filter_map(|v| v.as_str()) {
+            let name = name.trim();
+            if name.is_empty() || names.iter().any(|item: &String| item == name) {
+                continue;
+            }
+            names.push(name.to_owned());
+        }
+        if names.is_empty() {
+            return false;
+        }
+        let active = value.get("active").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        self.project_tabs = names;
+        self.active_project = active.min(self.project_tabs.len() - 1);
+        self.project_name = self.project_tabs[self.active_project].clone();
+        self.project_transcripts.clear();
+        self.project_layouts.clear();
+        self.project_metadata.clear();
+        if let Some(metadata) = value.get("metadata") {
+            self.project_metadata = serde_json::from_value(metadata.clone()).unwrap_or_default();
+        }
+        // A restored strip starts with explicit empty runtime slots. The host
+        // may subsequently hydrate transcripts/layouts from its session store.
+        for name in &self.project_tabs {
+            self.project_transcripts.entry(name.clone()).or_default();
+            self.project_layouts
+                .entry(name.clone())
+                .or_insert_with(|| self.workspace_layout.clone());
+            self.project_metadata.entry(name.clone()).or_default();
+        }
+        self.messages = self
+            .project_transcripts
+            .get(&self.project_name)
+            .cloned()
+            .unwrap_or_default();
+        if let Some(layout) = self.project_layouts.get(&self.project_name).cloned() {
+            self.workspace_layout = layout;
+        }
+        self.dirty = true;
+        true
+    }
+
+    pub fn restore_project_checkpoint(&mut self, value: &serde_json::Value) -> bool {
+        self.restore_project_tabs(value)
+    }
+
+    /// Return the currently selected project's complete in-memory view. This
+    /// is the boundary a host uses when swapping project tabs atomically.
+    pub fn project_view(&self) -> serde_json::Value {
+        serde_json::json!({
+            "name": self.active_project(),
+            "metadata": self.project_metadata(self.active_project()),
+            "transcript_messages": self.messages.len(),
+            "feature_projection": self.workspace_layout.tab.as_str(),
+        })
+    }
+
+    /// Atomically switch the visible project and return its host metadata.
+    /// The host can use the returned projection to bind the Agent/session.
+    pub fn select_project_view(&mut self, index: usize) -> Option<serde_json::Value> {
+        if !self.select_project_tab(index) {
+            return None;
+        }
+        Some(self.project_view())
+    }
+
+    /// Return a stable snapshot suitable for a host-side project switch.
+    pub fn project_tab_snapshot(&self, name: &str) -> Option<serde_json::Value> {
+        self.project_tabs.iter().any(|item| item == name).then(|| {
+            serde_json::json!({
+                "name": name,
+                "metadata": self.project_metadata(name),
+                "has_transcript": self.project_transcripts.get(name).is_some_and(|m| !m.is_empty()),
+                "has_layout": self.project_layouts.contains_key(name),
+            })
+        })
+    }
+
+    pub fn project_name(&self) -> &str {
+        &self.project_name
+    }
+
+    pub fn project_metadata(&self, name: &str) -> Option<&ProjectTabMetadata> {
+        self.project_metadata.get(name)
+    }
+
+    /// Attach host-owned cwd/session identity to a project tab. The TUI does
+    /// not open sessions or change directories; it stores the projection so
+    /// the host can restore the correct project context on selection.
+    pub fn set_project_metadata(&mut self, name: impl Into<String>, metadata: ProjectTabMetadata) {
+        let name = name.into();
+        if self.project_tabs.iter().any(|item| item == &name) {
+            self.project_metadata.insert(name, metadata);
+            self.dirty = true;
+        }
+    }
+
+    pub fn set_active_project_metadata(&mut self, metadata: ProjectTabMetadata) {
+        let name = self.active_project().to_owned();
+        self.set_project_metadata(name, metadata);
+    }
+
     /// Borrow the layout model used by the production workspace renderer.
     ///
     /// Keeping this as a typed model lets hosts inspect or adjust bounded
@@ -633,10 +1018,15 @@ impl TuiState {
         &self.workspace_layout
     }
 
-    /// Return a bounded snapshot of every tab's user-owned state. The active
-    /// tab is first, followed by inactive tabs in stable `TabId` order.
-    /// Capabilities are retained in memory for the host but omitted by the
-    /// config persistence layer.
+    /// The project tab is the only top-level workspace scope. Feature
+    /// presets may exist for migration, but they are never project identity.
+    pub fn active_project_workspace(&self) -> &LayoutModel {
+        &self.workspace_layout
+    }
+
+    /// Return a bounded snapshot of every persisted pane preset. Project tabs
+    /// still own the visible workspace; legacy feature presets remain stored
+    /// only for migration and compatibility.
     pub fn workspace_layout_states(&self) -> Vec<LayoutModel> {
         let mut states = Vec::with_capacity(TabId::ALL.len());
         states.push(self.workspace_layout.clone());
@@ -824,9 +1214,8 @@ impl TuiState {
         }
     }
 
-    /// Select a workspace tab and invalidate the next frame. Each tab keeps
-    /// its own ratios, collapsed panes, and focus in memory; switching does
-    /// not mark the preference document dirty by itself.
+    /// Select an internal pane preset for compatibility. This does not alter
+    /// the top-level project tab identity.
     pub fn set_workspace_tab(&mut self, tab: TabId) {
         if self.workspace_layout.tab != tab {
             let capabilities = self.workspace_layout.capabilities;
@@ -1125,6 +1514,33 @@ impl TuiState {
         self.dirty = true;
     }
 
+    /// Append an event to the Goal hot-zone transcript. Goal events are kept
+    /// separate from ordinary conversation messages so a future owner can
+    /// stream execution progress without contaminating the chat lane.
+    pub fn push_goal_message(&mut self, role: MessageRole, text: impl Into<String>) {
+        self.goal_messages.push_back(TuiMessage::new(role, text));
+        while self.goal_messages.len() > self.max_messages {
+            self.goal_messages.pop_front();
+        }
+        self.dirty = true;
+    }
+
+    /// Number of messages currently projected in the Goal hot zone.
+    pub fn goal_message_count(&self) -> usize {
+        self.goal_messages.len()
+    }
+
+    /// Replace the Goal lane when its owner changes (for example after a
+    /// session switch). This prevents stale execution notices from crossing
+    /// session boundaries while preserving the ordinary conversation.
+    pub fn clear_goal_messages(&mut self) {
+        if !self.goal_messages.is_empty() {
+            self.goal_messages.clear();
+            self.pane_scroll.remove(&PaneId::GoalConversation);
+            self.dirty = true;
+        }
+    }
+
     /// Merge adjacent stream chunks to avoid one allocation per token.
     pub fn append_stream(&mut self, role: MessageRole, chunk: impl AsRef<str>) {
         self.streaming_job_id = None;
@@ -1249,6 +1665,8 @@ impl TuiState {
     }
 
     pub fn set_input(&mut self, input: impl Into<String>) {
+        self.palette_dismissed = false;
+        self.palette_index = 0;
         self.input = bound_text(sanitize_input(input.into()));
         self.cursor = self.input.len();
         self.history_cursor = None;
@@ -1267,9 +1685,316 @@ impl TuiState {
         self.dirty = true;
     }
 
+    pub fn slash_choices(&self) -> Vec<String> {
+        if self.palette_dismissed
+            || self.cursor != self.input.len()
+            || !self.input.starts_with('/')
+            || self.input.contains('\n')
+        {
+            return Vec::new();
+        }
+        let input = self.input.as_str();
+        if input.ends_with(' ') && input.trim().contains(' ') {
+            return Vec::new();
+        }
+        let Some((command, query)) = input.split_once(' ') else {
+            return slash::COMMAND_SPECS
+                .iter()
+                .flat_map(|spec| std::iter::once(spec.name).chain(spec.aliases.iter().copied()))
+                .filter(|name| name.starts_with(&input[1..]))
+                .map(|name| format!("/{name}"))
+                .collect();
+        };
+        let values: Vec<String> = match command {
+            "/persona" | "/personas" => crate::persona::TYPES
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "/model" => self.model_choices.clone(),
+            "/goal" => ["show", "list", "status", "put"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "/yolo" => ["on", "off"].iter().map(|s| s.to_string()).collect(),
+            "/approval" | "/approvals" => ["ask", "always", "never"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "/learn" => ["show", "put", "evidence", "resume"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "/review" => ["status", "diff"].iter().map(|s| s.to_string()).collect(),
+            "/project" => {
+                let mut values = vec![
+                    "list".to_string(),
+                    "open".to_string(),
+                    "select".to_string(),
+                    "close".to_string(),
+                ];
+                if query.eq_ignore_ascii_case("open")
+                    || query.eq_ignore_ascii_case("select")
+                    || query.eq_ignore_ascii_case("close")
+                {
+                    values = self.project_tabs.clone();
+                }
+                values
+            }
+            "/session" => ["list", "resume-last", "open", "fork", "inspect", "archive"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            _ => Vec::new(),
+        };
+        values
+            .into_iter()
+            .filter(|value| {
+                value
+                    .to_ascii_lowercase()
+                    .starts_with(&query.to_ascii_lowercase())
+            })
+            .map(|value| format!("{command} {value}"))
+            .collect()
+    }
+
+    fn choose_slash(&mut self, choices: &[String]) {
+        if let Some(choice) = choices.get(self.palette_index % choices.len()) {
+            let second_level = choice.contains(' ');
+            self.set_input(format!("{choice} "));
+            self.palette_index = 0;
+            self.palette_dismissed = second_level;
+        }
+    }
+
+    fn render_slash_choices(&mut self, frame: &mut Frame<'_>, prompt: Rect) {
+        self.palette_area = Rect::default();
+        let choices = self.slash_choices();
+        if choices.is_empty() {
+            return;
+        }
+        let available = prompt.y.saturating_sub(frame.area().y);
+        let height = (choices.len().min(8) as u16 + 2).min(available);
+        if height < 3 {
+            return;
+        }
+        let area = Rect::new(prompt.x, prompt.y - height, prompt.width.min(52), height);
+        self.palette_area = area;
+        let selected = self.palette_index.min(choices.len() - 1);
+        let start = selected.saturating_sub(usize::from(height - 3));
+        let lines = choices
+            .iter()
+            .enumerate()
+            .skip(start)
+            .take(usize::from(height - 2))
+            .map(|(i, choice)| {
+                Line::from(Span::styled(
+                    choice.clone(),
+                    if i == selected {
+                        Style::default().fg(Color::Black).bg(Color::Cyan)
+                    } else {
+                        Style::default().fg(Color::White)
+                    },
+                ))
+            })
+            .collect::<Vec<_>>();
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(" Commands ")),
+            area,
+        );
+    }
+
+    pub fn handle_mouse(&mut self, mouse: MouseEvent) -> TuiAction {
+        let position = Position::new(mouse.column, mouse.row);
+        if mouse.kind == MouseEventKind::Up(MouseButton::Left) {
+            self.dragging_split = None;
+            self.dragging_row = None;
+            return TuiAction::Redraw;
+        }
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            if self.palette_area.contains(position) {
+                let choices = self.slash_choices();
+                if !choices.is_empty()
+                    && mouse.row > self.palette_area.y
+                    && mouse.row < self.palette_area.bottom() - 1
+                {
+                    let start = self
+                        .palette_index
+                        .saturating_sub(usize::from(self.palette_area.height.saturating_sub(3)));
+                    self.palette_index = start + usize::from(mouse.row - self.palette_area.y - 1);
+                    self.choose_slash(&choices);
+                }
+                return TuiAction::Redraw;
+            }
+            if let Some((_, index)) = self
+                .project_hits
+                .iter()
+                .find(|(rect, _)| rect.contains(position))
+            {
+                if *index == self.project_tabs.len() {
+                    let mut suffix = self.project_tabs.len() + 1;
+                    let mut name = format!("project-{suffix}");
+                    while self.project_tabs.iter().any(|item| item == &name) {
+                        suffix += 1;
+                        name = format!("project-{suffix}");
+                    }
+                    self.open_project_tab(name);
+                } else {
+                    self.select_project_tab(*index);
+                }
+                return TuiAction::Redraw;
+            }
+        }
+        let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, self.workspace_area);
+        let panes: Vec<_> = adapter.visible_panes().collect();
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            self.dragging_row = panes.iter().find_map(|top| {
+                panes
+                    .iter()
+                    .find(|bottom| {
+                        bottom.id != top.id
+                            && bottom.rect.x == top.rect.x
+                            && bottom.rect.y == top.rect.bottom()
+                            && mouse.row.abs_diff(bottom.rect.y) <= 2
+                            && mouse.column > top.rect.x
+                            && mouse.column < top.rect.right().saturating_sub(1)
+                    })
+                    .map(|bottom| {
+                        let preset = self.workspace_layout.preset();
+                        let weight = |id| {
+                            self.workspace_layout
+                                .row_weights
+                                .get(&id)
+                                .copied()
+                                .unwrap_or_else(|| {
+                                    preset
+                                        .panes
+                                        .iter()
+                                        .find(|spec| spec.id == id)
+                                        .unwrap()
+                                        .row_weight
+                                })
+                        };
+                        let column = preset
+                            .panes
+                            .iter()
+                            .find(|spec| spec.id == top.id)
+                            .unwrap()
+                            .column;
+                        let specs: Vec<_> = preset
+                            .panes
+                            .iter()
+                            .filter(|spec| {
+                                spec.column == column && panes.iter().any(|pane| pane.id == spec.id)
+                            })
+                            .collect();
+                        let total: u16 = specs.iter().map(|spec| weight(spec.id)).sum();
+                        let minimum: u16 = specs.iter().map(|spec| spec.min_size.height).sum();
+                        (
+                            top.id,
+                            bottom.id,
+                            mouse.row,
+                            weight(top.id),
+                            weight(bottom.id),
+                            self.workspace_area
+                                .height
+                                .saturating_sub(minimum)
+                                .max(1)
+                                .saturating_mul(1000)
+                                / total.max(1),
+                        )
+                    })
+            });
+            let preset = self.workspace_layout.preset();
+            self.dragging_split = panes.iter().find_map(|pane| {
+                let adjacent = panes
+                    .iter()
+                    .find(|other| other.rect.x == pane.rect.right())?;
+                let left = preset.panes.iter().find(|spec| spec.id == pane.id)?.column;
+                let right = preset
+                    .panes
+                    .iter()
+                    .find(|spec| spec.id == adjacent.id)?
+                    .column;
+                (left != right
+                    // Forgiving two-cell grip, matching herdr's coarse-mouse
+                    // pane handle behavior.
+                    && mouse.column.abs_diff(pane.rect.right()) <= 2
+                    && mouse.row >= pane.rect.y
+                    && mouse.row < pane.rect.bottom())
+                .then_some((
+                    left,
+                    right,
+                    mouse.column,
+                    self.workspace_layout.ratios.bounded(),
+                ))
+            });
+            if let Some(pane) = panes.iter().find(|pane| pane.rect.contains(position)) {
+                self.focus_workspace_pane(pane.id);
+            }
+        }
+        if let Some((top, bottom, origin, top_weight, bottom_weight, scale)) = self.dragging_row
+            && matches!(mouse.kind, MouseEventKind::Drag(MouseButton::Left))
+        {
+            // Transfer only this pair's weight; unrelated rows retain their share.
+            let delta = (i32::from(mouse.row) - i32::from(origin)) * 1000 / i32::from(scale.max(1));
+            let total = top_weight + bottom_weight;
+            let split = (i32::from(top_weight) + delta).clamp(
+                i32::from(total.saturating_sub(1000).max(1)),
+                i32::from((total - 1).min(1000)),
+            ) as u16;
+            self.workspace_layout.row_weights.insert(top, split);
+            self.workspace_layout
+                .row_weights
+                .insert(bottom, total - split);
+            self.layout_dirty = true;
+            self.cached_transcript = None;
+        } else if let Some((left, right, origin, initial)) = self.dragging_split
+            && matches!(mouse.kind, MouseEventKind::Drag(MouseButton::Left))
+            && self.workspace_area.width > 0
+        {
+            let delta = (i32::from(mouse.column) - i32::from(origin)) * 100
+                / i32::from(self.workspace_area.width);
+            let total = initial.get(left) + initial.get(right);
+            let value =
+                (i32::from(initial.get(left)) + delta).clamp(5, i32::from(total - 5)) as u16;
+            let mut ratios = initial;
+            ratios.set(left, value);
+            ratios.set(right, total - value);
+            self.workspace_layout.set_ratios(ratios);
+            self.layout_dirty = true;
+            self.cached_transcript = None;
+        }
+        if let Some(pane) = panes.iter().find(|pane| pane.rect.contains(position))
+            && matches!(
+                mouse.kind,
+                MouseEventKind::ScrollUp | MouseEventKind::ScrollDown
+            )
+        {
+            self.focus_workspace_pane(pane.id);
+            if pane.id == conversation_pane_for_tab(self.workspace_layout.tab) {
+                if mouse.kind == MouseEventKind::ScrollUp {
+                    self.scroll_up(3);
+                } else {
+                    self.scroll_down(3);
+                }
+            } else {
+                let scroll = self.pane_scroll.entry(pane.id).or_default();
+                *scroll = if mouse.kind == MouseEventKind::ScrollUp {
+                    scroll.saturating_sub(3)
+                } else {
+                    scroll.saturating_add(3)
+                };
+            }
+        }
+        self.dirty = true;
+        TuiAction::Redraw
+    }
+
     pub fn handle_event(&mut self, event: Event) -> TuiAction {
         match event {
             Event::Key(key) if key.kind == KeyEventKind::Press => self.handle_key(key),
+            Event::Mouse(mouse) => self.handle_mouse(mouse),
             Event::Paste(text) => {
                 self.insert_text(&text);
                 TuiAction::None
@@ -1284,6 +2009,44 @@ impl TuiState {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> TuiAction {
+        if matches!(
+            key.code,
+            KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
+        ) {
+            self.palette_dismissed = false;
+            self.palette_index = 0;
+        }
+        let choices = self.slash_choices();
+        if !choices.is_empty() && key.modifiers.is_empty() {
+            match key.code {
+                KeyCode::Down => {
+                    self.palette_index = (self.palette_index + 1) % choices.len();
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Up => {
+                    self.palette_index = (self.palette_index + choices.len() - 1) % choices.len();
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Esc => {
+                    self.palette_dismissed = true;
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Enter => {
+                    let exact = choices
+                        .get(self.palette_index % choices.len())
+                        .is_some_and(|choice| choice.eq_ignore_ascii_case(&self.input));
+                    let submenu = matches!(
+                        self.input.as_str(),
+                        "/persona" | "/personas" | "/model" | "/goal" | "/learn" | "/session"
+                    );
+                    if !exact || submenu {
+                        self.choose_slash(&choices);
+                        return TuiAction::Redraw;
+                    }
+                }
+                _ => {}
+            }
+        }
         let modifiers = key.modifiers;
         if modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
@@ -1340,14 +2103,25 @@ impl TuiState {
                     self.reset_workspace_layout();
                     return TuiAction::Redraw;
                 }
-                // Workspace tabs are intentionally keyboard-only for now so
-                // the existing prompt workflow remains unchanged.  The tab
-                // bar mirrors these stable numbers in the BentoBox view.
-                KeyCode::Char(character) if ('1'..='5').contains(&character) => {
+                // Workspace navigation follows herdr's tab-cycle model; the
+                // visible names remain the source of truth, while Ctrl-Tab
+                // provides a discoverable non-numeric shortcut.
+                KeyCode::Tab if self.input.is_empty() => {
+                    let current = self.active_project;
+                    let next = if modifiers.contains(KeyModifiers::SHIFT) {
+                        (current + self.project_tabs.len() - 1) % self.project_tabs.len()
+                    } else {
+                        (current + 1) % self.project_tabs.len()
+                    };
+                    self.select_project_tab(next);
+                    return TuiAction::Redraw;
+                }
+                // Keep Ctrl+1..5 as a compatibility shortcut. The visible
+                // tab bar is the primary navigation and is mouse-addressable;
+                // numeric keys are never interpreted while drafting text.
+                KeyCode::Char(character) if ('1'..='9').contains(&character) => {
                     let index = usize::from(character as u8 - b'1');
-                    if let Some(tab) = TabId::ALL.get(index).copied() {
-                        self.set_workspace_tab(tab);
-                    }
+                    self.select_project_tab(index);
                     return TuiAction::Redraw;
                 }
                 // Ctrl-J is the portable terminal spelling of a newline.
@@ -1699,27 +2473,60 @@ impl TuiState {
     }
 
     fn render_transcript(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.render_transcript_pane(frame, area, false);
+    }
+
+    fn render_transcript_pane(&mut self, frame: &mut Frame<'_>, area: Rect, goal: bool) {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let title = if self.fold_tool_logs {
+        let title = if goal {
+            " Goal "
+        } else if self.fold_tool_logs {
             " Conversation (tools folded) "
         } else {
             " Conversation "
         };
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(
+                if self.workspace_layout.focused
+                    == Some(if goal {
+                        PaneId::GoalConversation
+                    } else {
+                        conversation_pane_for_tab(self.workspace_layout.tab)
+                    })
+                {
+                    crate::persona::color(&self.persona)
+                } else {
+                    Color::DarkGray
+                },
+            ))
             .title(title);
         let inner = block.inner(area);
         let width = usize::from(inner.width).max(1);
+        if goal {
+            let mut lines = transcript_lines(&self.goal_messages, width, &self.persona);
+            lines.truncate(MAX_RENDER_LINES);
+            frame.render_widget(
+                Paragraph::new(lines).block(block).scroll((
+                    *self
+                        .pane_scroll
+                        .get(&PaneId::GoalConversation)
+                        .unwrap_or(&0),
+                    0,
+                )),
+                area,
+            );
+            return;
+        }
         if self
             .cached_transcript
             .as_ref()
             .is_none_or(|(cached_width, _)| *cached_width != inner.width)
         {
             let messages = self.transcript_messages();
-            let mut lines = transcript_lines(&messages, width);
+            let mut lines = transcript_lines(&messages, width, &self.persona);
             if lines.len() > MAX_RENDER_LINES {
                 lines.drain(..lines.len() - MAX_RENDER_LINES);
             }
@@ -1779,7 +2586,11 @@ impl TuiState {
             } else {
                 Color::Cyan
             }))
-            .title(" Prompt ");
+            .title(if self.input.starts_with('/') {
+                " Prompt  • command palette active "
+            } else {
+                " Prompt "
+            });
         let inner = block.inner(area);
         let width = usize::from(inner.width).max(1);
         let lines = wrap_plain(&self.input, width)
@@ -1877,32 +2688,74 @@ impl TuiState {
         self.render_workspace(frame, chunks[2]);
         self.render_input(frame, chunks[3]);
         self.render_footer(frame, chunks[4]);
+        self.render_slash_choices(frame, chunks[3]);
     }
 
-    fn render_workspace_tabs(&self, frame: &mut Frame<'_>, area: Rect) {
+    fn render_workspace_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let active = self.workspace_layout.tab;
-        let mut spans = Vec::with_capacity(TabId::ALL.len());
-        for (index, tab) in TabId::ALL.into_iter().enumerate() {
-            let style = if tab == active {
+        // The strip represents projects only. Goal/Learn/Review/Session are
+        // commands and panes inside the selected project, never peer tabs.
+        let mut spans = vec![
+            Span::styled(
+                " zenpi ",
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-            spans.push(Span::styled(
-                format!(" {}:{} ", index + 1, tab.as_str()),
-                style,
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(
+                    "| projects: {} ",
+                    self.project_tabs
+                        .iter()
+                        .enumerate()
+                        .map(|(i, n)| if i == self.active_project {
+                            format!("[{}]", n)
+                        } else {
+                            n.clone()
+                        })
+                        .collect::<Vec<_>>()
+                        .join("  ")
+                ),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ];
+        // A trailing plus affordance makes project creation discoverable
+        // without introducing a second functional tab strip.
+        spans.push(Span::styled(
+            "  [+]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ));
+        self.project_hits.clear();
+        let mut project_x = area.x + 10;
+        for (index, name) in self.project_tabs.iter().enumerate() {
+            let width =
+                (name.chars().count() as u16 + 4).min(area.right().saturating_sub(project_x));
+            self.project_hits
+                .push((Rect::new(project_x, area.y, width, area.height), index));
+            project_x = project_x.saturating_add(width);
+        }
+        if project_x < area.right() {
+            self.project_hits.push((
+                Rect::new(
+                    project_x,
+                    area.y,
+                    5.min(area.right() - project_x),
+                    area.height,
+                ),
+                self.project_tabs.len(),
             ));
         }
         frame.render_widget(Paragraph::new(Line::from(spans)), area);
     }
 
     fn render_workspace(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.workspace_area = area;
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -1912,7 +2765,20 @@ impl TuiState {
             if pane.rect.width == 0 || pane.rect.height == 0 {
                 continue;
             }
-            if pane.id == canonical {
+            if pane.id == PaneId::GoalConversation {
+                self.render_transcript_pane(frame, pane.rect, true);
+            } else if pane.id == canonical
+                || matches!(
+                    pane.id,
+                    PaneId::ProjectConversation
+                        | PaneId::LearnConversation
+                        | PaneId::ReviewConversation
+                        | PaneId::SessionConversation
+                )
+            {
+                // Every workspace keeps its ordinary conversation lane
+                // visible alongside Goal; tab switching changes context, not
+                // the existence of either hot zone.
                 self.render_transcript(frame, pane.rect);
             } else {
                 self.render_workspace_pane(frame, pane.id, pane.rect);
@@ -1924,15 +2790,19 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let title = workspace_pane_title(id);
+        // Keep the split affordance visible without adding a second toolbar:
+        // the centered grip is a stable mouse target at every breakpoint.
+        let title = format!(" {}  ⋮ ", workspace_pane_title(id));
         let content = match id {
             PaneId::Gantt => self.gantt_pane_content(),
             PaneId::Resources => self.resource_pane_content(),
             PaneId::SessionList => self.session_pane_content(),
             PaneId::ReplayControls => self.replay_pane_content(),
             PaneId::EventTimeline => self.session_timeline_content(),
-            PaneId::GoalConversation
-            | PaneId::ProjectConversation
+            // Goal is rendered as a transcript in `render_workspace`; this
+            // branch is retained for compact-layout fallback paths.
+            PaneId::GoalConversation => "-".into(),
+            PaneId::ProjectConversation
             | PaneId::LearnConversation
             | PaneId::ReviewConversation
             | PaneId::SessionConversation => "-".into(),
@@ -1948,12 +2818,19 @@ impl TuiState {
         };
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(
+                Style::default().fg(if self.workspace_layout.focused == Some(id) {
+                    Color::Cyan
+                } else {
+                    Color::DarkGray
+                }),
+            )
             .title(title);
         frame.render_widget(
             Paragraph::new(content)
                 .style(Style::default().fg(Color::DarkGray))
                 .block(block)
+                .scroll((*self.pane_scroll.get(&id).unwrap_or(&0), 0))
                 .wrap(Wrap { trim: true }),
             area,
         );
@@ -1962,8 +2839,11 @@ impl TuiState {
     fn session_pane_content(&self) -> String {
         match &self.session_snapshot {
             Some(snapshot) => format!(
-                "Active session\n{}\nTurns {}\nRecovery warnings {}\nMailbox: owner required",
-                snapshot.session_id, snapshot.turn_count, snapshot.warning_count,
+                "Active session\n{}\nTurns {}\nRecovery warnings {}\nJournal next sequence: {}\nTransport ACK: unavailable\nReconnect: owner required\nMailbox: owner required",
+                snapshot.session_id,
+                snapshot.turn_count,
+                snapshot.warning_count,
+                snapshot.journal_next_sequence,
             ),
             None => "Session unavailable\nMailbox: owner required".into(),
         }
@@ -1972,7 +2852,7 @@ impl TuiState {
     fn replay_pane_content(&self) -> String {
         match &self.session_snapshot {
             Some(snapshot) => format!(
-                "Journal next sequence: {}\nTransport ACK: unavailable\nReconnect: owner required",
+                "Journal next sequence: {}\nTransport ACK: unavailable\nReconnect: owner required\nMailbox: owner required",
                 snapshot.journal_next_sequence,
             ),
             None => "Journal cursor unavailable\nReconnect: owner required".into(),
@@ -2181,23 +3061,23 @@ fn pane_available(pane: PaneId, capabilities: crate::layout::PaneCapabilities) -
 
 fn workspace_pane_title(id: PaneId) -> &'static str {
     match id {
-        PaneId::ProjectConversation => "Project",
+        PaneId::ProjectConversation => "Conversation",
         PaneId::Resources => "Resources",
         PaneId::GoalConversation => "Goal",
         PaneId::Gantt => "Gantt",
         PaneId::Browser => "Browser",
         PaneId::Terminal => "Terminal",
-        PaneId::LearnConversation => "Learn",
+        PaneId::LearnConversation => "Conversation",
         PaneId::LearnResources => "Learn resources",
         PaneId::LearnQueue => "Learn queue",
         PaneId::LearnMapping => "Learn mapping",
         PaneId::Evidence => "Evidence",
-        PaneId::ReviewConversation => "Review",
+        PaneId::ReviewConversation => "Conversation",
         PaneId::Checks => "Checks",
         PaneId::ApprovalQueue => "Approval queue",
         PaneId::Diff => "Diff",
         PaneId::SessionList => "Sessions",
-        PaneId::SessionConversation => "Session",
+        PaneId::SessionConversation => "Conversation",
         PaneId::ReplayControls => "Replay",
         PaneId::EventTimeline => "Events",
     }
@@ -2372,6 +3252,146 @@ pub fn dispatch_slash_command(
     mut agent: Option<&mut crate::core::Agent>,
 ) -> SlashDispatchAction {
     match command {
+        SlashCommand::Project { action } => {
+            use crate::slash::ProjectAction;
+            let (ok, message) = match action {
+                ProjectAction::List => (
+                    true,
+                    format!(
+                        "projects: {} (active: {})\n{}",
+                        state.project_tabs().join(", "),
+                        state.active_project(),
+                        TuiState::project_navigation_model()
+                    ),
+                ),
+                ProjectAction::Open { name } => {
+                    let ok = state.open_project_tab(name.clone());
+                    if ok && let Some(agent) = agent.as_deref_mut() {
+                        let mut slug = name
+                            .chars()
+                            .map(|c| {
+                                if c.is_ascii_alphanumeric() || matches!(c, '-' | '_') {
+                                    c
+                                } else {
+                                    '-'
+                                }
+                            })
+                            .collect::<String>();
+                        if slug.is_empty() {
+                            slug = "project".into();
+                        }
+                        let path = agent
+                            .session()
+                            .path()
+                            .parent()
+                            .unwrap_or_else(|| std::path::Path::new("."))
+                            .join(format!("{slug}.jsonl"));
+                        match crate::session::SessionStore::open(&path).and_then(|_| {
+                            agent.resume_session(path.clone()).map_err(|e| {
+                                crate::session::SessionError::InvalidRecord(e.to_string())
+                            })
+                        }) {
+                            Ok(()) => state.set_active_project_metadata(
+                                ProjectTabMetadata::from_session(agent.session()),
+                            ),
+                            Err(error) => state.push_message(
+                                MessageRole::Error,
+                                format!("project session create failed: {error}"),
+                            ),
+                        }
+                        bind_agent_to_active_project(state, agent);
+                    }
+                    (
+                        ok,
+                        if ok {
+                            format!("project opened: {name}")
+                        } else {
+                            format!("project already exists or has an invalid name: {name}")
+                        },
+                    )
+                }
+                ProjectAction::Select { name } => {
+                    let index = state.project_tabs().iter().position(|item| item == &name);
+                    let ok = index.is_some_and(|i| state.select_project_tab(i));
+                    if ok && let Some(agent) = agent.as_deref_mut() {
+                        bind_agent_to_active_project(state, agent);
+                    }
+                    (
+                        ok,
+                        if ok {
+                            format!("project selected: {name}")
+                        } else {
+                            format!("project not found: {name}")
+                        },
+                    )
+                }
+                ProjectAction::Close { name } => {
+                    let was_active = state.active_project() == name;
+                    let ok = state.close_project_tab(&name);
+                    if ok
+                        && was_active
+                        && let Some(agent) = agent.as_deref_mut()
+                    {
+                        bind_agent_to_active_project(state, agent);
+                    }
+                    (
+                        ok,
+                        if ok {
+                            format!("project closed: {name}")
+                        } else {
+                            format!("cannot close project: {name}")
+                        },
+                    )
+                }
+            };
+            state.push_message(
+                if ok {
+                    MessageRole::System
+                } else {
+                    MessageRole::Error
+                },
+                message,
+            );
+        }
+        SlashCommand::Yolo { enabled } => {
+            if let Some(agent) = agent.as_deref_mut() {
+                let mut policy = agent.approval_policy().unwrap_or_default();
+                policy.mode = if enabled {
+                    crate::approval::ApprovalMode::Never
+                } else {
+                    crate::approval::ApprovalMode::ReadOnly
+                };
+                agent.set_approval_policy(policy);
+                state.push_message(
+                    MessageRole::System,
+                    format!("yolo {}", if enabled { "on" } else { "off" }),
+                );
+            } else {
+                state.push_message(MessageRole::Error, "yolo requires an idle owner");
+            }
+        }
+        SlashCommand::Approval { mode } => {
+            let mode = mode.to_ascii_lowercase();
+            if !matches!(mode.as_str(), "ask" | "always" | "never") {
+                state.push_message(
+                    MessageRole::Error,
+                    "approval mode must be ask, always, or never",
+                );
+            } else {
+                if let Some(agent) = agent.as_deref_mut() {
+                    let mut policy = agent.approval_policy().unwrap_or_default();
+                    policy.mode = match mode.as_str() {
+                        "ask" => crate::approval::ApprovalMode::ReadOnly,
+                        "always" => crate::approval::ApprovalMode::Always,
+                        _ => crate::approval::ApprovalMode::Never,
+                    };
+                    agent.set_approval_policy(policy);
+                    state.push_message(MessageRole::System, format!("approval mode: {mode}"));
+                } else {
+                    state.push_message(MessageRole::Error, "approval requires an idle owner");
+                }
+            }
+        }
         SlashCommand::Help { topic } => match slash::help(topic.as_deref()) {
             Some(help) => state.push_message(MessageRole::System, help),
             None => state.push_message(
@@ -2379,6 +3399,21 @@ pub fn dispatch_slash_command(
                 "unknown help topic; type /help for available commands",
             ),
         },
+        SlashCommand::Persona { name } => {
+            if let Some(agent) = agent.as_deref_mut() {
+                if let Some(name) = name
+                    && let Err(error) = agent.set_persona(&name)
+                {
+                    state.push_message(MessageRole::Error, error.to_string());
+                    return SlashDispatchAction::Continue;
+                }
+                state.persona = agent.persona().into();
+                state.cached_transcript = None;
+                state.set_status(format!("Persona {}", state.persona));
+            } else {
+                state.push_message(MessageRole::Error, "persona requires an idle owner");
+            }
+        }
         SlashCommand::Model { name } => {
             let host_available = agent.is_some();
             let requested_change = name.is_some();
@@ -2500,6 +3535,7 @@ pub fn dispatch_slash_command(
         SlashCommand::Exit => return SlashDispatchAction::Quit,
         SlashCommand::Goal { instruction } => match parse_tui_goal_owner_action(&instruction) {
             Ok(Some(TuiGoalOwnerAction::ShowAll)) => {
+                state.push_goal_message(MessageRole::System, "Goal store refreshed");
                 match crate::headless::domain_store_view(agent.as_deref()) {
                     Ok(data) => state.push_message(
                         MessageRole::System,
@@ -2507,7 +3543,7 @@ pub fn dispatch_slash_command(
                             "goal show:\n{}",
                             bounded_display(
                                 &serde_json::to_string(&data)
-                                    .unwrap_or_else(|_| { "{\"goals\":[]}".into() })
+                                    .unwrap_or_else(|_| "{\"goals\":[]}".into())
                             )
                         ),
                     ),
@@ -2518,6 +3554,7 @@ pub fn dispatch_slash_command(
                 }
             }
             Ok(Some(TuiGoalOwnerAction::Show(id))) => {
+                state.push_goal_message(MessageRole::System, format!("Goal selected: {id}"));
                 match crate::headless::domain_store_view(agent.as_deref()) {
                     Ok(data) => {
                         let goal = data
@@ -2693,6 +3730,7 @@ pub fn dispatch_slash_command(
             | crate::slash::SessionAction::Archive { .. }
             | crate::slash::SessionAction::Unarchive { .. }
             | crate::slash::SessionAction::Delete { .. }
+            | crate::slash::SessionAction::RetireMailbox { .. }
             | crate::slash::SessionAction::Queue { .. }) => {
                 let active_path = agent.as_deref().map(|value| value.session().path());
                 match crate::headless::session_lifecycle_view(&action, active_path) {
@@ -2731,6 +3769,22 @@ pub fn dispatch_slash_command(
                     "session gc is unavailable while the agent is busy",
                 ),
             },
+        },
+        SlashCommand::Recovery { action } => match agent.as_deref_mut() {
+            Some(agent) => match crate::headless::recovery_view(agent, &action) {
+                Ok(data) => {
+                    state.refresh_session_snapshot(agent.session());
+                    state.push_message(
+                        MessageRole::System,
+                        format!("recovery:\n{}", bounded_display(&data.to_string()),),
+                    );
+                }
+                Err(error) => state.push_message(MessageRole::Error, error),
+            },
+            None => state.push_message(
+                MessageRole::Error,
+                "recovery requires the idle session owner",
+            ),
         },
         SlashCommand::Mailbox { action } => match agent.as_deref() {
             Some(agent) => match crate::headless::mailbox_slash_view(agent, &action) {
@@ -2861,75 +3915,121 @@ pub fn dispatch_slash_command(
             match action {
                 BlueprintAction::Show | BlueprintAction::Status => {
                     match crate::headless::domain_store_view(agent.as_deref()) {
-                        Ok(data) => state.push_message(
-                            MessageRole::System,
-                            format!(
-                                "blueprint {}:\n{}",
-                                if matches!(action, BlueprintAction::Show) {
-                                    "show"
-                                } else {
-                                    "status"
-                                },
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                                )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint store unavailable: {error}"),
-                        ),
+                        Ok(data) => {
+                            state.push_goal_message(MessageRole::System, "Blueprint status loaded");
+                            state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "blueprint {}:\n{}",
+                                    if matches!(action, BlueprintAction::Show) {
+                                        "show"
+                                    } else {
+                                        "status"
+                                    },
+                                    bounded_display(
+                                        &serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            )
+                        }
+                        Err(error) => {
+                            state.push_goal_message(
+                                MessageRole::Error,
+                                format!("Blueprint status failed: {error}"),
+                            );
+                            state.push_message(
+                                MessageRole::Error,
+                                format!("blueprint store unavailable: {error}"),
+                            )
+                        }
                     }
                 }
                 BlueprintAction::Validate { path: Some(path) } => {
                     match crate::headless::blueprint_validation_view(&path) {
-                        Ok(data) => state.push_message(
-                            MessageRole::System,
-                            format!(
-                                "blueprint validate:\n{}",
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                                )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint validation failed: {error}"),
-                        ),
+                        Ok(data) => {
+                            state.push_goal_message(
+                                MessageRole::System,
+                                "Blueprint validation completed",
+                            );
+                            state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "blueprint validate:\n{}",
+                                    bounded_display(
+                                        &serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            )
+                        }
+                        Err(error) => {
+                            state.push_goal_message(
+                                MessageRole::Error,
+                                format!("Blueprint validation failed: {error}"),
+                            );
+                            state.push_message(
+                                MessageRole::Error,
+                                format!("blueprint validation failed: {error}"),
+                            )
+                        }
                     }
                 }
                 BlueprintAction::Validate { path: None } => {
                     match crate::headless::domain_store_view(agent.as_deref()) {
-                        Ok(data) => state.push_message(
-                            MessageRole::System,
-                            format!(
-                                "blueprint validate:\n{}",
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                                )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint validation failed: {error}"),
-                        ),
+                        Ok(data) => {
+                            state.push_goal_message(
+                                MessageRole::System,
+                                "Blueprint validation completed",
+                            );
+                            state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "blueprint validate:\n{}",
+                                    bounded_display(
+                                        &serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            )
+                        }
+                        Err(error) => {
+                            state.push_goal_message(
+                                MessageRole::Error,
+                                format!("Blueprint validation failed: {error}"),
+                            );
+                            state.push_message(
+                                MessageRole::Error,
+                                format!("blueprint validation failed: {error}"),
+                            )
+                        }
                     }
                 }
                 BlueprintAction::Put { path } => match agent.as_deref_mut() {
                     Some(agent) => match crate::headless::persist_blueprint_path(agent, &path) {
-                        Ok(data) => state.push_message(
-                            MessageRole::System,
-                            format!(
-                                "blueprint persisted:\n{}",
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                                )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint persistence failed: {error}"),
-                        ),
+                        Ok(data) => {
+                            state.push_goal_message(MessageRole::System, "Blueprint persisted");
+                            state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "blueprint persisted:\n{}",
+                                    bounded_display(
+                                        &serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            )
+                        }
+                        Err(error) => {
+                            state.push_goal_message(
+                                MessageRole::Error,
+                                format!("Blueprint persistence failed: {error}"),
+                            );
+                            state.push_message(
+                                MessageRole::Error,
+                                format!("blueprint persistence failed: {error}"),
+                            )
+                        }
                     },
                     None => state.push_message(
                         MessageRole::Error,
@@ -2937,21 +4037,40 @@ pub fn dispatch_slash_command(
                     ),
                 },
                 BlueprintAction::Run { target } => match agent.as_deref_mut() {
-                    Some(agent) => match crate::headless::run_blueprint_next(agent, &target) {
-                        Ok(data) => state.push_message(
+                    Some(agent) => {
+                        state.push_goal_message(
                             MessageRole::System,
-                            format!(
-                                "blueprint run:\n{}",
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            "Blueprint item execution started",
+                        );
+                        match crate::headless::run_blueprint_next(agent, &target) {
+                            Ok(data) => {
+                                state.push_goal_message(
+                                    MessageRole::System,
+                                    "Blueprint item execution receipt recorded",
+                                );
+                                state.push_message(
+                                    MessageRole::System,
+                                    format!(
+                                        "blueprint run:\n{}",
+                                        bounded_display(
+                                            &serde_json::to_string(&data)
+                                                .unwrap_or_else(|_| "{}".into())
+                                        )
+                                    ),
                                 )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint run failed: {error}"),
-                        ),
-                    },
+                            }
+                            Err(error) => {
+                                state.push_goal_message(
+                                    MessageRole::Error,
+                                    format!("Blueprint execution failed: {error}"),
+                                );
+                                state.push_message(
+                                    MessageRole::Error,
+                                    format!("blueprint run failed: {error}"),
+                                )
+                            }
+                        }
+                    }
                     None => state.push_message(
                         MessageRole::Error,
                         "blueprint execution is unavailable while the agent is busy",
@@ -2959,19 +4078,32 @@ pub fn dispatch_slash_command(
                 },
                 BlueprintAction::Handoff { target } => match agent.as_deref_mut() {
                     Some(agent) => match crate::headless::handoff_blueprint_next(agent, &target) {
-                        Ok(data) => state.push_message(
-                            MessageRole::System,
-                            format!(
-                                "blueprint handoff:\n{}",
-                                bounded_display(
-                                    &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
-                                )
-                            ),
-                        ),
-                        Err(error) => state.push_message(
-                            MessageRole::Error,
-                            format!("blueprint handoff failed: {error}"),
-                        ),
+                        Ok(data) => {
+                            state.push_goal_message(
+                                MessageRole::System,
+                                "Blueprint handoff recorded",
+                            );
+                            state.push_message(
+                                MessageRole::System,
+                                format!(
+                                    "blueprint handoff:\n{}",
+                                    bounded_display(
+                                        &serde_json::to_string(&data)
+                                            .unwrap_or_else(|_| "{}".into())
+                                    )
+                                ),
+                            )
+                        }
+                        Err(error) => {
+                            state.push_goal_message(
+                                MessageRole::Error,
+                                format!("Blueprint handoff failed: {error}"),
+                            );
+                            state.push_message(
+                                MessageRole::Error,
+                                format!("blueprint handoff failed: {error}"),
+                            )
+                        }
                     },
                     None => state.push_message(
                         MessageRole::Error,
@@ -3099,6 +4231,38 @@ pub fn dispatch_slash_command(
         state.set_status("Ready");
     }
     SlashDispatchAction::Continue
+}
+
+/// Bind the shared Agent to the project currently selected by the TUI. This
+/// is deliberately kept at the host boundary: project tabs own session and
+/// cwd, while the workspace renderer remains agent-agnostic.
+fn bind_agent_to_active_project(state: &mut TuiState, agent: &mut crate::core::Agent) {
+    let metadata = state
+        .project_metadata(state.active_project())
+        .cloned()
+        .unwrap_or_default();
+    if let Some(path) = metadata.session_path.as_deref()
+        && let Err(error) = agent.resume_session(path.to_owned())
+    {
+        state.push_message(
+            MessageRole::Error,
+            format!("project session switch failed: {error}"),
+        );
+    }
+    if !metadata.cwd.trim().is_empty() {
+        match crate::tools::ToolContext::new(&metadata.cwd) {
+            Ok(context) => agent.set_attachment_workspace(context),
+            Err(error) => state.push_message(
+                MessageRole::Error,
+                format!("project workspace switch failed: {error}"),
+            ),
+        }
+    }
+    let _ = agent.set_approval_policy(crate::approval::ApprovalPolicy {
+        mode: metadata.approval_mode,
+        ..crate::approval::ApprovalPolicy::default()
+    });
+    state.refresh_session_snapshot(agent.session());
 }
 
 fn dispatch_runtime_intent(
@@ -3372,6 +4536,7 @@ fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
         crate::slash::SessionAction::Archive { .. } => "archive",
         crate::slash::SessionAction::Unarchive { .. } => "unarchive",
         crate::slash::SessionAction::Delete { .. } => "delete",
+        crate::slash::SessionAction::RetireMailbox { .. } => "retire-mailbox",
         crate::slash::SessionAction::Queue { .. } => "queue",
         crate::slash::SessionAction::Gc { .. } => "gc",
     }
@@ -3741,7 +4906,7 @@ impl TuiLayoutPersistence {
         };
         let preferences =
             crate::config::load_layout_preferences(paths).map_err(|error| error.to_string())?;
-        let layouts = crate::layout::TabId::ALL
+        let layouts = [crate::layout::TabId::Project]
             .into_iter()
             .map(|tab| {
                 preferences
@@ -3750,6 +4915,13 @@ impl TuiLayoutPersistence {
             })
             .collect::<Result<Vec<_>, _>>()?;
         state.restore_workspace_layouts(layouts);
+        let project_path = paths.project_tabs_path();
+        if project_path.is_file() {
+            let bytes = std::fs::read(&project_path).map_err(|error| error.to_string())?;
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                state.restore_project_checkpoint(&value);
+            }
+        }
         Ok(())
     }
 
@@ -3769,7 +4941,7 @@ impl TuiLayoutPersistence {
                 .reset_tab(self.profile.as_deref(), tab)
                 .map_err(|error| error.to_string())?;
         }
-        for layout in state.workspace_layout_states() {
+        for layout in [state.active_project_workspace().clone()] {
             if reset_tabs.contains(&layout.tab) {
                 continue;
             }
@@ -3781,7 +4953,20 @@ impl TuiLayoutPersistence {
             crate::config::save_layout_preferences(paths, &preferences)
                 .map_err(|error| error.to_string())?;
         }
+        let project_path = paths.project_tabs_path();
+        let bytes = serde_json::to_vec_pretty(&state.project_checkpoint())
+            .map_err(|error| error.to_string())?;
+        std::fs::write(project_path, bytes).map_err(|error| error.to_string())?;
         Ok(())
+    }
+
+    fn save_project_checkpoint(&self, state: &TuiState) -> Result<(), String> {
+        let Some(paths) = self.paths.as_ref() else {
+            return Ok(());
+        };
+        let bytes = serde_json::to_vec_pretty(&state.project_checkpoint())
+            .map_err(|error| error.to_string())?;
+        std::fs::write(paths.project_tabs_path(), bytes).map_err(|error| error.to_string())
     }
 
     fn disable(&mut self) {
@@ -3931,6 +5116,13 @@ pub fn run_async_with_profile(
     );
     let mut state = TuiState::default();
     if let Ok(agent) = shared.lock() {
+        state.set_active_project_metadata(ProjectTabMetadata::from_session(agent.session()));
+        state.persona = agent.persona().into();
+        state.model_choices = crate::config::model_catalog(None)
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|entry| entry.model)
+            .collect();
         for turn in agent.history() {
             let role = match turn.role {
                 crate::core::TurnRole::User => MessageRole::User,
@@ -4070,23 +5262,39 @@ pub fn run_async_with_profile(
                                 if completed_generation == Some(result.generation)
                                     && gantt_tracker.accepts(&result) =>
                             {
-                                state.set_gantt_snapshot(result.snapshot)
+                                state.set_gantt_snapshot(result.snapshot);
+                                state.push_goal_message(
+                                    MessageRole::System,
+                                    "Blueprint/Goal snapshot refreshed",
+                                );
                             }
                             JobOutcome::Succeeded(_) => {}
                             JobOutcome::Failed(error)
                                 if completed_generation == Some(gantt_tracker.generation) =>
                             {
-                                state.gantt_refresh_failed(error)
+                                state.gantt_refresh_failed(&error);
+                                state.push_goal_message(
+                                    MessageRole::Error,
+                                    format!("Goal refresh failed: {error}"),
+                                );
                             }
                             JobOutcome::Failed(_) => {}
                             JobOutcome::Cancelled => {
                                 if completed_generation == Some(gantt_tracker.generation) {
                                     state.gantt_refresh_failed("Gantt refresh cancelled");
+                                    state.push_goal_message(
+                                        MessageRole::System,
+                                        "Goal refresh cancelled",
+                                    );
                                 }
                             }
                             JobOutcome::Panicked => {
                                 if completed_generation == Some(gantt_tracker.generation) {
                                     state.gantt_refresh_failed("Gantt worker panicked");
+                                    state.push_goal_message(
+                                        MessageRole::Error,
+                                        "Goal refresh worker panicked",
+                                    );
                                 }
                             }
                         }
@@ -4678,6 +5886,11 @@ pub fn run_async_with_profile(
                         }
                     }
                 }
+                if state.project_checkpoint_dirty() && !layout_persistence.disabled {
+                    if layout_persistence.save_project_checkpoint(&state).is_ok() {
+                        state.clear_project_checkpoint_dirty();
+                    }
+                }
                 scheduler.request();
                 processed += 1;
                 if processed >= 256
@@ -4699,6 +5912,11 @@ pub fn run_async_with_profile(
     {
         state.clear_layout_dirty();
         state.clear_layout_reset_tabs();
+    }
+    if state.project_checkpoint_dirty() && !layout_persistence.disabled {
+        if layout_persistence.save_project_checkpoint(&state).is_ok() {
+            state.clear_project_checkpoint_dirty();
+        }
     }
     // Restore the terminal before waiting for provider cancellation. A second
     // OS signal can then use the original disposition without stranding raw
@@ -4862,8 +6080,20 @@ impl TerminalGuard {
         let signals = terminal_signals::SignalGuard::install()?;
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        if let Err(error) = execute!(stdout, EnterAlternateScreen, EnableBracketedPaste, Hide) {
-            let _ = execute!(stdout, Show, DisableBracketedPaste, LeaveAlternateScreen);
+        if let Err(error) = execute!(
+            stdout,
+            EnterAlternateScreen,
+            EnableBracketedPaste,
+            EnableMouseCapture,
+            Hide
+        ) {
+            let _ = execute!(
+                stdout,
+                Show,
+                DisableMouseCapture,
+                DisableBracketedPaste,
+                LeaveAlternateScreen
+            );
             let _ = disable_raw_mode();
             return Err(TuiError::Io(error));
         }
@@ -4890,7 +6120,13 @@ impl TerminalGuard {
     fn leave(&mut self) {
         if self.active {
             let mut stdout = io::stdout();
-            let _ = execute!(stdout, Show, DisableBracketedPaste, LeaveAlternateScreen);
+            let _ = execute!(
+                stdout,
+                Show,
+                DisableMouseCapture,
+                DisableBracketedPaste,
+                LeaveAlternateScreen
+            );
             let _ = disable_raw_mode();
             self.active = false;
         }
@@ -5278,30 +6514,29 @@ fn wrap_plain(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
-fn transcript_lines(messages: &VecDeque<TuiMessage>, width: usize) -> Vec<Line<'static>> {
+fn transcript_lines(
+    messages: &VecDeque<TuiMessage>,
+    width: usize,
+    persona: &str,
+) -> Vec<Line<'static>> {
     let width = width.max(1);
     let mut result = Vec::new();
     for message in messages {
-        let prefix = format!("{}: ", message.role.label());
+        let prefix = "● ";
+        let style = if message.role == MessageRole::Assistant {
+            Style::default().fg(crate::persona::color(persona))
+        } else {
+            message.role.style()
+        };
         // Provider prose gets the small Markdown renderer; user prompts,
         // tool output, and errors stay literal so metadata or diff markers do
         // not acquire surprising presentation semantics.
         let rendered = match message.role {
             MessageRole::Assistant | MessageRole::System => {
-                crate::render::render_markdown_prefixed(
-                    &prefix,
-                    &message.text,
-                    width,
-                    message.role.style(),
-                )
+                crate::render::render_markdown_prefixed(prefix, &message.text, width, style)
             }
             MessageRole::User | MessageRole::Tool | MessageRole::Error => {
-                crate::render::render_plain_prefixed(
-                    &prefix,
-                    &message.text,
-                    width,
-                    message.role.style(),
-                )
+                crate::render::render_plain_prefixed(prefix, &message.text, width, style)
             }
         };
         for line in rendered {

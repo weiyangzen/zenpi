@@ -893,6 +893,13 @@ impl SessionStore {
                 "export digest does not match source".into(),
             ));
         }
+        // A session journal and its addressed mailbox form one durable
+        // lifecycle unit. Preserve the sidecar on export/import rather than
+        // silently turning an offline queue into an empty recipient.
+        if let Err(error) = copy_mailbox_sidecar(&self.path, destination) {
+            let _ = fs::remove_file(destination);
+            return Err(error);
+        }
         Ok(())
     }
 
@@ -1935,6 +1942,13 @@ pub enum SessionLifecycleRequest {
         #[serde(default)]
         confirmed: bool,
     },
+    /// Explicitly retire a durable mailbox before deleting its session.
+    /// Retention never removes a queue implicitly.
+    RetireMailbox {
+        path: PathBuf,
+        #[serde(default)]
+        confirmed: bool,
+    },
     Queue {
         source: PathBuf,
         recipient: PathBuf,
@@ -2051,6 +2065,14 @@ pub fn execute_session_lifecycle(
             fs::remove_file(&path)?;
             return Ok(Receipt::Deleted { path });
         }
+        Request::RetireMailbox { path, confirmed } => {
+            retire_session_mailbox(&path, active_session, confirmed)?;
+            // The session itself remains intact; return its catalog entry so
+            // hosts can refresh their lifecycle projection after retirement.
+            return Ok(Receipt::Session {
+                session: SessionStore::open_existing(path)?.catalog_entry(),
+            });
+        }
         Request::Queue {
             source,
             recipient,
@@ -2123,6 +2145,65 @@ pub const MAX_MAILBOX_PAYLOAD_BYTES: usize = 64 * 1024;
 pub const MAX_MAILBOX_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_MAILBOX_MESSAGES: usize = 256;
 pub const MAX_MAILBOX_TTL_MS: u64 = 7 * 24 * 60 * 60 * 1000;
+
+/// Remove a recipient mailbox only as an explicit, confirmed lifecycle
+/// action. The active recipient is rejected so an owner cannot race an
+/// in-flight delivery by deleting its queue. Callers should archive a session
+/// first when they need to retain the queue for later inspection.
+pub fn retire_session_mailbox(
+    session_path: impl AsRef<Path>,
+    active_session: Option<&Path>,
+    confirmed: bool,
+) -> Result<bool, SessionError> {
+    let session_path = session_path.as_ref();
+    if !confirmed {
+        return Err(SessionError::InvalidRecord(
+            "mailbox retirement requires explicit confirmation".into(),
+        ));
+    }
+    reject_active_session(session_path, active_session)?;
+    let mut store = SessionStore::open_existing_writable(session_path)?;
+    require_clean_session(&store)?;
+    if let Some(active) = active_session
+        && SessionStore::open_existing(active)?.session_id() == store.session_id()
+    {
+        return Err(SessionError::InvalidRecord(
+            "mailbox retirement cannot modify an alias of the active session".into(),
+        ));
+    }
+    let already_retired = store
+        .events()
+        .iter()
+        .any(|event| event["type"] == "mailbox_retired");
+    let sidecar = mailbox_path(session_path)?;
+    match fs::symlink_metadata(&sidecar) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(SessionError::Symlink(sidecar));
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            return Err(SessionError::InvalidRecord(
+                "mailbox sidecar is not a regular file".into(),
+            ));
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+        Ok(_) => {}
+    }
+    // Validate the complete journal while holding its inode lock. A torn or
+    // malformed queue must be repaired/inspected, never discarded by a
+    // retention command accidentally.
+    let mailbox = SessionMailbox::open(session_path)?;
+    let mut lock = mailbox.locked_inner(false, false)?;
+    mailbox.recover(&mut lock.file)?;
+    // Persist the retirement before unlinking. New or already-open senders
+    // recheck it under the mailbox lock, so an old handle cannot recreate an
+    // empty queue and repeat effects after the deduplication journal is gone.
+    if !already_retired {
+        store.append_event(json!({"type": "mailbox_retired"}))?;
+    }
+    fs::remove_file(&sidecar)?;
+    Ok(true)
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -2465,6 +2546,17 @@ impl SessionMailbox {
     }
 
     fn locked(&self, create: bool) -> Result<MailboxLock, SessionError> {
+        self.locked_inner(create, true)
+    }
+
+    fn locked_inner(
+        &self,
+        create: bool,
+        require_active: bool,
+    ) -> Result<MailboxLock, SessionError> {
+        if require_active {
+            self.check_not_retired()?;
+        }
         reject_session_symlink(&self.path)?;
         let mut options = OpenOptions::new();
         options.read(true).write(true).create(create);
@@ -2489,6 +2581,9 @@ impl SessionMailbox {
             if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
                 return Err(io::Error::last_os_error().into());
             }
+            if require_active {
+                self.check_not_retired()?;
+            }
             Ok(MailboxLock { file })
         }
         #[cfg(not(unix))]
@@ -2498,6 +2593,21 @@ impl SessionMailbox {
                 "mailbox locking is unsupported on this platform".into(),
             ))
         }
+    }
+
+    fn check_not_retired(&self) -> Result<(), SessionError> {
+        let recipient = SessionStore::open_existing(&self.recipient_path)?;
+        if recipient.session_id() != self.recipient_session_id
+            || recipient
+                .events()
+                .iter()
+                .any(|event| event["type"] == "mailbox_retired")
+        {
+            return Err(SessionError::InvalidRecord(
+                "mailbox recipient changed or was explicitly retired".into(),
+            ));
+        }
+        Ok(())
     }
 
     fn recover(&self, file: &mut File) -> Result<(Vec<MailboxMessage>, u64), SessionError> {
@@ -2607,6 +2717,72 @@ fn mailbox_path(session_path: &Path) -> Result<PathBuf, SessionError> {
     let mut name = name.to_os_string();
     name.push(".mailbox");
     Ok(session_path.with_file_name(name))
+}
+
+/// Copy a mailbox sidecar without following aliases and with create-new
+/// semantics. The source is fully recovered before any bytes are copied, so a
+/// failed export cannot create a destination that merely looks deliverable.
+fn copy_mailbox_sidecar(
+    source_session: &Path,
+    destination_session: &Path,
+) -> Result<(), SessionError> {
+    let source_mailbox = mailbox_path(source_session)?;
+    let destination_mailbox = mailbox_path(destination_session)?;
+    let metadata = match fs::symlink_metadata(&source_mailbox) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(SessionError::Symlink(source_mailbox));
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            return Err(SessionError::InvalidRecord(
+                "mailbox sidecar is not a regular file".into(),
+            ));
+        }
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    if metadata.len() > MAX_MAILBOX_BYTES as u64 {
+        return Err(SessionError::LimitExceeded {
+            max: MAX_MAILBOX_BYTES,
+            actual: metadata.len(),
+        });
+    }
+    let source = SessionMailbox::open(source_session)?;
+    let mut source_lock = source.locked(false)?;
+    source.recover(&mut source_lock.file)?;
+
+    reject_session_symlink(&destination_mailbox)?;
+    let mut options = OpenOptions::new();
+    options.create_new(true).write(true);
+    #[cfg(unix)]
+    options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+    source_lock.file.seek(SeekFrom::Start(0))?;
+    let mut bytes = Vec::new();
+    (&mut source_lock.file)
+        .take(MAX_MAILBOX_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_MAILBOX_BYTES {
+        return Err(SessionError::LimitExceeded {
+            max: MAX_MAILBOX_BYTES,
+            actual: bytes.len() as u64,
+        });
+    }
+    let mut destination = options.open(&destination_mailbox)?;
+    if let Err(error) = destination
+        .write_all(&bytes)
+        .and_then(|()| destination.sync_all())
+    {
+        let _ = fs::remove_file(&destination_mailbox);
+        return Err(error.into());
+    }
+    use sha2::{Digest, Sha256};
+    if format!("{:x}", Sha256::digest(&bytes)) != file_sha256(&destination_mailbox)? {
+        let _ = fs::remove_file(&destination_mailbox);
+        return Err(SessionError::InvalidRecord(
+            "mailbox export digest does not match source".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn mailbox_id(id: &str) -> Result<(), SessionError> {

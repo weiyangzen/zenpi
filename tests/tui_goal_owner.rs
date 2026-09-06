@@ -38,6 +38,46 @@ fn last_system_text(state: &TuiState) -> String {
 }
 
 #[test]
+fn tui_recovery_uses_the_shared_owner_without_retrying_work() {
+    use zenpi::session::{InterruptedOperation, OperationKind};
+    use zenpi::slash::RecoveryAction;
+    let dir = tempdir().unwrap();
+    let mut session = SessionStore::open(dir.path().join("recover.jsonl")).unwrap();
+    session
+        .begin_operation(&InterruptedOperation {
+            operation_id: "uncertain".into(),
+            kind: OperationKind::Provider,
+            turn_id: "turn-1".into(),
+            retry_requires_confirmation: true,
+        })
+        .unwrap();
+    let mut agent = Agent::with_echo(session);
+    let mut state = TuiState::default();
+    dispatch_slash_command(
+        SlashCommand::Recovery {
+            action: RecoveryAction::Inspect,
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(last_system_text(&state).contains("uncertain"));
+    dispatch_slash_command(
+        SlashCommand::Recovery {
+            action: RecoveryAction::Abandon {
+                operation_id: "uncertain".into(),
+            },
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(agent.operation_recovery().is_empty());
+    assert!(agent.history().is_empty());
+    let response = last_system_text(&state);
+    assert!(response.contains("execution_started"));
+    assert!(!response.contains("\"execution_started\":true"));
+}
+
+#[test]
 fn tui_goal_owner_actions_match_headless_and_persist_status() {
     let dir = tempdir().unwrap();
     let session_path = dir.path().join("session.jsonl");

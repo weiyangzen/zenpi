@@ -321,8 +321,8 @@ if records[1].get("code") != "invalid_utf8":
 # framing state. The deterministic borrowed reader covers post-error recovery.
 PY
 
-# New session-control frames must be distinct from prompts and must not
-# pretend an unavailable mailbox or shell owner admitted a side effect.
+# Session controls use the real owners. Missing recipients fail, and shutdown
+# denies a shell approval that has not been answered before child dispatch.
 python3 - "$BIN" "$TMP_ROOT" <<'PY'
 import json
 import pathlib
@@ -357,19 +357,25 @@ assert len(by_id) == len(requests), responses
 inspection = by_id["inspect"]
 assert inspection["success"] is True, inspection
 assert inspection["data"]["cursor_scope"] == "session_journal", inspection
-assert inspection["data"]["reconnect_supported"] is False, inspection
-assert inspection["data"]["acknowledgement_supported"] is False, inspection
-for request_id, owner, version in [
-    ("send", "session_mailbox", 2), ("shell", "user_shell", 2), ("legacy-shell", "user_shell", 1),
-]:
+assert inspection["data"]["reconnect_supported"] is True, inspection
+assert inspection["data"]["acknowledgement_supported"] is True, inspection
+assert inspection["data"]["transport"]["owner_epoch"] == 1, inspection
+for request_id, code in [("send", "mailbox_error"), ("shell", "approval_error")]:
     response = by_id[request_id]
-    assert response["success"] is False and response["code"] == "owner_required", response
-    assert response["execution_state"] == "untracked" and response["required_owner"] == owner, response
-    assert response["schema_version"] == version and "data" not in response, response
-assert not marker.exists(), "unowned user-shell request executed"
-assert "private" not in run.stdout, "unowned request payload was echoed to stdout"
+    assert response["success"] is False and response["code"] == code, response
+    assert response["schema_version"] == 2 and "data" not in response, response
+help_response = by_id["legacy-shell"]
+assert help_response["schema_version"] == 1 and help_response["success"] is True, help_response
+assert help_response["data"]["status"] == "help", help_response
+assert help_response["data"]["execution_started"] is False, help_response
+assert by_id["stop"]["success"] is True, by_id["stop"]
+assert not marker.exists(), "unapproved user-shell request executed"
+assert "private mailbox payload" not in run.stdout, "failed delivery leaked its payload"
 journal = [json.loads(line) for line in session.read_text().split("\n") if line]
 assert all(record["kind"] not in ("turn", "handoff", "handoff_record") for record in journal), journal
+assert not any(record.get("event", {}).get("type") in (
+    "operation_started", "tool_execution_started",
+) for record in journal), "denied shell or control request dispatched work"
 assert inspection["data"]["cursor"]["session_id"] == journal[0]["session_id"], journal
 print("headless session-control boundary smoke passed")
 PY

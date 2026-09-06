@@ -4,7 +4,7 @@
 > This file describes how work is claimed, isolated, validated, integrated,
 > and published. It is not a second product checklist; the authoritative
 > checklist is `Zenpi_Execution_Blueprint.md`. Its v1 receipt is a workflow
-> record, not proof of end-user product usability; the versioned v2.0.0 draft
+> record, not proof of end-user product usability; the versioned v2.1.0 draft
 > (`Docs/Zenpi_Execution_Blueprint_v2.md`) is the current UX audit and re-plan.
 
 ```yaml
@@ -156,9 +156,12 @@ marker; `/compact` records a deterministic context checkpoint without a
 provider call. Ordinary
 terminal responses are replayable by ID; a sequence replay re-emits its event
 suffix on each retry.
-Event sequence numbers are process-global within one host; switching session
-paths clears the old replay namespace and preserves monotonic numbering, so a
-client may receive `replay_gap` rather than a reset to sequence zero.
+Event sequence numbers are durable within the reconnect owner epoch and replay
+namespace; switching session paths clears the old namespace and preserves
+monotonic numbering for the new owner, so a client may receive `replay_gap`
+rather than a reset to sequence zero. The reconnect sidecar uses a bounded
+cross-process lock; this does not yet provide portable migration, non-Unix
+locking, or TUI transport reconnect.
 Input is framed strictly by LF (U+2028/U+2029 are payload characters). A
 malformed non-empty frame gets a stable error code, never mutates session state,
 and the loop remains usable; blank LF frames are ignored. Stdout is
@@ -284,8 +287,12 @@ physical Rust inventory under `src/`, `tests/`, `examples/`, and `benches/` is
 reported for visibility only; its aggregate is not an acceptance cap. Tests must cover refusal and
 failure paths, malformed/truncated records, out-of-order envelope records,
 resize during rapid local updates, terminal cleanup, and resource ownership,
-not only happy-path output. The append owner is deliberately single-threaded;
-cross-process locking is outside this release.
+not only happy-path output. The primary journal append owner remains
+single-threaded. Its reconnect sidecar
+uses a bounded cross-process lock and owner epoch to serialize reservations and
+terminal replay. Portable sidecar migration/retention, non-Unix locking, and
+TUI transport reconnect remain open acceptance work; they are not silently
+treated as complete.
 
 The release artifact must be usable outside Cargo's development target. The
 Master therefore validates both `target/release/zenpi` and an isolated

@@ -35,6 +35,181 @@ fn json_lines(bytes: &[u8]) -> Vec<Value> {
         .collect()
 }
 
+#[cfg(unix)]
+#[test]
+fn mailbox_retirement_is_confirmed_and_owned_in_both_hosts() {
+    use zenpi::{
+        session::SessionMailbox,
+        tui::{TuiState, dispatch_slash_command},
+    };
+    let dir = tempdir().unwrap();
+    let active = dir.path().join("active.jsonl");
+    let recipient_path = dir.path().join("recipient.jsonl");
+    let sender = SessionStore::open(&active).unwrap();
+    let recipient = SessionStore::open(&recipient_path).unwrap();
+    let mailbox = SessionMailbox::open(&recipient_path).unwrap();
+    mailbox
+        .enqueue(
+            &sender,
+            "pending",
+            serde_json::json!({"work":true}),
+            1000,
+            1,
+        )
+        .unwrap();
+    let command = format!(
+        "/session retire-mailbox '{}' --yes",
+        recipient_path.display()
+    );
+    let mut agent = Agent::new(sender, Box::new(NoControlProvider));
+    let mut state = TuiState::default();
+    let parsed = zenpi::slash::parse(&command).unwrap().unwrap();
+    dispatch_slash_command(parsed.clone(), &mut state, None);
+    assert!(
+        mailbox.path().exists(),
+        "an unowned TUI cannot retire mailboxes"
+    );
+    let input = [
+        serde_json::json!({"type":"command","id":"unconfirmed","text":command.trim_end_matches(" --yes")}),
+        serde_json::json!({"type":"command","id":"retire","text":command}),
+    ].iter().map(Value::to_string).collect::<Vec<_>>().join("\n") + "\n";
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input), &mut output).unwrap();
+    let records = json_lines(&output);
+    assert_eq!(
+        records.iter().find(|r| r["id"] == "unconfirmed").unwrap()["success"],
+        false
+    );
+    assert_eq!(
+        records.iter().find(|r| r["id"] == "retire").unwrap()["success"],
+        true
+    );
+    assert!(!mailbox.path().exists());
+    dispatch_slash_command(parsed, &mut state, Some(&mut agent));
+    assert!(!mailbox.path().exists());
+    assert_eq!(
+        SessionStore::open_existing(recipient.path())
+            .unwrap()
+            .events()
+            .iter()
+            .filter(|e| e["type"] == "mailbox_retired")
+            .count(),
+        1
+    );
+    assert!(agent.session().turns().is_empty());
+}
+
+#[test]
+fn resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&source).unwrap());
+    let mut first_output = Vec::new();
+    run_headless(
+        &mut agent,
+        Cursor::new(concat!(
+            "{\"type\":\"status\",\"id\":\"old-status\"}\n",
+            "{\"type\":\"prompt\",\"id\":\"prompt\",\"text\":\"persist once\"}\n"
+        )),
+        &mut first_output,
+    )
+    .unwrap();
+    let first = json_lines(&first_output);
+    let old_status = first.iter().find(|r| r["id"] == "old-status").unwrap();
+    assert_eq!(old_status["data"]["session"]["turn_count"], 0);
+    drop(agent);
+
+    let agent = Agent::new(
+        SessionStore::open(dir.path().join("new.jsonl")).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let input = [
+        serde_json::json!({"type":"resume", "id":"resume", "path":source}),
+        serde_json::json!({"type":"status", "id":"old-status"}),
+        serde_json::json!({"type":"status", "id":"fresh-status"}),
+        serde_json::json!({"type":"shutdown", "id":"stop-after-resume"}),
+    ]
+    .iter()
+    .map(Value::to_string)
+    .collect::<Vec<_>>()
+    .join("\n")
+        + "\n";
+    let output = SharedWriter::default();
+    let captured = output.clone();
+    zenpi::headless::run_async_streams(agent, Cursor::new(input), output).unwrap();
+    let records = json_lines(&captured.0.lock().unwrap());
+    let response = |id| {
+        records
+            .iter()
+            .find(|r| r["type"] == "response" && r["id"] == id)
+            .unwrap()
+    };
+    assert_eq!(response("old-status"), old_status);
+    assert_eq!(response("fresh-status")["data"]["session"]["turn_count"], 2);
+    assert_eq!(
+        response("fresh-status")["data"]["session"],
+        response("resume")["data"]["session"]
+    );
+    assert_eq!(
+        SessionStore::open_existing(&source).unwrap().turns().len(),
+        2
+    );
+}
+
+#[test]
+fn recovery_slash_is_durable_confirmed_and_never_dispatches_retry() {
+    for decision in ["retry", "abandon"] {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("recovery.jsonl");
+        let mut store = SessionStore::open(&path).unwrap();
+        store
+            .begin_operation(&InterruptedOperation {
+                operation_id: "uncertain-request".into(),
+                kind: OperationKind::Provider,
+                turn_id: "old-turn".into(),
+                retry_requires_confirmation: true,
+            })
+            .unwrap();
+        let mut agent = Agent::with_echo(store);
+        let requests = [
+            serde_json::json!({"type":"command","id":"inspect","text":"/recovery inspect"}),
+            serde_json::json!({"type":"command","id":"refuse","text":format!("/recovery {decision} uncertain-request")}),
+            serde_json::json!({"type":"command","id":"decide","text":format!("/recovery {decision} uncertain-request --yes")}),
+            serde_json::json!({"type":"command","id":"duplicate","text":format!("/recovery {decision} uncertain-request --yes")}),
+            serde_json::json!({"type":"command","id":"after","text":"/recovery inspect"}),
+        ].iter().map(Value::to_string).collect::<Vec<_>>().join("\n") + "\n";
+        let mut output = Vec::new();
+        run_headless(&mut agent, Cursor::new(requests), &mut output).unwrap();
+        let records = json_lines(&output);
+        let response = |id| {
+            records
+                .iter()
+                .find(|value| value["type"] == "response" && value["id"] == id)
+                .unwrap()
+        };
+        assert_eq!(response("inspect")["data"]["pending_count"], 1);
+        assert_eq!(response("refuse")["success"], false);
+        assert_eq!(response("decide")["success"], true);
+        assert_eq!(response("decide")["data"]["execution_started"], false);
+        assert_eq!(response("duplicate")["success"], true);
+        assert_eq!(response("after")["data"]["pending_count"], 0);
+        let restored = SessionStore::open_existing(&path).unwrap();
+        assert!(
+            restored.turns().is_empty(),
+            "retry decision must not submit a prompt"
+        );
+        assert!(restored.operation_recovery().is_empty());
+        assert_eq!(
+            restored
+                .events()
+                .iter()
+                .filter(|e| e["type"] == "operation_recovery_decided")
+                .count(),
+            1
+        );
+    }
+}
+
 #[test]
 fn user_shell_echo_is_explicit_and_does_not_call_provider() {
     let dir = tempdir().unwrap();
@@ -951,9 +1126,15 @@ fn async_recovery_event_does_not_overtake_turn_admission() {
         })
         .unwrap();
     drop(store);
-    // Agent construction queues a recovery warning before the first request's
-    // TurnAccepted marker. The host must still emit both before provider data.
-    let agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    // Preserve the startup warning, but explicitly abandon the interrupted
+    // effect before requesting another model turn. A warning is not consent.
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    agent
+        .resolve_operation_recovery(
+            "tool-recovery-order",
+            zenpi::core::ToolRecoveryDecision::Abandon,
+        )
+        .unwrap();
     let (mut writer, reader) = std::os::unix::net::UnixStream::pair().unwrap();
     let output = SharedWriter::default();
     let captured = output.clone();

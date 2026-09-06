@@ -13,12 +13,22 @@ const MAX_REGISTERED_SECRETS: usize = 128;
 const MAX_SECRET_BYTES: usize = 16 * 1024;
 const REGISTERED_SECRET_TTL_MS: u64 = 10 * 60 * 1000;
 
-#[derive(Debug)]
 struct SecretMaterial {
     value: Mutex<Vec<u8>>,
     policy_digest: String,
     expires_at_ms: Option<u64>,
     revoked: std::sync::atomic::AtomicBool,
+}
+
+impl std::fmt::Debug for SecretMaterial {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SecretMaterial")
+            .field("value", &"<redacted>")
+            .field("policy_digest", &self.policy_digest)
+            .field("expires_at_ms", &self.expires_at_ms)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Drop for SecretMaterial {
@@ -176,8 +186,10 @@ fn secret_registry() -> &'static Mutex<Vec<Weak<SecretMaterial>>> {
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn legacy_secret_registry() -> &'static Mutex<Vec<(Arc<SecretMaterial>, u64)>> {
-    static REGISTRY: OnceLock<Mutex<Vec<(Arc<SecretMaterial>, u64)>>> = OnceLock::new();
+type LegacySecretRegistry = Mutex<Vec<(Arc<SecretMaterial>, u64)>>;
+
+fn legacy_secret_registry() -> &'static LegacySecretRegistry {
+    static REGISTRY: OnceLock<LegacySecretRegistry> = OnceLock::new();
     REGISTRY.get_or_init(|| Mutex::new(Vec::new()))
 }
 

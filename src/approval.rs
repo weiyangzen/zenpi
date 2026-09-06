@@ -31,6 +31,8 @@ pub enum ApprovalMode {
     PerTool,
     /// Never prompt; deny anything not already allowed by the host.
     Headless,
+    /// Explicit interactive opt-in; Blueprint and sandbox gates still apply.
+    Never,
     /// Automatic only after a host binding matches a live per-action gate.
     WorkerAllowAfterPreflight,
 }
@@ -515,6 +517,7 @@ impl ApprovalPolicy {
                 Some(ApprovalDecision::Allow)
             }
             ApprovalMode::Headless => Some(ApprovalDecision::Deny),
+            ApprovalMode::Never => Some(ApprovalDecision::Allow),
             _ => None,
         }
     }

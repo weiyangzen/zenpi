@@ -520,7 +520,15 @@ fn inline_segments(text: &str, base_style: Style) -> Vec<StyledSegment> {
     while index < text.len() {
         let rest = &text[index..];
         let special = rest.as_bytes().first().copied().unwrap_or_default();
-        let parsed = if special == b'`' {
+        let intraword_underscore = special == b'_'
+            && text[..index]
+                .trim_end_matches('_')
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric);
+        let parsed = if intraword_underscore {
+            None
+        } else if special == b'`' {
             parse_delimited(rest, '`', "`")
                 .map(|(content, consumed)| (content, consumed, base_style.fg(Color::LightYellow)))
         } else if rest.starts_with("**") {

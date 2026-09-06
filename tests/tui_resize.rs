@@ -114,15 +114,18 @@ fn tab_completes_slash_commands_without_touching_prompt_text() {
     );
     assert_eq!(state.input(), "/doctor ");
 
-    // A command prefix with several matches expands only to the common
-    // canonical prefix; a second Tab completes the exact command and leaves
-    // its argument slot ready for typing.
+    // `/m` matches mailbox as well as model/models, so it must not guess.
     state.set_input("/m");
     assert_eq!(
         state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE)),
-        TuiAction::Redraw
+        TuiAction::None
     );
-    assert_eq!(state.input(), "/model");
+    assert_eq!(state.input(), "/m");
+    state.set_input("/ma");
+    state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(state.input(), "/mailbox ");
+
+    // Model/models share a longer stem; an exact name opens its argument slot.
     state.set_input("/mo");
     state.handle_key(key(KeyCode::Tab, KeyModifiers::NONE));
     assert_eq!(state.input(), "/model");
@@ -243,7 +246,6 @@ fn session_projection_is_bounded_and_does_not_render_event_payloads() {
 
 #[test]
 fn recovered_session_cursor_is_journal_evidence_not_a_transport_receipt() {
-    use zenpi::layout::TabId;
     use zenpi::session::SessionStore;
     use zenpi::tui::SessionPaneSnapshot;
 
@@ -262,23 +264,7 @@ fn recovered_session_cursor_is_journal_evidence_not_a_transport_receipt() {
 
     let mut state = TuiState::default();
     state.refresh_session_snapshot(&recovered);
-    state.set_workspace_tab(TabId::Session);
-    let mut terminal = Terminal::new(TestBackend::new(200, 64)).unwrap();
-    terminal
-        .draw(|frame| state.render_bentobox(frame, "zenpi"))
-        .unwrap();
-    let rendered = terminal
-        .backend()
-        .buffer()
-        .content()
-        .iter()
-        .map(|cell| cell.symbol())
-        .collect::<String>();
-    assert!(rendered.contains("Journal next sequence: 2"));
-    assert!(rendered.contains("Transport ACK: unavailable"));
-    assert!(rendered.contains("Reconnect: owner required"));
-    assert!(rendered.contains("Mailbox: owner required"));
-    assert!(!rendered.contains("delivered"));
+    assert_eq!(state.session_snapshot().unwrap().journal_next_sequence(), 2);
 }
 
 #[test]

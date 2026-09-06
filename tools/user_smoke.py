@@ -93,8 +93,8 @@ def assert_headless_echo(binary: Path, root: Path) -> Path:
     session = root / "echo-session.jsonl"
     payload = (
         '{"type":"prompt","id":"p","text":"installed echo works"}\n'
-        '{"type":"status","id":"s"}\n'
-        '{"type":"shutdown","id":"q"}\n'
+        '{"type":"status","id":"echo-status"}\n'
+        '{"type":"shutdown","id":"echo-shutdown"}\n'
     )
     result = run(
         [str(binary), "--mode", "headless", "--backend", "echo", "--session", str(session)],
@@ -103,7 +103,7 @@ def assert_headless_echo(binary: Path, root: Path) -> Path:
     assert_success(result, "installed headless echo")
     records = json_lines(result.stdout)
     responses = {record["id"]: record for record in records if record.get("type") == "response"}
-    for request_id in ("p", "s", "q"):
+    for request_id in ("p", "echo-status", "echo-shutdown"):
         if request_id not in responses or responses[request_id].get("success") is not True:
             raise AssertionError(f"missing successful response for {request_id}: {records!r}")
     assistant = responses["p"].get("data", {}).get("assistant", {})
@@ -134,9 +134,15 @@ def assert_resume(binary: Path, session: Path, root: Path) -> None:
         for record in json_lines(result.stdout)
         if record.get("type") == "response" and record.get("id")
     }
-    summary = responses.get("s", {}).get("data", {}).get("session", {})
-    if summary.get("turn_count") != 2:
-        raise AssertionError(f"resume did not recover two turns: {summary!r}")
+    # Request IDs survive process restart. A new status query must not reuse
+    # the ID of the initial busy response and accidentally ask for its replay.
+    for request_id in ("r", "s", "q"):
+        if responses.get(request_id, {}).get("success") is not True:
+            raise AssertionError(f"resume request failed: {responses!r}")
+    resumed_summary = responses["r"].get("data", {}).get("session", {})
+    summary = responses["s"].get("data", {}).get("session", {})
+    if summary.get("turn_count") != 2 or summary != resumed_summary:
+        raise AssertionError(f"resume/status disagree on restored history: {responses!r}")
 
 
 def assert_resume_reopens_process(binary: Path, session: Path, root: Path) -> None:
@@ -146,7 +152,7 @@ def assert_resume_reopens_process(binary: Path, session: Path, root: Path) -> No
         [str(binary), "--mode", "headless", "--backend", "echo", "--session", str(fresh)],
         input_text=(
             '{"type":"prompt","id":"first","text":"persist across process"}\n'
-            '{"type":"shutdown","id":"done"}\n'
+            '{"type":"shutdown","id":"first-done"}\n'
         ),
     )
     assert_success(first, "first process before resume")

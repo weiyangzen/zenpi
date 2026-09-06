@@ -1,24 +1,24 @@
 # zenpi Execution Gantt
 
-> **Read-only historical projection.** This file mirrors the frozen v1
-> execution receipt in `Docs/Zenpi_Execution_Blueprint.md`; it is regenerated
+> **Read-only projection.** This file mirrors the v1 execution receipt
+> in `Docs/Zenpi_Execution_Blueprint.md`; it is regenerated
 > atomically by the canonical Master and contains no mutable checklist marks.
 > It cannot be used to claim end-user product acceptance; current product
 > status is tracked in the non-authoritative v2 audit.
 
 ```yaml
 schema_version: execution-gantt/v1
-generated_at: 2026-09-04T19:26:18Z
+generated_at: 2026-09-05T22:19:26Z
 source_path: Docs/Zenpi_Execution_Blueprint.md
-source_sha256: 44e8d80a67d9d4675862a125959bd95d5b418e0b345038c917f431b1cb049c71
+source_sha256: b7270b7f816d63ec91076b2c03fb60b340c2385d1f9bd8e519ee304a4bf0dabc
 spec_path: Docs/Zenpi_Execution_Spec.md
-spec_sha256: d83776912935dfda44d31d5c1ca6b8615c2c893f08dd3123e4d60d60cf17cf84
+spec_sha256: 168969bdc8032cc040d3632868ee8198698eb6cd564ed1d77fc7c8093284d391
 projection_authority: false
 timing_policy: relative phase estimates only; no calendar dates invented
 state_summary:
-  unclaimed: 0
+  unclaimed: 16
   self_tested: 0
-  master_accepted: 67
+  master_accepted: 58
   pending_repair: 0
   pending_integration: 0
 ```
@@ -82,6 +82,12 @@ Blueprint and intentionally omitted from this relative-time projection.
 | ZP-302 | master_accepted | ZP-005,ZP-301 | Master/Execution | none | none | dependency |
 | ZP-303 | master_accepted | ZP-302 | Master/Release | none | none | dependency |
 | ZP-304 | master_accepted | ZP-303 | Master/Release | none | none | dependency |
+| ZP-011 | master_accepted | ZP-004,ZP-107 | Rust/TUI/Core | none | none | dependency |
+
+| ZP-012 | master_accepted | ZP-004,ZP-107 | Rust/TUI/Docs | none | none | dependency |
+
+| ZP-013 | unclaimed | ZP-004,ZP-107 | Rust/TUI/Session | none | none | dependency |
+
 | CF-001 | master_accepted | ZP-005 | Architecture/Master | none | none | dependency |
 
 | CF-002 | master_accepted | CF-001 | Rust/Provider | none | none | dependency |
@@ -120,33 +126,41 @@ Blueprint and intentionally omitted from this relative-time projection.
 
 | CF-304 | master_accepted | CF-302,CF-303 | Rust/Core | none | none | dependency |
 
-| CF-305 | master_accepted | CF-302,CF-303,CF-304 | Rust/TUI | none | none | dependency |
+| CF-305 | unclaimed | CF-302,CF-303,CF-304 | Rust/TUI | none | none | dependency |
 
-| CF-306 | master_accepted | CF-302,CF-303,CF-304 | Rust/Headless | none | none | dependency |
+| CF-306 | unclaimed | CF-302,CF-303,CF-304 | Rust/Headless | none | none | dependency |
 
-| CF-307 | master_accepted | CF-302,CF-306 | Rust/Headless | none | none | dependency |
+| CF-307 | unclaimed | CF-302,CF-306 | Rust/Headless | none | none | dependency |
 
 | CF-401 | master_accepted | CF-201,CF-302 | Rust/Tools | none | none | dependency |
 
-| CF-402 | master_accepted | CF-401,CF-303 | Rust/Core | none | none | dependency |
+| CF-402 | unclaimed | CF-401,CF-303 | Rust/Core | none | none | dependency |
 
 | CF-403 | master_accepted | CF-401,CF-402 | Rust/Tools | none | none | dependency |
 
-| CF-404 | master_accepted | CF-401,CF-402 | Rust/Tools | none | none | dependency |
+| CF-404 | unclaimed | CF-401,CF-402 | Rust/Tools | none | none | dependency |
 
-| CF-405 | master_accepted | CF-303,CF-404 | Rust/Approval | none | none | dependency |
+| CF-405 | unclaimed | CF-303,CF-404 | Rust/Approval | none | none | dependency |
 
 | CF-406 | master_accepted | CF-402,CF-405 | Rust/Tools | none | none | dependency |
 
 | CF-407 | master_accepted | CF-401,CF-405 | Rust/Extensions | none | none | dependency |
 
+| CF-408 | unclaimed | CF-306,CF-404,CF-405 | Rust/Shell | none | none | dependency |
+
+| CF-409 | unclaimed | CF-404,CF-405,CF-701,CF-703 | Rust/WorkerHost | none | none | dependency |
+
 | CF-501 | master_accepted | CF-201,CF-302 | Rust/Context | none | none | dependency |
 
 | CF-502 | master_accepted | CF-501,CF-406 | Rust/Context | none | none | dependency |
 
-| CF-503 | master_accepted | CF-101,CF-502 | Rust/Session | none | none | dependency |
+| CF-503 | unclaimed | CF-101,CF-502 | Rust/Session | none | none | dependency |
 
-| CF-504 | master_accepted | CF-302,CF-402,CF-502 | Rust/Session | none | none | dependency |
+| CF-504 | unclaimed | CF-302,CF-402,CF-502 | Rust/Session | none | none | dependency |
+
+| CF-505 | unclaimed | CF-306,CF-307,CF-503,CF-504 | Rust/SessionIPC | none | none | dependency |
+
+| CF-506 | unclaimed | CF-305,CF-505,CF-409 | Rust/SessionHost | none | none | dependency |
 
 | CF-601 | master_accepted | CF-101,CF-401 | Rust/Skills | none | none | dependency |
 
@@ -156,15 +170,15 @@ Blueprint and intentionally omitted from this relative-time projection.
 
 | CF-604 | master_accepted | CF-103,CF-603 | Rust/Extensions | none | none | dependency |
 
-| CF-701 | master_accepted | CF-101,CF-103,CF-404 | Rust/Security | none | none | dependency |
+| CF-701 | unclaimed | CF-101,CF-103,CF-404 | Rust/Security | none | none | dependency |
 
 | CF-702 | master_accepted | CF-302,CF-701 | Rust/Observability | none | none | dependency |
 
-| CF-703 | master_accepted | CF-205,CF-402,CF-406 | Rust/Governance | none | none | dependency |
+| CF-703 | unclaimed | CF-205,CF-402,CF-406 | Rust/Governance | none | none | dependency |
 
 | CF-704 | master_accepted | CF-003,CF-701 | Release/CI | none | none | dependency |
 
-| CF-705 | master_accepted | CF-105,CF-305,CF-306,CF-402,CF-503,CF-704 | QA/Master | none | none | dependency |
+| CF-705 | unclaimed | CF-105,CF-305,CF-306,CF-307,CF-402,CF-408,CF-409,CF-503,CF-504,CF-505,CF-506,CF-704 | QA/Master | none | none | dependency |
 
 ## Unscheduled work
 

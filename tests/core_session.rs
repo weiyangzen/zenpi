@@ -123,6 +123,27 @@ fn shell_agent(root: &std::path::Path, backend: Box<dyn Backend>) -> Agent {
 
 #[cfg(unix)]
 #[test]
+fn generic_unknown_outcome_cannot_be_bypassed_by_local_shell() {
+    let dir = tempdir().unwrap();
+    let mut agent = shell_agent(dir.path(), Box::new(zenpi::backend::EchoBackend));
+    agent
+        .session_mut()
+        .begin_operation(&zenpi::session::InterruptedOperation {
+            operation_id: "unresolved-provider".into(),
+            kind: zenpi::session::OperationKind::Provider,
+            turn_id: "prior".into(),
+            retry_requires_confirmation: true,
+        })
+        .unwrap();
+    assert!(matches!(
+        agent.run_user_shell_with_cancel("!touch must-not-exist", || false),
+        Err(zenpi::core::AgentError::Recovery(_))
+    ));
+    assert!(!dir.path().join("must-not-exist").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn user_shell_is_local_and_persists_next_turn_context() {
     struct ContextBackend;
     impl Backend for ContextBackend {
@@ -350,7 +371,10 @@ fn provider_transport_failure_is_unknown_and_requires_explicit_recovery() {
     ));
     let pending = agent.operation_recovery();
     assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].state, zenpi::session::OperationRecoveryState::UnknownOutcome);
+    assert_eq!(
+        pending[0].state,
+        zenpi::session::OperationRecoveryState::UnknownOutcome
+    );
     assert!(matches!(
         agent.process(TurnInputRequest::new("must be blocked")),
         Err(AgentError::Recovery(_))

@@ -1,4 +1,5 @@
 use tempfile::tempdir;
+use zenpi::approval::ApprovalMode;
 use zenpi::core::{Agent, Turn, TurnRole};
 use zenpi::session::SessionStore;
 use zenpi::slash::{
@@ -33,6 +34,62 @@ fn core_slash_commands_parse_to_typed_values() {
     );
     assert!(parse("/goal ship it").unwrap().unwrap().is_first_class());
     assert!(!parse("/status").unwrap().unwrap().is_first_class());
+    assert_eq!(
+        parse("/yolo").unwrap(),
+        Some(SlashCommand::Yolo { enabled: true })
+    );
+    assert_eq!(
+        parse("/yolo off").unwrap(),
+        Some(SlashCommand::Yolo { enabled: false })
+    );
+    assert_eq!(
+        parse("/approval never").unwrap(),
+        Some(SlashCommand::Approval {
+            mode: "never".into()
+        })
+    );
+    assert!(parse("/approval invalid").is_err());
+    assert_eq!(
+        parse("/project open api").unwrap(),
+        Some(SlashCommand::Project {
+            action: zenpi::slash::ProjectAction::Open { name: "api".into() }
+        })
+    );
+    assert_eq!(
+        parse("/review").unwrap(),
+        Some(SlashCommand::Diff { path: None })
+    );
+    assert_eq!(
+        parse("/review src/lib.rs").unwrap(),
+        Some(SlashCommand::Diff {
+            path: Some("src/lib.rs".into())
+        })
+    );
+}
+
+#[test]
+fn every_command_spec_has_help_and_completion_entry() {
+    for command in zenpi::slash::COMMAND_SPECS {
+        assert!(
+            spec(command.name).is_some(),
+            "missing spec for {}",
+            command.name
+        );
+        assert!(
+            help(Some(command.name)).is_some(),
+            "missing help for {}",
+            command.name
+        );
+        assert!(!command.name.is_empty());
+    }
+}
+
+#[test]
+fn slash_help_explains_goal_boundary_and_posture_controls() {
+    let goal_help = help(Some("goal")).unwrap();
+    assert!(goal_help.contains("separate host primitive"));
+    assert!(help(Some("yolo")).unwrap().contains("/yolo"));
+    assert!(help(Some("approval")).unwrap().contains("ask|always|never"));
 }
 
 #[test]
@@ -41,6 +98,34 @@ fn compete_and_loop_are_runtime_routes() {
         let command = parse(input).unwrap().unwrap();
         assert_eq!(command.route(), SlashRoute::Runtime);
         assert!(command.is_runtime());
+    }
+}
+
+#[test]
+fn recovery_commands_require_explicit_confirmation() {
+    use zenpi::slash::RecoveryAction;
+    assert_eq!(
+        parse("/recovery").unwrap(),
+        Some(SlashCommand::Recovery {
+            action: RecoveryAction::Inspect,
+        })
+    );
+    assert_eq!(
+        parse("/recovery retry operation-1 --yes").unwrap(),
+        Some(SlashCommand::Recovery {
+            action: RecoveryAction::Retry {
+                operation_id: "operation-1".into()
+            },
+        })
+    );
+    assert!(spec("recovery").is_some());
+    for invalid in [
+        "/recovery retry operation-1",
+        "/recovery abandon operation-1",
+        "/recovery retry operation-1 --yes extra",
+        "/recovery abandon '' --yes",
+    ] {
+        assert!(parse(invalid).is_err(), "{invalid}");
     }
 }
 
@@ -204,6 +289,15 @@ fn common_workflow_commands_have_typed_arguments_and_metadata() {
     );
     assert_eq!(parse("/compact").unwrap(), Some(SlashCommand::Compact));
     assert_eq!(
+        parse("/session retire-mailbox inactive.jsonl --yes").unwrap(),
+        Some(SlashCommand::Session {
+            action: SessionAction::RetireMailbox {
+                path: "inactive.jsonl".into(),
+                confirmed: true,
+            },
+        })
+    );
+    assert_eq!(
         parse("/diff src/main.rs").unwrap(),
         Some(SlashCommand::Diff {
             path: Some("src/main.rs".into()),
@@ -245,6 +339,16 @@ fn common_workflow_commands_have_typed_arguments_and_metadata() {
 
 #[test]
 fn common_workflow_commands_fail_closed_on_invalid_arguments() {
+    for input in [
+        "/session retire-mailbox",
+        "/session retire-mailbox inactive.jsonl",
+        "/session retire-mailbox inactive.jsonl --yes extra",
+    ] {
+        assert!(
+            parse(input).is_err(),
+            "unexpected retirement acceptance: {input}"
+        );
+    }
     assert!(matches!(
         parse("/resume nope").unwrap_err(),
         SlashError::InvalidResumeSequence
@@ -409,4 +513,29 @@ fn session_open_rejects_missing_target_without_creating_a_journal() {
         agent.session().path(),
         directory.path().join("active.jsonl")
     );
+}
+
+#[test]
+fn approval_slash_commands_mutate_configured_agent_policy() {
+    let directory = tempdir().unwrap();
+    let active = SessionStore::open(directory.path().join("active.jsonl")).unwrap();
+    let mut agent = Agent::with_echo(active);
+    agent.set_attachment_workspace(
+        zenpi::tools::ToolContext::new(directory.path().to_path_buf()).unwrap(),
+    );
+    let mut state = TuiState::default();
+    dispatch_slash_command(
+        SlashCommand::Yolo { enabled: true },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert_eq!(agent.approval_policy().unwrap().mode, ApprovalMode::Never);
+    dispatch_slash_command(
+        SlashCommand::Approval {
+            mode: "always".into(),
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert_eq!(agent.approval_policy().unwrap().mode, ApprovalMode::Always);
 }

@@ -18,7 +18,10 @@ pub const COMPACT_WIDTH: u16 = 80;
 pub const STANDARD_WIDTH: u16 = 100;
 pub const WIDE_WIDTH: u16 = 160;
 
-/// The five workspace tabs exposed by the v2 product contract.
+/// Legacy pane-preset identifiers. The TUI presents these as projections of a
+/// project workspace; they are not project identities. Project identity is
+/// owned by the session/workspace host and may be changed without changing
+/// this enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TabId {
@@ -134,6 +137,8 @@ pub const MAX_LAYOUT_COLLAPSED_PANES: usize = 64;
 #[serde(deny_unknown_fields)]
 pub struct PersistedTabLayout {
     pub ratios: ColumnRatios,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub row_weights: BTreeMap<PaneId, u16>,
     #[serde(default)]
     pub collapsed: BTreeSet<PaneId>,
     #[serde(default)]
@@ -144,6 +149,7 @@ impl PersistedTabLayout {
     pub fn from_model(model: &LayoutModel) -> Self {
         Self {
             ratios: model.ratios,
+            row_weights: model.row_weights.clone(),
             collapsed: model.collapsed.clone(),
             focused: model.focused,
         }
@@ -151,6 +157,7 @@ impl PersistedTabLayout {
 
     fn apply_to_model(&self, model: &mut LayoutModel) {
         model.ratios = self.ratios;
+        model.row_weights = self.row_weights.clone();
         model.collapsed = self.collapsed.clone();
         model.focused = self.focused;
     }
@@ -396,6 +403,14 @@ fn validate_tab_state(tab: TabId, state: &PersistedTabLayout) -> Result<(), Layo
         .into_iter()
         .map(|pane| pane.id)
         .collect::<BTreeSet<_>>();
+    for (pane, weight) in &state.row_weights {
+        if !valid.contains(pane) {
+            return Err(LayoutError::UnknownPane { tab, pane: *pane });
+        }
+        if !(1..=1000).contains(weight) {
+            return Err(LayoutError::InvalidRatios { tab });
+        }
+    }
     for pane in state.collapsed.iter().copied() {
         if !valid.contains(&pane) {
             return Err(LayoutError::UnknownPane { tab, pane });
@@ -900,6 +915,8 @@ pub struct PaneCapabilities {
 pub struct LayoutModel {
     pub tab: TabId,
     pub ratios: ColumnRatios,
+    #[serde(default)]
+    pub row_weights: BTreeMap<PaneId, u16>,
     pub collapsed: BTreeSet<PaneId>,
     pub focused: Option<PaneId>,
     pub capabilities: PaneCapabilities,
@@ -910,6 +927,7 @@ impl LayoutModel {
         Self {
             tab,
             ratios: LayoutPreset::for_tab(tab).ratios,
+            row_weights: BTreeMap::new(),
             collapsed: BTreeSet::new(),
             focused: None,
             capabilities: PaneCapabilities::default(),
@@ -1127,6 +1145,7 @@ impl LayoutModel {
     /// Restore the active tab's preset ratios and clear user pane state.
     pub fn reset_layout(&mut self) {
         self.ratios = self.preset().ratios;
+        self.row_weights.clear();
         self.collapsed.clear();
         self.focused = None;
     }
@@ -1291,7 +1310,16 @@ impl LayoutModel {
             let width = column_lengths.get(active_column).copied().unwrap_or(0);
             let row_specs = entries
                 .iter()
-                .map(|state| (state.spec.row_weight, state.spec.min_size.height))
+                .map(|state| {
+                    (
+                        self.row_weights
+                            .get(&state.spec.id)
+                            .copied()
+                            .unwrap_or(state.spec.row_weight)
+                            .clamp(1, 1000),
+                        state.spec.min_size.height,
+                    )
+                })
                 .collect::<Vec<_>>();
             let row_lengths = allocate_lengths(viewport.height, &row_specs);
             let mut y = 0_u16;

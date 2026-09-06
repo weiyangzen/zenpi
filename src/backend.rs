@@ -958,7 +958,10 @@ impl OpenAiCompatibleBackend {
             .client
             .post(&self.endpoint)
             .header("content-type", "application/json")
-            .header("x-idempotency-key", idempotency_key(request.turn_id));
+            .header(
+                "x-idempotency-key",
+                idempotency_key(&self.endpoint, request.turn_id, &body)?,
+            );
         if let Some(secret) = &self.secret_handle {
             let digest = self.secret_policy_digest.as_deref().ok_or_else(|| {
                 BackendError::Configuration("secret policy binding missing".into())
@@ -1137,13 +1140,22 @@ impl Backend for OpenAiCompatibleBackend {
     }
 }
 
-fn idempotency_key(turn_id: &str) -> String {
+fn idempotency_key(endpoint: &str, turn_id: &str, body: &Value) -> Result<String, BackendError> {
     use sha2::{Digest, Sha256};
 
+    let payload = serde_json::to_vec(body).map_err(|_| {
+        BackendError::Configuration("cannot encode provider request identity".into())
+    })?;
     let mut digest = Sha256::new();
-    digest.update(b"zenpi-provider-turn-v1\0");
+    // Retries of identical payloads share an identity; tool continuations in
+    // the same outer turn do not. Length prefixes separate arbitrary inputs.
+    digest.update(b"zenpi-provider-request-v2\0");
+    digest.update((endpoint.len() as u64).to_be_bytes());
+    digest.update(endpoint.as_bytes());
+    digest.update((turn_id.len() as u64).to_be_bytes());
     digest.update(turn_id.as_bytes());
-    format!("zenpi-{:x}", digest.finalize())
+    digest.update(payload);
+    Ok(format!("zenpi-{:x}", digest.finalize()))
 }
 
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);

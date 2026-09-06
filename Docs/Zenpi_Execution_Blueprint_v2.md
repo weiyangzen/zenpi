@@ -1,6 +1,6 @@
 # zenpi Execution Blueprint v2
 
-> **Review draft, version 2.0.0 (2026-09-04).** This document is a
+> **Review draft, version 2.1.0 (2026-09-05).** This document is a
 > self-audit and re-plan for the terminal-agent product. It is intentionally
 > **not** the current authoritative checklist and it does not mutate or
 > supersede `Docs/Zenpi_Execution_Blueprint.md` until the Master accepts the
@@ -10,7 +10,7 @@
 
 ```yaml
 schema_version: execution-blueprint/v2
-blueprint_version: 2.0.0
+blueprint_version: 2.1.0
 revision_date: 2026-09-05
 status: proposed-audit
 authoritative: false
@@ -26,13 +26,28 @@ layout_name: bentobox
 first_class_domains: [blueprint, goal, learn]
 runtime_domains: [compete, loop]
 gui_scope: future-separate-workspaces
+worker_policy: blueprint_scoped_allow
+allow_scope: declared_item_only
+deny_precedence: true
+preflight_required: true
+policy_digest_required: true
+host_emergency_cancel: true
+default_network: deny
+nested_agents_schedulers_daemons: deny
+credential_paths: deny
+approval_mode: worker_allow_after_preflight
+prohibition_gate: required_preflight_and_per_action
+gate_precedence: deny_over_allow
+unknown_side_effect: deny
+worker_can_modify_policy: false
+emergency_cancel_owner: host
 ```
 
-The review draft is checked independently of the frozen v1 authority:
+The review draft is checked independently of the v1 authority:
 
 ```text
 python3 tools/validate_blueprint_v2.py
-Blueprint v2 valid: 38 rows, max LOC 2800 < 5000
+Blueprint v2 valid: 46 rows, max LOC 2800 < 5000
 ```
 
 `tools/validate_blueprint.py` continues to validate the single authoritative
@@ -58,12 +73,19 @@ This v2 draft makes the distinction explicit:
   failure mode, or proof is missing.
 * `PLANNED` means the contract is now specified but implementation is not
   accepted.
-* `DEFERRED` means intentionally outside the lightweight v2.0 binary; it is
+* `DEFERRED` means intentionally outside the lightweight v2.1 binary; it is
   not silently counted as done.
 * `ACCEPTED` means that row's applicable acceptance evidence and gates pass; it
   is not a promise that the complete v2 matrix has passed. `V2-999` remains the
   master gate for the whole contract. A v2 row must never be marked accepted
   merely because a nearby v1 row is `[x]`.
+
+Version 2.1 explicitly reopens v1 claims that cannot prove worker-scoped
+allowance, immutable Blueprint prohibition gates, durable cross-process
+checkpoints, session-to-session delivery, or local `!` shell escapes. The
+affected v1 contract rows are now marked `[ ]` and the read-only Gantt is
+regenerated from that source; untouched foundation rows remain historical
+provenance and are not silently treated as acceptance of these new contracts.
 
 The `Estimated LOC` value on every row is an independent forecast. The number
 of rows is not a target, and there is no aggregate 5,000-line limit. Every
@@ -158,19 +180,19 @@ The goal is a capable terminal agent without shipping a desktop/browser stack
 or an idle server. The default binary should stay small; capability-heavy
 adapters must be optional and must not leak into headless startup.
 
-| Choice | v2.0 decision | Reason and gate |
+| Choice | v2.1 decision | Reason and gate |
 |---|---|---|
 | Rust | KEEP | Ownership, typed errors, one portable core, and straightforward process/terminal cleanup match the failure-sensitive product. |
 | Ratatui + crossterm | KEEP | Already provides a single terminal buffer, resize events, and compact rendering. The current BentoBox adapter uses pure layout data plus Ratatui; do not add a second TUI framework. |
 | serde + serde_json | KEEP | One typed representation can serve the JSONL protocol, session records, layout presets, and b3 handoffs. |
-| JSONL journal | KEEP for v2.0 | Append-only, inspectable, crash-prefix recovery, and no database dependency. Add an index only after a measured history query problem. |
+| JSONL journal | KEEP for v2.1 | Append-only, inspectable, crash-prefix recovery, and no database dependency. Add an index only after a measured history query problem. |
 | `std::thread` + bounded channels | KEEP provisionally | The measured no-feature release is 6,249,216 bytes with 12 direct normal dependencies on the observed arm64 Darwin host (see the runtime receipt). It is enough to keep a blocking provider off the UI thread and is cheaper than introducing an executor solely for scheduling. It is not called an async executor. |
 | Tokio + reqwest | DEFER behind a measured gate | Adopt together, not piecemeal, only if tests require external abort of an in-flight socket, nonblocking Chat streaming, or concurrent tools that bounded threads cannot satisfy. A v2.1 migration must replace the provider boundary coherently; a Tokio runtime around blocking `ureq` is explicitly rejected. |
 | `ureq` | KEEP while the gate is green | It keeps the current synchronous adapter small and works with the dedicated worker. Responses SSE body reads now use a bounded cooperative poll, but Chat/non-streaming and pre-body network phases still have no external abort handle; the limitation is explicit rather than hidden. |
 | clap | DEFER | The current parser has no dependency/compile cost and can be wrapped by a typed slash registry. Reconsider when command grammar, completion, and generated help exceed the hand parser's testable surface; do not add clap only for branding. |
-| SQLite | DEFER / optional index | A single session owner does not need locking or migrations in v2.0. Introduce SQLite only with a benchmark showing JSONL history or multi-process indexing is the bottleneck, and keep the append-only journal as the recovery source. |
+| SQLite | DEFER / optional index | The append-only journal remains the recovery source in v2.1; introduce SQLite only with a benchmark showing JSONL history or multi-process indexing is the bottleneck. |
 | Browser pane | DEFER / external adapter | An embedded browser is a large security and binary-size commitment. v2 models a browser pane as an optional capability that can show a bounded external URL/snapshot; no browser process starts by default. |
-| Terminal pane | DEFER / external PTY adapter | A terminal pane may later own a PTY and child lifecycle, but v2.0 keeps `run_command` approval and reaping in the existing tool boundary. No hidden shell multiplexer or daemon is introduced. |
+| Terminal pane | DEFER / external PTY adapter | A terminal pane may later own a PTY and child lifecycle, but v2.1 keeps `run_command` approval and reaping in the existing tool boundary. No hidden shell multiplexer or daemon is introduced. |
 | GUI (Svelte-quality) | DEFER / separate workspaces | No GUI is built now. A future macOS, Linux, and Windows client will consume the stable headless/core protocol from separate crates or workspace members, so GUI dependencies never enter the lightweight TUI/headless binary. |
 
 ### Hard size and ownership rules
@@ -263,8 +285,10 @@ while preserving the user's b3ehive composition model.
 
 ### 4.3 Slash-command contract
 
-The target command area is a typed command registry, not shell evaluation. The
-current `src/slash.rs` supplies the parser/catalogue and both TUI input and
+The target command area is a typed command registry, not implicit shell
+evaluation. An explicit `!` local shell escape is a separate user route
+defined by V2-118; ordinary shell-looking prompt text is still never executed.
+The current `src/slash.rs` supplies the parser/catalogue and both TUI input and
 headless JSONL `type=command` now dispatch local commands before provider
 submission. Read-only domain inspection, bounded resource snapshots, explicit
 JSON `put` operations, bounded Learn evidence/checkpoint inspection, and
@@ -287,7 +311,7 @@ request so TUI and headless behavior cannot drift.
 | `/learn put\|show\|resume\|evidence` | inspect/persist or manage a source-to-target learn task | first-class |
 | `/compete submit\|status` | hand a bounded proposal request to the runtime | runtime call |
 | `/loop start\|status\|stop` | hand a bounded continuation request to the runtime | runtime call |
-| `/session list\|open\|fork\|export\|import\|gc` | navigate durable sessions | core |
+| `/session list\|open\|fork\|export\|import\|gc` plus planned lifecycle actions | navigate durable sessions; V2-117 adds agents/list, resume-last, queue, archive, delete, unarchive, and migrate semantics | core |
 | `/resume [sequence]` | replay a bounded event suffix or recover a turn | core |
 | `/diff [path]` | inspect pending file changes and bounded hunks | review |
 | `/attach [path]` | add a bounded workspace attachment to the next turn | core/provider |
@@ -295,12 +319,14 @@ request so TUI and headless behavior cannot drift.
 | `/compact` | compact context with a durable marker | core |
 | `/approve [id] once\|always\|deny` | answer a pending side-effect request | approval |
 | `/cancel` | cancel the active turn/tool/goal operation | core |
+| `!<command>` | explicit local `user_shell` escape; never an implicit prompt or `run_command` tool | V2-118 (planned; `!!` is not Codex parity and is not accepted here) |
 | `/layout [show\|preset\|reset\|save] [tab]` | inspect, select/reset, or persist a BentoBox preset | TUI owner (headless returns an explicit owner-required response) |
 | `/pane [show\|focus\|collapse\|expand\|toggle] [name]` | inspect, focus, or change pane visibility | TUI owner (headless returns an explicit owner-required response) |
 | `/clear`, `/quit` | clear view or close cleanly | TUI |
 
 Unknown commands, ambiguous arguments, and shell-looking payloads fail before
-mutating the journal. `/compete` and `/loop` never imply that zenpi itself has
+mutating the journal; only the explicit V2-118 bang route may request a local
+shell operation. `/compete` and `/loop` never imply that zenpi itself has
 started a scheduler.
 
 ## 5. BentoBox workspace contract
@@ -396,10 +422,11 @@ events. Typed adapters and bounded envelopes exist, but canonical block parity
 is not emitted yet; current headless clients receive the existing event schema
 and can use its plain-text fields until V2-004/V2-301 are accepted.
 
-The current headless replay cache is process-local and bounded by count and
-bytes. Session-path switches clear that namespace while preserving global
-sequence monotonicity; a restart therefore requires the still-planned durable
-replay work rather than implying journal-backed event replay.
+The headless replay cache is now restored from a private, bounded `.reconnect`
+WAL with request reservations, terminal responses, event sequence, ACK, and
+writer-epoch evidence. Session-path switches change that namespace. This does
+not yet provide portable WAL migration/retention, non-Unix locking, or TUI
+transport reconnect; those parts of V2-115 remain open.
 
 ## 7. v2 work matrix
 
@@ -439,7 +466,7 @@ independent forecast and is `<5000`.
 
 | ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
 |---|---|---|---|---|---|---:|
-| V2-201 | PARTIAL | Durable Blueprint store, digest, DAG validation, read-only `/blueprint show`/`status`/`validate`, explicit `/blueprint put <json-path>` persistence, and a bounded local `/blueprint run ID[@VERSION]` owner now exist. The owner selects one dependency-ready item, writes a private receipt snapshot with running/terminal state, enforces the linked Goal budget, and resumes a running receipt without allocating a duplicate attempt; TUI and headless share the adapter and never call the provider for this local evidence operation. The receipt proves only deterministic control-plane admission/recovery: it does **not** execute or validate the Blueprint item's described implementation work, so its `succeeded` state is not product-work completion. Production TUI still projects a 32 KiB/96-row Blueprint/Goal summary through an independent single-slot worker, retains the last good result, and rejects stale results after a session switch. This is not yet item-progress/evidence Gantt semantics or a general worker scheduler | `src/b3.rs`, `src/domain_execution.rs`, `src/domains.rs`, `src/domain_store.rs`, `src/session.rs`, `src/slash.rs`, `src/headless.rs`, `src/tui.rs`, `tests/domain_execution_owner.rs`, `tests/domain_execution_host.rs` | V2-005,V2-006 | Duplicate/cycle/missing dependency, budget/cancel/restart receipt, and shared host-owner tests pass; executing the item's real work, importing acceptance evidence, multi-item worker parallelism, Goal cancellation, and external handoff remain | 2400 |
+| V2-201 | PARTIAL | Durable Blueprint store, digest, DAG validation, read-only `/blueprint show`/`status`/`validate`, explicit `/blueprint put <json-path>` persistence, and a bounded local `/blueprint run ID[@VERSION]` owner now exist. The owner selects one dependency-ready item, writes a private receipt snapshot with running/terminal state, enforces the linked Goal budget, and resumes a running receipt without allocating a duplicate attempt; TUI and headless share the adapter and never call the provider for this local evidence operation. The receipt proves only deterministic control-plane admission/recovery: it does **not** execute or validate the Blueprint item's described implementation work, so its `succeeded` state is not product-work completion. Production TUI still projects a 32 KiB/96-row Blueprint/Goal summary through an independent single-slot worker, retains the last good result, and rejects stale results after a session switch. This is not yet item-progress/evidence Gantt semantics, production worker bootstrap/lease admission, or a general worker scheduler | `src/b3.rs`, `src/domain_execution.rs`, `src/domains.rs`, `src/domain_store.rs`, `src/session.rs`, `src/slash.rs`, `src/headless.rs`, `src/tui.rs`, `src/tools.rs`, `src/governance.rs`, `tests/domain_execution_owner.rs`, `tests/domain_execution_host.rs` | V2-005,V2-006 | Duplicate/cycle/missing dependency, budget/cancel/restart receipt, and shared host-owner tests pass; executing the item's real work, binding an external worker to immutable gate+budget lease, importing acceptance evidence, multi-item worker parallelism, Goal cancellation, and external handoff remain | 2400 |
 | V2-202 | PARTIAL | Durable Goal records are linked to immutable Blueprint digests with bounded status transitions; headless and TUI `/goal show`/`list`/`status`/`transition` inspect and durably transition goals, and `/goal put <json-path>` persists a validated record; natural-language create/run/resume/cancel owner commands remain open | `src/b3.rs`, `src/domains.rs`, `src/domain_store.rs`, `src/session.rs`, `src/core.rs`, `src/tui.rs`, `src/headless.rs`, `tests/` | V2-006,V2-201 | Goal status transitions and restart recovery are typed and idempotent through the command owner | 1600 |
 | V2-203 | PARTIAL | Bounded Learn records, `/learn show`, and explicit `/learn put <json-path>` persistence now exist. `/learn evidence <id> <repo-relative-ref>` validates and hashes a bounded local artifact, persists only an idempotent reference, and returns a receipt in both hosts; `/learn resume <id>` validates and exposes a durable read-only checkpoint with `zenpi_started: false`, `execution_state: untracked`, and `external_owner_required` rather than pretending to run a worker | `src/b3.rs`, `src/domains.rs`, `src/domain_store.rs`, `src/session.rs`, `src/slash.rs`, `src/headless.rs`, `tests/learn_owner.rs` | V2-006,V2-202 | Add actual source-to-target worker resume, mapping/result handoff, and external execution lifecycle while preserving bounded traceability | 1900 |
 | V2-204 | PARTIAL | `/compete` and `/loop` now create bounded typed route/envelope/optional-parent-lease intents, recover them from the session journal, and expose submit/status in TUI and headless. Headless source request ID plus payload fingerprint provide cross-restart replay/no-second-append and conflict detection. Responses explicitly say `route: runtime_intent`, `delivery: journal_only`, `zenpi_started: false`, and `execution_state: untracked`; this is not external runtime execution | `src/b3.rs`, `src/runtime_intent.rs`, `src/session.rs`, `src/headless.rs`, `src/tui.rs`, `tests/runtime_intent_owner.rs` | V2-006,V2-202 | Add external delivery/claim/acknowledgement, result-manifest import, multi-writer journal serialization, and lifecycle evidence without a hidden scheduler or nested agent | 1600 |
@@ -454,21 +481,39 @@ independent forecast and is `<5000`.
 
 | ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
 |---|---|---|---|---|---|---:|
-| V2-301 | PARTIAL | Expose the currently declared events/commands over strict bounded JSONL while retaining stdout protocol-only; runtime admission, queue, start, and cancellation transitions are correlated, monotonic, and replayable, and `view_model` adapters/resources are available, but canonical block parity is not yet emitted | `src/protocol.rs`, `src/headless.rs`, `src/view_model.rs`, `tests/headless_protocol.rs`, `tests/` | V2-003,V2-005,V2-103 | Split/overlong/malformed frames, replay gaps, duplicate IDs, EOF, and cancellation matrix; canonical block/event parity remains open | 2200 |
+| V2-301 | PARTIAL | Expose the currently declared events/commands over strict bounded JSONL while retaining stdout protocol-only; runtime admission, queue, start, cancellation, durable reconnect, session lifecycle/mailbox, and explicit user-shell transitions are now correlated and replayable, and `view_model` adapters/resources are available, but canonical block parity and complete worker-budget host wiring are not yet emitted | `src/protocol.rs`, `src/headless.rs`, `src/view_model.rs`, `src/governance.rs`, `tests/headless_protocol.rs`, `tests/` | V2-003,V2-005,V2-103 | Split/overlong/malformed frames, replay gaps, duplicate IDs, EOF, cancellation, mailbox/lifecycle, `!echo`, worker policy, and budget matrix; canonical block/event parity remains open | 2200 |
 | V2-302 | PARTIAL | Benchmark queue memory, stream latency, startup/RSS, render frames, and layout computation; the checked-in probe measures locked release size, cold headless exit/RSS for a new/empty session, 2,000 runtime round trips, 500 TestBackend renders, 60,000 layout computations, and deterministic render coalescing with raw samples and no p95 claim | `tools/bench_runtime.py`, `tools/runtime_budget_probe.rs`, `Docs/quality/runtime-budget-v2.md` | V2-002,V2-102,V2-110 | Current host passes repeatable limits; near-256 MiB journal startup/RSS, stream first-paint/end-to-end latency, and direct queue-memory measurement remain open | 700 |
 | V2-303 | PARTIAL | Apply the Tokio/reqwest/clap/SQLite decision gates using measured evidence; current evidence keeps all four deferred/rejected at their ownership boundary, with explicit reopen requirements, while the incomplete V2-302 stream/queue-memory evidence prevents final acceptance | `Docs/quality/technology-decision-v2.md`, `tools/` | V2-002,V2-302 | Any migration is all-at-once at its ownership boundary; rejected additions stay absent | 300 |
-| V2-304 | PARTIAL | Re-audit secrets, paths, approvals, diff content, external adapters, and redacted diagnostics; session symlink/O_NOFOLLOW, existing-only resume/session opens, over-limit journal refusal before permission mutation, headless status/session path redaction, and sibling domain-store listing negatives are now covered | `src/security.rs`, `src/config.rs`, `src/approval.rs`, `src/b3.rs`, `src/session.rs`, `src/headless.rs`, `tests/` | V2-103,V2-104,V2-106 | Negative tests prove no credential, absolute path, shell escape, session-link mutation, missing-resume creation, oversized-journal mutation, domain-store corruption, or hidden side effect | 1300 |
+| V2-304 | PARTIAL | Re-audit secrets, paths, approvals, diff content, external adapters, and redacted diagnostics; session symlink/O_NOFOLLOW, existing-only resume/session opens, over-limit journal refusal before permission mutation, headless status/session path redaction, and sibling domain-store listing negatives are now covered | `src/security.rs`, `src/config.rs`, `src/approval.rs`, `src/b3.rs`, `src/session.rs`, `src/headless.rs`, `tests/` | V2-103,V2-104,V2-106 | Negative tests prove no credential leak, absolute-path escape, unclassified or implicit shell escape, session-link mutation, missing-resume creation, oversized-journal mutation, domain-store corruption, worker/user origin confusion, or hidden side effect; the explicit V2-118 user-shell route remains policy-gated | 1300 |
 | V2-305 | PARTIAL | Run the ten-experience acceptance matrix in both TUI PTY and headless fixture lanes; user smoke installs a production no-fixture binary and, against local OpenAI-compatible Responses fixtures, proves Responses SSE, slow-provider EOF drain, bounded pre-write diff, approval, actual workspace write, provider continuation, and durable tool result. `tools/tui_approval_smoke.py --binary PATH` separately proves the installed production TUI approval/diff deny-and-allow path after folding tool logs. Its feature install covers TUI resize, exact multiline paste, stream interruption/restoration, and selected `/models`, `/doctor`, `/help`, `/diff`, `/attach`, `/compact`, `/resume`, `/compete`, and session-reopen paths | `tests/`, `tools/user_smoke.py`, `tools/tui_approval_smoke.py`, `tools/headless_smoke.sh`, `Docs/quality/` | V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-301 | Complete remaining rows, especially cursor/history/paste-limit/narrow wrapping, atomic failure, history UI, socket-level cancel outside Responses body reads, and all resize classes; no compile-only acceptance | 1500 |
 | V2-306 | PARTIAL | Reconcile README/spec/Gantt, version notes, release archive, SBOM, and size receipt | `README.md`, `Docs/Zenpi_Execution_Spec.md`, `Docs/Zenpi_Execution_Gantt.md`, `Docs/quality/` | V2-303,V2-305 | Docs never call partial/deferred work complete; release reproduces the recorded size | 500 |
 
-### E. Explicitly future GUI boundary
+### E. Reopened 2.1 requirements
+
+These rows began as `PLANNED` and are now `PARTIAL` where implementation and
+focused tests exist. Both statuses remain unchecked work, not product
+acceptance. The individual gates below record the remaining worker, session,
+and local-shell integration boundaries.
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-112 | PARTIAL | Worker-scoped all-allow profile: grant the worker every declared capability only inside an immutable Blueprint item lease covering owned paths, tools/effects, commands, network hosts, budgets, cancellation, and non-exportable secret handles; credential paths and raw secrets remain deny-by-default; keep `user_shell`, `agent_tool`, and `blueprint_worker` origins distinct. The current gate, binding, approval, and budget foundations are implemented; host bootstrap and complete end-to-end lease admission remain open | `src/domains.rs`, `src/domain_execution.rs`, `src/tools.rs`, `src/approval.rs`, `src/governance.rs`, `tests/` | V2-006,V2-104,V2-201 | Preflight binds the allow profile to the Blueprint/Goal digest and lease; no global remembered approval or capability bleed between items; production host bootstrap must install the matching gate, binding, and budget reservation before any worker side effect | 1800 |
+| V2-113 | PARTIAL | Immutable prohibition-gate compiler and per-action enforcement: deny wins over allow for paths, commands, network, secrets, destructive effects, identity changes, Blueprint writes, and nested agents/schedulers/daemons/servers; unknown effects fail closed and every verdict carries a policy digest. Current tool gate and digest paths are implemented; hostile filesystem swap, arbitrary worker shell sandbox, and cross-platform containment remain open | `src/security.rs`, `src/tools.rs`, `src/b3.rs`, `src/domain_execution.rs`, `tests/` | V2-112 | Preflight and every action reject undeclared or prohibited effects before spawn; workers cannot mutate policy; digest and reason are present in claim, receipt, replay, and imported manifest; OS confinement tests must pass before acceptance | 1800 |
+| V2-114 | PARTIAL | Worker evidence and emergency cancellation: bounded lease renew/expiry, explicit blocked/denied/cancelled/failed terminal states, host-owned kill and child reaping, and TUI/headless proof for allow, deny, timeout, retry, and stale-lease paths. Core cancellation and tool reaping are implemented; CLI bootstrap, full worker evidence, and lease renewal remain open | `src/domain_execution.rs`, `src/core.rs`, `src/headless.rs`, `src/tui.rs`, `src/governance.rs`, `tests/` | V2-109,V2-113 | Host can cancel or reap without worker cooperation; no receipt or Goal transition implies implementation completion; retries are idempotent and preserve the policy digest; all states must be visible in both transports | 1800 |
+| V2-115 | PARTIAL | Durable cross-process session checkpoint and reconnect cursor: persist operation markers, event envelopes, request ledger, ACK state, and session/sequence identity so restart, reconnect, and stale-marker repair cannot duplicate or silently skip work. Headless WAL, locks, ACK/replay, and kill/restart evidence now exist; TUI reconnect and WAL lifecycle migration remain open | `src/session.rs`, `src/protocol.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-105,V2-108,V2-301 | Two processes and a kill/restart fixture prove single-owner serialization, bounded replay, gap detection, duplicate suppression, and repair of an interrupted append without hidden daemons; export/import/delete/GC must preserve or explicitly retire reconnect state | 2200 |
+| V2-116 | PARTIAL | Session-to-session mailbox and queue: addressed envelopes with sender/recipient session IDs, request ID, digest, ordering, TTL, ACK/fail/claim/result, deduplication, conflict handling, offline inbox, and explicit access checks; fork/import remaps identity rather than copying a stale owner. Durable local mailbox and host transport wiring are implemented; TUI projection and non-Unix locking remain open | `src/session.rs`, `src/b3.rs`, `src/protocol.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-006,V2-115 | Inter-session delivery is journal/file based and observable in both hosts; no provider call, implicit daemon, or cross-workspace credential transfer; restart and replay remain idempotent | 2200 |
+| V2-117 | PARTIAL | Codex-style session lifecycle parity: list agents/sessions, resume-last and queue an existing session, fork, archive, delete, unarchive, and migrate with explicit ownership and retention semantics; remote auth and provider-managed orchestration remain explicitly deferred. Backend and headless lifecycle dispatch are implemented; TUI parity and live-agent semantics remain open | `src/session.rs`, `src/slash.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-108,V2-115,V2-116 | Every lifecycle action has a typed command, dry-run/confirmation where destructive, bounded receipt, restart-safe identity, and TUI/headless parity; no hidden remote control plane | 1600 |
+| V2-118 | PARTIAL | Codex-style single-leading-`!` local shell escape: `!cmd` (including `!echo hi`) is a `user_shell` operation, empty bang shows help, one prefix is trimmed, original input and output are journaled, bounded output is exposed to the next model turn as an explicit user-shell event, and the route is never the model `run_command` tool; any `!!` behavior is an explicitly separate zenpi extension, not assumed Codex parity. Core, headless, and real PTY allow/deny/output/reap paths are implemented; queue/cancel PTY and cross-platform acceptance remain open | `src/slash.rs`, `src/core.rs`, `src/tools.rs`, `src/headless.rs`, `src/tui.rs`, `src/protocol.rs`, `tests/`, `tools/tui_user_shell_smoke.py` | V2-005,V2-103,V2-104,V2-109,V2-301,V2-113 | Parse before provider submission; preserve pipes/redirects/quoting only under an explicit ShellEscapePolicy; bound output, NUL/length, timeout, cancel, signal, child reaping, cwd/env, approval, and prohibition gates; PTY/headless tests prove `!echo hi` output/error/exit, next-turn context, and zero provider calls, while a running shell queues rather than steers a model turn | 2200 |
+| V2-119 | PLANNED | Bind Blueprint execution receipts to a real external worker handoff | `src/domain_execution.rs`, `src/domains.rs`, `src/governance.rs`, `src/session.rs`, `src/headless.rs`, `src/tui.rs`, `tests/` | V2-006,V2-112,V2-113,V2-114,V2-115 | A dependency-ready item creates one atomic claim/request lease containing Blueprint/Goal/item digests, immutable prohibition policy, worker identity, attempt ID, and budget reservation; an external worker returns a checksum-valid evidence/result manifest; duplicate claims, stale leases, policy changes, and fabricated `recorded`/`control_plane_only` success remain unaccepted; no hidden scheduler or nested worker is introduced | 2600 |
+
+### F. Explicitly future GUI boundary
 
 | ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
 |---|---|---|---|---|---|---:|
 | V2-401 | DEFERRED | Publish a stable core/headless/layout protocol that a future GUI can consume | `Docs/Zenpi_GUI_Future_Contract.md` | V2-003,V2-007 | Contract names macOS, Linux, and Windows without adding GUI dependencies now | 0 |
 | V2-402 | DEFERRED | Future macOS GUI workspace (Svelte-quality interaction target) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
 | V2-403 | DEFERRED | Future Linux/Windows GUI workspace (same shared protocol) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
-| V2-999 | PLANNED | Master acceptance, v1 archive/migration, Gantt regeneration, and final user receipt | `Docs/`, `tools/`, `.github/` | V2-001,V2-002,V2-003,V2-004,V2-005,V2-006,V2-007,V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-201,V2-202,V2-203,V2-204,V2-205,V2-206,V2-207,V2-208,V2-301,V2-302,V2-303,V2-304,V2-305,V2-306 | All required rows `ACCEPTED`, zero unresolved partials, clean gates, and size receipt; deferred adapter/GUI rows are not v2.0 blockers | 0 |
+| V2-999 | PLANNED | Master acceptance, v1 archive/migration, Gantt regeneration, and final user receipt | `Docs/`, `tools/`, `.github/` | V2-001,V2-002,V2-003,V2-004,V2-005,V2-006,V2-007,V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-112,V2-113,V2-114,V2-115,V2-116,V2-117,V2-118,V2-119,V2-201,V2-202,V2-203,V2-204,V2-205,V2-206,V2-207,V2-208,V2-301,V2-302,V2-303,V2-304,V2-305,V2-306 | All required rows `ACCEPTED`, zero unresolved partials, clean gates, and size receipt; deferred adapter/GUI rows are not lightweight v2.1 blockers | 0 |
 
 ## 8. Acceptance matrix for the ten core experiences
 
@@ -503,14 +548,19 @@ claim that the full v2 gate has passed:
 Additional acceptance is required for Markdown block rendering, every slash
 command, all five tab presets, resource polling bounds, b3 digest/lease rules,
 near-cap valid-journal startup/RSS, and the remaining provider cancellation
-boundaries. The default-build dependency/size gate is recorded separately in
-V2-002 and its host-specific receipt.
+boundaries. The reopened 2.1 lanes must also prove worker allow plus
+prohibition-gate evidence (V2-112--V2-114), cross-process checkpoint and
+session mailbox/lifecycle/live-recipient recovery (V2-115--V2-117, V2-119),
+and explicit `!` user-shell TUI/headless parity with zero provider calls
+(V2-118). The default-build
+dependency/size gate is recorded separately in V2-002 and its host-specific
+receipt.
 
 ## 9. Versioning and migration policy
 
-* `2.0.0` is a product-contract revision, not a claim that the rows are done.
-  Additive v2 fixes use `2.0.x`; additive compatible features use `2.1.y`;
-  protocol, event, or layout incompatibilities require `3.0.0`.
+* `2.1.0` is a product-contract revision, not a claim that the rows are done.
+  Additive v2.1 fixes use `2.1.x`; protocol, event, or layout incompatibilities
+  require `3.0.0`.
 * Until `V2-999` is accepted, the v1 file and v1 Gantt remain authoritative
   only for the historical v1 receipt and its validator. A worker must not mark
   a v1 row complete to imply a v2 row is complete.
@@ -519,12 +569,41 @@ V2-002 and its host-specific receipt.
   Gantt, and run all structural and executable gates. A hand-edited Gantt or a
   compile-only receipt is not a migration.
 * GUI, browser, PTY, Tokio/reqwest, clap, and SQLite work may not be smuggled
-  into v2.0 by changing a dependency or adding an unlisted mode. Each requires
+  into the lightweight v2 binary by changing a dependency or adding an unlisted mode. Each requires
   a row, an estimate, a gate, and (for a contract change) a new version.
+
+### 9.1 Historical `[x]` reopen map
+
+The v1 document remains the authoritative checklist, but the affected contract
+rows below have been explicitly reopened now (`[x]` -> `[ ]`). The Gantt is a
+read-only projection regenerated from that source. Untouched ZP foundation rows
+remain historical provenance; they are not being selectively falsified as
+unfinished. The v2 `PARTIAL` and `PLANNED` rows are additional unchecked work.
+
+The following document edits are recorded, not implementation acceptance:
+
+- Reopened worker approval and prohibition claims (`CF-402`, `CF-404`, `CF-405`).
+- Reopened checkpoint, reconnect, and replay claims (`CF-305`, `CF-306`, `CF-307`).
+- Reopened session lifecycle and interrupted-operation claims (`CF-503`, `CF-504`).
+- Reopened security and durable budget claims (`CF-701`, `CF-703`).
+- Added the explicit local `!` route claim (`CF-408`).
+- Added worker admission, mailbox, and live-recipient claims (`CF-409`, `CF-505`, `CF-506`) and external worker handoff (`V2-119`).
+- Aggregate acceptance (`CF-705`) remains open until V2-112--V2-119 scenarios pass.
+
+| Reopened v1 rows | Why the old receipt was insufficient | Replacement v2 rows |
+|---|---|---|
+| `CF-402`, `CF-404`, `CF-405` | Existing tool continuation and approval rows do not prove worker-scoped all-allow, immutable deny-wins gates, per-action policy evidence, or explicit user-shell origin | `V2-112`, `V2-113`, `V2-114` |
+| `CF-305`, `CF-306`, `CF-307` | Existing TUI/headless rows do not prove durable cross-process checkpoint, reconnect cursor, writer ownership, mailbox envelope parity, or replay deduplication | `V2-115`, `V2-116`, `V2-118` |
+| `CF-503`, `CF-504` | Existing session administration and recovery rows do not provide Codex lifecycle actions, operation idempotency, or explicit unknown-outcome retry/abandon semantics | `V2-115`, `V2-116`, `V2-117` |
+| `CF-701`, `CF-703` | Existing security and budget rows do not bind non-exportable secret handles, policy digests, worker leases, network/process budgets, or user-shell accounting | `V2-112`, `V2-113`, `V2-114` |
+| `CF-408` | The historical receipt had no accepted local `!echo` contract; current partial implementation and model `run_command` do not replace its full acceptance matrix | `V2-118` |
+| `CF-409` | Existing worker rows do not connect Blueprint execution receipts to a real external worker lease, immutable policy digest, and evidence manifest | `V2-112`, `V2-113`, `V2-114`, `V2-119` |
+| `CF-505`, `CF-506` | Existing session rows provide local mailbox/lifecycle pieces but do not prove durable recipient delivery, live-owner dispatch, result linkage, or offline/dead-owner handling | `V2-115`, `V2-116`, `V2-117`, `V2-119` |
+| `CF-408`, `CF-705` | The local `!echo` lane and aggregate acceptance must include all new policy, session IPC, lifecycle, live-recipient, and shell gates; both remain open | `V2-118`, `V2-119`, `V2-999` |
 
 ## 10. Open decisions for the Master review
 
-1. Keep the lightweight synchronous provider boundary for v2.0 while retaining
+1. Keep the lightweight synchronous provider boundary for v2.1 while retaining
    bounded queues, joined shutdown, steer admission, and Responses-body
    cancellation polling, or approve a complete Tokio+reqwest migration if
    external abort is required for Chat/non-streaming or pre-body socket phases.

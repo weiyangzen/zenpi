@@ -368,6 +368,179 @@ fn mailbox_lock_torn_tail_and_cross_workspace_access_are_rejected() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn mailbox_sidecar_survives_export_and_requires_explicit_retirement() {
+    use zenpi::session::{
+        MailboxStatus, SessionLifecycleReceipt as Receipt, SessionLifecycleRequest as Request,
+        SessionMailbox, execute_session_lifecycle,
+    };
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let source_path = dir.path().join("recipient.jsonl");
+    let source = SessionStore::open(&source_path).unwrap();
+    let mailbox = SessionMailbox::open(&source_path).unwrap();
+    mailbox
+        .enqueue(
+            &sender,
+            "offline",
+            serde_json::json!({"work": true}),
+            10_000,
+            1,
+        )
+        .unwrap();
+    let destination = dir.path().join("imported.jsonl");
+    execute_session_lifecycle(
+        Request::Migrate {
+            source: source_path.clone(),
+            destination: destination.clone(),
+        },
+        None,
+        2,
+    )
+    .unwrap();
+    let imported = SessionMailbox::open(&destination).unwrap();
+    let imported_store = SessionStore::open_existing(&destination).unwrap();
+    let page = imported.list(&imported_store, 0, 10, 2).unwrap();
+    assert_eq!(page.messages.len(), 1);
+    assert_eq!(page.messages[0].status, MailboxStatus::Queued);
+    assert!(
+        destination
+            .with_file_name("imported.jsonl.mailbox")
+            .exists()
+    );
+
+    assert!(
+        execute_session_lifecycle(
+            Request::RetireMailbox {
+                path: destination.clone(),
+                confirmed: false,
+            },
+            None,
+            3,
+        )
+        .is_err()
+    );
+    assert!(
+        execute_session_lifecycle(
+            Request::RetireMailbox {
+                path: destination.clone(),
+                confirmed: true,
+            },
+            Some(&source_path),
+            3,
+        )
+        .is_err()
+    );
+    let retired = execute_session_lifecycle(
+        Request::RetireMailbox {
+            path: destination.clone(),
+            confirmed: true,
+        },
+        None,
+        3,
+    )
+    .unwrap();
+    assert!(matches!(retired, Receipt::Session { .. }));
+    assert!(
+        !destination
+            .with_file_name("imported.jsonl.mailbox")
+            .exists()
+    );
+    assert!(destination.exists());
+    assert!(
+        imported
+            .enqueue(
+                &sender,
+                "offline",
+                serde_json::json!({"work": true}),
+                10_000,
+                4
+            )
+            .is_err()
+    );
+    assert!(
+        !destination
+            .with_file_name("imported.jsonl.mailbox")
+            .exists()
+    );
+    assert!(!zenpi::session::retire_session_mailbox(&destination, None, true).unwrap());
+    drop(source);
+}
+
+#[cfg(unix)]
+#[test]
+fn mailbox_export_failure_preserves_preexisting_destination_sidecar() {
+    use zenpi::session::SessionMailbox;
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let source = SessionStore::open(dir.path().join("source.jsonl")).unwrap();
+    SessionMailbox::open(source.path())
+        .unwrap()
+        .enqueue(
+            &sender,
+            "pending",
+            serde_json::json!({"work": true}),
+            1000,
+            1,
+        )
+        .unwrap();
+    let destination = dir.path().join("destination.jsonl");
+    let sidecar = dir.path().join("destination.jsonl.mailbox");
+    fs::write(&sidecar, b"preexisting mailbox evidence").unwrap();
+    assert!(source.export_to(&destination).is_err());
+    assert!(!destination.exists());
+    assert_eq!(fs::read(&sidecar).unwrap(), b"preexisting mailbox evidence");
+
+    fs::remove_file(&sidecar).unwrap();
+    let unrelated = dir.path().join("unrelated.txt");
+    fs::write(&unrelated, b"preserve this target").unwrap();
+    std::os::unix::fs::symlink(&unrelated, &sidecar).unwrap();
+    assert!(source.export_to(&destination).is_err());
+    assert!(
+        fs::symlink_metadata(&sidecar)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(fs::read(&unrelated).unwrap(), b"preserve this target");
+}
+
+#[cfg(unix)]
+#[test]
+fn mailbox_retirement_resumes_after_durable_marker_before_unlink() {
+    use zenpi::session::{SessionMailbox, retire_session_mailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let mut recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    mailbox
+        .enqueue(
+            &sender,
+            "pending",
+            serde_json::json!({"work":true}),
+            1000,
+            1,
+        )
+        .unwrap();
+    recipient
+        .append_event(serde_json::json!({"type":"mailbox_retired"}))
+        .unwrap();
+    assert!(mailbox.path().exists());
+    assert!(retire_session_mailbox(recipient.path(), None, true).unwrap());
+    assert!(!mailbox.path().exists());
+    assert!(!retire_session_mailbox(recipient.path(), None, true).unwrap());
+    let restored = SessionStore::open_existing(recipient.path()).unwrap();
+    assert_eq!(
+        restored
+            .events()
+            .iter()
+            .filter(|e| e["type"] == "mailbox_retired")
+            .count(),
+        1
+    );
+}
+
 #[test]
 fn malformed_prefix_is_warned_and_append_remains_recoverable() {
     let dir = tempdir().unwrap();
@@ -540,13 +713,19 @@ fn operation_markers_are_idempotent_and_recovery_requires_a_new_decision() {
         turn_id: "turn-1".into(),
         retry_requires_confirmation: true,
     };
-    store.begin_operation_with_key(&operation, "idem-1").unwrap();
+    store
+        .begin_operation_with_key(&operation, "idem-1")
+        .unwrap();
     let before = fs::read(&path).unwrap();
-    store.begin_operation_with_key(&operation, "idem-1").unwrap();
+    store
+        .begin_operation_with_key(&operation, "idem-1")
+        .unwrap();
     assert_eq!(fs::read(&path).unwrap(), before);
-    assert!(store
-        .begin_operation_with_key(&operation, "idem-2")
-        .is_err());
+    assert!(
+        store
+            .begin_operation_with_key(&operation, "idem-2")
+            .is_err()
+    );
     assert_eq!(store.operation_recovery().len(), 1);
     assert_eq!(
         store.operation_recovery()[0].state,
@@ -560,9 +739,11 @@ fn operation_markers_are_idempotent_and_recovery_requires_a_new_decision() {
         .finish_operation(&operation.operation_id, OperationOutcome::UnknownOutcome)
         .unwrap();
     assert_eq!(fs::read(&path).unwrap(), after);
-    assert!(store
-        .finish_operation(&operation.operation_id, OperationOutcome::Succeeded)
-        .is_err());
+    assert!(
+        store
+            .finish_operation(&operation.operation_id, OperationOutcome::Succeeded)
+            .is_err()
+    );
     assert_eq!(store.operation_recovery().len(), 1);
     store
         .decide_operation_recovery(

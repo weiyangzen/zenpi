@@ -10,6 +10,30 @@ fn line_text(line: &Line<'_>) -> String {
 }
 
 #[test]
+fn identifiers_keep_literal_underscores_without_losing_emphasis() {
+    for text in [
+        "ZENPI_TUI_a522b536f7",
+        "src/my_file_name.rs",
+        "foo__bar__baz",
+    ] {
+        assert_eq!(
+            render_markdown(text, 100)
+                .iter()
+                .map(line_text)
+                .collect::<String>(),
+            text
+        );
+    }
+    assert_eq!(
+        render_markdown("_italic_ __bold__", 100)
+            .iter()
+            .map(line_text)
+            .collect::<String>(),
+        "italic bold"
+    );
+}
+
+#[test]
 fn block_parser_preserves_code_and_separates_conversation_blocks() {
     let blocks = parse_markdown(
         "## Plan\n\nUse **small** steps.\n\n```rust\nfn main() {}\n```\n\n- ship it",

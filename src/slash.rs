@@ -43,6 +43,17 @@ pub enum SlashRoute {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum SlashCommand {
+    /// Toggle the interactive execution posture without leaving the TUI.
+    Yolo {
+        enabled: bool,
+    },
+    /// Select the approval policy used for side-effecting tools.
+    Approval {
+        mode: String,
+    },
+    Persona {
+        name: Option<String>,
+    },
     /// Show command help, optionally narrowed to one command name.
     Help {
         topic: Option<String>,
@@ -129,6 +140,10 @@ pub enum SlashCommand {
     Resume {
         sequence: Option<u64>,
     },
+    /// Inspect or explicitly resolve an uncertain operation without rerunning it.
+    Recovery {
+        action: RecoveryAction,
+    },
     /// Compact the current context through the host's context manager.
     Compact,
     /// Inspect a bounded file diff. The path remains workspace-relative data.
@@ -150,6 +165,10 @@ pub enum SlashCommand {
     Clear,
     /// Ask the active request to stop.
     Cancel,
+    /// Create, select, or close a top-level project workspace tab.
+    Project {
+        action: ProjectAction,
+    },
     /// Leave the interactive host.
     Exit,
     /// A command understood by the b3ehive runtime, but intentionally not
@@ -160,6 +179,24 @@ pub enum SlashCommand {
     Loop {
         args: Vec<String>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectAction {
+    List,
+    Open { name: String },
+    Select { name: String },
+    Close { name: String },
+}
+
+/// Recovery decisions require explicit host confirmation and never dispatch work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum RecoveryAction {
+    Inspect,
+    Retry { operation_id: String },
+    Abandon { operation_id: String },
 }
 
 /// Durable session operations exposed by `/session`.
@@ -198,6 +235,10 @@ pub enum SessionAction {
         path: String,
     },
     Delete {
+        path: String,
+        confirmed: bool,
+    },
+    RetireMailbox {
         path: String,
         confirmed: bool,
     },
@@ -329,6 +370,9 @@ impl SlashCommand {
     /// Canonical command spelling, useful for status messages and telemetry.
     pub const fn name(&self) -> &'static str {
         match self {
+            Self::Yolo { .. } => "yolo",
+            Self::Approval { .. } => "approval",
+            Self::Persona { .. } => "persona",
             Self::Help { .. } => "help",
             Self::Goal { .. } => "goal",
             Self::GoalPut { .. } => "goal",
@@ -348,6 +392,7 @@ impl SlashCommand {
             Self::Session { .. } => "session",
             Self::Mailbox { .. } => "mailbox",
             Self::Resume { .. } => "resume",
+            Self::Recovery { .. } => "recovery",
             Self::Compact => "compact",
             Self::Diff { .. } => "diff",
             Self::Attach { .. } => "attach",
@@ -355,6 +400,7 @@ impl SlashCommand {
             Self::Status => "status",
             Self::Clear => "clear",
             Self::Cancel => "cancel",
+            Self::Project { .. } => "project",
             Self::Exit => "exit",
             Self::Compete { .. } => "compete",
             Self::Loop { .. } => "loop",
@@ -366,7 +412,10 @@ impl SlashCommand {
     pub const fn is_first_class(&self) -> bool {
         matches!(
             self,
-            Self::Goal { .. }
+            Self::Yolo { .. }
+                | Self::Approval { .. }
+                | Self::Persona { .. }
+                | Self::Goal { .. }
                 | Self::GoalPut { .. }
                 | Self::Plan { .. }
                 | Self::Model { .. }
@@ -381,6 +430,8 @@ impl SlashCommand {
                 | Self::Pane { .. }
                 | Self::Session { .. }
                 | Self::Mailbox { .. }
+                | Self::Recovery { .. }
+                | Self::Project { .. }
         )
     }
 
@@ -411,6 +462,34 @@ const EXIT_ALIASES: &[&str] = &["quit", "q"];
 /// deliberately listed so clients can complete them, while their route keeps
 /// execution in the b3ehive runtime rather than the local agent core.
 pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
+    SlashCommandSpec {
+        name: "yolo",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/yolo [on|off]",
+        summary: "toggle explicit allow-all execution posture",
+    },
+    SlashCommandSpec {
+        name: "approval",
+        aliases: &["approvals"],
+        route: SlashRoute::Local,
+        usage: "/approval <ask|always|never>",
+        summary: "set side-effect approval mode",
+    },
+    SlashCommandSpec {
+        name: "persona",
+        aliases: &["personas"],
+        route: SlashRoute::Local,
+        usage: "/persona [MBTI]",
+        summary: "conversation style",
+    },
+    SlashCommandSpec {
+        name: "project",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/project [list|open NAME|new NAME|select NAME|close NAME]",
+        summary: "manage top-level project tabs (the unified workspace context)",
+    },
     SlashCommandSpec {
         name: "help",
         aliases: HELP_ALIASES,
@@ -517,6 +596,13 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         summary: "replay or recover a bounded event suffix",
     },
     SlashCommandSpec {
+        name: "recovery",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/recovery [inspect|retry ID --yes|abandon ID --yes]",
+        summary: "inspect uncertain operations or record an explicit recovery decision",
+    },
+    SlashCommandSpec {
         name: "compact",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
@@ -529,6 +615,13 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Local,
         usage: "/diff [path]",
         summary: "inspect bounded pending file changes",
+    },
+    SlashCommandSpec {
+        name: "review",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/review [path]",
+        summary: "inspect a bounded change review projection",
     },
     SlashCommandSpec {
         name: "attach",
@@ -617,6 +710,8 @@ pub enum SlashError {
     UnsupportedUserShellExtension,
     #[error("unterminated quoted argument")]
     UnterminatedQuote,
+    #[error("use /recovery inspect, /recovery retry ID --yes, or /recovery abandon ID --yes")]
+    InvalidRecoveryAction,
     #[error("trailing escape in slash command")]
     TrailingEscape,
     #[error("unknown slash command `/{0}`; type /help")]
@@ -665,7 +760,7 @@ pub enum SlashError {
     MissingLayoutTab { action: &'static str },
     #[error("/layout {action} received an unexpected argument")]
     UnexpectedLayoutArgument { action: &'static str },
-    #[error("unknown layout tab `{0}`; expected project, goal, learn, review, or session")]
+    #[error("unknown layout scope `{0}`; layout belongs to the active project workspace")]
     UnknownLayoutTab(String),
     #[error("/pane has unknown action `/{action}`")]
     UnknownPaneAction { action: String },
@@ -836,10 +931,107 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
                 sequence: sequence.transpose()?,
             }
         }
+        "recovery" => SlashCommand::Recovery {
+            action: match args {
+                [] => RecoveryAction::Inspect,
+                [action] if action.eq_ignore_ascii_case("inspect") => RecoveryAction::Inspect,
+                [action, operation_id, confirm]
+                    if confirm == "--yes"
+                        && !operation_id.trim().is_empty()
+                        && operation_id.len() <= crate::protocol::MAX_ID_BYTES =>
+                {
+                    match action.to_ascii_lowercase().as_str() {
+                        "retry" => RecoveryAction::Retry {
+                            operation_id: operation_id.clone(),
+                        },
+                        "abandon" => RecoveryAction::Abandon {
+                            operation_id: operation_id.clone(),
+                        },
+                        _ => return Err(SlashError::InvalidRecoveryAction),
+                    }
+                }
+                _ => return Err(SlashError::InvalidRecoveryAction),
+            },
+        },
+        "persona" | "personas" => SlashCommand::Persona {
+            name: match args {
+                [] => None,
+                [value] => Some(
+                    crate::persona::normalize(value)
+                        .ok_or_else(|| SlashError::UnknownCommand(format!("persona {value}")))?
+                        .into(),
+                ),
+                _ => {
+                    return Err(SlashError::UnknownCommand(
+                        "persona expects one MBTI type".into(),
+                    ));
+                }
+            },
+        },
+        "project" => match args {
+            [] => SlashCommand::Project {
+                action: ProjectAction::List,
+            },
+            [action] if action.eq_ignore_ascii_case("list") => SlashCommand::Project {
+                action: ProjectAction::List,
+            },
+            [action, name]
+                if action.eq_ignore_ascii_case("open") || action.eq_ignore_ascii_case("new") =>
+            {
+                SlashCommand::Project {
+                    action: ProjectAction::Open {
+                        name: name.trim().to_owned(),
+                    },
+                }
+            }
+            [action, name] if action.eq_ignore_ascii_case("select") => SlashCommand::Project {
+                action: ProjectAction::Select {
+                    name: name.trim().to_owned(),
+                },
+            },
+            [action, name] if action.eq_ignore_ascii_case("close") => SlashCommand::Project {
+                action: ProjectAction::Close {
+                    name: name.trim().to_owned(),
+                },
+            },
+            _ => return Err(SlashError::UnexpectedArgument { command: "project" }),
+        },
+        "yolo" => {
+            let enabled = match args {
+                [] => true,
+                [value] if value.eq_ignore_ascii_case("on") => true,
+                [value] if value.eq_ignore_ascii_case("off") => false,
+                _ => return Err(SlashError::UnexpectedArgument { command: "yolo" }),
+            };
+            SlashCommand::Yolo { enabled }
+        }
+        "approval" | "approvals" => {
+            let mode = args.first().cloned().unwrap_or_else(|| "ask".into());
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument {
+                    command: "approval",
+                });
+            }
+            if !matches!(
+                mode.to_ascii_lowercase().as_str(),
+                "ask" | "always" | "never"
+            ) {
+                return Err(SlashError::UnknownCommand(format!("approval mode {mode}")));
+            }
+            SlashCommand::Approval { mode }
+        }
         "compact" => unit_command(args, "compact", SlashCommand::Compact)?,
         "diff" => {
             if args.len() > 1 {
                 return Err(SlashError::UnexpectedArgument { command: "diff" });
+            }
+            SlashCommand::Diff {
+                path: args.first().cloned(),
+            }
+        }
+        "review" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument { command: "review" });
             }
             SlashCommand::Diff {
                 path: args.first().cloned(),
@@ -911,12 +1103,17 @@ pub fn help(topic: Option<&str>) -> Option<String> {
     match topic {
         Some(topic) => {
             let spec = spec(topic)?;
-            Some(format!(
-                "{} - {}\n{}",
-                spec.usage,
-                spec.summary,
-                route_label(spec.route)
-            ))
+            let suffix = (topic.eq_ignore_ascii_case("goal"))
+                .then_some(format!("\n{}", parity_note()))
+                .unwrap_or_default();
+            Some(
+                format!(
+                    "{} - {}\n{}",
+                    spec.usage,
+                    spec.summary,
+                    route_label(spec.route)
+                ) + &suffix,
+            )
         }
         None => Some(
             COMMAND_SPECS
@@ -926,6 +1123,13 @@ pub fn help(topic: Option<&str>) -> Option<String> {
                 .join("\n"),
         ),
     }
+}
+
+/// Codex-compatible command aliases exposed by zenpi.  These are intentionally
+/// explicit so `/goal` remains a local b3ehive projection rather than implying
+/// parity with an internal Codex implementation.
+pub fn parity_note() -> &'static str {
+    "Zenpi /goal manages a bounded b3ehive goal; Codex /goal is a separate host primitive. Use /help goal for Zenpi semantics."
 }
 
 const fn route_label(route: SlashRoute) -> &'static str {
@@ -1049,10 +1253,6 @@ fn parse_pane(args: &[String]) -> Result<PaneAction, SlashError> {
 fn parse_tab(value: &str) -> Result<TabId, SlashError> {
     match value.to_ascii_lowercase().as_str() {
         "project" | "proj" => Ok(TabId::Project),
-        "goal" => Ok(TabId::Goal),
-        "learn" => Ok(TabId::Learn),
-        "review" => Ok(TabId::Review),
-        "session" | "sessions" => Ok(TabId::Session),
         _ => Err(SlashError::UnknownLayoutTab(value.to_owned())),
     }
 }
@@ -1321,6 +1521,13 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
         "delete" => {
             let path = required_session_path_with_yes(args, "delete")?;
             Ok(SessionAction::Delete {
+                path,
+                confirmed: true,
+            })
+        }
+        "retire-mailbox" | "retire_mailbox" => {
+            let path = required_session_path_with_yes(args, "retire-mailbox")?;
+            Ok(SessionAction::RetireMailbox {
                 path,
                 confirmed: true,
             })
@@ -1673,10 +1880,10 @@ mod tests {
     #[test]
     fn layout_and_pane_commands_parse_to_bounded_typed_actions() {
         assert_eq!(
-            parse("/layout preset learn").unwrap(),
+            parse("/layout preset project").unwrap(),
             Some(SlashCommand::Layout {
                 action: LayoutAction::Preset {
-                    tab: Some(TabId::Learn),
+                    tab: Some(TabId::Project),
                 },
             })
         );

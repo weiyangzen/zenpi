@@ -168,6 +168,11 @@ impl ConfigPaths {
         self.layout_path()
     }
 
+    /// Non-secret checkpoint for the Wave-style project tab strip.
+    pub fn project_tabs_path(&self) -> PathBuf {
+        self.root.join("project-tabs.json")
+    }
+
     /// Create the directory with owner-only permissions and tighten an
     /// existing directory before any credential file is read or written.
     pub fn ensure_root(&self) -> Result<(), ConfigError> {

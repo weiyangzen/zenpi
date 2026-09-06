@@ -3,6 +3,16 @@ use zenpi::security::{SecretError, SecretHandle, child_environment, redact_json,
 const FIXTURE_SECRET: &str = "sk-fixture-secret-123456";
 
 #[test]
+fn revocation_debug_never_exposes_secret_bytes() {
+    let secret = "opaque-revocation-fixture-4871";
+    let (handle, revocation) = SecretHandle::new(secret, "b".repeat(64)).unwrap();
+    let debug = format!("{handle:?} {revocation:?}");
+    assert!(!debug.contains(secret));
+    assert!(!debug.contains(&format!("{:?}", secret.as_bytes())));
+    assert!(debug.contains("<redacted>"));
+}
+
+#[test]
 fn redaction_covers_headers_urls_nested_json_and_known_values() {
     let text = format!(
         "Authorization: Bearer {FIXTURE_SECRET} https://user:{FIXTURE_SECRET}@example.test/v1?api_key={FIXTURE_SECRET}"
