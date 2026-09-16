@@ -1,0 +1,6 @@
+data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "search-call-319", "type": "function", "function": {"name": "search_text", "arguments": "{\"query\": \"^needle[0-9]+$\", \"regex\": true, \"glob\": \"**/*.rs\", \"context\": 1, \"case_sensitive\": false, \"path\": \"fixture\", \"max_matches\": 1}"}}]}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]}
+
+data: [DONE]
+

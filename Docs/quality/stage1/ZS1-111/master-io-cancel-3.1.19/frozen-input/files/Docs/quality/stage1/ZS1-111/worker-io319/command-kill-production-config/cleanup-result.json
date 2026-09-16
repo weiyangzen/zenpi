@@ -1,0 +1,18 @@
+{
+  "project": {
+    "project_id": "a65c83667e57745ba4b5ca16a6ec3cc6fdef550860329931c79e39be0718b5fd",
+    "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config",
+    "session_id": "session-1789190554164-62056-0"
+  },
+  "schema_version": 2,
+  "id": "cleanup",
+  "type": "response",
+  "command": "tool_output",
+  "success": true,
+  "data": {
+    "call_id": null,
+    "removed": 2,
+    "session_id": "session-1789190554164-62056-0"
+  },
+  "code": "ok"
+}

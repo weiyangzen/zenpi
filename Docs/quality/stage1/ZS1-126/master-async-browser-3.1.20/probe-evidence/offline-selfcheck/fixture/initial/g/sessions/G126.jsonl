@@ -1,0 +1,2 @@
+{"schema_version":1,"session_id":"G126","timestamp_ms":1789171200000,"timestamp":"2026-09-12T00:00:00.000Z","kind":"session","seq":0,"version":1,"created_at_ms":1789171200000,"cwd":"/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-pty-3.1.20/offline-selfcheck/fixture/initial"}
+{"schema_version":1,"session_id":"G126","timestamp_ms":1789171200000,"timestamp":"2026-09-12T00:00:00.000Z","kind":"turn","seq":1,"turn":{"id":"G126-turn-0","parent_id":null,"role":"user","content":"global only","created_at_ms":1789171200000}}

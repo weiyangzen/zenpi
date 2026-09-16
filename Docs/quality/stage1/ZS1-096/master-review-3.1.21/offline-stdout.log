@@ -1,0 +1,234 @@
+{"label": "manifest exact payload", "passed": true}
+{"label": "readonly no symlinks", "passed": true}
+{"label": "formal60098B1706L", "passed": true}
+{"label": "capture capture/zenpi/src/render.rs", "passed": true}
+{"label": "capture capture/zenpi/src/tui.rs", "passed": true}
+{"label": "capture capture/zenpi/src/view_model.rs", "passed": true}
+{"label": "capture capture/zenpi/src/lib.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/render_markdown.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/tui_markdown.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/tui_transcript_ux.rs", "passed": true}
+{"label": "capture capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md", "passed": true}
+{"label": "capture capture/zenpi/Docs/execution/active_requirement.json", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/source_manifest.tsv", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/file_learn_index.tsv", "passed": true}
+{"label": "capture capture/zenpi/Docs/quality/stage1/ZS1-125/master-approval-timer-3.1.21/review.md", "passed": true}
+{"label": "capture capture/codex/codex-rs/tui/src/key_hint.rs", "passed": true}
+{"label": "capture capture/codex/codex-rs/tui/src/status_indicator_widget.rs", "passed": true}
+{"label": "capture history/inherited-worker-report.md", "passed": true}
+{"label": "capture history/old-working-report.md", "passed": true}
+{"label": "baseline30217B901Ldistinct", "passed": true}
+{"label": "baseline exact delta", "passed": true}
+{"label": "seven contiguous formal reads", "passed": true}
+{"label": "35readrecords", "passed": true}
+{"label": "read reads/001.txt", "passed": true}
+{"label": "read reads/002.txt", "passed": true}
+{"label": "read reads/003.txt", "passed": true}
+{"label": "read reads/004.txt", "passed": true}
+{"label": "read reads/005.txt", "passed": true}
+{"label": "read reads/006.txt", "passed": true}
+{"label": "read reads/007.txt", "passed": true}
+{"label": "read reads/008.txt", "passed": true}
+{"label": "read reads/009.txt", "passed": true}
+{"label": "read reads/010.txt", "passed": true}
+{"label": "read reads/011.txt", "passed": true}
+{"label": "read reads/012.txt", "passed": true}
+{"label": "read reads/013.txt", "passed": true}
+{"label": "read reads/014.txt", "passed": true}
+{"label": "read reads/015.txt", "passed": true}
+{"label": "read reads/016.txt", "passed": true}
+{"label": "read reads/017.txt", "passed": true}
+{"label": "read reads/018.txt", "passed": true}
+{"label": "read reads/019.txt", "passed": true}
+{"label": "read reads/020.txt", "passed": true}
+{"label": "read reads/021.txt", "passed": true}
+{"label": "read reads/022.txt", "passed": true}
+{"label": "read reads/023.txt", "passed": true}
+{"label": "read reads/024.txt", "passed": true}
+{"label": "read reads/025.txt", "passed": true}
+{"label": "read reads/026.txt", "passed": true}
+{"label": "read reads/027.txt", "passed": true}
+{"label": "read reads/028.txt", "passed": true}
+{"label": "read reads/029.txt", "passed": true}
+{"label": "read reads/030.txt", "passed": true}
+{"label": "read reads/031.txt", "passed": true}
+{"label": "read reads/032.txt", "passed": true}
+{"label": "read reads/033.txt", "passed": true}
+{"label": "read reads/034.txt", "passed": true}
+{"label": "read reads/035.txt", "passed": true}
+{"label": "61continuousunits", "passed": true}
+{"label": "18substantivemaps", "passed": true}
+{"label": "unit U01", "passed": true}
+{"label": "unit U02", "passed": true}
+{"label": "unit U03", "passed": true}
+{"label": "unit U04", "passed": true}
+{"label": "unit U05", "passed": true}
+{"label": "unit U06", "passed": true}
+{"label": "unit U07", "passed": true}
+{"label": "unit U08", "passed": true}
+{"label": "unit U09", "passed": true}
+{"label": "unit U10", "passed": true}
+{"label": "unit U11", "passed": true}
+{"label": "unit U12", "passed": true}
+{"label": "unit U13", "passed": true}
+{"label": "unit U14", "passed": true}
+{"label": "unit U15", "passed": true}
+{"label": "unit U16", "passed": true}
+{"label": "unit U17", "passed": true}
+{"label": "unit U18", "passed": true}
+{"label": "unit U19", "passed": true}
+{"label": "unit U20", "passed": true}
+{"label": "unit U21", "passed": true}
+{"label": "unit U22", "passed": true}
+{"label": "unit U23", "passed": true}
+{"label": "unit U24", "passed": true}
+{"label": "unit U25", "passed": true}
+{"label": "unit U26", "passed": true}
+{"label": "unit U27", "passed": true}
+{"label": "unit U28", "passed": true}
+{"label": "unit U29", "passed": true}
+{"label": "unit U30", "passed": true}
+{"label": "unit U31", "passed": true}
+{"label": "unit U32", "passed": true}
+{"label": "unit U33", "passed": true}
+{"label": "unit U34", "passed": true}
+{"label": "unit U35", "passed": true}
+{"label": "unit U36", "passed": true}
+{"label": "unit U37", "passed": true}
+{"label": "unit U38", "passed": true}
+{"label": "unit U39", "passed": true}
+{"label": "unit U40", "passed": true}
+{"label": "unit U41", "passed": true}
+{"label": "unit U42", "passed": true}
+{"label": "unit U43", "passed": true}
+{"label": "unit U44", "passed": true}
+{"label": "unit U45", "passed": true}
+{"label": "unit U46", "passed": true}
+{"label": "unit U47", "passed": true}
+{"label": "unit U48", "passed": true}
+{"label": "unit U49", "passed": true}
+{"label": "unit U50", "passed": true}
+{"label": "unit U51", "passed": true}
+{"label": "unit U52", "passed": true}
+{"label": "unit U53", "passed": true}
+{"label": "unit U54", "passed": true}
+{"label": "unit U55", "passed": true}
+{"label": "unit U56", "passed": true}
+{"label": "unit U57", "passed": true}
+{"label": "unit U58", "passed": true}
+{"label": "unit U59", "passed": true}
+{"label": "unit U60", "passed": true}
+{"label": "unit U61", "passed": true}
+{"label": "67exactfn", "passed": true}
+{"label": "42production2helpers23tests", "passed": true}
+{"label": "fn 57 parse_markdown", "passed": true}
+{"label": "fn 63 parse_markdown_bounded", "passed": true}
+{"label": "fn 139 render_markdown", "passed": true}
+{"label": "fn 150 render_markdown_prefixed", "passed": true}
+{"label": "fn 192 render_plain_prefixed", "passed": true}
+{"label": "fn 241 render_markdown_tail_prefixed", "passed": true}
+{"label": "fn 252 render_plain_tail_prefixed", "passed": true}
+{"label": "fn 273 render_markdown_tail_prefixed_with_metadata", "passed": true}
+{"label": "fn 284 render_plain_tail_prefixed_with_metadata", "passed": true}
+{"label": "fn 294 render_tail_prefixed", "passed": true}
+{"label": "fn 304 render_tail_metadata", "passed": true}
+{"label": "fn 385 sanitize_compact", "passed": true}
+{"label": "fn 402 retain_tail", "passed": true}
+{"label": "fn 413 wrap_tail_segments", "passed": true}
+{"label": "fn 438 walk_wrapped_segments", "passed": true}
+{"label": "fn 487 block_visual_lines", "passed": true}
+{"label": "fn 534 tail_inline", "passed": true}
+{"label": "fn 569 render_block_tail", "passed": true}
+{"label": "fn 659 tail_prefix_to_width", "passed": true}
+{"label": "fn 679 render_markdown_with_limit", "passed": true}
+{"label": "fn 755 flush_paragraph", "passed": true}
+{"label": "fn 763 heading_info", "passed": true}
+{"label": "fn 779 quote_info", "passed": true}
+{"label": "fn 785 list_info", "passed": true}
+{"label": "fn 818 is_rule", "passed": true}
+{"label": "fn 829 starts_with_whitespace", "passed": true}
+{"label": "fn 833 fence_info", "passed": true}
+{"label": "fn 867 render_inline_text", "passed": true}
+{"label": "fn 884 render_prefixed_inline", "passed": true}
+{"label": "fn 920 render_code", "passed": true}
+{"label": "fn 968 inline_segments", "passed": true}
+{"label": "fn 1054 parse_delimited", "passed": true}
+{"label": "fn 1080 closer", "passed": true}
+{"label": "fn 1092 parse", "passed": true}
+{"label": "fn 1109 wrap_segments", "passed": true}
+{"label": "fn 1149 wrap_plain", "passed": true}
+{"label": "fn 1175 heading_style", "passed": true}
+{"label": "fn 1184 push_line", "passed": true}
+{"label": "fn 1190 bounded_line_limit", "passed": true}
+{"label": "fn 1196 truncate_bytes", "passed": true}
+{"label": "fn 1212 sanitize_text", "passed": true}
+{"label": "fn 1216 sanitize_text_with_limit", "passed": true}
+{"label": "fn 1247 truncate_to_width", "passed": true}
+{"label": "fn 1266 line_text", "passed": true}
+{"label": "fn 1274 parses_blocks_without_swallowing_unknown_text", "passed": true}
+{"label": "fn 1297 renders_inline_styles_and_hides_link_target", "passed": true}
+{"label": "fn 1314 output_is_bounded_for_narrow_unicode_viewports", "passed": true}
+{"label": "fn 1325 unclosed_fence_is_visible_as_code", "passed": true}
+{"label": "fn 1333 line_limit_is_hard", "passed": true}
+{"label": "fn 1339 terminal_control_sequences_are_rendered_as_text", "passed": true}
+{"label": "fn 1347 crlf_input_does_not_leak_carriage_returns", "passed": true}
+{"label": "fn 1354 prefixed_rendering_keeps_role_and_body_inside_width", "passed": true}
+{"label": "fn 1366 plain_prefixed_rendering_does_not_interpret_markers", "passed": true}
+{"label": "fn 1374 sanitization_bound_applies_after_tab_expansion", "passed": true}
+{"label": "fn 1380 cell_budget_limits_wide_viewport_allocations", "passed": true}
+{"label": "fn 1387 tail_retains_latest_wrapped_rows_while_head_stays_at_start", "passed": true}
+{"label": "fn 1408 tail_matches_uncapped_head_styles_and_block_spacing", "passed": true}
+{"label": "fn 1436 tail_preserves_unclosed_fence_and_inline_context", "passed": true}
+{"label": "fn 1468 tail_distinguishes_closed_fence_quote_list_and_plain_markers", "passed": true}
+{"label": "fn 1489 tail_tabs_do_not_consume_the_final_legal_input_bytes", "passed": true}
+{"label": "fn 1513 tail_unicode_prefix_controls_and_cells_are_bounded", "passed": true}
+{"label": "fn 1539 tail_wide_rules_and_role_indentation_share_the_cell_budget", "passed": true}
+{"label": "fn 1569 tail_continuation_does_not_reinsert_ordered_marker", "passed": true}
+{"label": "fn 1586 unfinished_link_search_is_linear_and_valid_links_remain_styled", "passed": true}
+{"label": "fn 1621 tail_metadata_matches_full_small_render_and_large_exact_row_counts", "passed": true}
+{"label": "fn 1657 tail_metadata_keeps_surviving_streamed_rows_at_original_indices", "passed": true}
+{"label": "fn 1675 tail_grapheme_safety_crosses_style_and_role_boundaries", "passed": true}
+{"label": "23tests77assert0snapshot0runs", "passed": true}
+{"label": "test T01", "passed": true}
+{"label": "test T02", "passed": true}
+{"label": "test T03", "passed": true}
+{"label": "test T04", "passed": true}
+{"label": "test T05", "passed": true}
+{"label": "test T06", "passed": true}
+{"label": "test T07", "passed": true}
+{"label": "test T08", "passed": true}
+{"label": "test T09", "passed": true}
+{"label": "test T10", "passed": true}
+{"label": "test T11", "passed": true}
+{"label": "test T12", "passed": true}
+{"label": "test T13", "passed": true}
+{"label": "test T14", "passed": true}
+{"label": "test T15", "passed": true}
+{"label": "test T16", "passed": true}
+{"label": "test T17", "passed": true}
+{"label": "test T18", "passed": true}
+{"label": "test T19", "passed": true}
+{"label": "test T20", "passed": true}
+{"label": "test T21", "passed": true}
+{"label": "test T22", "passed": true}
+{"label": "test T23", "passed": true}
+{"label": "complete history history/target096-review320-ready", "passed": true}
+{"label": "complete history history/target096-postfreeze320", "passed": true}
+{"label": "complete history history/reference308-keys321-ready", "passed": true}
+{"label": "complete history history/reference309-status321-ready", "passed": true}
+{"label": "old reports exact and prefix", "passed": true}
+{"label": "reference reuse ZS1-308", "passed": true}
+{"label": "reference reuse ZS1-309", "passed": true}
+{"label": "104ready30471regular145tracked484history unchanged", "passed": true}
+{"label": "formal source unchanged at freeze", "passed": true}
+{"label": "no runtime execution", "passed": true}
+{"label": "unique owned report creation", "passed": true}
+{"label": "exact bounded patches", "passed": true}
+{"label": "temporary apply report.patch", "passed": true}
+{"label": "forward exact report", "passed": true}
+{"label": "sentinel report.patch", "passed": true}
+{"label": "temporary apply rollback.patch", "passed": true}
+{"label": "rollback only report removed", "passed": true}
+{"label": "sentinel rollback.patch", "passed": true}
+{"label": "post-audit package exact", "passed": true}
+{"checks": 233, "failed": 0, "structural_only": true, "runtime_execution": false}

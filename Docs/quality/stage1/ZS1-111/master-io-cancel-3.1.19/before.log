@@ -1,0 +1,34 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.54s
+     Running tests/stage1_tool_output.rs (target/debug/deps/stage1_tool_output-4a18213c0c004f77)
+
+running 1 test
+default 8MiB artifact, requested 8B: read_ms=4943 cancellation_to_return_ms=4942 callback_checks=3
+
+thread 'actual_default_max_artifact_read_measures_in_scan_cancellation' (28250037) panicked at tests/stage1_tool_output.rs:2599:9:
+cancel waited for full artifact scan
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test actual_default_max_artifact_read_measures_in_scan_cancellation ... FAILED
+
+failures:
+
+failures:
+    actual_default_max_artifact_read_measures_in_scan_cancellation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 52 filtered out; finished in 10.83s
+
+error: test failed, to rerun pass `--test stage1_tool_output`

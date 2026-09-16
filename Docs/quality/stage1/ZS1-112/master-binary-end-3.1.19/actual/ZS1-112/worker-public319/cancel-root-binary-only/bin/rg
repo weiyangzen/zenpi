@@ -1,0 +1,6 @@
+#!/bin/sh
+printf "%s\n" $$ > .rg-leader
+/bin/sleep 30 &
+printf "%s\n" "$!" > .rg-descendant
+wait
+exec /Applications/ChatGPT.app/Contents/Resources/rg "$@"

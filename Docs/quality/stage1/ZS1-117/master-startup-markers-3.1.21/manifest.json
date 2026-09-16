@@ -1,0 +1,52 @@
+{
+  "item": "ZS1-117",
+  "complete": false,
+  "production_budget_accepted": false,
+  "diagnostic_only": true,
+  "artifacts": {
+    "offline.run.json": {
+      "bytes": 290,
+      "sha256": "8c3b3f2f1dbb9d56991801c7486e93384241dd381a3f5dbabc8b72abecd163ae"
+    },
+    "worker-manifest.json": {
+      "bytes": 94076,
+      "sha256": "b1f4557c439c436918af2a2cb047e1fd1a4bfd8a01c8cc589c91da0370c63a53"
+    },
+    "markers.tsv": {
+      "bytes": 342,
+      "sha256": "bb40adbafd35d9927556fbadd400d68f667013972e4aa2d8d428791eaa57b3e2"
+    },
+    "worker-diagnosis.md": {
+      "bytes": 10582,
+      "sha256": "83ce106b7c36cbabc053051505d6e10eb59a6fb40893584e52d9a37d86130d73"
+    },
+    "stage-analysis.json": {
+      "bytes": 3629,
+      "sha256": "021a9a1d7bc342962ff53649d65d1c03730b65c64acce63031e667855e410fd1"
+    },
+    "diagnostic.patch": {
+      "bytes": 5707,
+      "sha256": "85923e5ca346803ca0be205a31e7ee2ad264a558a576891bcbd6b4d6a044082d"
+    },
+    "launch.run.json": {
+      "bytes": 2929,
+      "sha256": "6897e51aeb0a1aeee034be3eadfb4da3e938229cd35909c0f25d8532e0c1552b"
+    },
+    "offline.stdout.json": {
+      "bytes": 2556,
+      "sha256": "25bb05be02afa6e66c5b635cad6bb6d6b37dd1301c8de6a033a441bbdf989aa3"
+    },
+    "worker-ready.tar.gz": {
+      "bytes": 9452809,
+      "sha256": "7a970fae24356f0944a51a6dbed2112120353830b393bc1ff124597832c93bfc"
+    },
+    "review.md": {
+      "bytes": 4353,
+      "sha256": "38aa2ef1a6707890477ac49a7ceba18a60ac304fa191669cac781ee79d8b6074"
+    },
+    "offline.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

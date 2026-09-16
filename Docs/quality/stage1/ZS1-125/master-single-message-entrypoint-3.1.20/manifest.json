@@ -1,0 +1,122 @@
+{
+  "item": "ZS1-125",
+  "complete": false,
+  "artifacts": {
+    "initial-master-verification.json": {
+      "bytes": 1039,
+      "sha256": "60207b75b2c2049cd702b358408d3e770be7ed5c1f05bd4f77ab5ae0d609603c"
+    },
+    "tui_transcript_ux_smoke.py": {
+      "bytes": 22756,
+      "sha256": "da5f91b5ae1c49808d62fff2f5402bd70790c51122819a382d6353a7bb0c41a8"
+    },
+    "run.py": {
+      "bytes": 1080,
+      "sha256": "905d07cde05633b805b9f09ee1352c5e34124c22beb1eeaae4d358db279a6cb6"
+    },
+    "actual.run.json": {
+      "bytes": 676,
+      "sha256": "ccfb19fbe26d860731a28a252a208d4488431e23cbfcf1caab13d0af55c6d696"
+    },
+    "entrypoint-equivalence.json": {
+      "bytes": 295,
+      "sha256": "d80898784c0dd0a5ee7a1d68bb7084fed39aae6a7abedf0d4cfefccb664fb12b"
+    },
+    "actual.log": {
+      "bytes": 595,
+      "sha256": "9eefd6be6333620200338b428c56b2e97d61337066e82a73365364fe61ce0b53"
+    },
+    "tui_project_workspace_smoke.py": {
+      "bytes": 30738,
+      "sha256": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a"
+    },
+    "patch-replay.json": {
+      "bytes": 539,
+      "sha256": "335dd867b640fd9b82b533fc8b674fca7bb1d661969272fcaffae4f3ca1399fa"
+    },
+    "product.patch": {
+      "bytes": 49433,
+      "sha256": "a3802bbce85212162d89fb71a1396c2ddb10e16cc04a5b25bf9c3b70c35fa145"
+    },
+    "master-verification.json": {
+      "bytes": 1190,
+      "sha256": "57b0c2a398f6ba6c147f83d8d08bb92bdf94cd4737e6b0d21dea60be6f8ca25a"
+    },
+    "tui_user_shell_smoke.py": {
+      "bytes": 6964,
+      "sha256": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+    },
+    "review.md": {
+      "bytes": 2062,
+      "sha256": "4930d071cc2d1fb0be56bcc0dc08600020de30f393e8fb6e8fc30b01d775c13b"
+    },
+    "actual-pty/summary.json": {
+      "bytes": 31112,
+      "sha256": "ed44353141531e797df92a2b3d51197266f7e4c025390d4c00e8bde1194385dd"
+    },
+    "actual-pty/fenced/session.jsonl": {
+      "bytes": 102820,
+      "sha256": "8d5b782d58e36a9f6b2aa7e5f804ba0d877705a1a2ba57e03e8f671771214287"
+    },
+    "actual-pty/fenced/result.json": {
+      "bytes": 15362,
+      "sha256": "43f8eb9e2c810a4843751b25ec0fdeb2bce1b4288dcc94b1ba60f36a6ca19294"
+    },
+    "actual-pty/fenced/http.json": {
+      "bytes": 8204,
+      "sha256": "35c74056899dd8e086b3d57e29d636ede00a41fe47afb068ee930afabbcf42c6"
+    },
+    "actual-pty/fenced/terminal.pty.log": {
+      "bytes": 10861,
+      "sha256": "a3e870e69d7cd14178132869752bb152f52f28a8bc4555d482febdf361e5796f"
+    },
+    "actual-pty/prose/session.jsonl": {
+      "bytes": 102806,
+      "sha256": "6b5e70ec9b9c929dcb2f38a246f55ab211aa5e968b27f8e3c723707d969467b8"
+    },
+    "actual-pty/prose/result.json": {
+      "bytes": 15364,
+      "sha256": "a43ac4f9906a4974d7896bdbc0bd0401c4ca20ce898aea1356b975306c881b7a"
+    },
+    "actual-pty/prose/http.json": {
+      "bytes": 8204,
+      "sha256": "35c74056899dd8e086b3d57e29d636ede00a41fe47afb068ee930afabbcf42c6"
+    },
+    "actual-pty/prose/terminal.pty.log": {
+      "bytes": 10778,
+      "sha256": "db9687e7053a258b7184b418138425114bad01d9aa7fb75a325bacffc6e76e52"
+    },
+    "before/tools/tui_transcript_ux_smoke.py": {
+      "bytes": 15702,
+      "sha256": "992a2b335487a230f7bcfd0f0ce7c2909dcd9168e5a840dbe2bf6b84d99b2fa4"
+    },
+    "before/tests/tui_transcript_ux.rs": {
+      "bytes": 12405,
+      "sha256": "9a5d9c2784ccb1ba5f43e5092ade33e370a259781c4709c059ab3a071d71c13c"
+    },
+    "before/src/render.rs": {
+      "bytes": 30217,
+      "sha256": "6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7"
+    },
+    "before/src/tui.rs": {
+      "bytes": 591434,
+      "sha256": "e0e509e507c7c28e4e4ca24709a088c9cedf167c692cf62c3d9bc0ac3658f336"
+    },
+    "after/tools/tui_transcript_ux_smoke.py": {
+      "bytes": 22756,
+      "sha256": "da5f91b5ae1c49808d62fff2f5402bd70790c51122819a382d6353a7bb0c41a8"
+    },
+    "after/tests/tui_transcript_ux.rs": {
+      "bytes": 16949,
+      "sha256": "26562ab62ebf73a8eae1fd951ac0a247eb4adb9fc8711e87a3fc55d0b5ebd5d7"
+    },
+    "after/src/render.rs": {
+      "bytes": 60098,
+      "sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d"
+    },
+    "after/src/tui.rs": {
+      "bytes": 591971,
+      "sha256": "2d3373d72fc5ad68b9e266824fe4c31c37db7b1c732927b4e38f4daecf8e53bd"
+    }
+  }
+}

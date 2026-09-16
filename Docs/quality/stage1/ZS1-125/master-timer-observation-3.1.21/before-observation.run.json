@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/Users/wangweiyang/GitHub/zenpi/target/debug/zenpi-status125-observation"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/status125-timer-observation-3.1.21",
+  "started_at": "2026-09-13T00:02:43.610870+00:00",
+  "ended_at": "2026-09-13T00:02:49.356548+00:00",
+  "exit_code": 1,
+  "stdout": {
+    "bytes": 2656,
+    "sha256": "95120c3de73dc4750198a9229c2ad3b184bb30abd1c1bb04cd1a849a5d27733d"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "binary": {
+    "bytes": 50751592,
+    "sha256": "80675c7331b87c9af4e0dcb9d70155608da17ff514092ed05b38442a8ff0a1ca"
+  },
+  "owned": {
+    "src/tui.rs": {
+      "bytes": 669221,
+      "sha256": "801bffa879a211fc8b1fe3f43463dd38584f7f570b870d91f0c5ba2258d79c02"
+    },
+    "src/layout.rs": {
+      "bytes": 54724,
+      "sha256": "f2f6883b429e012d017bb208b03ecd35a02f9ddb186989d73037c56c07d94af8"
+    },
+    "tests/tui_bentobox.rs": {
+      "bytes": 21904,
+      "sha256": "6f5e35cace2cd9aa5a0e4fb7fa720a08ec4ab1f7f987e73f1613024233782455"
+    }
+  },
+  "scope": "128 local short-workspace keyboard focus repair; full interaction acceptance pending"
+}

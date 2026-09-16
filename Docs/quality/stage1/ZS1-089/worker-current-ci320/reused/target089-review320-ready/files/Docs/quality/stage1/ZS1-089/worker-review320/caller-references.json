@@ -1,0 +1,150 @@
+[
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/validate_blueprint.py",
+    "relative_path": "tools/validate_blueprint.py",
+    "sha256": "2d103963fd98885690762c8ebf12eeb766c28a4bf08433f042a917a3e4c8cc9d",
+    "bytes": 27223,
+    "lines": 591,
+    "captured_at": "2026-09-12T11:20:48.194923+00:00",
+    "scope": "entry excerpt; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 36,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/validate_blueprint-1-36.txt",
+        "sha256": "93972a28d244492f98bc86c069c4e680a64131ce091b00d98d2f86ba071e6b1e"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/validate_blueprint_v2.py",
+    "relative_path": "tools/validate_blueprint_v2.py",
+    "sha256": "f9aab3285ab9d2f1d45a0c80cdcbdeb5196d67c30ceacc132cc9b2c688b721d3",
+    "bytes": 7895,
+    "lines": 198,
+    "captured_at": "2026-09-12T11:20:48.195124+00:00",
+    "scope": "entry excerpt; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 29,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/validate_blueprint_v2-1-29.txt",
+        "sha256": "e022e04bd758be616b572bb9a9ca5f18fbd03f4c80d73f889a4ec9e92c724adb"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/check_rust_loc.py",
+    "relative_path": "tools/check_rust_loc.py",
+    "sha256": "836d71278a88698e8d205fe4f617fcd16e79eb6dfbe96b64d1d9f8ba38677cbe",
+    "bytes": 7711,
+    "lines": 225,
+    "captured_at": "2026-09-12T11:20:48.195264+00:00",
+    "scope": "entry excerpt; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 38,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_rust_loc-1-38.txt",
+        "sha256": "2e544c02800de20b902fe8080e89de076f160aa7f3159ba4a590a7ab91fbb16c"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+    "relative_path": "tools/bench_runtime.py",
+    "sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c",
+    "bytes": 15327,
+    "lines": 338,
+    "captured_at": "2026-09-12T11:20:48.195399+00:00",
+    "scope": "budget and main excerpts; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 55,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-1-55.txt",
+        "sha256": "21d111b729d1bee8fcf8d1286a26368eca7c868030dcf18506445d7ea6745b4f"
+      },
+      {
+        "line_start": 292,
+        "line_end": 338,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-292-338.txt",
+        "sha256": "a2cc335f2ae797478fa2ed3835ca6c1b64857a89e1b5cd09379ed0e6f155b9c0"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/check_modes.py",
+    "relative_path": "tools/check_modes.py",
+    "sha256": "38e03245127a7fb7417f8f20f1ca73ba54507df4e8c5f8c6d82a2c6242aad38d",
+    "bytes": 2070,
+    "lines": 53,
+    "captured_at": "2026-09-12T11:20:48.195599+00:00",
+    "scope": "full script; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 53,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_modes-1-53.txt",
+        "sha256": "38e03245127a7fb7417f8f20f1ca73ba54507df4e8c5f8c6d82a2c6242aad38d"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/headless_smoke.sh",
+    "relative_path": "tools/headless_smoke.sh",
+    "sha256": "4a676eafbda99c05773e851fa4bb91e40339de880385b2517354dd11e1e41f01",
+    "bytes": 16632,
+    "lines": 396,
+    "captured_at": "2026-09-12T11:20:48.195725+00:00",
+    "scope": "entry excerpt; remaining smoke assertions not read; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 95,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/headless_smoke-1-95.txt",
+        "sha256": "8497a7d78d1374591c2182f619a27ff6e2b05f40e21edacdb8e9fcc44b6aa23c"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/user_smoke.py",
+    "relative_path": "tools/user_smoke.py",
+    "sha256": "8d7fcbcab3cc44ebc8b489aaf3ff312cd03ac592a276cc4df6d27c4a7e98caef",
+    "bytes": 76027,
+    "lines": 1836,
+    "captured_at": "2026-09-12T11:20:48.195960+00:00",
+    "scope": "environment and main excerpts; helper tests not read; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 57,
+        "line_end": 82,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-57-82.txt",
+        "sha256": "19cc2feb964ad9b910087922e166b5ed4306a7a80c02b2feb2147e48ef5c4944"
+      },
+      {
+        "line_start": 1744,
+        "line_end": 1836,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-1744-1836.txt",
+        "sha256": "da7c1689d3aa3e4dbad0d8f8e5fa71261fa14c46f6a3ab5c290ab02cce35e92c"
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/release.sh",
+    "relative_path": "tools/release.sh",
+    "sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094",
+    "bytes": 2222,
+    "lines": 49,
+    "captured_at": "2026-09-12T11:20:48.196290+00:00",
+    "scope": "full script; no sibling acceptance",
+    "excerpts": [
+      {
+        "line_start": 1,
+        "line_end": 49,
+        "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/caller-references/release-1-49.txt",
+        "sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094"
+      }
+    ]
+  }
+]

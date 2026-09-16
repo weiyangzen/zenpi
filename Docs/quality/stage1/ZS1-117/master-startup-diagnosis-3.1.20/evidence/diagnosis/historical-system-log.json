@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/usr/bin/log",
+    "show",
+    "--style",
+    "json",
+    "--start",
+    "2026-09-12 14:02:49",
+    "--end",
+    "2026-09-12 14:03:36",
+    "--predicate",
+    "(process == \"syspolicyd\" OR process == \"amfid\" OR process == \"kernel\") AND eventMessage CONTAINS[c] \"zenpi\""
+  ],
+  "returncode": 0,
+  "elapsed_ms": 3499.751208
+}

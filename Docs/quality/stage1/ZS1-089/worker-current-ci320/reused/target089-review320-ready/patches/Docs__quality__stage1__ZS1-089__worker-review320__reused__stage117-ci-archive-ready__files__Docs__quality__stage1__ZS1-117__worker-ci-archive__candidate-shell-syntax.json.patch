@@ -1,0 +1,28 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.json b/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.json
+@@ -0,0 +1,23 @@
++{
++  "name": "candidate-shell-syntax",
++  "argv": [
++    "/bin/bash",
++    "-n",
++    "Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-gate.sh"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-10T23:13:16.204751+00:00",
++  "ended_at": "2026-09-10T23:13:16.207943+00:00",
++  "elapsed_seconds": 0.003048167000000001,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 2015232,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.log",
++  "bytes": 0,
++  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
++}

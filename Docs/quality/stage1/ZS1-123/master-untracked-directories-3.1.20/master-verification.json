@@ -1,0 +1,21 @@
+{
+  "item": "ZS1-123",
+  "increment": "wholly untracked directories",
+  "complete": false,
+  "integrated": true,
+  "root_top_level_rust_passed": 89,
+  "root_nested_child_cases_excluded": 2,
+  "worker_results_not_added": true,
+  "root_host_before_failed_checks": 12,
+  "root_host_after_passed_checks": 15,
+  "source_before_sha256": "eb8cd91d6f84ea977454fe69a2304a2ff56ef714b8356e90e51526f5ce1dfcc3",
+  "source_after_sha256": "7006078ff6a612b1d7a3cde59965e629919444ff0fb51034f5e86c7dca239831",
+  "binary_sha256": "7a405f3443ef362afbeca95b521c2eb3dc7b368f50c931e6367b4c1e6b3f6e2a",
+  "release_verified": false,
+  "remaining": [
+    "unborn HEAD mixed staged-only omission",
+    "empty untracked no-index handling under investigation",
+    "final exact release and budgets"
+  ],
+  "prescribed_whole_item_acceptance": false
+}

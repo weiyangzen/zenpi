@@ -1,0 +1,452 @@
+[
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/authority-context.json",
+    "bytes": 2273,
+    "sha256": "dd899a1553cdba661cbcd4e5776b6c109ea0d70ff53aac0ed760ffbb580d8545"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency-status.json",
+    "bytes": 969,
+    "sha256": "72b53b20959dbcdeb4bdf314959e2c53b93754703e3dcf1184ff29f6d084eb10"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md",
+    "bytes": 24526,
+    "sha256": "33e353712730db9dcb9335e8c16c8d9caa83c2488a0d7b851d3042a33dfa670f"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/baseline-ci.yml",
+    "bytes": 2480,
+    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/baseline-to-current.diff",
+    "bytes": 1013,
+    "sha256": "90723015cfe9a08de1e1f0036b3e8a871fb7ba521644a5d399298c706ece5fee"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-1-55.txt",
+    "bytes": 1757,
+    "sha256": "21d111b729d1bee8fcf8d1286a26368eca7c868030dcf18506445d7ea6745b4f"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-292-338.txt",
+    "bytes": 2611,
+    "sha256": "a2cc335f2ae797478fa2ed3835ca6c1b64857a89e1b5cd09379ed0e6f155b9c0"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_modes-1-53.txt",
+    "bytes": 2070,
+    "sha256": "38e03245127a7fb7417f8f20f1ca73ba54507df4e8c5f8c6d82a2c6242aad38d"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_rust_loc-1-38.txt",
+    "bytes": 1255,
+    "sha256": "2e544c02800de20b902fe8080e89de076f160aa7f3159ba4a590a7ab91fbb16c"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/headless_smoke-1-95.txt",
+    "bytes": 2613,
+    "sha256": "8497a7d78d1374591c2182f619a27ff6e2b05f40e21edacdb8e9fcc44b6aa23c"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/release-1-49.txt",
+    "bytes": 2222,
+    "sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-1744-1836.txt",
+    "bytes": 4070,
+    "sha256": "da7c1689d3aa3e4dbad0d8f8e5fa71261fa14c46f6a3ab5c290ab02cce35e92c"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-57-82.txt",
+    "bytes": 694,
+    "sha256": "19cc2feb964ad9b910087922e166b5ed4306a7a80c02b2feb2147e48ef5c4944"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/validate_blueprint-1-36.txt",
+    "bytes": 1074,
+    "sha256": "93972a28d244492f98bc86c069c4e680a64131ce091b00d98d2f86ba071e6b1e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/validate_blueprint_v2-1-29.txt",
+    "bytes": 844,
+    "sha256": "e022e04bd758be616b572bb9a9ca5f18fbd03f4c80d73f889a4ec9e92c724adb"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/caller-references.json",
+    "bytes": 5724,
+    "sha256": "4be613e3b1c4e4b2642e5fac78154159e6ffe4cb878089c41c4121ed8160e932"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/current-ci.yml",
+    "bytes": 3104,
+    "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/gate-disposition.json",
+    "bytes": 738,
+    "sha256": "dd8502c381a6967387f7a03c287ff7358d7b3b39517321562536f229aade60b1"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/gstage-main.json",
+    "bytes": 926,
+    "sha256": "a6f46428bb316293b6c22723957570066a6740d5e92c14510c0e40e7dd621f16"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/gstage-main.log",
+    "bytes": 408,
+    "sha256": "fd4e98ca2d279a3a8f6df7fe7ca1b6f6e56a655d5976318aee2f2d673e90638f"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/input-manifest.json",
+    "bytes": 1381,
+    "sha256": "570cdb1b03d1e94a9b891bc0185d80db0732b2eab5fe28d641f9e8cae853dcce"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/integrity-final.json",
+    "bytes": 834,
+    "sha256": "1bca9645e0d9d507a85220139640399e482d48ccd9eecf2771dd7f4c32922c32"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/integrity-final.log",
+    "bytes": 2933,
+    "sha256": "0e051246042ee749a1f77840a38172c239fbb1c6a09ae00173a2bf9dbddcd0ad"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/integrity-offline.json",
+    "bytes": 853,
+    "sha256": "7eef23cdd081092f66ab52b9bff1e1ea2f06eb7c406aa84d3b3e6c02963beb7a"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/integrity-offline.log",
+    "bytes": 904,
+    "sha256": "85953e3679dc1fdfedfacd8484a821b0b6717092b8a144a2f5e0925fce17b21b"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/local-working-source.json",
+    "bytes": 247,
+    "sha256": "b4fa8f31cc52680b4d31504aabb3785e24eae1ab9cd584bb3f4a04b845cea339"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/preserved-ready-manifests.json",
+    "bytes": 6325,
+    "sha256": "5fbfe1a279407154259bc818174b28361096f721fab19694441440a8432ef07a"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/prior-report.md",
+    "bytes": 12050,
+    "sha256": "60ecb71dd2898ae62ed20169442f4ec36a58894dfb380d50fea1ed2fd965f96e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/report-final.json",
+    "bytes": 194,
+    "sha256": "801fbd62a96215b34b977f9be9e844f6d53ea6f64403e1e1ddbf8577549e2da9"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/report-inventory.json",
+    "bytes": 323,
+    "sha256": "5e0776bc58cfc1a6cf9dd1df14388fd8aaf194826126e93efe22b3a293769820"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/.github/workflows/ci.yml",
+    "bytes": 3104,
+    "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/baseline-ci.yml",
+    "bytes": 2480,
+    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/baseline-gate.sh",
+    "bytes": 121,
+    "sha256": "dd1f35d88a2dca2eb81107dcec60102c1816264dc4a23b3cc386787fef7b2302"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/baseline.json",
+    "bytes": 422,
+    "sha256": "cf8615af3115a04df89d665a53f2b9c48bee70f3cdea201ca6b02ce50be8c973"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-ci.yml",
+    "bytes": 3104,
+    "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-gate.sh",
+    "bytes": 575,
+    "sha256": "58756a2e3723b6ac22b274b0e9c46c6e25ae757b143f50f00475b85d70495dd1"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.json",
+    "bytes": 868,
+    "sha256": "d2d41aa3d4e154552c924ec31aca58cae5046699f7d7417daac3d046c5a17266"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/candidate-shell-syntax.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/evidence-verified.json",
+    "bytes": 849,
+    "sha256": "2454134a363a86aacc543856ecd1d7ebaa3f1ed2665a59ae0fef583e55210dd5"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/evidence-verified.log",
+    "bytes": 205,
+    "sha256": "0c4775dc4b0174cd7e0a9523eb0dcc4d105d1498f3ebd763adc612395f547b8e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/g-stage-main-before-integration.json",
+    "bytes": 1138,
+    "sha256": "a877c660d58c6412ae327258e08c104ced15671a371393b6cc38005abf2c0739"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/g-stage-main-before-integration.log",
+    "bytes": 408,
+    "sha256": "60eceb06118437035a2b02d9dc72b1fc3223dcba669fe1234f7cf58d4d6fb544"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/old089-preservation.json",
+    "bytes": 262,
+    "sha256": "2c5a2c5964aecfda5da9cb27bd69914fe2f9ad1379860b773a703559768e1ab8"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/original089-archive-gate-counterexample.json",
+    "bytes": 877,
+    "sha256": "59915079b759e39c04934af3e3aa200ba1296cbb9eeebf3e53bb77768dd78d54"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/original089-archive-gate-counterexample.log",
+    "bytes": 1498,
+    "sha256": "f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/repair-report.md",
+    "bytes": 4361,
+    "sha256": "493b447c193f16208d5beaa75340f8baab2b899fad1ef39348c53e513b05ba14"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/replay_archive_gate.py",
+    "bytes": 4137,
+    "sha256": "279bc1173ee3bdcdaa378e5bb0b8c9c28d5dc2459d46ec9ab7304adfdbd5ba4e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/three-case-replay.json",
+    "bytes": 846,
+    "sha256": "dd32934392d692d36ca71b8cfb31fa88845d4415d7232b413245fe4da10e5e0a"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/three-case-replay.log",
+    "bytes": 3773,
+    "sha256": "58d1f5f757016f2e2ef9c9befc618984670d0baf7f4ddfcf832ab00e84d76426"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/three-case-results.json",
+    "bytes": 4783,
+    "sha256": "13e8f8c41e38f8f099ff3e4317739877c9600c38a624fba19a71d7c42902c7d8"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/files/Docs/quality/stage1/ZS1-117/worker-ci-archive/verify_evidence.py",
+    "bytes": 1940,
+    "sha256": "65fe003d28748c8613eb712924170d575a6dfe3f52130e7ec6a3e8ac41e04254"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready/manifest.json",
+    "bytes": 12311,
+    "sha256": "160a2115a98abc13ba7cd022f2aad28dff583b5e8573c867393799e8fb409d37"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md",
+    "bytes": 12050,
+    "sha256": "60ecb71dd2898ae62ed20169442f4ec36a58894dfb380d50fea1ed2fd965f96e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/README.md",
+    "bytes": 1512,
+    "sha256": "bd6d29f35a38689e6242758254ba46ca9adddf5fe48ec6d05317a92e017abde1"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/archive-gate-counterexample.json",
+    "bytes": 877,
+    "sha256": "59915079b759e39c04934af3e3aa200ba1296cbb9eeebf3e53bb77768dd78d54"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/archive-gate-counterexample.log",
+    "bytes": 1498,
+    "sha256": "f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/current-ci.yml",
+    "bytes": 2480,
+    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/external-reference.json",
+    "bytes": 442,
+    "sha256": "e92c5f988caa0558ae8505e395c4b716372b665f83ef22f930657643de1aa822"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/g-stage-main-before-integration.json",
+    "bytes": 1132,
+    "sha256": "f86e70c0415fdd3608d60d73eefac25699c140cdbd03e19a8c774e757f512707"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/g-stage-main-before-integration.log",
+    "bytes": 408,
+    "sha256": "fd4e98ca2d279a3a8f6df7fe7ca1b6f6e56a655d5976318aee2f2d673e90638f"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/input-manifest.json",
+    "bytes": 1349,
+    "sha256": "e18240a403fc435449a4c314ef9379498cf6e1e70aa3a69f4249384f7297d3cb"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/original-ci.yml",
+    "bytes": 2480,
+    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/probe_archive_gate.py",
+    "bytes": 2381,
+    "sha256": "9708b33279b15bfcb85e1008f73980a0dc279fd94e40e5c9a6c7373749c0426b"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/references-verified.json",
+    "bytes": 851,
+    "sha256": "546d9ba8a946e15d074b3fa0fab1a3a4e5213b4f821aa3415c9134e02f2becba"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/references-verified.log",
+    "bytes": 336,
+    "sha256": "0308d3fc32c0c86d23bef882cfb35c3b4ad96615822da5404c40065ca66fe671"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/references.json",
+    "bytes": 1152,
+    "sha256": "8c1b639e8d965ba17d950fb547d7a1c4dfbf4b9e1ced7ded3ab92e0c81f5cd89"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/script-context.json",
+    "bytes": 19229,
+    "sha256": "8b0865a5bc5e64d02690a9977600e6f977aa4f459a7684f0170517b69d82ccd3"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/step-index.json",
+    "bytes": 1071,
+    "sha256": "75c0ec44ef9161462ee1e21258e50fa176de87b0c8306319fcd5d202878d135e"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/verify_references.py",
+    "bytes": 2115,
+    "sha256": "f1c6442ddfef23e6c567d8d1183bab06dca602f67cf61303262bcfc4d7d7c6fe"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/manifest.json",
+    "bytes": 10400,
+    "sha256": "e4584db1d96af2d80ad3e8a660daa3a47c69f244b0998526f5efcb10e8605d47"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/reused-packages.json",
+    "bytes": 843,
+    "sha256": "5898fc96ca5f219fe2e178fde7c4c89ee6b87b17b85536c7e56c61e306635f64"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/step-index.json",
+    "bytes": 2434,
+    "sha256": "e308955f4c32d186c2077f8e0c0cf12b7c67b4b50328fbf9b95a161783d20c38"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/files/Docs/quality/stage1/ZS1-089/worker-review320/verify_review.py",
+    "bytes": 7235,
+    "sha256": "40541348c57e912b2b1c3f124596f3a0d6adfff19d1178f7ed3d9bf56bb2aa1d"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/dependency089/manifest.json",
+    "bytes": 53078,
+    "sha256": "d82de0618e7c6aa00062a0df039ad4016473dcd5c9eba5cf798962245235674c"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/directory-inventory.json",
+    "bytes": 1037,
+    "sha256": "66e3124fa355765c67ff4209332e08ff956e79db123d57ae11dc61a009a8275a"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/directory-snapshot/ci.yml",
+    "bytes": 3104,
+    "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/directory-snapshot/release.yml",
+    "bytes": 3779,
+    "sha256": "caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/gate-disposition.json",
+    "bytes": 844,
+    "sha256": "4eba09f429a20c682bbc4bceabc01f5df9fdb352aa4dc3f66e47e38262ab8e5b"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/gstage-main.json",
+    "bytes": 922,
+    "sha256": "9649ba0df672f9ad4f59335fbafb274447e8a9d28d4b736345cecd00dc5fe250"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/gstage-main.log",
+    "bytes": 408,
+    "sha256": "8a40f07cfaf62ef256e48e90b676db7d29bde6e9bffe4daddc084ce961fa903a"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/input-manifest.json",
+    "bytes": 937,
+    "sha256": "2f2d971c127bbe4877f283fef1bb9eae77758808924651226450f30db42160b1"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/integrity-final.json",
+    "bytes": 832,
+    "sha256": "64f16c40d78364638f04118de2941752e120a39e0090957fb33f610f6b6cde77"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/integrity-final.log",
+    "bytes": 1026,
+    "sha256": "67b9f4a1ae97f162fbe5915d90bb02aabb7ec1ef958423078cfc2e27690e020b"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/integrity-offline.json",
+    "bytes": 854,
+    "sha256": "735dc52dee21dc67d2f36643f73d4cf0cd8fbf7ab6e72575dcf184c024664d69"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/integrity-offline.log",
+    "bytes": 1027,
+    "sha256": "c5dac298bd043568f5bdb5b2ffdeb91fe0572017c59c9684555127deeb7472a4"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/local-working-sources.json",
+    "bytes": 400,
+    "sha256": "a877aa1c992a7af5bd83ff76210fdc2e2be9e9b71d2f5175b74bcd18fd45d117"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/preserved-ready-manifests.json",
+    "bytes": 6523,
+    "sha256": "77958adfa13e9cb7e00f69b5221a3853429a79cd14179ecbc778324f00fb8fac"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/report-final.json",
+    "bytes": 196,
+    "sha256": "1429b0818ab74c47e2e5b8f1520cfddacaef5d7e667ae5eabfcbad2032bf3808"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/report-inventory.json",
+    "bytes": 202,
+    "sha256": "4114d9323f1e0a6e77a6047b43bcb3c4faeb5f89a03c1fd8e4ec94321f7409e1"
+  },
+  {
+    "path": "Docs/quality/stage1/ZS1-092/worker-review320/verify_review.py",
+    "bytes": 6082,
+    "sha256": "9e65d4f6cdba44b91a4c437a446943c0910303db00f8b341db27dcee31f2ea98"
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "scope": "offline evidence integrity only; no new behavior execution",
+  "production_prefix_identical": true,
+  "existing_runner_budget_assertion_sentinel": true,
+  "unchanged_test_count": 5,
+  "unchanged_helper_ignore_count": 1,
+  "final_cases_checked": 12,
+  "negative_startup_cases_failed": 4,
+  "context_files_checked": 128,
+  "forward_apply_check": true,
+  "actual_forward_hash": true,
+  "reverse_apply_check": true,
+  "actual_reverse_hash": true,
+  "unrelated_sentinel_unchanged": true,
+  "master_acceptance_pending": true
+}

@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "clippy",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--test",
+    "stage1_semantic_compaction",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-13T02:13:14.677481+00:00",
+  "ended_at": "2026-09-13T02:13:20.221055+00:00",
+  "exit_code": 0,
+  "log": {
+    "bytes": 828,
+    "sha256": "a70f4176720e2718209dd61c296d47e60137988c8bb53cde629c59640337dffc"
+  },
+  "env_overrides": {
+    "CARGO_TARGET_DIR": "/Users/wangweiyang/GitHub/zenpi/target",
+    "CARGO_BUILD_JOBS": "2",
+    "ZS1_DEFERRED_SUMMARY_EVIDENCE": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/summary-deferred-integration-3.1.21/after-http-evidence"
+  }
+}

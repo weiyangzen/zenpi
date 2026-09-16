@@ -1,0 +1,302 @@
+{
+  "schema": "zs1-029-independent-offline/v1",
+  "passed": true,
+  "checks": [
+    {
+      "name": "all captured inputs exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "62416 bytes1717 lines frozen source",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "seven new complete contiguous source readings",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all29 context ranges byte and line exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "eight earlier context identities reused separately",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original physical package source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original payloads source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original bases source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original patch and runner source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all memory forward reverse patches source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "combined patch equals constituent sequence source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original physical package source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original payloads source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original bases source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original patch and runner source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all memory forward reverse patches source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "combined patch equals constituent sequence source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original physical package source029-current-map320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "original payloads source029-current-map320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current-map original artifact table",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current-map memory forward reverse candidate.patch",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current-map memory forward reverse append-existing-report.patch",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "report prefix chain exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current-map nested prior package exact source029-behavior-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current-map nested prior package exact source029-reuse320-ready",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical complete reading exact reuse320",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical complete reading exact current-map320",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "11 behavior artifacts exact across revisions",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "actual probe identity",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt source-native",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt target-chat",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical33 cases37 requests",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical pinned SDK/parser",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical8 target passes",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "later historical Chat receipt worker-reasoning-replay/acceptance-reviewed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "later historical Chat receipt worker-json-strict/joint-final",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "later historical Chat receipt worker-contract318/prescribed108",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical integrity preserved integrity-final",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical integrity preserved integrity-reviewed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "core drift failure retained",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "G-STAGE original failure reuse320",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "G-STAGE original failure current-map320",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "five current target identities match prior mapping",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "15 prior mapping excerpts exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current22 Chat definitions",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "previous dependency identity packages/ai/src/api/transform-messages.ts",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "previous dependency identity packages/ai/src/utils/provider-retry.ts",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "3.1.21 authority baseline",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "029 only source/report binding source_manifest.tsv",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "029 only source/report binding file_learn_index.tsv",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "only029 authored candidate",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "initial and final authority captures retained",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "final captured029 authority scope stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready payload hashes",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready exact file set",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "mode": "portable only",
+  "runtime_executions_this_round": 0,
+  "candidate": {
+    "bytes": 26839,
+    "sha256": "254d3041e58ad6aa5d17587d8e9b4dad3509341ba39922f17d457ee49797c21a"
+  },
+  "historical_receipts": [
+    {
+      "receipt": "historical/source029-reuse320-ready/files/Docs/quality/stage1/ZS1-029/worker-reuse320/historical/Docs/quality/stage1/ZS1-108/worker-reasoning-replay/acceptance-reviewed.json",
+      "chat_tests": 15
+    },
+    {
+      "receipt": "historical/source029-reuse320-ready/files/Docs/quality/stage1/ZS1-029/worker-reuse320/historical/Docs/quality/stage1/ZS1-108/worker-json-strict/joint-final.json",
+      "chat_tests": 20
+    },
+    {
+      "receipt": "historical/source029-reuse320-ready/files/Docs/quality/stage1/ZS1-029/worker-reuse320/historical/Docs/quality/stage1/ZS1-108/worker-contract318/prescribed108.json",
+      "chat_tests": 22
+    }
+  ],
+  "scope": "029 complete file only; unrelated status/Gantt not gates; no old script/product execution or master acceptance"
+}

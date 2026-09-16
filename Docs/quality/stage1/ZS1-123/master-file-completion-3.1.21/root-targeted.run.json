@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--test",
+    "tui_command_palette",
+    "file_completion_"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "env_overrides": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/Users/wangweiyang/GitHub/zenpi/target",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "started_at": "2026-09-13T00:06:55.590451+00:00",
+  "ended_at": "2026-09-13T00:07:12.743708+00:00",
+  "exit_code": 0,
+  "log": {
+    "bytes": 1911,
+    "sha256": "adea50c15a8e63401e460e8d06ab4fdf9298d770089bc3161ee1400363c29e73"
+  }
+}

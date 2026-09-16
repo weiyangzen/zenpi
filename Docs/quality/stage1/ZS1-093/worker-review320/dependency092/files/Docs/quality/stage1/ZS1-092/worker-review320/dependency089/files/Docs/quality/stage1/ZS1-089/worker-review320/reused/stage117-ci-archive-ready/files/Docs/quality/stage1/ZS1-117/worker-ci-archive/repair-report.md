@@ -1,0 +1,25 @@
+# ZS1-117 CI archive check repair
+
+Candidate [_]. Authority3.1.17, requirement digest `4b4bbb809fc660d55186317e9e12cfdccc7f3a2ba4567dc94b93d96858584f1a`. Main explicitly assigned this narrow117 repair after083 and the subsequent115 fixture repair. Changed product path: `.github/workflows/ci.yml` only; other additions are this117 evidence directory. This is not completion of all117 production/smoke obligations.
+
+A checksum-consistent but malformed archive previously passed the final CI archive gate. The old `! tar ... | grep ...` combined two separate questions: whether tar could read the archive and whether its listing matched forbidden names. A failed tar with no matching listing became a successful negated no-match result. Original089's actual counterexample remains unchanged, with copied receipt/log here; frozen089 manifest SHA `e4584db1d96af2d80ad3e8a660daa3a47c69f244b0998526f5efcb10e8605d47` and all frozen file hashes were rechecked.
+
+The final step now writes each successfully read archive listing to a temporary file, explicitly fails if tar cannot read it, and only then checks forbidden entries. The forbidden-name regex is unchanged. A match fails; grep's ordinary no-match status1 passes; other grep errors fail. An EXIT trap removes the temporary listing on success or error. The existing checksum verification stays first, and every matching archive is iterated separately. There is no pipeline whose negation can erase tar's status. No change to release.sh, Cargo, Rust, prior workflow steps or inherited serial-test/budget-upload changes is included.
+
+Dirty main baseline:2480 bytes, SHA `5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6`. Candidate:3104 bytes, SHA `b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd`. The patch base is the captured current main file, not Git HEAD, so existing dirty CI work is preserved. The source before the final old archive-check line is byte-identical.
+
+## Actual three-case replay
+
+The runner extracts the actual old/new checksum-plus-archive commands from their YAML blocks; it excludes only `tools/release.sh`, so it does not rebuild or claim to execute the whole workflow. Both versions receive identical archive bytes and a matching SHA256 file in each private directory. Actual `/bin/bash -e`, shasum, tar, grep and mktemp run locally. Results:
+
+| Archive | Checksum | Previous gate | Fixed gate |
+| --- | --- | --- | --- |
+| Valid archive containing README | matches |0|0|
+| Valid archive containing `.env` with harmless test bytes | matches |1|1|
+| Malformed archive | matches |0, incorrect pass|1, explicit tar failure|
+
+`three-case-replay.log` SHA `58d1f5f757016f2e2ef9c9befc618984670d0baf7f4ddfcf832ab00e84d76426` preserves actual stdout/stderr/status and tool versions. All three checksum checks print OK in both versions. Independent tar listing rejects the malformed bytes. Temporary-listing cleanup is checked after every old/new execution. Archive bytes are retained as Base64 plus hashes in three-case-results.json for exact reconstruction; there are no credentials in the fixtures. The runner does not change HOME or CODEX_HOME; it only directs TMPDIR into its private fixture directory. All subprocesses have bounded replay timeouts.
+
+The extracted final shell block also passes bash -n. The source/receipt verifier confirms the unchanged prefix, expected three statuses, exact artifact hashes and frozen089 preservation. This is real local macOS arm64/BSD tar/bash3.2 behavior. It is **not** a hosted GitHub Ubuntu/Linux run, full YAML platform validation, release compilation or complete117 acceptance. Missing archives, multiple archives, grep IO errors and other package contents were not additional executed scenarios; their branch behavior is described from the implementation without inflating the three-case count. A new broad Cargo suite is not relevant to this shell-only delta.
+
+G-STAGE ran on read-only main with PYTHONDONTWRITEBYTECODE=1 and returned structural validity plus missing117 master receipt (exit1); this remains nonacceptance. The freeze verifies apply/check, every forward byte, reverse/check and exact baseline restoration in scratch. Rollback restores the captured2480-byte CI file and removes only this new117 evidence. Old089/115 packages, inherited changes and main product files remain untouched by worker C.

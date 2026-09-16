@@ -1,0 +1,22 @@
+"""Exercise actual captured checksum/archive-list shell lines, no workflow mutation."""
+from pathlib import Path
+import hashlib,io,json,subprocess,tarfile,tempfile
+R=Path(__file__).resolve().parents[5];source=R/'.ops/target089-base/current-ci.yml';lines=source.read_text().splitlines();commands='\n'.join(line.strip() for line in lines[75:77])+'\n';assert commands.startswith('(cd dist && shasum') and '! tar -tzf' in commands
+rows=[]
+for case in ['clean','forbidden-name','checksum-consistent-invalid-archive']:
+ with tempfile.TemporaryDirectory(prefix='zenpi-ci-gate-',dir=R/'.ops') as tmp:
+  root=Path(tmp);dist=root/'dist';dist.mkdir();archive=dist/'probe.tar.gz'
+  if case=='checksum-consistent-invalid-archive':archive.write_bytes(b'not a tar archive\n')
+  else:
+   with tarfile.open(archive,'w:gz') as t:
+    data=b'non-secret fixture bytes\n';entry=tarfile.TarInfo('zenpi/README.md' if case=='clean' else 'zenpi/.env');entry.size=len(data);t.addfile(entry,io.BytesIO(data))
+  (dist/'probe.tar.gz.sha256').write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+'  probe.tar.gz\n')
+  script=root/'gate.sh';script.write_text(commands)
+  # Workflow does not specify shell; GitHub documents bash -e {0} on Linux.
+  result=subprocess.run(['bash','-e',str(script)],cwd=root,capture_output=True,text=True,timeout=10)
+  listing=subprocess.run(['tar','-tzf',str(archive)],capture_output=True,text=True,timeout=10)
+  row={'case':case,'gate_exit_code':result.returncode,'gate_stdout':result.stdout,'gate_stderr':result.stderr,'independent_tar_exit_code':listing.returncode,'independent_tar_stdout':listing.stdout,'archive_sha256':hashlib.sha256(archive.read_bytes()).hexdigest()};rows.append(row)
+  print(json.dumps(row),flush=True)
+assert [r['gate_exit_code'] for r in rows]==[0,1,0]
+assert rows[2]['independent_tar_exit_code']!=0
+print(json.dumps({'status':'counterexample-confirmed','actual_shell_lines':commands,'cases':3,'defect':'checksum-valid malformed archive passes final gate because tar failure is masked by negating grep no-match','execution':'Local macOS bash/tar/grep/shasum actual subprocesses; no GitHub/Linux runner claimed; release.sh/build not executed','tools':{'bash':subprocess.run(['bash','--version'],capture_output=True,text=True).stdout.splitlines()[0],'tar':subprocess.run(['tar','--version'],capture_output=True,text=True).stdout.strip()}},indent=2))

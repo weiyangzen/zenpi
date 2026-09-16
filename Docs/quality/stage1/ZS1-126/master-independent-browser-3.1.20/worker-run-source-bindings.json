@@ -1,0 +1,59 @@
+{
+  "runs": [
+    {
+      "name": "independent-tests-01",
+      "test_source": "commands/independent-tests-01.rs",
+      "test_source_identity": {
+        "bytes": 11028,
+        "sha256": "36b8d0c340fad6f242710390d19dff4f12ae3abefe348fafa6d12ae0882a6cd3"
+      },
+      "compiled_tui": {
+        "bytes": 621835,
+        "sha256": "389be613eaecb96eee489d044342191751e6ea40b63b3e3ab5594943082fe1e5"
+      },
+      "log": {
+        "bytes": 6977,
+        "sha256": "e2e5a2e88f2e0405f21cb1925380ab62e063800648233af36683146863c4e3d2"
+      },
+      "receipt": {
+        "bytes": 1036,
+        "sha256": "3acf55eb9e4b8c3e537f9295e23e04c1aa0d815346dc6838033d0338e54275da"
+      },
+      "environment": {
+        "TMPDIR": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage126-independent320/tmp",
+        "CARGO_TARGET_DIR": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage126-independent320/target",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "new_cases": 8
+    },
+    {
+      "name": "independent-tests-final",
+      "test_source": "context/independent/session_browser_review.rs",
+      "test_source_identity": {
+        "bytes": 13017,
+        "sha256": "e45819f57aafc133cd3029f1c185d0a4359de86b538925a9744e92032a920bf1"
+      },
+      "compiled_tui": {
+        "bytes": 621835,
+        "sha256": "389be613eaecb96eee489d044342191751e6ea40b63b3e3ab5594943082fe1e5"
+      },
+      "log": {
+        "bytes": 2289,
+        "sha256": "895a435f3761cc050d452073a8a13719ca65020e3c9115486c9a07258aeeaf7e"
+      },
+      "receipt": {
+        "bytes": 1040,
+        "sha256": "2baa93fb5d9f3292d94a49d21ec6e27f1567b6776b2722e3d15a2b7fbb2fc038"
+      },
+      "environment": {
+        "TMPDIR": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage126-independent320/tmp",
+        "CARGO_TARGET_DIR": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage126-independent320/target",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "new_cases": 8
+    }
+  ],
+  "first_to_final_change": "rustfmt layout and test identifier old_A to old_a only; product source unchanged",
+  "unique_new_cases": 8,
+  "historical_A_runs_reexecuted": false
+}

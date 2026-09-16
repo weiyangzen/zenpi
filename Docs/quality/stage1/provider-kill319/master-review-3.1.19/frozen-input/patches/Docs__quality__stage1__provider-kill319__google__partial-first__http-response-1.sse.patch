@@ -1,0 +1,7 @@
+diff --git a/Docs/quality/stage1/provider-kill319/google/partial-first/http-response-1.sse b/Docs/quality/stage1/provider-kill319/google/partial-first/http-response-1.sse
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/google/partial-first/http-response-1.sse
+@@ -0,0 +1,2 @@
++data: {"responseId": "google319", "modelVersion": "gemini-2.5-flash", "candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": "FRESH_FINAL_319", "thoughtSignature": "dGV4dC0zMTk="}]}, "finishReason": "STOP"}]}
++

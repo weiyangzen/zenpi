@@ -1,0 +1,44 @@
+{
+  "TargetObject": "ZS1-117 release startup diagnosis",
+  "InstrumentObject": "tools/bench_runtime.py",
+  "trigger": ".ops/stage1_execution/release-current-20260912/looper_log.json",
+  "changed_files": [
+    "tools/bench_runtime.py",
+    "tools/test_bench_runtime.py"
+  ],
+  "EvidenceLint": {
+    "passed": true,
+    "evidence": "evidence-tests.run.json",
+    "coverage": "4 real isolated fixture tests: exact CRLF streams/identity; nonzero durability; timeout partial output and descendant group cleanup; bounded export and overwrite rejection"
+  },
+  "ROI": {
+    "benefit": "Retain first cold sample when later samples or gates fail; avoid recreating discarded diagnostics through another release run.",
+    "cost": "Popen observation and 4 fixture tests; no additional zenpi launch or prewarming."
+  },
+  "ParetoGate": {
+    "passed": true,
+    "improves": [
+      "traceability",
+      "failure retention",
+      "probe cleanup"
+    ],
+    "protected": {
+      "same_budget_expressions": true,
+      "same_max_sample_aggregation": true,
+      "first_sample_retained": true,
+      "no_product_permission_change": true,
+      "encoding_hash_and_disk_write_after_timer": true,
+      "state_grammar_unchanged": true
+    }
+  },
+  "rollback": {
+    "patch": "product.patch",
+    "exact_forward_reverse": true,
+    "sentinel_preserved": true
+  },
+  "tooling_attempts": [
+    "First AST check used literal_eval and failed on arithmetic expressions before changing any file; corrected to compare exact AST structure."
+  ],
+  "master_state": "[x]",
+  "scope": "Only diagnostics instrument accepted; no Stage1 whole-item promotion."
+}

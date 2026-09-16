@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-080",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-080",
+  "source_path": "src/extensions.rs",
+  "source_hash": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed",
+  "read_ranges": [
+    [
+      0,
+      20742
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/extensions.rs_learn.md",
+      "bytes": 2008,
+      "sha256": "9285180fa81ad840aef1e59017d4092d5c0dbffba44d881b41f2ff6a4eb3b748"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-current/review.md",
+      "bytes": 375,
+      "sha256": "cc0bdb348088702df6f35e9beb7becb0d2ce86a69d49dd6aea26b8cb742ba59c"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-current/review.md",
+      "bytes": 375,
+      "sha256": "cc0bdb348088702df6f35e9beb7becb0d2ce86a69d49dd6aea26b8cb742ba59c"
+    },
+    "findings": "完整读取 extensions.rs，覆盖 manifest/catalog、lifecycle、local-process tool 与 capability broker。"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "claims": [
+    {
+      "item_id": "ZS1-125",
+      "model": "gpt-6-astra",
+      "owned_paths": [
+        "src/tui.rs",
+        "src/render.rs",
+        "src/view_model.rs",
+        "tests/tui_transcript_ux.rs",
+        "tools/tui_transcript_ux_smoke.py"
+      ],
+      "reasoning_effort": "high",
+      "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+      "run_id": "zenpi-stage1-20260911",
+      "runtime_checked_at": "2026-09-13T03:12:57.031761+00:00",
+      "runtime_note": "Session stopped by controller; no Zenpi worker remains active.",
+      "runtime_status": "finished",
+      "session": "01a08be3-4677-7463-832b-bdb571ea6b9a",
+      "workspace": "/Users/wangweiyang/.codex/worktrees/2267/zenpi"
+    }
+  ],
+  "requirement_digest": "deddd954483498fb39ce951173196b159b97c44e80fabea20dc6a9a5c447e3b3",
+  "snapshot_sha256": "9488b10d1f88f3a54f1ca4970fcde53723984a7ce3257b876b180b4cf1119ec2"
+}

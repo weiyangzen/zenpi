@@ -1,0 +1,176 @@
+    pub fn project_tabs(&self) -> &[String] {
+        &self.project_tabs
+    }
+
+    pub fn project_index(&self, name: &str) -> Option<usize> {
+        self.project_tabs.iter().position(|item| item == name)
+    }
+
+    pub fn active_project(&self) -> &str {
+        &self.project_tabs[self.active_project]
+    }
+
+    /// Create a project tab and select it. Each project owns its session and
+    /// workspace in the host; this view layer only tracks stable tab labels.
+    pub fn open_project_tab(&mut self, name: impl Into<String>) -> bool {
+        let name = name.into();
+        if name.trim().is_empty()
+            || self.project_tabs.contains(&name)
+            || self.project_tabs.len() >= crate::project_workspace::MAX_PROJECT_TABS
+        {
+            return false;
+        }
+        self.touch_editor_draft();
+        self.project_tabs.push(name);
+        self.select_project_tab(self.project_tabs.len() - 1)
+    }
+
+    pub fn select_project_tab(&mut self, index: usize) -> bool {
+        if index >= self.project_tabs.len() {
+            return false;
+        }
+        if index == self.active_project {
+            return true;
+        }
+        self.finish_ordinary_paste();
+        let old = self.active_project().to_owned();
+        self.project_transcripts
+            .insert(old.clone(), std::mem::take(&mut self.messages));
+        self.project_layouts
+            .insert(old.clone(), self.workspace_layout.clone());
+        self.project_drafts.insert(
+            old,
+            ProjectDraft {
+                draft_epoch: self.draft_epoch,
+                kill_buffer: std::mem::take(&mut self.kill_buffer),
+                paste: std::mem::take(&mut self.paste),
+                submitted_pastes: std::mem::take(&mut self.submitted_pastes),
+                queued_inputs: std::mem::take(&mut self.queued_inputs),
+                history_draft: self.history_draft.take(),
+                history_search: self.history_search.take(),
+                history_cursor: self.history_cursor.take(),
+                model_menu: std::mem::take(&mut self.model_menu),
+                command_resources: std::mem::take(&mut self.command_resources),
+                ux: std::mem::take(&mut self.transcript_ux),
+                input: std::mem::take(&mut self.input),
+                cursor: self.cursor,
+                history: std::mem::take(&mut self.history),
+                scroll: self.scroll,
+                input_scroll: self.input_scroll,
+                pane_scroll: std::mem::take(&mut self.pane_scroll),
+                presets: std::mem::take(&mut self.workspace_layouts),
+                busy: self.busy,
+                status: self.status.clone(),
+                streaming_role: self.streaming_role,
+                streaming_job_id: self.streaming_job_id,
+                streaming_message_started: self.streaming_message_started,
+                streaming_block: self.streaming_block.take(),
+                terminal_snapshot: std::mem::take(&mut self.terminal_snapshot),
+                session_snapshot: self.session_snapshot.take(),
+                goal_messages: std::mem::take(&mut self.goal_messages),
+                persona: self.persona.clone(),
+                resource_snapshot: self.resource_snapshot.take(),
+                resource_status: Some(self.resource_status.clone()),
+                gantt_snapshot: self.gantt_snapshot.take(),
+                gantt_status: Some(self.gantt_status.clone()),
+            },
+        );
+        self.active_project = index;
+        self.project_name = self.project_tabs[index].clone();
+        self.messages = self
+            .project_transcripts
+            .remove(&self.project_name)
+            .unwrap_or_default();
+        self.workspace_layout = self
+            .project_layouts
+            .remove(&self.project_name)
+            .unwrap_or_else(|| LayoutModel::new(TabId::Project));
+        let draft = self
+            .project_drafts
+            .remove(&self.project_name)
+            .unwrap_or_default();
+        self.file_completion = None;
+        self.queued_inputs = draft.queued_inputs;
+        self.history_draft = draft.history_draft;
+        self.history_search = draft.history_search;
+        self.history_cursor = draft.history_cursor;
+        self.model_menu = draft.model_menu;
+        self.command_resources = draft.command_resources;
+        self.transcript_ux = draft.ux;
+        self.transcript_browser = None;
+        self.draft_epoch = self.activate_draft_epoch(draft.draft_epoch);
+        self.input = draft.input;
+        self.kill_buffer = draft.kill_buffer;
+        self.paste = draft.paste;
+        self.submitted_pastes = draft.submitted_pastes;
+        self.cursor = draft.cursor;
+        self.history = draft.history;
+        self.scroll = draft.scroll;
+        self.input_scroll = draft.input_scroll;
+        self.pane_scroll = draft.pane_scroll;
+        self.workspace_layouts = draft.presets;
+        self.busy = draft.busy;
+        self.status = if draft.status.is_empty() {
+            "Ready".into()
+        } else {
+            draft.status
+        };
+        self.streaming_role = draft.streaming_role;
+        self.streaming_job_id = draft.streaming_job_id;
+        self.streaming_message_started = draft.streaming_message_started;
+        self.streaming_block = draft.streaming_block;
+        self.terminal_snapshot = draft.terminal_snapshot;
+        self.session_snapshot = draft.session_snapshot;
+        self.goal_messages = draft.goal_messages;
+        self.persona = if draft.persona.is_empty() {
+            "INTJ".into()
+        } else {
+            draft.persona
+        };
+        self.resource_snapshot = draft.resource_snapshot;
+        self.resource_status = draft.resource_status.unwrap_or(ResourcePaneStatus::Idle);
+        self.gantt_snapshot = draft.gantt_snapshot;
+        self.gantt_status = draft.gantt_status.unwrap_or(GanttPaneStatus::Idle);
+        self.preferred_column = None;
+        self.cached_transcript = None;
+        self.palette_dismissed = false;
+        self.project_metadata
+            .entry(self.project_name.clone())
+            .or_default();
+        self.dirty = true;
+        self.project_checkpoint_dirty = true;
+        true
+    }
+
+    pub fn close_project_tab(&mut self, name: &str) -> bool {
+        if self.project_tabs.len() <= 1 {
+            return false;
+        }
+        let Some(index) = self.project_index(name) else {
+            return false;
+        };
+        if index == self.active_project {
+            self.select_project_tab(if index + 1 < self.project_tabs.len() {
+                index + 1
+            } else {
+                index - 1
+            });
+        }
+        self.project_tabs.remove(index);
+        if index < self.active_project {
+            self.active_project -= 1;
+        }
+        self.project_name = self.project_tabs[self.active_project].clone();
+        self.project_transcripts.remove(name);
+        self.project_layouts.remove(name);
+        self.project_metadata.remove(name);
+        self.project_session_cursors.remove(name);
+        self.project_drafts.remove(name);
+        self.approval_views.remove(name);
+        self.scheduled_inputs.retain(|entry| entry.project != name);
+        self.cached_transcript = None;
+        self.dirty = true;
+        self.project_checkpoint_dirty = true;
+        true
+    }
+

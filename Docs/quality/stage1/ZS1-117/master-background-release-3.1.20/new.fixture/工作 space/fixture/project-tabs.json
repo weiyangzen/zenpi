@@ -1,0 +1,112 @@
+{
+  "active": 0,
+  "metadata": {
+    "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl"
+    }
+  },
+  "project_name": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+  "project_state": [
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "OLD_CONTEXT_MARKER",
+          "/pane collapse resources",
+          "/new",
+          "NEW_TOOL",
+          "/model new-reasoner ",
+          "/reasoning high ",
+          "/persona ESFP",
+          "NEW_PREFERENCES",
+          "/new",
+          "NEW_AFTER_TUI_CANCEL",
+          "/new",
+          "NEW_AFTER_CONCURRENT_COMMIT"
+        ],
+        "input": "",
+        "next_paste_id": 2,
+        "paste_folds": [],
+        "presets": {},
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [
+          "resources"
+        ],
+        "focused": null,
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "project"
+      },
+      "messages": [
+        {
+          "role": "User",
+          "text": "NEW_PREFERENCES"
+        },
+        {
+          "role": "Assistant",
+          "text": "REPLY_NEW"
+        },
+        {
+          "role": "User",
+          "text": "NEW_AFTER_TUI_CANCEL"
+        },
+        {
+          "role": "Assistant",
+          "text": "REPLY_NEW"
+        },
+        {
+          "role": "Error",
+          "text": "invalid turn: project checkpoint changed in another host; reopen the host before modifying projects"
+        },
+        {
+          "role": "User",
+          "text": "NEW_AFTER_CONCURRENT_COMMIT"
+        },
+        {
+          "role": "Assistant",
+          "text": "REPLY_NEW"
+        }
+      ],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl"
+      },
+      "name": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5"
+    }
+  ],
+  "projects": [
+    "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5"
+  ],
+  "scheduled_inputs": [],
+  "schema_version": 3,
+  "session_cursors": {
+    "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5": {
+      "next_sequence": 20,
+      "session_id": "session-1789210051383-4294-0"
+    }
+  },
+  "workspace": {
+    "active": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+    "schema_version": 1,
+    "tabs": [
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5"
+      }
+    ]
+  }
+}

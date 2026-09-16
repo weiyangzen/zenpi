@@ -1,0 +1,142 @@
+{
+  "schema_version": "zs1-050-offline-review/v1",
+  "root": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/dir050-current-3.1.21/worker",
+  "passed": true,
+  "checks": [
+    {
+      "name": "old manifest identity",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "old 55 payloads intact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "old exact 56-file set",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "27 original source identities current",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "three direct files and no subdirectory",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "three current source copies",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "current accepted master012 receipt identity",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "69 dependency artifact identities",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "012 acceptance and complete source reading chain",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "3.1.21 binding unchanged except snapshot",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "final selector still current",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "012 050 054 records unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "frozen direct inventory only012 and closure050",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ten captured current context files",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "only signal/context fixture correction",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "frozen correction patch exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical failure3pass2fail then5pass",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "both fixture errors parent.value",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "five historical observations scope",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical master37 in three files",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "4432 previous ready files unchanged",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "only one candidate artifact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical report verbatim suffix",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready manifest payload identities",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready exact artifact set",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "runtime_executions_this_round": 0,
+  "candidate": {
+    "bytes": 22285,
+    "sha256": "6308e6745d722b3eabfa9b7426bb9591de9d95e93532d0a12da9a00446796733"
+  },
+  "historical_test_counts": {
+    "050": 5,
+    "012_master": 37
+  },
+  "note": "Read/hash/JSON/patch audit, not runtime or product tests; semantic review is in candidate report."
+}

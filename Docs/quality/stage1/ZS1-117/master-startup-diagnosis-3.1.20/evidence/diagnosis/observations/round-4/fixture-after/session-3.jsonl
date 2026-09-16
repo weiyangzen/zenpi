@@ -1,0 +1,2 @@
+{"created_at_ms":1789196045351,"cwd":"/Users/wangweiyang/GitHub/zenpi","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789196045351-28568-0","timestamp":"2026-09-12T06:54:05Z","timestamp_ms":1789196045351,"version":1}
+{"event":{"generation":1,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789196045351-28568-0","timestamp":"2026-09-12T06:54:05Z","timestamp_ms":1789196045360}

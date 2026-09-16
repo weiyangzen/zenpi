@@ -1,0 +1,8 @@
+{
+  "files_hash_checked": 15,
+  "patches_checked": 15,
+  "forward_replay_exact": true,
+  "reverse_all_new_paths_removed": true,
+  "references_hash_checked": 10,
+  "root_report_integrated": false
+}

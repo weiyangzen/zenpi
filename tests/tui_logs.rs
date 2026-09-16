@@ -158,3 +158,22 @@ fn folded_logs_do_not_hide_a_pending_approval_prompt() {
     assert!(output.contains("Approval required"));
     assert!(output.contains("1 tool log folded"));
 }
+
+#[test]
+fn approval_diff_is_retained_as_shared_view_block() {
+    let mut state = TuiState::default();
+    state.push_message_block(
+        MessageRole::System,
+        "Approval required: write_file",
+        zenpi::view_model::ViewBlock::Diff {
+            path: Some("notes.md".into()),
+            patch: "@@ -1 +1 @@\n-old\n+new\n".into(),
+        },
+    );
+    let message = state.messages().next().unwrap();
+    assert_eq!(message.blocks.len(), 1);
+    assert!(matches!(
+        &message.blocks[0],
+        zenpi::view_model::ViewBlock::Diff { path: Some(path), .. } if path == "notes.md"
+    ));
+}

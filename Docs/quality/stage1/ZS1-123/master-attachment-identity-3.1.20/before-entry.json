@@ -1,0 +1,26 @@
+{
+  "binary_sha256": "98987fe27d6f15a6fd45ce3f35d1adbeb694edc78effb6e418ff4de3389a06cc",
+  "checks": {},
+  "status": "failed",
+  "error": "AssertionError({'project': {'project_id': '43e617b528840712dfe36f11923df669dbb6d06ae0524e1795e8f4abaf4459d0', 'cwd': '/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/before-entry.fixture/jsonl/initial', 'session_id': 'session-1789215460299-25108-0'}, 'schema_version': 2, 'id': 'attach-0', 'type': 'response', 'command': 'attach', 'success': False, 'error': 'workspace path denied: notereport.txt', 'code': 'attachment_error'})",
+  "http_count": 0,
+  "jsonl_processes": 1,
+  "tui_processes": 0,
+  "server_errors": [],
+  "receipts": {
+    "0": {
+      "project": {
+        "project_id": "43e617b528840712dfe36f11923df669dbb6d06ae0524e1795e8f4abaf4459d0",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/before-entry.fixture/jsonl/initial",
+        "session_id": "session-1789215460299-25108-0"
+      },
+      "schema_version": 2,
+      "id": "attach-0",
+      "type": "response",
+      "command": "attach",
+      "success": false,
+      "error": "workspace path denied: notereport.txt",
+      "code": "attachment_error"
+    }
+  }
+}

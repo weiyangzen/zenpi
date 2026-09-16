@@ -1,0 +1,21 @@
+{
+  "binary_sha256": "1d7b2e61ecc9096ad0f5e6cd3f3c03c6820cafe8371d9201de3497bb6b4e8f58",
+  "checks": {
+    "unapproved_write_absent_and_folded_diff_visible": true,
+    "full_diff_scrolling": true,
+    "allow_actual_write_and_draft_cursor_focus_restore": true,
+    "audit_precedes_tool_result": true,
+    "paste_never_decides": true,
+    "deny_durable_no_write": true,
+    "project_picker_takes_focus_over_approval": true,
+    "cross_project_approval_rejected": true,
+    "cancel_pending_no_write": true,
+    "sequential_real_requests_exact_call_decisions": true,
+    "unfinished_approval_restart_never_replays_or_grants": true,
+    "remembered_deny_durable": true,
+    "independent_restart_remembered_policy_no_prompt_or_write": true,
+    "terminal_restored": true
+  },
+  "request_count": 12,
+  "passed": true
+}

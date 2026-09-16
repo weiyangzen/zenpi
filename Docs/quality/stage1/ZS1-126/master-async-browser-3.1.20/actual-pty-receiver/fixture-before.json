@@ -1,0 +1,90 @@
+{
+  "total_session_bytes": 7877502,
+  "limit": 67108864,
+  "files": [
+    {
+      "path": "initial/g/sessions/G126.jsonl",
+      "kind": "file",
+      "bytes": 552,
+      "sha256": "881964d30914745c3831e6114a459e2a00474959895bcbfc5707691e7a9ce7f7"
+    },
+    {
+      "path": "initial/l/b.jsonl",
+      "kind": "file",
+      "bytes": 550,
+      "sha256": "1cb3e9524785b2c3a65430598e920ed1a71d3e3778765f80e70b1256cadacd8d"
+    },
+    {
+      "path": "initial/l/c.jsonl",
+      "kind": "file",
+      "bytes": 558,
+      "sha256": "dfed3fa06526e4eed7656af021bdc7538705fdfea3d710bf8f9846bf4b2d5d8b"
+    },
+    {
+      "path": "initial/l/m-owner.jsonl",
+      "kind": "file",
+      "bytes": 551,
+      "sha256": "7594de79ae70c105dae2994ac8aca5fbf8df34a4de02c38fa3b7db5bdab2f56a"
+    },
+    {
+      "path": "initial/l/p00.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "04e4fbcd109626557a8ad21f38d37e6ef2451754bff6a77b35b0590f62e22cb2"
+    },
+    {
+      "path": "initial/l/p01.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "e76c32b4dd1a70dd92fdab50b9a83af68fb126ee3cccfa050e731eff95d50484"
+    },
+    {
+      "path": "initial/l/p02.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "58d979f3ff0cbcee9b101d3dfab9dfb21984a00d60f0da5619d2f66893ca8ddb"
+    },
+    {
+      "path": "initial/l/p03.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "aa2f9be41ec39270b12606b290f8b122e4959cce2f7de85a0935380ebe6b2a76"
+    },
+    {
+      "path": "initial/l/p04.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "a9e2c27738a0b64293b7e3163ee6116f604ca95553245c43a79ed1ed6a2e805f"
+    },
+    {
+      "path": "initial/l/p05.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "1393ebb5ab20b2c925120fe96565bdeb55de3cd213832c31091223592e7054fc"
+    },
+    {
+      "path": "initial/l/p06.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "6ba52afc84e89a0a9bfdbc787e8a1ea23009eb298877dcb58e1f88887253cc40"
+    },
+    {
+      "path": "initial/l/p07.jsonl",
+      "kind": "file",
+      "bytes": 984271,
+      "sha256": "d3322b68598b563bfbbb8ae08e05a2e05b3712914f79075094b94f64803c8e8d"
+    },
+    {
+      "path": "initial/other/s/d.jsonl",
+      "kind": "file",
+      "bytes": 561,
+      "sha256": "91fb78d2c42a0db0f7c6fa3b073eba2a26485230abb961aaa58d7c2282b49d45"
+    },
+    {
+      "path": "initial/other/s/e.jsonl",
+      "kind": "file",
+      "bytes": 562,
+      "sha256": "4cdfacb29a39a4408c004b09b823cde5700cbd069182b4c11b240e54c003ebd4"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.21s
+     Running tests/tui_composer.rs (target/debug/deps/tui_composer-69c8fa2b8a92f5dd)
+
+running 5 tests
+test terminal_shortcut_super_key_keeps_preceding_held_ascii_without_submitting ... FAILED
+test terminal_shortcut_plain_unicode_keeps_press_repeat_and_release_semantics ... ok
+test terminal_shortcut_modified_characters_never_become_draft_text ... FAILED
+test terminal_shortcut_existing_control_and_alt_editing_still_dispatch ... ok
+test terminal_shortcut_editor_hint_agrees_with_action_in_the_rendered_state ... FAILED
+
+failures:
+
+---- terminal_shortcut_super_key_keeps_preceding_held_ascii_without_submitting stdout ----
+
+thread 'terminal_shortcut_super_key_keeps_preceding_held_ascii_without_submitting' (30240599) panicked at tests/tui_composer.rs:1335:9:
+assertion `left == right` failed: Press
+  left: ("ax", 2)
+ right: ("a", 1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- terminal_shortcut_modified_characters_never_become_draft_text stdout ----
+
+thread 'terminal_shortcut_modified_characters_never_become_draft_text' (30240597) panicked at tests/tui_composer.rs:1274:17:
+assertion `left == right` failed: KeyModifiers(SUPER) Press 'x' must not insert shortcut text
+  left: ("keep 世界x", 12)
+ right: ("keep 世界", 11)
+
+---- terminal_shortcut_editor_hint_agrees_with_action_in_the_rendered_state stdout ----
+
+thread 'terminal_shortcut_editor_hint_agrees_with_action_in_the_rendered_state' (30240595) panicked at tests/tui_composer.rs:1368:9:
+assertion `left == right` failed: visible command choices:  zenpi | projects: [default]                                                                                                                                                                 [<] [>] [+]
+ zenpi    Ready | tokens —                                                                                                                                                                              
+┌ Conversation ────────────────────────────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                              ││Waiting for Blueprint/Goal snapshot                                                                                   │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘│                                                                                                                      │
+┌ Resources  ⋮ ────────────────────────────────────────────────────────────────┐│                                                                                                                      │
+│Waiting for workspace snapshot                                                ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘│                                                                                                                      │
+┌ Goal ────────────────────────────────────────────────────────────────────────┐│                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+│                                                                              ││                                                                                                                      │
+┌ Commands / files 1/2 ────────────────────────────────────────────────────────────────────────────────────────┐                                                                                       │
+│/model                                                                                                        │                                                                                       │
+│/models                                                                                                       │                                                                                       │
+│show or select the provider model                                                                             │                                                                                       │
+│Up/Down select · Tab/Enter complete · Esc dismiss                                                             │                                                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘───────────────────────────────────────────────────────────────────────────────────────┘
+┌ Prompt  • command palette active ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│/mo                                                                                                                                                                                                   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input                                                                  
+  left: true
+ right: false
+
+
+failures:
+    terminal_shortcut_editor_hint_agrees_with_action_in_the_rendered_state
+    terminal_shortcut_modified_characters_never_become_draft_text
+    terminal_shortcut_super_key_keeps_preceding_held_ascii_without_submitting
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 46 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `--test tui_composer`

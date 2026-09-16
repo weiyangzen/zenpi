@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-first/tools/tui_session_new_smoke.py", line 16, in <module>
+    from tui_project_workspace_smoke import Terminal
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-first/tools/tui_project_workspace_smoke.py", line 7, in <module>
+    from tui_user_shell_smoke import drain, send, visible
+ModuleNotFoundError: No module named 'tui_user_shell_smoke'

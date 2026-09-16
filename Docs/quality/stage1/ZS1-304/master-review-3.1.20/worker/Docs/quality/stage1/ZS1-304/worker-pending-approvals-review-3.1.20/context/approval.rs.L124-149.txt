@@ -1,0 +1,26 @@
+/// unreadable: the host can drain pending requests and answer them while the
+/// worker waits on this bounded condition variable.
+#[derive(Debug, Clone)]
+pub struct ApprovalCoordinator {
+    inner: Arc<(Mutex<CoordinatorState>, Condvar)>,
+    cancellation_epoch: Arc<AtomicU64>,
+}
+
+#[derive(Debug, Default)]
+struct CoordinatorState {
+    pending: BTreeMap<String, ApprovalRequest>,
+    visible: BTreeMap<String, ApprovalRequest>,
+    decisions: BTreeMap<String, ApprovalResponse>,
+    accepted: Vec<AcceptedApproval>,
+}
+
+/// One host response accepted by the coordinator.  The worker drains these
+/// records into the session journal while it already owns the mutable agent,
+/// before it may consume the matching decision or execute a side effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptedApproval {
+    pub request: ApprovalRequest,
+    pub response: ApprovalResponse,
+}
+
+impl Default for ApprovalCoordinator {

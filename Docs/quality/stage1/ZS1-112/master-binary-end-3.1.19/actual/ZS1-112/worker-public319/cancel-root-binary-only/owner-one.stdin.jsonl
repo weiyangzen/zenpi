@@ -1,0 +1,2 @@
+{"schema_version": 2, "type": "prompt", "id": "search", "text": "find workspace files"}
+{"schema_version": 2, "type": "cancel", "id": "cancel", "target_id": "search"}

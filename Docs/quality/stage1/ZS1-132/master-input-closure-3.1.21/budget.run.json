@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "python3",
+    "tools/bench_runtime.py",
+    "--samples",
+    "3",
+    "--output",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/input-shutdown-release-3.1.21/budget.json",
+    "--startup-evidence-dir",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/input-shutdown-release-3.1.21/startup"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T18:17:32.983752+00:00",
+  "ended_at": "2026-09-12T18:19:03.275522+00:00",
+  "exit_code": 1,
+  "pid": 44968,
+  "reaped": true,
+  "timed_out": false,
+  "log": {
+    "bytes": 12454,
+    "sha256": "e3228007878a92ed3ade664ad3a7006eaf7e0342a1aa02f3eda4fbb38b0f44ef"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true
+}

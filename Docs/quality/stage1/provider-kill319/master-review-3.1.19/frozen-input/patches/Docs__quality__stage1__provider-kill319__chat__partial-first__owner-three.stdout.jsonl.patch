@@ -1,0 +1,7 @@
+diff --git a/Docs/quality/stage1/provider-kill319/chat/partial-first/owner-three.stdout.jsonl b/Docs/quality/stage1/provider-kill319/chat/partial-first/owner-three.stdout.jsonl
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/chat/partial-first/owner-three.stdout.jsonl
+@@ -0,0 +1,2 @@
++{"project":{"project_id":"dc330c1025647d1e7182e2e64b549de9ed4aee83e5e1de902d089a53c9520293","cwd":"/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/chat/partial-first","session_id":"session-1789189734951-55991-0"},"schema_version":2,"id":"fresh","type":"response","command":"prompt","success":true,"data":{"assistant":{"content":"FRESH_FINAL_319","created_at_ms":1789189735241,"id":"assistant-1789189735241-3","metadata":{"annotations":[{"finish_reason":"stop","type":"chat_finish_reason"}],"model":"gpt-4.1","response_id":"chat319"},"parent_id":"turn-1789189735209-1","role":"assistant"},"submission":{"status":"started","turn_id":"turn-1789189735209-1"}},"code":"ok"}
++{"schema_version":2,"id":"killed","type":"response","command":"prompt","success":false,"error":"previous owner stopped without a durable result; execution was not retried; inspect effects and explicitly retry with a new ID or abandon","code":"unknown_outcome"}

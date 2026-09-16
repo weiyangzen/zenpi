@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage126-independent320/ready/verify.py", line 46, in <module>
+    assert 1 <= row['start'] <= row['end'] <= len(lines)
+AssertionError

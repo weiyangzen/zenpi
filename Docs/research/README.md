@@ -13,6 +13,9 @@ state lives only in [`../Zenpi_Execution_Blueprint.md`](../Zenpi_Execution_Bluep
 | [`zenpi-architecture.md`](zenpi-architecture.md) | Freeze module ownership, data flow, public modes, limits, and verification seams | zenpi execution Spec and current source layout |
 | [`zenpi-rendering.md`](zenpi-rendering.md) | Bounded Markdown/code block rendering, terminal safety, and parity gaps | zenpi `src/render.rs` and TUI integration at the execution date |
 | [`README.md`](README.md) | This index and provenance policy | Local repository state at the execution date |
+| [Provider/account routing](provider-account-routing-2026-09-13.md) | Separate provider eligibility from proposed canonical adapters | Official provider documentation and local Rust backend, 2026-09-13 |
+| [Account scheduler and service](account-scheduler-plugins-2026-09-13.md) | Bounded scheduling, extension, persistence and service decisions | Revision-pinned upstream source and local ownership audit |
+| [Redis service subset](../learn/subsets/redis-account-broker/route_decision.md) | One-to-one source-window learning for reactor, client I/O and durability | Redis `669b2a1316f5b35ecf964281b77c054ff28dc934`; three selected files, not a whole-repository audit |
 
 ## Evidence policy
 

@@ -1,0 +1,110 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-120",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "integrated_tree_sha256": "1604117620ec436b6630d1a1dda5fb728cb9339076c4ea6fab694bf1f61fb2be",
+  "validators": "G-CODE、G-HOST；cargo test --locked --test project_workspace",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "project_workspace"
+      ],
+      "cwd": ".",
+      "ended_at": "2026-09-13T16:59:51.134995+00:00",
+      "env_names": [],
+      "executed_by": "controller",
+      "exit_code": 0,
+      "started_at": "2026-09-13T16:59:51.134995+00:00",
+      "stdout": {
+        "path": "Docs/quality/stage1/ZS1-120/master-review-current/project_workspace.test.txt",
+        "bytes": 1547,
+        "sha256": "bd45ea7c60eee44a4d166e149d0ace7cdb760d7c0b0beb376976afe8019cd069"
+      },
+      "stderr": {
+        "path": "Docs/quality/stage1/ZS1-120/master-review-current/pty-smoke.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests_run": 7
+    }
+  ],
+  "scenarios": {
+    "positive": {
+      "expected": "canonical identity and cwd owner survive selection",
+      "actual": "PTY smoke passed directory identity, duplicate basenames, shell writes, session headers, and restart restore",
+      "evidence": "Docs/quality/stage1/ZS1-120/master-review-current/pty-evidence"
+    },
+    "negative": {
+      "expected": "invalid/cancelled selection leaves state unchanged",
+      "actual": "PTY smoke passed invalid path and cancellation assertions",
+      "evidence": "Docs/quality/stage1/ZS1-120/master-review-current/pty-evidence"
+    },
+    "cancel": {
+      "expected": "cancel is atomic",
+      "actual": "passed",
+      "evidence": "Docs/quality/stage1/ZS1-120/master-review-current/pty-evidence"
+    },
+    "restart": {
+      "expected": "checkpoint restores owner",
+      "actual": "passed",
+      "evidence": "Docs/quality/stage1/ZS1-120/master-review-current/pty-evidence"
+    }
+  },
+  "binary": {
+    "path": "target/release/zenpi",
+    "bytes": 6094160,
+    "sha256": "972e9cb6049353034941708a930705b9dcdc3bcc53aead4b2cd08f390bd2ecc5"
+  },
+  "resource_peaks": {
+    "processes": "bounded smoke harness"
+  },
+  "rollback": "failed/cancelled selection performs no checkpoint write; smoke restores terminal",
+  "artifacts": [
+    {
+      "path": "Docs/quality/stage1/ZS1-120/master-review-current/review.md",
+      "bytes": 510,
+      "sha256": "8f3b02d88ec261f82d3f131e91d2781a01c447423e76085ab86e4b8632629347"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-120/master-review-current/project_workspace.test.txt",
+      "bytes": 1547,
+      "sha256": "bd45ea7c60eee44a4d166e149d0ace7cdb760d7c0b0beb376976afe8019cd069"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-120/master-review-current/pty-evidence",
+      "bytes": 689,
+      "sha256": "a4592036c1ba3f4ed0e85aadaa6aad5710320be7b88b62cb82f2f1bb4757c549"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-120/master-review-current/pty-smoke.stdout",
+      "bytes": 623,
+      "sha256": "63140d84d44610f584252a0fefadb66968323fc1433585c759f8049ab177a3ea"
+    },
+    {
+      "path": "target/release/zenpi",
+      "bytes": 6094160,
+      "sha256": "972e9cb6049353034941708a930705b9dcdc3bcc53aead4b2cd08f390bd2ecc5"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-120/master-review-current/review.md",
+      "bytes": 510,
+      "sha256": "8f3b02d88ec261f82d3f131e91d2781a01c447423e76085ab86e4b8632629347"
+    },
+    "findings": "定向 project workspace tests 与真实 PTY 项目 smoke 共同证明稳定 identity、cwd/session owner、取消/错误原子性与重启恢复。"
+  }
+}

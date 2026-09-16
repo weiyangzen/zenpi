@@ -181,6 +181,22 @@ pub struct ExecutionReceipt {
     pub error: Option<String>,
 }
 
+/// Minimal result contract emitted by an external Blueprint worker.  The
+/// manifest is data only: zenpi verifies identity and acceptance evidence, but
+/// never executes commands from it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalResultManifest {
+    pub execution_id: String,
+    #[serde(default)]
+    pub claim_digest: String,
+    pub blueprint_digest: String,
+    pub item_id: String,
+    pub status: ExecutionStatus,
+    pub acceptance_passed: bool,
+    pub acceptance_evidence: Vec<String>,
+}
+
 impl ExecutionReceipt {
     pub fn validate(&self) -> Result<(), ExecutionError> {
         bounded_id(&self.execution_id, "execution_id")?;
@@ -206,8 +222,7 @@ impl ExecutionReceipt {
         bounded_text(&self.evidence, "evidence", MAX_DOMAIN_RECORD_BYTES)?;
         match (self.external_work_executed, &self.manifest_checksum) {
             (false, None) => {}
-            (true, Some(checksum))
-                if checksum.len() == 64 && checksum.bytes().all(|b| b.is_ascii_hexdigit()) => {}
+            (true, Some(checksum)) if is_lowercase_sha256(checksum) => {}
             _ => {
                 return Err(ExecutionError::InvalidReceipt(
                     "external evidence must carry a SHA-256 manifest checksum".into(),
@@ -239,6 +254,13 @@ impl ExecutionReceipt {
     }
 }
 
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 /// A request for an external b3ehive/agent owner to execute one declarative
 /// [`BlueprintTask`].  This is intentionally a handoff, not a completion
 /// receipt: zenpi never executes the instruction or its acceptance commands
@@ -247,6 +269,8 @@ impl ExecutionReceipt {
 #[serde(deny_unknown_fields)]
 pub struct BlueprintHandoff {
     pub handoff_id: String,
+    /// Immutable claim identity shared by the handoff and imported result.
+    pub claim_digest: String,
     pub goal_id: String,
     pub blueprint_id: String,
     pub blueprint_version: String,
@@ -274,6 +298,7 @@ pub enum HandoffStatus {
 impl BlueprintHandoff {
     pub fn validate(&self) -> Result<(), ExecutionError> {
         bounded_id(&self.handoff_id, "handoff_id")?;
+        validate_digest(&self.claim_digest)?;
         bounded_id(&self.goal_id, "goal_id")?;
         bounded_id(&self.blueprint_id, "blueprint_id")?;
         bounded_id(&self.blueprint_version, "blueprint_version")?;
@@ -380,11 +405,15 @@ struct Snapshot {
     generation: u64,
     digest: String,
     receipts: Vec<ExecutionReceipt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    external: Vec<ExternalEvidence>,
 }
 
 #[derive(Debug, Serialize)]
 struct UnsignedSnapshot<'a> {
     receipts: &'a [ExecutionReceipt],
+    #[serde(skip_serializing_if = "<[ExternalEvidence]>::is_empty")]
+    external: &'a [ExternalEvidence],
 }
 
 /// Atomic, private, bounded persistence for execution receipts.
@@ -393,6 +422,7 @@ pub struct ExecutionStore {
     path: PathBuf,
     generation: u64,
     receipts: Vec<ExecutionReceipt>,
+    external: Vec<ExternalEvidence>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -482,6 +512,12 @@ impl HandoffStore {
             .find(|request| request.handoff_id == handoff_id)
     }
 
+    pub fn find_claim(&self, claim_digest: &str) -> Option<&BlueprintHandoff> {
+        self.requests
+            .iter()
+            .find(|request| request.claim_digest == claim_digest)
+    }
+
     /// Insert one immutable request. Repeating the exact request is
     /// idempotent; changing any field under the same identity fails closed.
     pub fn insert(
@@ -519,6 +555,23 @@ impl HandoffStore {
         next.commit()?;
         *self = next;
         Ok(ExecutionStoreChange::Inserted)
+    }
+
+    /// Remove a queued request during admission compensation. The identity
+    /// check prevents a failed attempt from deleting a later replacement.
+    fn remove_exact(&mut self, handoff_id: &str) -> Result<(), ExecutionError> {
+        let Some(index) = self
+            .requests
+            .iter()
+            .position(|request| request.handoff_id == handoff_id)
+        else {
+            return Ok(());
+        };
+        let mut next = self.clone();
+        next.requests.remove(index);
+        next.commit()?;
+        *self = next;
+        Ok(())
     }
 
     fn empty(path: PathBuf) -> Self {
@@ -727,6 +780,32 @@ impl ExecutionStore {
             .find(|receipt| receipt.execution_id == execution_id)
     }
 
+    /// Cancel every still-running attempt belonging to one Goal. Completed
+    /// and externally evidenced receipts remain immutable. The update is
+    /// committed as one bounded snapshot and is idempotent on repeat calls.
+    pub fn cancel_running_for_goal(
+        &mut self,
+        goal_id: &str,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        bounded_id(goal_id, "goal_id")?;
+        let mut next = self.clone();
+        let mut changed = false;
+        for receipt in &mut next.receipts {
+            if receipt.goal_id == goal_id && receipt.status == ExecutionStatus::Running {
+                receipt.status = ExecutionStatus::Cancelled;
+                receipt.error = Some("cancelled by Goal owner".into());
+                receipt.validate()?;
+                changed = true;
+            }
+        }
+        if !changed {
+            return Ok(ExecutionStoreChange::Unchanged);
+        }
+        next.commit(ExecutionStoreChange::Updated)?;
+        *self = next;
+        Ok(ExecutionStoreChange::Updated)
+    }
+
     /// Return the highest-attempt receipt for one item in the exact immutable
     /// Goal/Blueprint execution scope.
     ///
@@ -746,7 +825,7 @@ impl ExecutionStore {
     }
 
     pub fn digest(&self) -> Result<String, ExecutionError> {
-        digest_receipts(&self.receipts)
+        digest_receipts(&self.receipts, &self.external)
     }
 
     /// Insert a receipt or replace the same attempt's lifecycle state.  A
@@ -821,41 +900,129 @@ impl ExecutionStore {
         Ok(())
     }
 
-    /// Attach one validated external result manifest to a terminal receipt.
-    /// This is the only path that can turn control-plane bookkeeping into
-    /// externally evidenced work; the local executor cannot set the flag.
+    /// A checksum alone is never proof of host acceptance. Kept as a rejecting
+    /// compatibility entry point so old callers cannot promote bookkeeping.
     pub fn attach_external_manifest(
         &mut self,
-        execution_id: &str,
-        manifest_checksum: String,
+        _execution_id: &str,
+        _manifest_checksum: String,
     ) -> Result<ExecutionStoreChange, ExecutionError> {
-        let Some(index) = self
-            .receipts
-            .iter()
-            .position(|receipt| receipt.execution_id == execution_id)
-        else {
-            return Err(ExecutionError::InvalidReceipt(
-                "execution receipt is not found".into(),
-            ));
-        };
-        let mut next = self.receipts[index].clone();
-        if next.external_work_executed
-            && next.manifest_checksum.as_deref() == Some(&manifest_checksum)
+        Err(ExecutionError::InvalidReceipt(
+            "host validators and verified file artifacts are required".into(),
+        ))
+    }
+    /// Importing a declaration only creates a candidate. No worker-controlled
+    /// Boolean, string, exit code or checksum can produce accepted work.
+    pub fn import_external_manifest(
+        &mut self,
+        path: impl AsRef<Path>,
+        expected_blueprint_digest: &str,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        let candidate = read_external_candidate(path.as_ref())?;
+        self.import_external_candidate(candidate, expected_blueprint_digest)
+    }
+    pub(crate) fn import_external_candidate(
+        &mut self,
+        candidate: ExternalCandidate,
+        expected_blueprint_digest: &str,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        let manifest = &candidate.declaration;
+        validate_digest(expected_blueprint_digest)?;
+        if manifest.blueprint_digest != expected_blueprint_digest {
+            return Err(ExecutionError::BlueprintLinkMismatch);
+        }
+        let receipt = self
+            .receipt(&manifest.execution_id)
+            .ok_or_else(|| invalid_evidence("execution receipt is missing"))?;
+        if receipt.blueprint_digest != manifest.blueprint_digest
+            || receipt.item_id != manifest.item_id
+            || claim_digest(
+                &receipt.goal_id,
+                &receipt.blueprint_digest,
+                &receipt.item_id,
+                receipt.attempt,
+            ) != manifest.claim_digest
         {
-            return Ok(ExecutionStoreChange::Unchanged);
+            return Err(ExecutionError::BlueprintLinkMismatch);
         }
-        if next.external_work_executed || !next.status.is_terminal() {
-            return Err(ExecutionError::ReceiptConflict {
-                execution_id: execution_id.to_owned(),
+        if !matches!(
+            receipt.status,
+            ExecutionStatus::Running | ExecutionStatus::Succeeded
+        ) {
+            return Err(invalid_evidence(
+                "terminal failed/cancelled claim cannot import",
+            ));
+        }
+        if self.receipts.iter().any(|r| {
+            r.goal_id == receipt.goal_id
+                && r.blueprint_digest == receipt.blueprint_digest
+                && r.item_id == receipt.item_id
+                && r.attempt > receipt.attempt
+        }) {
+            return Err(invalid_evidence("claim was superseded"));
+        }
+        let mut record = self
+            .external_evidence(&manifest.execution_id)
+            .cloned()
+            .unwrap_or(ExternalEvidence {
+                execution_id: manifest.execution_id.clone(),
+                contract: None,
+                candidate: None,
+                status: EvidenceStatus::Candidate,
+                observations: Vec::new(),
+                reason: None,
             });
+        if let Some(old) = &record.candidate {
+            return if old == &candidate {
+                Ok(ExecutionStoreChange::Unchanged)
+            } else {
+                Err(invalid_evidence(
+                    "claim replay conflicts with its immutable candidate",
+                ))
+            };
         }
-        next.external_work_executed = true;
-        next.manifest_checksum = Some(manifest_checksum);
-        next.validate()?;
-        let mut replacement = self.clone();
-        replacement.receipts[index] = next;
-        replacement.commit(ExecutionStoreChange::Updated)?;
-        *self = replacement;
+        if let Some(verified) = &candidate.verifiable {
+            let contract = record
+                .contract
+                .as_ref()
+                .ok_or_else(|| invalid_evidence("host preparation must precede worker changes"))?;
+            validate_manifest_contract(verified, contract)?;
+        }
+        record.candidate = Some(candidate);
+        record.status = EvidenceStatus::Candidate;
+        self.save_external(record)
+    }
+    pub fn external_evidence(&self, execution_id: &str) -> Option<&ExternalEvidence> {
+        self.external
+            .iter()
+            .find(|r| r.execution_id == execution_id)
+    }
+    pub fn is_master_accepted(&self, receipt: &ExecutionReceipt) -> bool {
+        receipt.status == ExecutionStatus::Succeeded
+            && self
+                .external_evidence(&receipt.execution_id)
+                .is_some_and(|e| {
+                    e.status == EvidenceStatus::Accepted
+                        && e.contract.is_some()
+                        && e.candidate.as_ref().is_some_and(|c| c.verifiable.is_some())
+                })
+    }
+    fn save_external(
+        &mut self,
+        record: ExternalEvidence,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        let mut next = self.clone();
+        if let Some(index) = next
+            .external
+            .iter()
+            .position(|r| r.execution_id == record.execution_id)
+        {
+            next.external[index] = record;
+        } else {
+            next.external.push(record);
+        }
+        next.commit(ExecutionStoreChange::Updated)?;
+        *self = next;
         Ok(ExecutionStoreChange::Updated)
     }
 
@@ -864,6 +1031,7 @@ impl ExecutionStore {
             path,
             generation: 0,
             receipts: Vec::new(),
+            external: Vec::new(),
         }
     }
 
@@ -891,11 +1059,13 @@ impl ExecutionStore {
 
     fn encode_snapshot(&self) -> Result<Vec<u8>, ExecutionError> {
         validate_receipts(&self.receipts)?;
+        validate_external_records(&self.receipts, &self.external)?;
         let snapshot = Snapshot {
             schema_version: EXECUTION_SCHEMA_VERSION,
             generation: self.generation,
-            digest: digest_receipts(&self.receipts)?,
+            digest: digest_receipts(&self.receipts, &self.external)?,
             receipts: self.receipts.clone(),
+            external: self.external.clone(),
         };
         let bytes = serde_json::to_vec(&snapshot)?;
         if bytes.len() > MAX_EXECUTION_STORE_BYTES {
@@ -922,19 +1092,21 @@ impl ExecutionStore {
             });
         }
         validate_receipts(&snapshot.receipts)?;
-        if snapshot.digest != digest_receipts(&snapshot.receipts)? {
+        validate_external_records(&snapshot.receipts, &snapshot.external)?;
+        if snapshot.digest != digest_receipts(&snapshot.receipts, &snapshot.external)? {
             return Err(ExecutionError::DigestMismatch);
         }
         Ok(Self {
             path,
             generation: snapshot.generation,
             receipts: snapshot.receipts,
+            external: snapshot.external,
         })
     }
 }
 
 /// Owner for one bounded local Blueprint step.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlueprintExecutor {
     store: ExecutionStore,
 }
@@ -954,6 +1126,59 @@ impl BlueprintExecutor {
 
     pub fn into_store(self) -> ExecutionStore {
         self.store
+    }
+
+    /// Persist the resumable receipt that backs an external handoff. This is
+    /// idempotent so a host restart between queue and receipt persistence can
+    /// repair the admission without allocating a second attempt.
+    pub fn ensure_external_pending_receipt(
+        &mut self,
+        goal: &Goal,
+        blueprint: &Blueprint,
+        item_id: &str,
+        attempt: u32,
+    ) -> Result<ExecutionStoreChange, ExecutionError> {
+        let Some(item) = blueprint.items.iter().find(|item| item.id == item_id) else {
+            return Err(ExecutionError::InvalidReceipt(
+                "handoff item is missing".into(),
+            ));
+        };
+        let execution_id = execution_id(goal, blueprint, item, attempt);
+        if let Some(existing) = self.store.receipt(&execution_id) {
+            if existing.status == ExecutionStatus::Running && !existing.external_work_executed {
+                return Ok(ExecutionStoreChange::Unchanged);
+            }
+            return Err(ExecutionError::ReceiptConflict { execution_id });
+        }
+        let receipt = make_external_pending_receipt(goal, blueprint, item, attempt)?;
+        let used = self.spent_for(goal, blueprint);
+        ensure_budget(goal.budget, used, receipt.cost)?;
+        self.store.upsert_receipt(receipt)
+    }
+
+    /// Admit an external worker claim with a resumable receipt, using bounded
+    /// compensation if either independently atomic snapshot fails.
+    pub fn admit_external_handoff(
+        &mut self,
+        handoffs: &mut HandoffStore,
+        goal: &Goal,
+        blueprint: &Blueprint,
+    ) -> Result<HandoffOutcome, ExecutionError> {
+        let mut next_executor = self.clone();
+        let mut next_handoffs = handoffs.clone();
+        let outcome = next_executor.handoff_next(&mut next_handoffs, goal, blueprint)?;
+        if let Err(error) = next_executor.ensure_external_pending_receipt(
+            goal,
+            blueprint,
+            &outcome.request.item_id,
+            outcome.request.attempt,
+        ) {
+            let _ = next_handoffs.remove_exact(&outcome.request.handoff_id);
+            return Err(error);
+        }
+        *self = next_executor;
+        *handoffs = next_handoffs;
+        Ok(outcome)
     }
 
     /// Admit one dependency-ready declarative task for an external owner.
@@ -1166,18 +1391,13 @@ impl BlueprintExecutor {
     ) -> Result<Option<Selection<'a>>, ExecutionError> {
         for item in &blueprint.items {
             let latest = self.latest_receipt(goal, blueprint, &item.id);
-            if latest.is_some_and(|receipt| {
-                receipt.status == ExecutionStatus::Succeeded && receipt.external_work_executed
-            }) {
+            if latest.is_some_and(|receipt| self.store.is_master_accepted(receipt)) {
                 continue;
             }
             let mut waiting_on = item.depends_on.iter().filter(|dependency| {
                 !self
                     .latest_receipt(goal, blueprint, dependency)
-                    .is_some_and(|receipt| {
-                        receipt.status == ExecutionStatus::Succeeded
-                            && receipt.external_work_executed
-                    })
+                    .is_some_and(|receipt| self.store.is_master_accepted(receipt))
             });
             if waiting_on.next().is_some() {
                 continue;
@@ -1280,6 +1500,31 @@ fn make_running_receipt(
     Ok(receipt)
 }
 
+fn make_external_pending_receipt(
+    goal: &Goal,
+    blueprint: &Blueprint,
+    item: &BlueprintItem,
+    attempt: u32,
+) -> Result<ExecutionReceipt, ExecutionError> {
+    let receipt = ExecutionReceipt {
+        execution_id: execution_id(goal, blueprint, item, attempt),
+        goal_id: goal.id.clone(),
+        blueprint_id: blueprint.id.clone(),
+        blueprint_version: blueprint.version.clone(),
+        blueprint_digest: blueprint.digest.clone(),
+        item_id: item.id.clone(),
+        attempt,
+        status: ExecutionStatus::Running,
+        cost: deterministic_cost(item),
+        evidence: "external_owner_pending external_work_executed=false".into(),
+        external_work_executed: false,
+        manifest_checksum: None,
+        error: None,
+    };
+    receipt.validate()?;
+    Ok(receipt)
+}
+
 fn make_handoff_request(
     goal: &Goal,
     blueprint: &Blueprint,
@@ -1289,6 +1534,7 @@ fn make_handoff_request(
 ) -> Result<BlueprintHandoff, ExecutionError> {
     let request = BlueprintHandoff {
         handoff_id: handoff_id(goal, blueprint, item, attempt),
+        claim_digest: claim_digest(&goal.id, &blueprint.digest, &item.id, attempt),
         goal_id: goal.id.clone(),
         blueprint_id: blueprint.id.clone(),
         blueprint_version: blueprint.version.clone(),
@@ -1303,6 +1549,17 @@ fn make_handoff_request(
     };
     request.validate()?;
     Ok(request)
+}
+
+fn claim_digest(goal_id: &str, blueprint_digest: &str, item_id: &str, attempt: u32) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zenpi-blueprint-claim-v1\0");
+    for part in [goal_id, blueprint_digest, item_id] {
+        hasher.update(part.as_bytes());
+        hasher.update([0]);
+    }
+    hasher.update(attempt.to_be_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 fn execution_id(goal: &Goal, blueprint: &Blueprint, item: &BlueprintItem, attempt: u32) -> String {
@@ -1455,8 +1712,11 @@ fn same_attempt_identity(left: &ExecutionReceipt, right: &ExecutionReceipt) -> b
         && left.attempt == right.attempt
 }
 
-fn digest_receipts(receipts: &[ExecutionReceipt]) -> Result<String, ExecutionError> {
-    let bytes = serde_json::to_vec(&UnsignedSnapshot { receipts })?;
+fn digest_receipts(
+    receipts: &[ExecutionReceipt],
+    external: &[ExternalEvidence],
+) -> Result<String, ExecutionError> {
+    let bytes = serde_json::to_vec(&UnsignedSnapshot { receipts, external })?;
     Ok(Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
@@ -1642,4 +1902,1080 @@ fn now_ms() -> u64 {
         .unwrap_or_default()
         .as_millis()
         .min(u128::from(u64::MAX)) as u64
+}
+
+/// Host-verifiable output is a separate state from a worker's declaration.
+/// All records stay in the existing execution snapshot and session owner.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FileEvidence {
+    pub path: String,
+    pub bytes: u64,
+    pub mode: u32,
+    pub sha256: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct FileChange {
+    pub path: String,
+    pub before: Option<FileEvidence>,
+    pub after: Option<FileEvidence>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorktreeEvidence {
+    /// SHA256 of the bounded canonical inventory, not a Git commit ID.
+    pub revision: String,
+    pub files: Vec<FileEvidence>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ValidatorSpec {
+    pub id: String,
+    pub argv: Vec<String>,
+    pub timeout_ms: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalPreparation {
+    pub claim_digest: String,
+    pub lease_id: String,
+    pub policy_digest: String,
+    pub owned_paths: Vec<String>,
+    pub validator_timeout_ms: u64,
+    pub policy: crate::tools::BlueprintPolicySpec,
+    pub lease: crate::tools::BlueprintLease,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalContract {
+    pub session_id: String,
+    pub execution_id: String,
+    pub claim_digest: String,
+    pub lease_id: String,
+    pub policy_digest: String,
+    pub workspace: PathBuf,
+    pub owned_paths: Vec<String>,
+    /// Explicit host control files excluded from product inventory. These
+    /// are derived by the host; worker manifests cannot add exclusions.
+    pub protected_paths: Vec<PathBuf>,
+    pub baseline: WorktreeEvidence,
+    pub validators: Vec<ValidatorSpec>,
+    pub prepared_at_ms: u64,
+    pub policy: crate::tools::BlueprintPolicySpec,
+    pub lease: crate::tools::BlueprintLease,
+    pub digest: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct VerifiableResultManifest {
+    pub schema_version: u16,
+    pub declaration: ExternalResultManifest,
+    pub contract_digest: String,
+    pub lease_id: String,
+    pub policy_digest: String,
+    pub baseline_revision: String,
+    pub output_revision: String,
+    pub diff_sha256: String,
+    pub changes: Vec<FileChange>,
+    pub validator_ids: Vec<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalCandidate {
+    pub checksum: String,
+    pub declaration: ExternalResultManifest,
+    pub verifiable: Option<VerifiableResultManifest>,
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceStatus {
+    Prepared,
+    Candidate,
+    Validating,
+    Rejected,
+    Cancelled,
+    Accepted,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ValidatorObservation {
+    pub validator_id: String,
+    pub operation_id: String,
+    pub argv: Vec<String>,
+    pub exit_code: Option<i32>,
+    pub signal: Option<i32>,
+    pub cancelled: bool,
+    pub timed_out: bool,
+    pub child_reaped: bool,
+    pub output: Vec<crate::tool_output::ArtifactRef>,
+    pub capture_errors: Vec<String>,
+    pub observed_at_ms: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalEvidence {
+    pub execution_id: String,
+    pub contract: Option<ExternalContract>,
+    pub candidate: Option<ExternalCandidate>,
+    pub status: EvidenceStatus,
+    pub observations: Vec<ValidatorObservation>,
+    pub reason: Option<String>,
+}
+
+fn invalid_evidence(reason: &str) -> ExecutionError {
+    ExecutionError::InvalidReceipt(reason.into())
+}
+fn evidence_hash<T: Serialize>(value: &T) -> Result<String, ExecutionError> {
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
+}
+pub fn read_external_candidate(path: &Path) -> Result<ExternalCandidate, ExecutionError> {
+    let bytes = read_bounded_with_limit(path, MAX_DOMAIN_RECORD_BYTES)?;
+    parse_external_candidate(&bytes)
+}
+pub(crate) fn parse_external_candidate(bytes: &[u8]) -> Result<ExternalCandidate, ExecutionError> {
+    if bytes.len() > MAX_DOMAIN_RECORD_BYTES {
+        return Err(invalid_evidence("external manifest exceeds byte limit"));
+    }
+    let value: serde_json::Value = serde_json::from_slice(bytes)?;
+    let (declaration, verifiable) = if value.get("schema_version").is_some() {
+        let verified: VerifiableResultManifest = serde_json::from_value(value)?;
+        if verified.schema_version != 2 {
+            return Err(invalid_evidence("unsupported external manifest version"));
+        }
+        (verified.declaration.clone(), Some(verified))
+    } else {
+        (
+            serde_json::from_value::<ExternalResultManifest>(value)?,
+            None,
+        )
+    };
+    bounded_id(&declaration.execution_id, "execution_id")?;
+    bounded_id(&declaration.item_id, "item_id")?;
+    validate_digest(&declaration.claim_digest)?;
+    validate_digest(&declaration.blueprint_digest)?;
+    if declaration.status != ExecutionStatus::Succeeded
+        || !declaration.acceptance_passed
+        || declaration.acceptance_evidence.is_empty()
+        || declaration.acceptance_evidence.len() > 8
+    {
+        return Err(invalid_evidence(
+            "worker declaration is not a bounded successful candidate",
+        ));
+    }
+    for entry in &declaration.acceptance_evidence {
+        bounded_text(entry, "worker_evidence", 4096)?;
+    }
+    Ok(ExternalCandidate {
+        checksum: format!("{:x}", Sha256::digest(bytes)),
+        declaration,
+        verifiable,
+    })
+}
+fn validate_manifest_contract(
+    m: &VerifiableResultManifest,
+    c: &ExternalContract,
+) -> Result<(), ExecutionError> {
+    if m.contract_digest != c.digest
+        || m.declaration.claim_digest != c.claim_digest
+        || m.declaration.execution_id != c.execution_id
+        || m.lease_id != c.lease_id
+        || m.policy_digest != c.policy_digest
+        || m.baseline_revision != c.baseline.revision
+        || m.validator_ids
+            != c.validators
+                .iter()
+                .map(|v| v.id.clone())
+                .collect::<Vec<_>>()
+    {
+        return Err(invalid_evidence(
+            "manifest differs from the frozen host contract",
+        ));
+    }
+    validate_digest(&m.output_revision)?;
+    validate_digest(&m.diff_sha256)?;
+    if m.changes.is_empty() || m.changes.len() > 64 || evidence_hash(&m.changes)? != m.diff_sha256 {
+        return Err(invalid_evidence("manifest diff is missing or corrupt"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for change in &m.changes {
+        evidence_relative_path(&change.path)?;
+        if !seen.insert(&change.path)
+            || !c.owned_paths.contains(&change.path)
+            || change.before == change.after
+            || (change.before.is_none() && change.after.is_none())
+        {
+            return Err(invalid_evidence(
+                "manifest diff is duplicate, unchanged or outside owned files",
+            ));
+        }
+        if change.before.as_ref() != c.baseline.files.iter().find(|f| f.path == change.path) {
+            return Err(invalid_evidence(
+                "manifest input bytes/hash differ from baseline",
+            ));
+        }
+        for file in [&change.before, &change.after].into_iter().flatten() {
+            if file.path != change.path || file.bytes > 8 * 1024 * 1024 {
+                return Err(invalid_evidence("invalid file artifact"));
+            }
+            validate_digest(&file.sha256)?;
+        }
+    }
+    Ok(())
+}
+fn evidence_relative_path(path: &str) -> Result<(), ExecutionError> {
+    if path.is_empty()
+        || path.len() > 4096
+        || path.chars().any(char::is_control)
+        || path.contains('\\')
+        || Path::new(path).is_absolute()
+        || Path::new(path)
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        || path
+            .split('/')
+            .any(|c| c.is_empty() || c == ".git" || c.starts_with(".zenpi-output-"))
+    {
+        return Err(invalid_evidence(
+            "artifact path must be a normalized product file",
+        ));
+    }
+    Ok(())
+}
+#[cfg(unix)]
+fn evidence_open(root: &Path, relative: &Path) -> Result<File, ExecutionError> {
+    use std::os::{
+        fd::{AsRawFd, FromRawFd},
+        unix::{ffi::OsStrExt, fs::MetadataExt},
+    };
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC);
+    let mut directory = options.open(root)?;
+    let components: Vec<_> = relative.components().collect();
+    for (index, component) in components.iter().enumerate() {
+        let std::path::Component::Normal(name) = component else {
+            return Err(invalid_evidence("unsafe artifact component"));
+        };
+        let name = std::ffi::CString::new(name.as_bytes())
+            .map_err(|_| invalid_evidence("artifact NUL"))?;
+        let last = index + 1 == components.len();
+        let flags = libc::O_RDONLY
+            | libc::O_NOFOLLOW
+            | libc::O_CLOEXEC
+            | libc::O_NONBLOCK
+            | if last { 0 } else { libc::O_DIRECTORY };
+        // Each component is opened relative to a pinned no-follow parent.
+        let fd = unsafe { libc::openat(directory.as_raw_fd(), name.as_ptr(), flags) };
+        if fd < 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+        directory = unsafe { File::from_raw_fd(fd) };
+        if last {
+            let metadata = directory.metadata()?;
+            if !metadata.is_file() || metadata.nlink() != 1 {
+                return Err(invalid_evidence(
+                    "artifact is not a singly-linked regular file",
+                ));
+            }
+        }
+    }
+    Ok(directory)
+}
+#[cfg(not(unix))]
+fn evidence_open(_root: &Path, _relative: &Path) -> Result<File, ExecutionError> {
+    Err(invalid_evidence(
+        "verified artifact containment requires Unix",
+    ))
+}
+/// Bounded content revision of product files. Git metadata and exact host
+/// control files are excluded; arbitrary symlinks and hardlinks fail closed.
+pub fn inspect_external_worktree(
+    root: &Path,
+    protected: &[PathBuf],
+    cancelled: &dyn Fn() -> bool,
+) -> Result<WorktreeEvidence, ExecutionError> {
+    let root = fs::canonicalize(root)?;
+    let mut queue = vec![PathBuf::new()];
+    let mut files = Vec::new();
+    let mut total = 0u64;
+    let mut entries = 0;
+    while let Some(relative) = queue.pop() {
+        if cancelled() {
+            return Err(invalid_evidence("external verification cancelled"));
+        }
+        if relative.components().count() > 64 {
+            return Err(invalid_evidence("artifact tree depth exceeded"));
+        }
+        for entry in fs::read_dir(root.join(&relative))? {
+            entries += 1;
+            if entries > 8192 {
+                return Err(invalid_evidence("artifact inventory exceeds8192 entries"));
+            }
+            let entry = entry?;
+            let relative = relative.join(entry.file_name());
+            let full = root.join(&relative);
+            if relative == Path::new(".git")
+                || protected
+                    .iter()
+                    .any(|p| full == *p || full.starts_with(p) && p.is_dir())
+            {
+                continue;
+            }
+            let metadata = entry.file_type()?;
+            if metadata.is_symlink() {
+                return Err(invalid_evidence("symlink in product inventory"));
+            }
+            if metadata.is_dir() {
+                queue.push(relative);
+                continue;
+            }
+            if files.len() >= 4096 {
+                return Err(invalid_evidence("artifact inventory exceeds4096 files"));
+            }
+            let path = relative
+                .to_str()
+                .ok_or_else(|| invalid_evidence("non-UTF8 artifact path"))?
+                .to_owned();
+            evidence_relative_path(&path)?;
+            let mut file = evidence_open(&root, &relative)?;
+            let declared = file.metadata()?.len();
+            if declared > 8 * 1024 * 1024 {
+                return Err(invalid_evidence("artifact exceeds8MiB"));
+            }
+            let mut hash = Sha256::new();
+            let mut buffer = [0u8; 8192];
+            let mut bytes = 0;
+            loop {
+                if cancelled() {
+                    return Err(invalid_evidence("external verification cancelled"));
+                }
+                let n = file.read(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+                bytes += n as u64;
+                total += n as u64;
+                if bytes > 8 * 1024 * 1024 || total > 64 * 1024 * 1024 {
+                    return Err(invalid_evidence("artifact inventory exceeds byte budget"));
+                }
+                hash.update(&buffer[..n]);
+            }
+            if bytes != declared || file.metadata()?.len() != bytes {
+                return Err(invalid_evidence("artifact changed during read"));
+            }
+            #[cfg(unix)]
+            let mode = {
+                use std::os::unix::fs::PermissionsExt;
+                file.metadata()?.permissions().mode() & 0o777
+            };
+            #[cfg(not(unix))]
+            let mode = 0;
+            files.push(FileEvidence {
+                path,
+                bytes,
+                mode,
+                sha256: format!("{:x}", hash.finalize()),
+            });
+        }
+    }
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(WorktreeEvidence {
+        revision: evidence_hash(&files)?,
+        files,
+    })
+}
+pub fn external_file_diff(before: &WorktreeEvidence, after: &WorktreeEvidence) -> Vec<FileChange> {
+    let keys: std::collections::BTreeSet<_> = before
+        .files
+        .iter()
+        .chain(&after.files)
+        .map(|f| f.path.clone())
+        .collect();
+    keys.into_iter()
+        .filter_map(|path| {
+            let old = before.files.iter().find(|f| f.path == path).cloned();
+            let new = after.files.iter().find(|f| f.path == path).cloned();
+            (old != new).then_some(FileChange {
+                path,
+                before: old,
+                after: new,
+            })
+        })
+        .collect()
+}
+
+impl ExecutionStore {
+    /// Freeze authority and input bytes before the external worker changes files.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_external_evidence(
+        &mut self,
+        session: &crate::session::SessionStore,
+        ledger: &crate::governance::WorkerBudgetLedger,
+        handoff: &BlueprintHandoff,
+        goal: &Goal,
+        blueprint: &Blueprint,
+        workspace: &Path,
+        request: &ExternalPreparation,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ExternalEvidence, ExecutionError> {
+        handoff.validate_against(goal, blueprint)?;
+        if request.claim_digest != handoff.claim_digest
+            || request.policy.blueprint_digest != blueprint.digest
+            || request.policy.item_id != handoff.item_id
+            || request.lease_id != request.lease.lease_id
+        {
+            return Err(invalid_evidence(
+                "preparation authority differs from existing claim",
+            ));
+        }
+        let now = now_ms();
+        let lease = ledger
+            .active_lease(
+                &request.lease_id,
+                &request.policy_digest,
+                &handoff.item_id,
+                now,
+            )
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        if request.validator_timeout_ms == 0
+            || request.validator_timeout_ms > 120_000
+            || request.owned_paths.is_empty()
+            || request.owned_paths.len() > 64
+            || request.lease.expires_at_ms > lease.expires_at_ms
+        {
+            return Err(invalid_evidence("preparation exceeds bounds"));
+        }
+        let workspace = fs::canonicalize(workspace)?;
+        let context = crate::tools::ToolContext::new(&workspace)
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        let (gate, _) = crate::tools::BlueprintGate::compile(
+            &context,
+            request.policy.clone(),
+            request.lease.clone(),
+            now,
+        )
+        .map_err(|e| invalid_evidence(&e.to_string()))?;
+        if gate.evidence().policy_digest != request.policy_digest {
+            return Err(invalid_evidence(
+                "supplied policy differs from host lease digest",
+            ));
+        }
+        let context = context
+            .with_blueprint_gate(gate)
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        let mut owned = request.owned_paths.clone();
+        owned.sort();
+        owned.dedup();
+        if owned.len() != request.owned_paths.len() {
+            return Err(invalid_evidence("duplicate owned paths"));
+        }
+        for path in &owned {
+            evidence_relative_path(path)?;
+            context
+                .check_call_gate(
+                    "write_file",
+                    crate::tools::ToolSideEffect::WorkspaceWrite,
+                    serde_json::json!({"path":path}).as_object().unwrap(),
+                )
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+        }
+        let receipt = self
+            .latest_receipt_for(goal, blueprint, &handoff.item_id)
+            .ok_or_else(|| invalid_evidence("claim has no receipt"))?;
+        if receipt.attempt != handoff.attempt
+            || receipt.status != ExecutionStatus::Running
+            || receipt.evidence != "external_owner_pending external_work_executed=false"
+        {
+            return Err(invalid_evidence(
+                "preparation requires a pending external claim, never control_plane_only",
+            ));
+        }
+        let execution_id = receipt.execution_id.clone();
+        if let Some(existing) = self.external_evidence(&execution_id) {
+            return if existing.contract.as_ref().is_some_and(|c| {
+                c.claim_digest == request.claim_digest
+                    && c.owned_paths == owned
+                    && c.lease_id == request.lease_id
+                    && c.policy_digest == request.policy_digest
+                    && c.workspace == workspace
+                    && c.validators
+                        .iter()
+                        .all(|v| v.timeout_ms == request.validator_timeout_ms)
+            }) {
+                Ok(existing.clone())
+            } else {
+                Err(invalid_evidence("external preparation cannot be rebound"))
+            };
+        }
+        let journal = fs::canonicalize(session.path())?;
+        let parent = journal
+            .parent()
+            .ok_or_else(|| invalid_evidence("journal has no parent"))?;
+        let mut protected = vec![
+            journal.clone(),
+            fs::canonicalize(&self.path)?,
+            absolute_control_path(&handoff_path_for_session(&journal))?,
+            absolute_control_path(&crate::domain_store::path_for_session(&journal))?,
+            parent.join(format!(
+                ".zenpi-output-{:x}",
+                Sha256::digest(session.session_id().as_bytes())
+            )),
+            workspace
+                .join(".zenpi-results")
+                .join(format!("{}.json", request.claim_digest)),
+        ];
+        protected.sort();
+        protected.dedup();
+        let result_path = workspace
+            .join(".zenpi-results")
+            .join(format!("{}.json", request.claim_digest));
+        for path in &protected {
+            if *path == result_path {
+                continue;
+            }
+            if let Ok(relative) = path.strip_prefix(&workspace) {
+                let args = serde_json::json!({"path":relative.to_string_lossy()});
+                if context
+                    .check_call_gate(
+                        "write_file",
+                        crate::tools::ToolSideEffect::WorkspaceWrite,
+                        args.as_object().unwrap(),
+                    )
+                    .is_ok()
+                {
+                    return Err(invalid_evidence(
+                        "worker policy permits writing host control state",
+                    ));
+                }
+            }
+        }
+        for path in &owned {
+            let full = workspace.join(path);
+            if protected.iter().any(|p| full == *p || full.starts_with(p)) {
+                return Err(invalid_evidence(
+                    "product ownership overlaps host control files",
+                ));
+            }
+        }
+        let baseline = inspect_external_worktree(&workspace, &protected, cancelled)?;
+        let validators = handoff
+            .acceptance_commands
+            .iter()
+            .enumerate()
+            .map(|(index, command)| {
+                if command.trim().is_empty() || command.starts_with("external-owner:") {
+                    return Err(invalid_evidence(
+                        "placeholder acceptance command is not a validator",
+                    ));
+                }
+                let argv = vec!["/bin/sh".into(), "-c".into(), command.clone()];
+                Ok(ValidatorSpec {
+                    id: format!("validator-{index}-{}", &evidence_hash(&argv)?[..16]),
+                    argv,
+                    timeout_ms: request.validator_timeout_ms,
+                })
+            })
+            .collect::<Result<Vec<_>, ExecutionError>>()?;
+        if cancelled() {
+            return Err(invalid_evidence("external preparation cancelled"));
+        }
+        let mut contract = ExternalContract {
+            session_id: session.session_id().into(),
+            execution_id: execution_id.clone(),
+            claim_digest: request.claim_digest.clone(),
+            lease_id: request.lease_id.clone(),
+            policy_digest: request.policy_digest.clone(),
+            workspace,
+            owned_paths: owned,
+            protected_paths: protected,
+            baseline,
+            validators,
+            prepared_at_ms: now,
+            policy: request.policy.clone(),
+            lease: request.lease.clone(),
+            digest: String::new(),
+        };
+        contract.digest = evidence_hash(&contract)?;
+        let record = ExternalEvidence {
+            execution_id,
+            contract: Some(contract),
+            candidate: None,
+            status: EvidenceStatus::Prepared,
+            observations: Vec::new(),
+            reason: None,
+        };
+        self.save_external(record.clone())?;
+        Ok(record)
+    }
+}
+fn absolute_control_path(path: &Path) -> Result<PathBuf, ExecutionError> {
+    if path.exists() {
+        Ok(fs::canonicalize(path)?)
+    } else {
+        let parent = path.parent().unwrap_or(Path::new("."));
+        Ok(fs::canonicalize(parent)?.join(
+            path.file_name()
+                .ok_or_else(|| invalid_evidence("invalid control path"))?,
+        ))
+    }
+}
+
+impl ExecutionStore {
+    /// Execute only the host-frozen validators. The candidate contains no
+    /// executable commands or host observations. SessionStore excludes writers.
+    #[allow(clippy::too_many_arguments)]
+    pub fn accept_external_candidate(
+        &mut self,
+        session: &mut crate::session::SessionStore,
+        ledger: &mut crate::governance::WorkerBudgetLedger,
+        output: &mut crate::tool_output::SessionOutputStore,
+        handoff: &BlueprintHandoff,
+        goal: &Goal,
+        blueprint: &Blueprint,
+        workspace: &Path,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ExternalEvidence, ExecutionError> {
+        use crate::governance::{BudgetCompletion, BudgetOrigin, BudgetReservation, ResourceUsage};
+        use crate::session::{InterruptedOperation, OperationKind, OperationOutcome};
+        handoff.validate_against(goal, blueprint)?;
+        let receipt = self
+            .latest_receipt_for(goal, blueprint, &handoff.item_id)
+            .ok_or_else(|| invalid_evidence("claim receipt missing"))?;
+        if receipt.attempt != handoff.attempt {
+            return Err(invalid_evidence("stale claim attempt"));
+        }
+        let mut record = self
+            .external_evidence(&receipt.execution_id)
+            .cloned()
+            .ok_or_else(|| invalid_evidence("candidate missing"))?;
+        let contract = record
+            .contract
+            .clone()
+            .ok_or_else(|| invalid_evidence("legacy declaration is candidate/history only"))?;
+        // A replay skips validator execution, but still belongs to the exact
+        // session and workspace that produced the durable acceptance.
+        if contract.session_id != session.session_id()
+            || contract.claim_digest != handoff.claim_digest
+            || contract.workspace != fs::canonicalize(workspace)?
+        {
+            return Err(invalid_evidence(
+                "acceptance belongs to another session/worktree",
+            ));
+        }
+        if record.status == EvidenceStatus::Accepted {
+            return Ok(record);
+        }
+        if record.status == EvidenceStatus::Validating {
+            return Err(invalid_evidence(
+                "validator outcome unknown; explicit reconcile required, no automatic replay",
+            ));
+        }
+        if record.status != EvidenceStatus::Candidate
+            || receipt.status != ExecutionStatus::Running
+            || receipt.evidence != "external_owner_pending external_work_executed=false"
+        {
+            return Err(invalid_evidence(
+                "only an external candidate can be accepted; control_plane_only is insufficient",
+            ));
+        }
+        let candidate = record
+            .candidate
+            .clone()
+            .ok_or_else(|| invalid_evidence("candidate missing"))?;
+        let manifest = candidate
+            .verifiable
+            .as_ref()
+            .ok_or_else(|| invalid_evidence("file artifact manifest required"))?;
+        validate_manifest_contract(manifest, &contract)?;
+        if !matches!(goal.status, GoalStatus::Queued | GoalStatus::Running) {
+            return Err(invalid_evidence("goal is not accepting external work"));
+        }
+        ledger
+            .active_lease(
+                &contract.lease_id,
+                &contract.policy_digest,
+                &handoff.item_id,
+                now_ms(),
+            )
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        ledger
+            .require_settled_item(&contract.lease_id)
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        let expected_commands: Vec<_> = contract
+            .validators
+            .iter()
+            .map(|v| v.argv.get(2).cloned().unwrap_or_default())
+            .collect();
+        if expected_commands != handoff.acceptance_commands {
+            return Err(invalid_evidence(
+                "validator contract no longer matches Blueprint",
+            ));
+        }
+        if cancelled() {
+            return self.external_terminal(
+                record,
+                EvidenceStatus::Cancelled,
+                "cancelled before validation",
+            );
+        }
+        let current =
+            inspect_external_worktree(&contract.workspace, &contract.protected_paths, cancelled)?;
+        if current.revision != manifest.output_revision
+            || external_file_diff(&contract.baseline, &current) != manifest.changes
+        {
+            return Err(invalid_evidence(
+                "actual artifact bytes/hash/revision/diff differ from candidate",
+            ));
+        }
+        record.status = EvidenceStatus::Validating;
+        self.save_external(record.clone())?;
+        for (index, validator) in contract.validators.iter().enumerate() {
+            if cancelled() {
+                return self.external_terminal(
+                    record,
+                    EvidenceStatus::Cancelled,
+                    "cancelled before validator dispatch",
+                );
+            }
+            let lease = ledger
+                .active_lease(
+                    &contract.lease_id,
+                    &contract.policy_digest,
+                    &handoff.item_id,
+                    now_ms(),
+                )
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            let expires = lease.expires_at_ms;
+            let operation = format!("validator-{}-{index}", &candidate.checksum[..32]);
+            let reservation = BudgetReservation {
+                operation_id: operation.clone(),
+                lease_id: contract.lease_id.clone(),
+                policy_digest: contract.policy_digest.clone(),
+                origin: BudgetOrigin::AgentTool,
+                resources: ResourceUsage {
+                    wall_ms: validator.timeout_ms + 1000,
+                    processes: 1,
+                    concurrency: 1,
+                    disk_bytes: crate::tool_output::command_disk_reservation(
+                        crate::tool_output::OutputLimits::default(),
+                    ),
+                    ..Default::default()
+                },
+                gate_decision_id: validator.id.clone(),
+                network_host: None,
+                credential_handles: Vec::new(),
+            };
+            if let Err(error) = ledger.reserve(session, reservation, now_ms()) {
+                return self.external_terminal(
+                    record,
+                    EvidenceStatus::Rejected,
+                    &error.to_string(),
+                );
+            }
+            session
+                .begin_operation(&InterruptedOperation {
+                    operation_id: operation.clone(),
+                    kind: OperationKind::Tool,
+                    turn_id: operation.clone(),
+                    retry_requires_confirmation: true,
+                })
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            session.append_event(serde_json::json!({"type":"tool_execution_started","operation_id":operation,"turn_id":operation,"call_id":operation,"tool":"run_command","validator_id":validator.id,"argv":validator.argv,"contract_digest":contract.digest})).map_err(|e|invalid_evidence(&e.to_string()))?;
+            let now = now_ms();
+            let store = output
+                .store(session.path(), session.session_id(), now)
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            let capture = crate::tool_output::CommandOutputCapture::new(
+                store,
+                session.session_id(),
+                &operation,
+                now,
+            )
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+            let context = crate::tools::ToolContext::new(&contract.workspace)
+                .map_err(|e| invalid_evidence(&e.to_string()))?
+                .with_origin(crate::tools::ToolOrigin::UserShell)
+                .with_output_capture(capture.clone())
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            let arguments =
+                serde_json::json!({"command":validator.argv[2],"timeout_ms":validator.timeout_ms});
+            let result = crate::tools::RunCommandTool::invoke_user_shell_with_cancel(
+                &context,
+                arguments.as_object().unwrap(),
+                &|| cancelled() || now_ms() >= expires,
+            );
+            let value = result.as_ref().ok();
+            let flag = |name: &str| value.and_then(|v| v[name].as_bool()).unwrap_or(false);
+            let observation = ValidatorObservation {
+                validator_id: validator.id.clone(),
+                operation_id: operation.clone(),
+                argv: validator.argv.clone(),
+                exit_code: value
+                    .and_then(|v| v["exit_code"].as_i64())
+                    .map(|v| v as i32),
+                signal: value.and_then(|v| v["signal"].as_i64()).map(|v| v as i32),
+                cancelled: flag("cancelled") || cancelled() || now_ms() >= expires,
+                timed_out: flag("timed_out"),
+                child_reaped: flag("child_reaped"),
+                output: capture.artifacts(),
+                capture_errors: capture.errors(),
+                observed_at_ms: now_ms(),
+            };
+            let successful = result.is_ok()
+                && observation.exit_code == Some(0)
+                && observation.signal.is_none()
+                && !observation.cancelled
+                && !observation.timed_out
+                && observation.child_reaped
+                && observation.output.len() == 2
+                && observation.output.iter().all(|r| r.finalized && r.complete)
+                && observation.capture_errors.is_empty();
+            session.append_event(serde_json::json!({"type":"tool_output_captured","operation_id":operation,"turn_id":operation,"call_id":operation,"output_capture":{"artifacts":observation.output,"errors":observation.capture_errors}})).map_err(|e|invalid_evidence(&e.to_string()))?;
+            session.append_event(serde_json::json!({"type":"external_validator_observed","claim_digest":contract.claim_digest,"candidate_checksum":candidate.checksum,"contract_digest":contract.digest,"observation":observation})).map_err(|e|invalid_evidence(&e.to_string()))?;
+            record.observations.push(observation.clone());
+            self.save_external(record.clone())?;
+            let completion = if observation.cancelled {
+                BudgetCompletion::Cancelled
+            } else if successful {
+                BudgetCompletion::Completed
+            } else {
+                BudgetCompletion::Failed
+            };
+            let outcome = if observation.cancelled {
+                OperationOutcome::Cancelled
+            } else if successful {
+                OperationOutcome::Succeeded
+            } else {
+                OperationOutcome::Failed
+            };
+            session
+                .finish_operation(&operation, outcome)
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            let directive = ledger
+                .settle(
+                    session,
+                    &operation,
+                    ResourceUsage {
+                        wall_ms: now_ms().saturating_sub(now),
+                        processes: 1,
+                        disk_bytes: observation
+                            .output
+                            .iter()
+                            .map(|r| r.bytes_stored + 8192)
+                            .sum(),
+                        ..Default::default()
+                    },
+                    completion,
+                    now_ms(),
+                )
+                .map_err(|e| invalid_evidence(&e.to_string()))?;
+            if !successful || directive.is_some() {
+                return self.external_terminal(
+                    record,
+                    if observation.cancelled {
+                        EvidenceStatus::Cancelled
+                    } else {
+                        EvidenceStatus::Rejected
+                    },
+                    "host validator failed, was cancelled, or exceeded budget",
+                );
+            }
+        }
+        if cancelled() {
+            return self.external_terminal(
+                record,
+                EvidenceStatus::Cancelled,
+                "cancelled before acceptance commit",
+            );
+        }
+        ledger
+            .active_lease(
+                &contract.lease_id,
+                &contract.policy_digest,
+                &handoff.item_id,
+                now_ms(),
+            )
+            .map_err(|e| invalid_evidence(&e.to_string()))?;
+        if inspect_external_worktree(&contract.workspace, &contract.protected_paths, cancelled)?
+            != current
+        {
+            return self.external_terminal(
+                record,
+                EvidenceStatus::Rejected,
+                "worktree changed during validator execution",
+            );
+        }
+        record.status = EvidenceStatus::Accepted;
+        record.reason = None;
+        let mut next = self.clone();
+        let index = next
+            .external
+            .iter()
+            .position(|r| r.execution_id == record.execution_id)
+            .unwrap();
+        next.external[index] = record.clone();
+        let receipt = next
+            .receipts
+            .iter_mut()
+            .find(|r| r.execution_id == record.execution_id)
+            .unwrap();
+        receipt.status = ExecutionStatus::Succeeded;
+        receipt.external_work_executed = true;
+        receipt.manifest_checksum = Some(candidate.checksum.clone());
+        receipt.evidence = format!(
+            "host_verified validators={} candidate={}",
+            record.observations.len(),
+            candidate.checksum
+        );
+        next.commit(ExecutionStoreChange::Updated)?;
+        *self = next;
+        session.append_event(serde_json::json!({"type":"external_candidate_accepted","execution_id":record.execution_id,"claim_digest":contract.claim_digest,"candidate_checksum":candidate.checksum,"output_revision":manifest.output_revision})).map_err(|e|invalid_evidence(&e.to_string()))?;
+        Ok(record)
+    }
+    fn external_terminal(
+        &mut self,
+        mut record: ExternalEvidence,
+        status: EvidenceStatus,
+        reason: &str,
+    ) -> Result<ExternalEvidence, ExecutionError> {
+        record.status = status;
+        record.reason = Some(crate::security::redact_text(reason, &[]));
+        self.save_external(record.clone())?;
+        Ok(record)
+    }
+}
+
+fn validate_external_records(
+    receipts: &[ExecutionReceipt],
+    records: &[ExternalEvidence],
+) -> Result<(), ExecutionError> {
+    if records.len() > receipts.len() {
+        return Err(invalid_evidence("too many external evidence records"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for record in records {
+        if !seen.insert(&record.execution_id) {
+            return Err(invalid_evidence("duplicate evidence identity"));
+        }
+        let receipt = receipts
+            .iter()
+            .find(|r| r.execution_id == record.execution_id)
+            .ok_or_else(|| invalid_evidence("evidence has no existing receipt"))?;
+        if record.observations.len() > 8 {
+            return Err(invalid_evidence("too many validator observations"));
+        }
+        if let Some(contract) = &record.contract {
+            let mut unsigned = contract.clone();
+            unsigned.digest.clear();
+            if evidence_hash(&unsigned)? != contract.digest
+                || contract.execution_id != record.execution_id
+                || contract.claim_digest
+                    != claim_digest(
+                        &receipt.goal_id,
+                        &receipt.blueprint_digest,
+                        &receipt.item_id,
+                        receipt.attempt,
+                    )
+                || contract.validators.is_empty()
+                || contract.validators.len() > 8
+                || contract.owned_paths.is_empty()
+                || contract.owned_paths.len() > 64
+                || contract.baseline.files.len() > 4096
+                || evidence_hash(&contract.baseline.files)? != contract.baseline.revision
+            {
+                return Err(invalid_evidence("corrupt host evidence contract"));
+            }
+            for validator in &contract.validators {
+                if validator.argv.len() != 3
+                    || validator.argv[0] != "/bin/sh"
+                    || validator.argv[1] != "-c"
+                    || validator.timeout_ms == 0
+                    || validator.timeout_ms > 120000
+                {
+                    return Err(invalid_evidence("invalid frozen validator argv or limit"));
+                }
+            }
+        }
+        if let Some(candidate) = &record.candidate {
+            validate_digest(&candidate.checksum)?;
+            if candidate.declaration.execution_id != record.execution_id
+                || candidate.declaration.claim_digest
+                    != claim_digest(
+                        &receipt.goal_id,
+                        &receipt.blueprint_digest,
+                        &receipt.item_id,
+                        receipt.attempt,
+                    )
+                || candidate.declaration.blueprint_digest != receipt.blueprint_digest
+                || candidate.declaration.item_id != receipt.item_id
+            {
+                return Err(invalid_evidence("candidate identity differs from receipt"));
+            }
+            if let Some(verified) = &candidate.verifiable {
+                if verified.declaration != candidate.declaration {
+                    return Err(invalid_evidence("conflicting worker declarations"));
+                }
+                validate_manifest_contract(
+                    verified,
+                    record
+                        .contract
+                        .as_ref()
+                        .ok_or_else(|| invalid_evidence("verified manifest has no contract"))?,
+                )?;
+            }
+        }
+        if record.status == EvidenceStatus::Prepared
+            && (record.contract.is_none()
+                || record.candidate.is_some()
+                || !record.observations.is_empty())
+        {
+            return Err(invalid_evidence("invalid prepared state"));
+        }
+        if record.status != EvidenceStatus::Prepared && record.candidate.is_none() {
+            return Err(invalid_evidence("evidence state lacks candidate"));
+        }
+        if record.status == EvidenceStatus::Accepted {
+            let contract = record
+                .contract
+                .as_ref()
+                .ok_or_else(|| invalid_evidence("accepted without contract"))?;
+            let candidate = record
+                .candidate
+                .as_ref()
+                .ok_or_else(|| invalid_evidence("accepted without candidate"))?;
+            if candidate.verifiable.is_none()
+                || record.observations.len() != contract.validators.len()
+                || !receipt.external_work_executed
+                || receipt.status != ExecutionStatus::Succeeded
+                || receipt.manifest_checksum.as_ref() != Some(&candidate.checksum)
+            {
+                return Err(invalid_evidence("acceptance lacks host verification"));
+            }
+            for (observed, spec) in record.observations.iter().zip(&contract.validators) {
+                if observed.validator_id != spec.id
+                    || observed.argv != spec.argv
+                    || observed.exit_code != Some(0)
+                    || observed.signal.is_some()
+                    || observed.cancelled
+                    || observed.timed_out
+                    || !observed.child_reaped
+                    || !observed.capture_errors.is_empty()
+                    || observed.output.len() != 2
+                    || observed.output.iter().any(|r| {
+                        !r.complete
+                            || !r.finalized
+                            || r.session_id != contract.session_id
+                            || r.call_id != observed.operation_id
+                    })
+                {
+                    return Err(invalid_evidence(
+                        "acceptance contains unsuccessful host observations",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }

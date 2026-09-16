@@ -1,0 +1,8 @@
+[package]
+name="editor-sync-probe"
+version="0.0.0"
+edition="2024"
+[dependencies]
+zenpi={path="/Users/wangweiyang/GitHub/zenpi"}
+[patch.crates-io]
+crossterm={path="/Users/wangweiyang/GitHub/zenpi/vendor/crossterm"}

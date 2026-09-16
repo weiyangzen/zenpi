@@ -1,0 +1,20 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/partial-first/http-response-0.sse b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/http-response-0.sse
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/http-response-0.sse
+@@ -0,0 +1,15 @@
++event: message_start
++data: {"type": "message_start", "message": {"type": "message", "id": "msg319", "role": "assistant", "model": "claude-sonnet-4-6", "content": [], "stop_reason": null, "usage": {"input_tokens": 7, "output_tokens": 0}}}
++
++event: content_block_start
++data: {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": "INTERRUPTED_PARTIAL_319"}}
++
++event: content_block_stop
++data: {"type": "content_block_stop", "index": 0}
++
++event: content_block_start
++data: {"type": "content_block_start", "index": 1, "content_block": {"type": "tool_use", "id": "incomplete_write_319", "name": "write_file", "input": {}}}
++
++event: content_block_delta
++data: {"type": "content_block_delta", "index": 1, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":\"NEVER"}}
++

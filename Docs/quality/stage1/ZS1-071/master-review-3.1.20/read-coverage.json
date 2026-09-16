@@ -1,0 +1,42 @@
+{
+  "source": "src/runtime.rs",
+  "current_sha256": "7a42c428083f8f3edb0019311296b479004ff562b548d7cdc504729f7cbd1f21",
+  "current_bytes": 33333,
+  "chunks": [
+    {
+      "lines": [
+        1,
+        340
+      ],
+      "bytes": [
+        0,
+        12663
+      ],
+      "sha256": "2e8c7b5f129e1a4e9057a3de66fca152ac979b71b86379d7bcaaf4fe5b062f65"
+    },
+    {
+      "lines": [
+        341,
+        660
+      ],
+      "bytes": [
+        12663,
+        25155
+      ],
+      "sha256": "2c8c06ea26738e9468f10f34a0f55c95443bdc65a6d3b18a47bf8bcf05bb1689"
+    },
+    {
+      "lines": [
+        661,
+        912
+      ],
+      "bytes": [
+        25155,
+        33333
+      ],
+      "sha256": "13d3167ed180298d6c58fa1c10c2e3c842532a0c6fd807a79367e1913628145f"
+    }
+  ],
+  "baseline_exact_prefix_bytes": 28121,
+  "tests_source_sha256": "ea811a89941921209a27f2cbd3d8a63aafa26a12f47529f1a2c2709112d5b79f"
+}

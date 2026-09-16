@@ -227,7 +227,7 @@ pub(crate) fn register_secret_value(value: &str) {
     }
 }
 
-fn registered_secret_values() -> Vec<String> {
+pub(crate) fn registered_secret_values() -> Vec<String> {
     let Ok(mut registry) = secret_registry().lock() else {
         return Vec::new();
     };
@@ -262,12 +262,18 @@ fn registered_secret_values() -> Vec<String> {
 
 const SECRET_KEYS: &[&str] = &[
     "authorization",
+    "proxy-authorization",
+    "cookie",
+    "set-cookie",
     "api_key",
     "api-key",
+    "x-api-key",
     "access_token",
     "refresh_token",
     "client_secret",
     "password",
+    "private_key",
+    "secret_key",
 ];
 
 pub fn redact_text(input: &str, known_secrets: &[&str]) -> String {
@@ -282,8 +288,42 @@ pub fn redact_text(input: &str, known_secrets: &[&str]) -> String {
         output = output.replace(secret, "<redacted>");
     }
     output = redact_assignments(&output);
+    output = redact_header_values(&output);
     output = redact_bearer_tokens(&output);
     output = redact_url_credentials(&output);
+    output
+}
+
+fn redact_header_values(value: &str) -> String {
+    const MARKERS: &[&str] = &[
+        "authorization:",
+        "proxy-authorization:",
+        "cookie:",
+        "set-cookie:",
+        "api-key:",
+        "x-api-key:",
+        "access-token:",
+        "refresh-token:",
+        "client-secret:",
+    ];
+    let mut output = String::with_capacity(value.len());
+    let mut remaining = value;
+    while !remaining.is_empty() {
+        let lower = remaining.to_ascii_lowercase();
+        let Some((index, marker)) = MARKERS
+            .iter()
+            .filter_map(|marker| lower.find(marker).map(|index| (index, *marker)))
+            .min_by_key(|(index, _)| *index)
+        else {
+            output.push_str(remaining);
+            break;
+        };
+        output.push_str(&remaining[..index + marker.len()]);
+        let tail = remaining[index + marker.len()..].trim_start_matches([' ', '\t']);
+        output.push_str(" <redacted>");
+        let end = tail.find(['\r', '\n']).unwrap_or(tail.len());
+        remaining = &tail[end..];
+    }
     output
 }
 
@@ -292,12 +332,18 @@ pub fn redact_text(input: &str, known_secrets: &[&str]) -> String {
 /// error strings such as `OPENAI_API_KEY=...` without changing the key name.
 fn redact_assignments(value: &str) -> String {
     const MARKERS: &[&str] = &[
+        "proxy-authorization=",
+        "cookie=",
+        "set-cookie=",
         "api_key=",
         "api-key=",
+        "x-api-key=",
         "access_token=",
         "refresh_token=",
         "password=",
         "client_secret=",
+        "private_key=",
+        "secret_key=",
         "secret=",
     ];
     let mut output = String::with_capacity(value.len());

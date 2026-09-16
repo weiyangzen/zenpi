@@ -1,0 +1,61 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-090",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-DIR；G-STAGE --item ZS1-090",
+  "scope": "target",
+  "folder_path": "src",
+  "children": [
+    "ZS1-070",
+    "ZS1-071",
+    "ZS1-072",
+    "ZS1-073",
+    "ZS1-074",
+    "ZS1-075",
+    "ZS1-076",
+    "ZS1-077",
+    "ZS1-078",
+    "ZS1-079",
+    "ZS1-080",
+    "ZS1-081",
+    "ZS1-082",
+    "ZS1-083",
+    "ZS1-084",
+    "ZS1-085",
+    "ZS1-086",
+    "ZS1-087",
+    "ZS1-088",
+    "ZS1-094",
+    "ZS1-095",
+    "ZS1-096"
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/src/current_folder_learn.md",
+      "bytes": 1421,
+      "sha256": "5f7cb9c0bc7d20047ba16dc31480b40cfe5d6d9bd3a7f0e9e07b7444055ae325"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-090/master-review-current/review.md",
+      "bytes": 653,
+      "sha256": "e450595e16bc688e47ff104ef267c904b8d05f3df0de15cc42830f7be48c37d9"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-090/master-review-current/review.md",
+      "bytes": 653,
+      "sha256": "e450595e16bc688e47ff104ef267c904b8d05f3df0de15cc42830f7be48c37d9"
+    },
+    "findings": "跨 22 个已接受 src child owner 完整核对调用、所有权、TUI directory-first picker、BentoBox 与 headless/core 边界。"
+  }
+}

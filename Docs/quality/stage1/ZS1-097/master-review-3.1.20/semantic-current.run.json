@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    ".ops/stage1_execution/cargo097-master/verify_current.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:33:27.431240+00:00",
+  "elapsed_seconds": 0.043797875,
+  "exit_code": 0,
+  "log_sha256": "eb6e557f363c7cbfeb2f48b886599079882c91a771634da60de05aaece4a6816",
+  "log_bytes": 8729
+}

@@ -1,0 +1,995 @@
+[
+  {
+    "pid": 70544,
+    "returncode": -9,
+    "rows": [
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 0,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 1,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 1,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "event": {
+          "runtime_job_id": 1,
+          "type": "request_started"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 2,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "turn_id": "turn-1789203193134-1",
+        "event": {
+          "mode": "start_or_steer",
+          "turn_id": "turn-1789203193134-1",
+          "type": "turn_accepted",
+          "view": {
+            "mode": "start_or_steer",
+            "request_id": "BEFORE_CRASH_SEED",
+            "schema_version": 1,
+            "sequence": 2,
+            "turn_id": "turn-1789203193134-1",
+            "type": "request_accepted"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 3,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "turn_id": "turn-1789203193134-1",
+        "event": {
+          "delta": "RECOVERY_HTTP_OK",
+          "type": "text_delta",
+          "view": {
+            "block_id": "turn-1789203193134-1:assistant",
+            "delta": "RECOVERY_HTTP_OK",
+            "request_id": "BEFORE_CRASH_SEED",
+            "schema_version": 1,
+            "sequence": 3,
+            "turn_id": "turn-1789203193134-1",
+            "type": "text_delta"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 4,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "turn_id": "turn-1789203193134-1",
+        "event": {
+          "model": "gpt-4.1",
+          "response_id": "recovery",
+          "type": "completed",
+          "view": {
+            "model": "gpt-4.1",
+            "request_id": "BEFORE_CRASH_SEED",
+            "response_id": "recovery",
+            "schema_version": 1,
+            "sequence": 4,
+            "turn_id": "turn-1789203193134-1",
+            "type": "turn_completed"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 5,
+        "type": "event",
+        "request_id": "BEFORE_CRASH_SEED",
+        "turn_id": "turn-1789203193134-1",
+        "event": {
+          "block": {
+            "kind": "paragraph",
+            "text": "RECOVERY_HTTP_OK"
+          },
+          "content": "RECOVERY_HTTP_OK",
+          "turn_id": "turn-1789203193134-1",
+          "type": "assistant_message",
+          "view": {
+            "block": {
+              "kind": "paragraph",
+              "text": "RECOVERY_HTTP_OK"
+            },
+            "block_id": "turn-1789203193134-1:assistant",
+            "request_id": "BEFORE_CRASH_SEED",
+            "schema_version": 1,
+            "sequence": 5,
+            "turn_id": "turn-1789203193134-1",
+            "type": "block"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "id": "BEFORE_CRASH_SEED",
+        "type": "response",
+        "command": "prompt",
+        "success": true,
+        "data": {
+          "assistant": {
+            "content": "RECOVERY_HTTP_OK",
+            "created_at_ms": 1789203193164,
+            "id": "assistant-1789203193164-3",
+            "metadata": {
+              "model": "gpt-4.1",
+              "response_id": "recovery"
+            },
+            "parent_id": "turn-1789203193134-1",
+            "role": "assistant"
+          },
+          "submission": {
+            "status": "started",
+            "turn_id": "turn-1789203193134-1"
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 6,
+        "type": "event",
+        "request_id": "precommit-crash",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 2,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 7,
+        "type": "event",
+        "request_id": "precommit-crash",
+        "event": {
+          "runtime_job_id": 2,
+          "type": "request_started"
+        }
+      }
+    ],
+    "stderr": [],
+    "reader_error": null
+  },
+  {
+    "pid": 70550,
+    "returncode": -9,
+    "rows": [
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "id": "precommit-recovered",
+        "type": "response",
+        "command": "status",
+        "success": true,
+        "data": {
+          "active_turn_id": null,
+          "backend": "openai-compatible",
+          "last_error": null,
+          "model": "gpt-4.1",
+          "phase": "idle",
+          "session": {
+            "created_at_ms": 1789203193084,
+            "event_count": 4,
+            "handoff_count": 0,
+            "handoff_record_count": 0,
+            "next_seq": 7,
+            "path": "<session:initial.jsonl>",
+            "recovery_warnings": 0,
+            "runtime_intent_count": 0,
+            "session_id": "session-1789203193084-70544-0",
+            "turn_count": 2
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 8,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 1,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 9,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "event": {
+          "runtime_job_id": 1,
+          "type": "request_started"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 10,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "turn_id": "turn-1789203193305-1",
+        "event": {
+          "mode": "start_or_steer",
+          "turn_id": "turn-1789203193305-1",
+          "type": "turn_accepted",
+          "view": {
+            "mode": "start_or_steer",
+            "request_id": "AFTER_PRECOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 10,
+            "turn_id": "turn-1789203193305-1",
+            "type": "request_accepted"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 11,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "turn_id": "turn-1789203193305-1",
+        "event": {
+          "delta": "RECOVERY_HTTP_OK",
+          "type": "text_delta",
+          "view": {
+            "block_id": "turn-1789203193305-1:assistant",
+            "delta": "RECOVERY_HTTP_OK",
+            "request_id": "AFTER_PRECOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 11,
+            "turn_id": "turn-1789203193305-1",
+            "type": "text_delta"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 12,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "turn_id": "turn-1789203193305-1",
+        "event": {
+          "model": "gpt-4.1",
+          "response_id": "recovery",
+          "type": "completed",
+          "view": {
+            "model": "gpt-4.1",
+            "request_id": "AFTER_PRECOMMIT_CRASH",
+            "response_id": "recovery",
+            "schema_version": 1,
+            "sequence": 12,
+            "turn_id": "turn-1789203193305-1",
+            "type": "turn_completed"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 13,
+        "type": "event",
+        "request_id": "AFTER_PRECOMMIT_CRASH",
+        "turn_id": "turn-1789203193305-1",
+        "event": {
+          "block": {
+            "kind": "paragraph",
+            "text": "RECOVERY_HTTP_OK"
+          },
+          "content": "RECOVERY_HTTP_OK",
+          "turn_id": "turn-1789203193305-1",
+          "type": "assistant_message",
+          "view": {
+            "block": {
+              "kind": "paragraph",
+              "text": "RECOVERY_HTTP_OK"
+            },
+            "block_id": "turn-1789203193305-1:assistant",
+            "request_id": "AFTER_PRECOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 13,
+            "turn_id": "turn-1789203193305-1",
+            "type": "block"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "id": "AFTER_PRECOMMIT_CRASH",
+        "type": "response",
+        "command": "prompt",
+        "success": true,
+        "data": {
+          "assistant": {
+            "content": "RECOVERY_HTTP_OK",
+            "created_at_ms": 1789203193333,
+            "id": "assistant-1789203193333-3",
+            "metadata": {
+              "model": "gpt-4.1",
+              "response_id": "recovery"
+            },
+            "parent_id": "turn-1789203193305-1",
+            "role": "assistant"
+          },
+          "submission": {
+            "status": "started",
+            "turn_id": "turn-1789203193305-1"
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 14,
+        "type": "event",
+        "request_id": "postcommit-crash",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 2,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193084-70544-0"
+        },
+        "schema_version": 2,
+        "sequence": 15,
+        "type": "event",
+        "request_id": "postcommit-crash",
+        "event": {
+          "runtime_job_id": 2,
+          "type": "request_started"
+        }
+      }
+    ],
+    "stderr": [],
+    "reader_error": null
+  },
+  {
+    "pid": 70555,
+    "returncode": 1,
+    "rows": [
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "id": "postcommit-recovered",
+        "type": "response",
+        "command": "status",
+        "success": true,
+        "data": {
+          "active_turn_id": null,
+          "backend": "openai-compatible",
+          "last_error": null,
+          "model": "gpt-4.1",
+          "phase": "idle",
+          "session": {
+            "created_at_ms": 1789203193381,
+            "event_count": 4,
+            "handoff_count": 0,
+            "handoff_record_count": 0,
+            "next_seq": 5,
+            "path": "<session:new-52298d8dbf31bba63ef6e1a7ef29fc6abd1374b1f528b69d4365b974a9b4ddcc-0.jsonl>",
+            "recovery_warnings": 0,
+            "runtime_intent_count": 0,
+            "session_id": "session-1789203193381-70550-0",
+            "turn_count": 0
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "id": "postcommit-crash",
+        "type": "response",
+        "command": "new",
+        "success": true,
+        "data": {
+          "command": "new",
+          "created": true,
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "new_session_id": "session-1789203193381-70550-0",
+          "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-52298d8dbf31bba63ef6e1a7ef29fc6abd1374b1f528b69d4365b974a9b4ddcc-0.jsonl",
+          "old_session_id": "session-1789203193084-70544-0",
+          "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/initial.jsonl",
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "route": "local"
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "id": "postcommit-crash",
+        "type": "response",
+        "command": "new",
+        "success": true,
+        "data": {
+          "command": "new",
+          "created": true,
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "new_session_id": "session-1789203193381-70550-0",
+          "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-52298d8dbf31bba63ef6e1a7ef29fc6abd1374b1f528b69d4365b974a9b4ddcc-0.jsonl",
+          "old_session_id": "session-1789203193084-70544-0",
+          "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/initial.jsonl",
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "route": "local"
+        },
+        "code": "ok"
+      },
+      {
+        "schema_version": 2,
+        "id": "postcommit-crash",
+        "type": "response",
+        "command": "command",
+        "success": false,
+        "error": "request ID was already used for a different request",
+        "code": "request_id_conflict"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 0,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 1,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 1,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "event": {
+          "runtime_job_id": 1,
+          "type": "request_started"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 2,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "turn_id": "turn-1789203193515-1",
+        "event": {
+          "mode": "start_or_steer",
+          "turn_id": "turn-1789203193515-1",
+          "type": "turn_accepted",
+          "view": {
+            "mode": "start_or_steer",
+            "request_id": "AFTER_POSTCOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 2,
+            "turn_id": "turn-1789203193515-1",
+            "type": "request_accepted"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 3,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "turn_id": "turn-1789203193515-1",
+        "event": {
+          "delta": "RECOVERY_HTTP_OK",
+          "type": "text_delta",
+          "view": {
+            "block_id": "turn-1789203193515-1:assistant",
+            "delta": "RECOVERY_HTTP_OK",
+            "request_id": "AFTER_POSTCOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 3,
+            "turn_id": "turn-1789203193515-1",
+            "type": "text_delta"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 4,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "turn_id": "turn-1789203193515-1",
+        "event": {
+          "model": "gpt-4.1",
+          "response_id": "recovery",
+          "type": "completed",
+          "view": {
+            "model": "gpt-4.1",
+            "request_id": "AFTER_POSTCOMMIT_CRASH",
+            "response_id": "recovery",
+            "schema_version": 1,
+            "sequence": 4,
+            "turn_id": "turn-1789203193515-1",
+            "type": "turn_completed"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 5,
+        "type": "event",
+        "request_id": "AFTER_POSTCOMMIT_CRASH",
+        "turn_id": "turn-1789203193515-1",
+        "event": {
+          "block": {
+            "kind": "paragraph",
+            "text": "RECOVERY_HTTP_OK"
+          },
+          "content": "RECOVERY_HTTP_OK",
+          "turn_id": "turn-1789203193515-1",
+          "type": "assistant_message",
+          "view": {
+            "block": {
+              "kind": "paragraph",
+              "text": "RECOVERY_HTTP_OK"
+            },
+            "block_id": "turn-1789203193515-1:assistant",
+            "request_id": "AFTER_POSTCOMMIT_CRASH",
+            "schema_version": 1,
+            "sequence": 5,
+            "turn_id": "turn-1789203193515-1",
+            "type": "block"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "id": "AFTER_POSTCOMMIT_CRASH",
+        "type": "response",
+        "command": "prompt",
+        "success": true,
+        "data": {
+          "assistant": {
+            "content": "RECOVERY_HTTP_OK",
+            "created_at_ms": 1789203193548,
+            "id": "assistant-1789203193548-3",
+            "metadata": {
+              "model": "gpt-4.1",
+              "response_id": "recovery"
+            },
+            "parent_id": "turn-1789203193515-1",
+            "role": "assistant"
+          },
+          "submission": {
+            "status": "started",
+            "turn_id": "turn-1789203193515-1"
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 6,
+        "type": "event",
+        "request_id": "replay-open-failure",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 2,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193381-70550-0"
+        },
+        "schema_version": 2,
+        "sequence": 7,
+        "type": "event",
+        "request_id": "replay-open-failure",
+        "event": {
+          "runtime_job_id": 2,
+          "type": "request_started"
+        }
+      }
+    ],
+    "stderr": [
+      "zenpi: headless I/O: new session created and committed at /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-63854c2008b02faa95448e6bbed308e05ff9891f926a5b55a721f51ece0acae7-0.jsonl; reconnect to recover receipt: headless persistence: session I/O: Is a directory (os error 21)\n"
+    ],
+    "reader_error": null
+  },
+  {
+    "pid": 70563,
+    "returncode": 0,
+    "rows": [
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "id": "replay-open-failure",
+        "type": "response",
+        "command": "new",
+        "success": true,
+        "data": {
+          "command": "new",
+          "created": true,
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "new_session_id": "session-1789203193599-70555-0",
+          "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-63854c2008b02faa95448e6bbed308e05ff9891f926a5b55a721f51ece0acae7-0.jsonl",
+          "old_session_id": "session-1789203193381-70550-0",
+          "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-52298d8dbf31bba63ef6e1a7ef29fc6abd1374b1f528b69d4365b974a9b4ddcc-0.jsonl",
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "route": "local"
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "id": "replay-open-failure",
+        "type": "response",
+        "command": "new",
+        "success": true,
+        "data": {
+          "command": "new",
+          "created": true,
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "new_session_id": "session-1789203193599-70555-0",
+          "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-63854c2008b02faa95448e6bbed308e05ff9891f926a5b55a721f51ece0acae7-0.jsonl",
+          "old_session_id": "session-1789203193381-70550-0",
+          "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/sessions/new-52298d8dbf31bba63ef6e1a7ef29fc6abd1374b1f528b69d4365b974a9b4ddcc-0.jsonl",
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "route": "local"
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 0,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "event": {
+          "queued": false,
+          "runtime_job_id": 1,
+          "type": "request_accepted"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 1,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "event": {
+          "runtime_job_id": 1,
+          "type": "request_started"
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 2,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "turn_id": "turn-1789203193787-1",
+        "event": {
+          "mode": "start_or_steer",
+          "turn_id": "turn-1789203193787-1",
+          "type": "turn_accepted",
+          "view": {
+            "mode": "start_or_steer",
+            "request_id": "AFTER_REPLAY_FAILURE",
+            "schema_version": 1,
+            "sequence": 2,
+            "turn_id": "turn-1789203193787-1",
+            "type": "request_accepted"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 3,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "turn_id": "turn-1789203193787-1",
+        "event": {
+          "delta": "RECOVERY_HTTP_OK",
+          "type": "text_delta",
+          "view": {
+            "block_id": "turn-1789203193787-1:assistant",
+            "delta": "RECOVERY_HTTP_OK",
+            "request_id": "AFTER_REPLAY_FAILURE",
+            "schema_version": 1,
+            "sequence": 3,
+            "turn_id": "turn-1789203193787-1",
+            "type": "text_delta"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 4,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "turn_id": "turn-1789203193787-1",
+        "event": {
+          "model": "gpt-4.1",
+          "response_id": "recovery",
+          "type": "completed",
+          "view": {
+            "model": "gpt-4.1",
+            "request_id": "AFTER_REPLAY_FAILURE",
+            "response_id": "recovery",
+            "schema_version": 1,
+            "sequence": 4,
+            "turn_id": "turn-1789203193787-1",
+            "type": "turn_completed"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "sequence": 5,
+        "type": "event",
+        "request_id": "AFTER_REPLAY_FAILURE",
+        "turn_id": "turn-1789203193787-1",
+        "event": {
+          "block": {
+            "kind": "paragraph",
+            "text": "RECOVERY_HTTP_OK"
+          },
+          "content": "RECOVERY_HTTP_OK",
+          "turn_id": "turn-1789203193787-1",
+          "type": "assistant_message",
+          "view": {
+            "block": {
+              "kind": "paragraph",
+              "text": "RECOVERY_HTTP_OK"
+            },
+            "block_id": "turn-1789203193787-1:assistant",
+            "request_id": "AFTER_REPLAY_FAILURE",
+            "schema_version": 1,
+            "sequence": 5,
+            "turn_id": "turn-1789203193787-1",
+            "type": "block"
+          }
+        }
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "id": "AFTER_REPLAY_FAILURE",
+        "type": "response",
+        "command": "prompt",
+        "success": true,
+        "data": {
+          "assistant": {
+            "content": "RECOVERY_HTTP_OK",
+            "created_at_ms": 1789203193821,
+            "id": "assistant-1789203193821-3",
+            "metadata": {
+              "model": "gpt-4.1",
+              "response_id": "recovery"
+            },
+            "parent_id": "turn-1789203193787-1",
+            "role": "assistant"
+          },
+          "submission": {
+            "status": "started",
+            "turn_id": "turn-1789203193787-1"
+          }
+        },
+        "code": "ok"
+      },
+      {
+        "project": {
+          "project_id": "e600d818c51f90875eb3074a3a7362fa714c8770752834bcaf1cff5b31ddd277",
+          "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/master-final-recovery.fixture/恢复 project/initial",
+          "session_id": "session-1789203193599-70555-0"
+        },
+        "schema_version": 2,
+        "id": "fixture-stop",
+        "type": "response",
+        "command": "shutdown",
+        "success": true,
+        "data": {
+          "closing": true,
+          "drained": true
+        },
+        "code": "ok"
+      }
+    ],
+    "stderr": [],
+    "reader_error": null
+  }
+]

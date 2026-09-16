@@ -1,0 +1,91 @@
+diff --git a/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md b/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md
+@@ -0,0 +1,86 @@
++# ZS1-016 — packages/ai/src/api/anthropic-messages.ts
++
++Worker candidate: [_]. learn_mode: understand. Main semantic review required. source_id: SRC-0286. source_hash: `8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7`; 48616 bytes, 1490 lines. Complete byte range [0,48616), lines 1–1490 read in five ordered nonoverlapping chunks; hash matches frozen blueprint. No directory acceptance inferred.
++
++## Complete behavior review
++
++1–240: SDK/types, cost/retry/transform/schema helpers; cache defaults short, optional long env setting; OAuth naming maps fixed Claude Code tool names case-insensitively. Content conversion joins text or emits base64 images. Compatibility includes strict/eager/deferred tools, signature exceptions and affinity. Thinking options distinguish fixed budget/adaptive effort.
++
++241–560: display/interleaved/tool choice/injected-client options; header merging and auth checks. SSE supports CR/LF, comments, multiline data, trailing frames; recognized named events only, repair parser and raw-payload error text, missing message_stop check. Partial assistant output and serving-model/transformations setup.
++
++561–900: callback payload forced stream=true, retries around establishment with SDK retries disabled. Per-index text/thinking/redacted/tool blocks fold deltas and signatures separately; partial tool JSON repeatedly repaired. Block-stop emits done and removes scratch state. Usage includes input/output/cache and optional reasoning subset. Missing stop/error/cancel fail. Catch keeps partial content. Simple reasoning uses adaptive mapping or bounded thinking/output helpers; absent reasoning disables thinking. OAuth detection uses token substring.
++
++901–1220: Copilot Bearer, OAuth Bearer with Claude Code identity, ordinary API-key/header modes. Beta selection supports explicit overrides, fine-grained/interleaved streams, fallback and managed effort/binding. Request transforms history/IDs, splits deferred tools, system/cache/OAuth identity, temperature compatibility, adaptive/manual/disabled thinking, user_id metadata, tool choice and fallbacks. Deferred tool references displace ordinary result content into sibling blocks.
++
++1221–1490: user text/image conversion filters empty blocks; signed thinking preserved, redacted data opaque; missing signature becomes text by default with empty-signature compatibility option. Tool results coalesce into user messages; final-user cache hint and managed historical/current effort system messages. Tool schemas preserve only legacy properties/required unless strict. Stops map end_turn/stop_sequence to stop, max_tokens to length, tool_use to toolUse, pause_turn to stop/resubmit; refusal/sensitive/unknown fail.
++
++## Errors, cancellation, recovery and side effects
++
++Network/SDK only, AbortSignal through establishment and reads; partial failure retained as error. No local frame/response/block/argument byte limits. Missing message_stop/final reason fail, but malformed JSON can be repaired and wrong-index block events ignored. Zenpi intentionally uses strict JSON/state transitions, bounded reads, terminal validation before executable tools and explicit incompatible-history errors. OAuth impersonation, tool renaming, fallback/deferred/cache/beta management and SDK dependencies are not part of this adapter scope.
++
++## Source tests and target mapping
++
++Fully read anthropic-sse-parsing.test.ts (585 lines) and anthropic-empty-thinking-signature-compat.test.ts (141 lines): initial content, repair, fallback rejection, managed betas/transformations, refusal/sensitive stops, optional usage, trailing unknown events, signed/unsigned/cross-model replay. Not executed; source evidence only.
++
++ZS1-109: native request/history/SSE/usage in providers/anthropic.rs; existing transport/auth/cancel in backend.rs; precise metadata registry; config resolution and minimal core factory changes. Current core tool-call history drops completion text/annotations, requiring a small existing-metadata persistence change for native signed blocks. Actual HTTP, host tool continuation/restart, malformed signatures/terminal/state, unsupported parameters and cancellation need target tests. No sibling or ZS1-055 directory acceptance.
++
++## Independent runnable source supplement — authority 3.1.13
++
++Original report SHA 58d4ab8ff0d365e10022fd7bed80f0f453a4cf52df4e3ae21913da6ecaa83085 matches the original anthropic-ready manifest source_audit; reused and preserved as the supplement base. Complete unchanged 1490-line source was reread in ordered 1–280, 281–580, 581–900, 901–1200, 1201–1490 ranges. Current source SHA remains 8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7. The earlier target paragraph predates integrated 109 native-history persistence; it is historical.
++
++After independent 015 freezing, source-native-final executes 23 cases using actual unchanged source and actual pinned Anthropic SDK 0.124.0 plus partial-json 0.1.7. Dependencies installed only in .ops/source016-runtime, package-lock retained, imports resolved by explicit NODE_PATH; pi-mono was not edited. No mocked import/client/parser. All request cases use a private loopback HTTP server returning deterministic raw SSE bytes. Passed actual path/auth/callbacks/text/usage; streamed signatures/redaction and replay; partial tools and scratch removal; premature toolcall_end followed by missing message_stop failure; all eight stop mappings; missing stop reason; comments/unknown/trailing SSE; repaired invalid string escapes; ignored wrong-index deltas; payload stream=true/metadata restriction; adaptive/off thinking; unsigned-signature compatibility; same-model IDs retained versus cross-model IDs normalized; missing-auth setup; pre-abort without HTTP. Exact case assertions/log/commands/times in worker-source-probe. First fixture assumed same-model IDs normalize; real source preserves them. Both failure and corrected explicit same/cross-model cases retained.
++
++Exact target owners: src/providers/anthropic.rs validate_effort:82, validate_history_wire:92, validate_blocks:136, request_body:243 and read_response:758; backend.rs owns native endpoint/auth/transport dispatch, core.rs journals native history alongside canonical tool calls, providers/registry.rs intersects exact model capability metadata. Owner hashes are recorded. Target stage1_anthropic rerun passes 17 tests with actual HTTP, tools, signed replay/restart, errors and cancellation. Existing anthropic-ready, summary-contract-ready and shared transport candidates are reused, unchanged.
++
++Demonstrated intentional differences: source emits toolcall_end at block stop before final message terminal; target publishes executable calls only after complete validated response. Source repairs malformed escapes and ignores unknown block indices; target rejects invalid transitions/JSON. Source preserves same-model IDs and normalizes cross-model IDs; target validates bounded provider identities and refuses incompatible signed history instead of silently downgrading it. Source unsigned thinking may turn into text; target signs/digests native-history metadata and rejects invalid replay. Source supports broad cache/beta/OAuth naming/fallback/deferred/managed-effort surfaces; native target exposes a bounded subset, and no parity is claimed for those branches. This fixture proves source logic and local transport, not hosted Anthropic behavior, retries under real outages, SDK DNS cancellation or full upstream suite. Shared transport remains incomplete for non-macOS DNS/non-Unix connect, and this evidence does not close that gap. [_] only.
++
++## 3.1.19 单文件完整复核与既有证据复用
++
++本节是当前解释，前文3.1.13报告及其更早段落保持原始字节以保留历史，未重复生成同等报告或执行原有用例。旧完整报告SHA `fda441946508ad53585d69e269c7fba7d9ee205670773b9c154546905d052fbd` 与 `.ops/source016-behavior-ready/manifest.json` 对应记录一致；旧manifest SHA `f52b12aaea01cf39c2e9705f81cce2560d427064d9a269259379f07e409c2d8d`，全部14个冻结artifact逐字节校验通过。源文件仍为48616B、1490行、SHA `8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7`，符合当前3.1.19 selector，需求digest `3ce9613262de0a8499837571137782becc01daa7b56923a53b11f7f04058f60d`。
++
++本轮全文重读五段：行1–280对应字节[0,10223)，281–580对应[10223,18033)，581–900对应[18033,30114)，901–1200对应[30114,39526)，1201–1490对应[39526,48616)。合并工具输出曾截断，因此另读780–1000行补齐显示缺口；完整覆盖以五段无缝原字节证据为准。新证据位于 `Docs/quality/stage1/ZS1-016/worker-reuse319`，不修改旧冻结包。Pi对象仅此源文件；导入的retry、transform、schema、token/cost等helper仅说明调用关系，没有借此扩成目录审查。
++
++### 实际代码分支与旧报告补充
++
++| 当前源入口 | 本轮核对的行为与限制 |
++|---|---|
++| resolveCacheRetention:53 / getCacheControl:63 / getAnthropicCompat:184 | 显式cacheRetention优先，env仅识别long，缺省short；none不加cache marker，long+兼容支持才加1h。兼容默认包含基于provider/baseUrl的OpenRouter判断；这属于源码分支，不是联网确认服务现状。defaultSupportsToolReferences:204只对Anthropic、非haiku且名称版本满足条件默认放行。 |
++| convertContentBlocks:121 / OAuth工具映射:109–116 | 纯文本以换行拼接并sanitize；有图片转base64块、仅图片时补占位文本。OAuth工具名大小写匹配Claude Code固定表，响应名按context.tools反查；不证明远端身份或工具能力。 |
++| mergeHeaders:275 / assertRequestAuth:298 / createClient:898 | headers以对象赋值覆盖；认证检查识别非空apiKey或options.headers中的authorization/x-api-key/cf-aig-authorization。该检查没有合并model.headers；注入client则跳过内部构造并固定isOAuth=false。Copilot Bearer、含特定子串的OAuth Bearer、普通key/header路径不同；浏览器允许标志和身份header是实际源码行为，Zenpi不必复制。 |
++| SSE:331–500 | CR/LF/CRLF、注释、data多行、尾部非空frame会flush。仅识别指定event名，error event直接抛其data；解析使用repair，异常串包含data与raw。event名白名单和JSON内type没有严格一致性检查。缺message_stop仅在已经观察到message_start时触发；没有完整的重复start/索引/开闭状态约束。这里无本地frame、raw、response、block或argument容量上限。 |
++| stream:502–818 | 先构造pending assistant；onPayload替换结果仍强制stream=true；SDK每次request maxRetries=0，由retryProviderRequest包装请求建立，传maxRetries/maxRetryDelayMs/signal。onResponse在body消费和start发布前await。重试仅包装asResponse建立，body迭代不在同一重试调用内；不能据此声称断流自动重试。 |
++| message_start:590起 / message_delta:737起 | message_start直接把output.model覆盖为返回model，而非只写responseModel；只有同provider且命中allowedFallbackModels才切fallbackCost，否则cost helper仍用原model。start初始化input/output/cache读写和1h拆分；delta仅对非null字段覆盖，reasoning来自thinking_tokens子集，cacheWrite1h没有在此delta分支更新。总tokens显式为input+output+cacheRead+cacheWrite。 |
++| content block折叠:613–736 | text/thinking start接受上游初始内容，未保证为空；这与types.ts的通用注释需要区分，旧fixture实际验证initial+delta。redacted保留opaque data；signature_delta只扩签名。工具保留partialJson并每次调用parseStreamingJson；stop再解析并删除scratch，立即发toolcall_end，此时还未验证message_stop/最终stop。错误索引或不匹配block类型的delta多为忽略。 |
++| terminal / catch:779–818 | 成功需非pending且非error/aborted；有input transformations时记录诊断子字段。catch清理index/partialJson，保留partial内容，按signal.aborted决定aborted/error，再发error/end。errorMessage可能来自原始解析错误，不把它等同于全面redacted diagnostics。 |
++| streamSimple:846 / mapThinkingLevelToEffort:826 | 缺认证同步throw；无reasoning转thinkingEnabled=false。forceAdaptive走model映射string或默认low/medium/high；未覆盖的xhigh/max在无映射时落high。普通thinking走外部预算/上下文helpers，随后预算限制为maxTokens-1024；buildParams对thinkingBudgetTokens使用`|| 1024`，0会回退1024。这是需要调用方关注的边界，旧23cases未验证小token预算边界，不声称已测或修复。 |
++| getBetaFeatures:979 / buildParams:1021 | 显式anthropic-beta header最后覆盖、null关闭、字符串拆分去重；默认加入兼容所需beta。历史先transform，再splitDeferredTools和convertMessages；如果只有deferred则全变immediate。max_tokens直接取options.maxTokens或model.maxTokens；raw stream没有这里之外的统一cap证明。temperature需未开thinking、非managed且兼容支持。metadata只接受user_id string。 |
++| thinking / fallback参数:1111–1175 | managed effort强制adaptive和drop_block，顶层effort高档配合历史/当前system effort消息；普通adaptive按options.effort，旧模型budget式thinking；显式关闭且off映射非null才送disabled。allowedFallbackModels非空才送fallbacks，每项只送model；参数发出不证明服务接受。 |
++| normalizeToolCallId:1179 / convertMessages:1223 | ID规范化callback传给外部transformMessages；不能只看normalize函数就断言所有同model ID都会改写。旧真实fixture明确同model保留bad:id、跨model改为bad_id并同步tool result。signed/redacted thinking保留，缺签名默认降为text或compat空签名，空用户/assistant文本过滤。 |
++| convertToolResult:1183 / convertTools:1425 | deferred引用去重，只对已知deferred名称加载；引用与普通result内容分开，全部tool_result先于移出的sibling块，连续tool results合成一条user。末尾user块可附cache。legacy schema只取properties/required；strict=true时保留扩展schema且覆盖object/properties/required，strict约束判定仍由外部helper负责。 |
++| insertThinkingLevelMessages:1405 / mapStopReason:1464 | 历史effort只取匹配API/provider且有效的providerThinkingLevel，前插system并最后附当前effort。end_turn/stop_sequence/pause_turn→stop；max_tokens→length；tool_use→toolUse；refusal/sensitive→error；未知reason抛错。pause_turn注释“resubmit”不是该函数实际发起重试。 |
++
++取消的精确入口是 requestOptions.signal、retry helper参数、iterateSseMessages每轮reader.read前检查，以及结束后检查。reader.read本身的及时取消依赖底层SDK/fetch；finally只releaseLock，没有在本函数调用reader.cancel。同一读取批次中consumeLine连续yield时没有逐event signal检查。旧预取消case只证明aborted预置时不发HTTP，不证明取消发生在慢body、buffered batch、DNS、SDK建立或inject client中的最长延迟。这些是代码边界说明，本轮未新跑取消实验。
++
++### 已有运行证据的实际owner、fixture与replay入口
++
++源行为执行owner是 `Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts`，SHA `d248ecf11acec471c03d0856d2727d3b5841cf9c5a0100b3a20325779be13ae3`。它直接import冻结anthropic-messages.ts，不mock client/parser/import；Bun.serve在127.0.0.1随机端口返回预设SSE文本，dummy API key与fixture model。SDK调用真实本地HTTP，响应内容由fixture决定，不是实际Anthropic模型推理。多数回复由一份Response(reply)给出，不能把它当成真实网络分包、服务端思考或生产背压测试。
++
++2026-09-10 source-native-final的23个断言case、24个HTTP request，receipt实际exit0；log SHA `3b1afccacb15d8bd184bff8b8c8f2f13b83f5d26c8dff5592b1085f3efdf2fe2`。覆盖范围继续以旧probe和原始scenario清单为准：path/auth/callback/usage、signed/redacted同模型回放、tool partial JSON、缺message_stop/stop reason、8种终止、注释未知与尾frame、repair、wrong index、payload覆盖、adaptive/off、空签名、同/跨model ID、缺认证、预abort。不增加本次通过数量。最初source-native exit1是同model ID规范化的fixture错误，原log SHA `2293c2c486a9c6c87fab2fde7a6f5432730a9642d2429ac1255ef9a466d59365` 保留，未掩盖失败。
++
++精确历史运行目录 `/Users/wangweiyang/.codex/worktrees/ff51/zenpi`；argv为 `env NODE_PATH=/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-runtime/node_modules bun Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts`。package-lock而非package.json的caret约束锁住 SDK0.124.0 / partial-json0.1.7；本次只检查现有版本，没有安装或运行。replay程序内run函数从stream/streamSimple进入，same-model replay通过把前次result加入context.messages后再调用run，最终落本源buildParams→transformMessages→convertMessages。旧证据没有给所有外部Pi helper逐项历史hash，不能宣称仅此源hash和npm锁就冻结完整传递依赖；严格历史重放还需对照原Pi checkout。新运行将是新证据，不能覆盖旧日志。
++
++旧target-native owner为当时本工作树的 `tests/stage1_anthropic.rs`，命令 `cargo +stable-aarch64-apple-darwin test --locked --test stage1_anthropic -- --test-threads=1`，2026-09-10实际17pass，log SHA `1d17e3916926b3635b2ad4e8247c49468c3d3b09cf660bb25d90d36d491a318b`。该fixture同时包含直接native backend和通过CARGO_BIN_EXE_zenpi启动的CLI；签名continuation/restart以临时session和本地server验证。它不是整个上游测试套件或远端模型执行。本次不重跑，也不把旧17pass算成当前主库19个测试的运行结果。5个历史owner中4个已变，transport.rs仍同hash，详见historical-owner-drift.json；旧报告“all old owners changed”的临时通信以这个逐文件记录为准。
++
++### 当前Zenpi的映射与明确修正
++
++`target-references.json` 固定当前主库4文件/10个片段的全文件hash与字节范围。主要入口为 `src/providers/anthropic.rs:243` request_body、`:186` assistant_blocks、`:135` validate_blocks、`:758` read_response、`:871` dispatch_frame；`src/core.rs:3855`后将completion.content及annotations/model/tool_calls写入assistant turn。前文“core丢弃文本/annotations”已过时；当前主库已保留。原始source replay是消息数组转换，目标replay是session Turn metadata→request_body→assistant_blocks，两者不能混称同一实现。
++
++目标对native_history检查provider/wire，signed blocks跨model拒绝；文本与canonical tool calls需和metadata一致，thinking/redacted需非空签名/opaque数据，块数128、history256KiB。这里不是“目标生成provider thinking签名”的实现：目标保留上游opaque签名并校验结构/一致性，不作私钥签名或验签证明。前文笼统“signs/digests native-history”不适用于当前所读Anthropic分支。
++
++read_response已有每个sink event发布前的cancel guard，来源为后续109修复；body循环也poll，且response/frame/line有界。dispatch_frame用严格serde_json并核对event名/type，尾部不完整frame拒绝。fold.finish验证message_stop、stop/tool一致及model capability后才发ToolCallDone/Usage/Completed；source早发toolcall_end不能直接对等目标可执行调用。目标公共Usage把cache read/write合入input，保留output/total且checked_add，不等同源细分cost/reasoning/cacheWrite1h。目标refusal可保留为可重放Completion.refusal；source把refusal作error，这也是有意差异，不能报全等。
++
++当前测试的真正CLI回放入口是 `tests/stage1_anthropic.rs:501`附近的CLI helper（CARGO_BIN_EXE_zenpi），`:580` production_tool_continuation_and_restart_keep_signed_ordered_blocks；后续`:966`和`:971`两个terminal cancellation测试不在旧17pass收据中。它们只是当前owner定位，本轮不执行。
++
++OAuth命名/身份、宽松repair、fallback、deferred tools、cache/beta、managed-effort完整surface与源同名接口不构成Zenpi必须全部照搬的验收。本项只完成该文件理解和目标映射，G05/G06对应实现项另需行为证据，未扩大至ZS1-055或目录状态。G-STAGE及结构校验结果保留在新证据目录；无master receipt则维持未验收，不修改主库或验收标记。
++
++本次G-STAGE --item ZS1-016实际exit1，structural.ok=true，缺少主库ZS1-016.master.json。原始日志SHA ba2a348b267692f4d49dba15755ba5e85c5d82d9a4f8ebc99fb413ae6e4e5cfe。结构/引用核对与主控语义验收仍分开，未把失败转成通过。

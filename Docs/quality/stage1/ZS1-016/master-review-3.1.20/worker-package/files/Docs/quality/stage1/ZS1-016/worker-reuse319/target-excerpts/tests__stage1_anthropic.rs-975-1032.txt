@@ -1,0 +1,58 @@
+fn assert_native_terminal_cancel(on_text: bool) {
+    let first = tool_block();
+    let mut second = tool_block();
+    second["id"] = json!("toolu_second");
+    second["input"]["path"] = json!("second.txt");
+    let response = events(vec![thinking(), text(), first, second], "tool_use");
+    let (url, requests, server) = serve(vec![("text/event-stream".into(), sse(&response))]);
+    let cancelled = AtomicBool::new(false);
+    let mut seen = vec![];
+    let mut late = vec![];
+    let turns = [Turn::new(
+        "u",
+        TurnRole::User,
+        "native terminal cancellation",
+    )];
+    let result = backend(url).complete_with_control(
+        CompletionRequest::new("u", &turns, None, &[tool()]),
+        &|| cancelled.load(Ordering::SeqCst),
+        &mut |event| {
+            if cancelled.load(Ordering::SeqCst) {
+                late.push(format!("{event:?}"));
+            }
+            if (on_text && matches!(event, ProviderEvent::TextDone { .. }))
+                || (!on_text && matches!(event, ProviderEvent::ToolCallDone { .. }))
+            {
+                cancelled.store(true, Ordering::SeqCst);
+            }
+            seen.push(event);
+            // Cancellation is delivered through the token, not a sink error.
+            Ok(())
+        },
+    );
+    server.join().unwrap();
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0].0.starts_with("POST /v1/messages "));
+    assert_eq!(requests[0].1["stream"], true);
+    assert!(cancelled.load(Ordering::SeqCst), "boundary was not reached");
+    assert!(seen.iter().any(|event| matches!(event, ProviderEvent::ReasoningDelta { delta } if delta == "visible summary")));
+    let ready: Vec<_> = seen
+        .iter()
+        .filter_map(|event| match event {
+            ProviderEvent::ToolCallDone { call } => Some(call),
+            _ => None,
+        })
+        .collect();
+    eprintln!(
+        "Anthropic on_text={on_text}, cancelled_result={}, ready={}, late={late:?}",
+        matches!(result, Err(BackendError::Cancelled)),
+        ready.len()
+    );
+    assert!(
+        late.is_empty(),
+        "events published after cancellation: {late:?}"
+    );
+    assert!(matches!(result, Err(BackendError::Cancelled)));
+    assert_eq!(ready.len(), usize::from(!on_text));
+    if !on_text {

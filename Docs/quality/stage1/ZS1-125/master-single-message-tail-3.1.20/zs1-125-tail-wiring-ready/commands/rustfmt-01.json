@@ -1,0 +1,49 @@
+{
+  "argv": [
+    "rustfmt",
+    "+stable-aarch64-apple-darwin",
+    "--edition",
+    "2024",
+    "src/tui.rs",
+    "tests/tui_transcript_ux.rs"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/checkout",
+  "started_at": "2026-09-12T12:23:50.286442+00:00",
+  "ended_at": "2026-09-12T12:23:50.741494+00:00",
+  "elapsed_seconds": 0.45490162500000003,
+  "exit_code": 0,
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/target",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "inputs_file": "rustfmt-01-inputs.json",
+  "inputs_sha256": "4475784e688183d7f7d947d7869c1f691b0180f46c33329c62189dcb7e442bc9",
+  "inputs_unchanged": false,
+  "changed_inputs": {
+    "src/tui.rs": {
+      "before": {
+        "bytes": 591851,
+        "sha256": "f644f31946dc1e8f9f8d855d5d03986698395c8badd73db7839fce387b342891"
+      },
+      "after": {
+        "bytes": 591971,
+        "sha256": "2d3373d72fc5ad68b9e266824fe4c31c37db7b1c732927b4e38f4daecf8e53bd"
+      }
+    },
+    "tests/tui_transcript_ux.rs": {
+      "before": {
+        "bytes": 16276,
+        "sha256": "702888eacf26c3904a16a17a307a41434c612e6840a4298ce8b90075130ab7a5"
+      },
+      "after": {
+        "bytes": 16911,
+        "sha256": "2a1f6f0f4e3782b8498fde0e2e7a5891cc8ad3312a7fc5ba7165e8bbb5d14faf"
+      }
+    }
+  },
+  "log": "rustfmt-01.log",
+  "log_bytes": 0,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

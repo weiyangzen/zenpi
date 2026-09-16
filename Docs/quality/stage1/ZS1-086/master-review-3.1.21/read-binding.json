@@ -1,0 +1,94 @@
+{
+  "formal_source": {
+    "path": "Docs/quality/stage1/ZS1-086/master-review-3.1.21/current-view_model.rs",
+    "bytes": 42009,
+    "sha256": "094833f051ab66d30ce3f6cc74fcc0334ed938e79f5fd8e9269341b62bed08fe"
+  },
+  "current_line_ranges": [
+    [
+      1,
+      300
+    ],
+    [
+      301,
+      600
+    ],
+    [
+      601,
+      900
+    ],
+    [
+      901,
+      1255
+    ]
+  ],
+  "current_byte_ranges": [
+    [
+      0,
+      9950
+    ],
+    [
+      9950,
+      19273
+    ],
+    [
+      19273,
+      30006
+    ],
+    [
+      30006,
+      42009
+    ]
+  ],
+  "baseline": {
+    "path": "Docs/quality/stage1/ZS1-086/master-review-3.1.21/baseline-view_model.rs",
+    "bytes": 40591,
+    "sha256": "1089a9f352b5aaebc755b51ece8189c1daaca1aa82060d2f009630b915b3abee"
+  },
+  "identical_to_current": false,
+  "baseline_full_read_ranges": [
+    [
+      1,
+      420
+    ],
+    [
+      421,
+      840
+    ],
+    [
+      841,
+      1220
+    ]
+  ],
+  "source_read_tool_chunks": [
+    "f72c1a",
+    "15d1be",
+    "f09cc5",
+    "fc96c6"
+  ],
+  "baseline_read_tool_chunks": [
+    "734df1",
+    "5578f9",
+    "ec7a55"
+  ],
+  "tests_read_tool_chunks": [
+    "f50a22",
+    "a8f292"
+  ],
+  "tests_read_line_ranges": [
+    [
+      1,
+      225
+    ],
+    [
+      226,
+      425
+    ]
+  ],
+  "report": {
+    "path": "Docs/quality/stage1/ZS1-086/master-review-3.1.21/worker-report.md",
+    "bytes": 29452,
+    "sha256": "c70cf7abc9c282d81e55a1c696f01a94073f17eab98ed6d9641c66cd1e7d3be5"
+  },
+  "product_executions": 0
+}

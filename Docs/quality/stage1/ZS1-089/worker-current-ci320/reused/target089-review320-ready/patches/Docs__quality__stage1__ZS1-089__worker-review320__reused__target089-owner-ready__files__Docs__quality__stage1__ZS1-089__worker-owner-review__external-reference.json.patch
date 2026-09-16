@@ -1,0 +1,16 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/external-reference.json b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/external-reference.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/external-reference.json
+@@ -0,0 +1,11 @@
++{
++  "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
++  "accessed_at": "2026-09-10T22:23:30.845778+00:00",
++  "primary_source": "GitHub Docs",
++  "claims_used": [
++    "UnspecifiedLinuxshell usesbash-e;explicitbash adds pipefail",
++    "Normalsteps dependon earlierstep success;noifalwaysupload inworkflow"
++  ],
++  "quoted_words": 0,
++  "scope": "Shell/stepdefaults only, no hostedCIexecution evidence"
++}

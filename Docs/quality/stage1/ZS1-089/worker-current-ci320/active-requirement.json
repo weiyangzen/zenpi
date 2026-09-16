@@ -1,0 +1,350 @@
+{
+  "activated_by": "master",
+  "active": true,
+  "baseline_files": {
+    "ZS1-010": {
+      "bytes": 22796,
+      "path": "packages/agent/src/agent-loop.ts",
+      "scope": "source",
+      "sha256": "1e16404a231912fbd7643d8317b15ec4cc6245ed8cedc37582a31d430a1cc6ac"
+    },
+    "ZS1-011": {
+      "bytes": 18767,
+      "path": "packages/agent/src/agent.ts",
+      "scope": "source",
+      "sha256": "25b52fda7c8fa09d4d5cc8bcbb04db63e9d785b978c846d8c59a367ba91fe045"
+    },
+    "ZS1-012": {
+      "bytes": 27410,
+      "path": "packages/agent/src/harness/compaction/compaction.ts",
+      "scope": "source",
+      "sha256": "6e7aec0d27cb566f8f85f7dd13850eda98f5ddf7e78f9a919fb3dd03c3ea3a8a"
+    },
+    "ZS1-013": {
+      "bytes": 2200,
+      "path": "packages/agent/src/harness/session/context.ts",
+      "scope": "source",
+      "sha256": "409078e31155a77bbfa1fff20ab81d55370fa379ad95c12933eecbf832efeaf1"
+    },
+    "ZS1-014": {
+      "bytes": 47809,
+      "path": "packages/agent/test/agent-loop.test.ts",
+      "scope": "source",
+      "sha256": "c359921a73525d67cf42481ad04210952fe36a9517d7b099f41710734438987d"
+    },
+    "ZS1-015": {
+      "bytes": 37411,
+      "path": "packages/ai/src/types.ts",
+      "scope": "source",
+      "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0"
+    },
+    "ZS1-016": {
+      "bytes": 48616,
+      "path": "packages/ai/src/api/anthropic-messages.ts",
+      "scope": "source",
+      "sha256": "8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7"
+    },
+    "ZS1-017": {
+      "bytes": 16027,
+      "path": "packages/ai/src/api/google-generative-ai.ts",
+      "scope": "source",
+      "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+    },
+    "ZS1-018": {
+      "bytes": 54054,
+      "path": "packages/coding-agent/src/core/session-manager.ts",
+      "scope": "source",
+      "sha256": "57bc70a751567b96c057535766240ae52d9b76d9013ea78049d74dc3b654e915"
+    },
+    "ZS1-019": {
+      "bytes": 14687,
+      "path": "packages/coding-agent/src/core/skills.ts",
+      "scope": "source",
+      "sha256": "055dbfde974fd1951267dd6f9204b5d713ff0004e0991eb870fce9158c6e359a"
+    },
+    "ZS1-020": {
+      "bytes": 8079,
+      "path": "packages/coding-agent/src/core/prompt-templates.ts",
+      "scope": "source",
+      "sha256": "e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a"
+    },
+    "ZS1-021": {
+      "bytes": 40180,
+      "path": "packages/coding-agent/src/core/resource-loader.ts",
+      "scope": "source",
+      "sha256": "1877e9535820cb8b45e5a84598ac8ae581058bb0fbee6f0c64ec672f8ab986dd"
+    },
+    "ZS1-022": {
+      "bytes": 63623,
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "scope": "source",
+      "sha256": "96e20f8038027f0b0172f311b6b9d9ddf42123b2f5b2a018f533af026fd3371e"
+    },
+    "ZS1-023": {
+      "bytes": 39774,
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "scope": "source",
+      "sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084"
+    },
+    "ZS1-024": {
+      "bytes": 6049,
+      "path": "packages/coding-agent/src/core/tools/output-accumulator.ts",
+      "scope": "source",
+      "sha256": "c601ddd8e10934be6f3db30696eacba7b9544f2dd1648a5ec3c9935f0d4625c3"
+    },
+    "ZS1-025": {
+      "bytes": 13665,
+      "path": "packages/coding-agent/src/core/tools/bash.ts",
+      "scope": "source",
+      "sha256": "b76645f5d7b414957c7772eb8ec75d9dee71d27320ebcbf419881451576a6eee"
+    },
+    "ZS1-026": {
+      "bytes": 11550,
+      "path": "packages/coding-agent/src/core/tools/grep.ts",
+      "scope": "source",
+      "sha256": "88be3d00217d1a1caf8a9e7bb2b8d2e6d96edfa4b790c2cf76c746ab36b8841b"
+    },
+    "ZS1-027": {
+      "bytes": 11178,
+      "path": "packages/coding-agent/src/core/tools/find.ts",
+      "scope": "source",
+      "sha256": "b06bcae6821a0e9fda1b63be613a7ce28eb0e66e1d01d16564e59e83f9ce10ea"
+    },
+    "ZS1-028": {
+      "bytes": 120916,
+      "path": "packages/coding-agent/src/core/agent-session.ts",
+      "scope": "source",
+      "sha256": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237"
+    },
+    "ZS1-029": {
+      "bytes": 62416,
+      "path": "packages/ai/src/api/openai-completions.ts",
+      "scope": "source",
+      "sha256": "5874bf0b121db117bd4eba8fffa750252f5f7617f38306c6eb1f746575896319"
+    },
+    "ZS1-030": {
+      "bytes": 5139,
+      "path": "packages/coding-agent/src/core/model-registry.ts",
+      "scope": "source",
+      "sha256": "b94ea3640c3df228eda475665fb10e4812b88a9e98f336349893e73a75ec91e9"
+    },
+    "ZS1-070": {
+      "bytes": 157476,
+      "path": "src/core.rs",
+      "scope": "target",
+      "sha256": "8e93d360ae897ce5f1d9c9f52ccdef89d1ad25369ac6b187dab252f3dc36a016"
+    },
+    "ZS1-071": {
+      "bytes": 28121,
+      "path": "src/runtime.rs",
+      "scope": "target",
+      "sha256": "2183b622d96a8fdc084784af8f537fa09a4e1703b5ff70de3bc459d29fb05315"
+    },
+    "ZS1-072": {
+      "bytes": 30269,
+      "path": "src/protocol.rs",
+      "scope": "target",
+      "sha256": "8a04fece439141be24bf1df985a095a3960f341f6df833abe609ca0a15d0a105"
+    },
+    "ZS1-073": {
+      "bytes": 8199,
+      "path": "src/context.rs",
+      "scope": "target",
+      "sha256": "bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909"
+    },
+    "ZS1-074": {
+      "bytes": 115551,
+      "path": "src/session.rs",
+      "scope": "target",
+      "sha256": "d0ae990638a8844e814eba68f3b25b62b677cae9282c654dfbbe1cbcf4c6d61c"
+    },
+    "ZS1-075": {
+      "bytes": 75179,
+      "path": "src/backend.rs",
+      "scope": "target",
+      "sha256": "215a2c4817f68bab49b18d4e10d356c83fd4e0d9474fd0ecee30937b4e2fdb3b"
+    },
+    "ZS1-076": {
+      "bytes": 62804,
+      "path": "src/config.rs",
+      "scope": "target",
+      "sha256": "2686c4254a1a13f4f76af26b9d4e478847ee0c818876f3ead6de409dbc8472c6"
+    },
+    "ZS1-077": {
+      "bytes": 93283,
+      "path": "src/tools.rs",
+      "scope": "target",
+      "sha256": "e9d07ca02c2e3c7ff42547773efe176fcbb0ff148735c48cbe35fa2b73d61827"
+    },
+    "ZS1-078": {
+      "bytes": 7883,
+      "path": "src/skills.rs",
+      "scope": "target",
+      "sha256": "123258e777a32528d361933fad70bd66690b5c77afad7a756bf2d4a4ced374be"
+    },
+    "ZS1-079": {
+      "bytes": 72421,
+      "path": "src/slash.rs",
+      "scope": "target",
+      "sha256": "4bf6bb3176eee66198a29c3e1c62bd42bcf8f0e5d21bdf8c915d32116d4a34a9"
+    },
+    "ZS1-080": {
+      "bytes": 23071,
+      "path": "src/extensions.rs",
+      "scope": "target",
+      "sha256": "9b1879edcfb70e711960092e12060a9137e2aacda6bdc547318e5ccb7510fe39"
+    },
+    "ZS1-081": {
+      "bytes": 69219,
+      "path": "src/domain_execution.rs",
+      "scope": "target",
+      "sha256": "f46237f1ef60d830ddf7f33edb064b3843917e861702e92add3b7aa6fe56a180"
+    },
+    "ZS1-082": {
+      "bytes": 24622,
+      "path": "src/domains.rs",
+      "scope": "target",
+      "sha256": "c11e10d02a21ed3412e731acd269080053b18f649935bb1f9486b128ee7c79ac"
+    },
+    "ZS1-083": {
+      "bytes": 38260,
+      "path": "src/governance.rs",
+      "scope": "target",
+      "sha256": "7c34c41e38ba1d8d7429ed13c86877fe10bcea7687a6bf3dc6808f6ce432867f"
+    },
+    "ZS1-084": {
+      "bytes": 312227,
+      "path": "src/headless.rs",
+      "scope": "target",
+      "sha256": "1c3b14bda2533e82e498372f0d570cf899833a06e41fd6cd70b8cf7cc385b478"
+    },
+    "ZS1-085": {
+      "bytes": 323172,
+      "path": "src/tui.rs",
+      "scope": "target",
+      "sha256": "3cbc9db903d7bd197b5eb285c7a8d38f5b21ed00a2d8824a900699c866cd9ca0"
+    },
+    "ZS1-086": {
+      "bytes": 40591,
+      "path": "src/view_model.rs",
+      "scope": "target",
+      "sha256": "1089a9f352b5aaebc755b51ece8189c1daaca1aa82060d2f009630b915b3abee"
+    },
+    "ZS1-087": {
+      "bytes": 24998,
+      "path": "src/slash_actions.rs",
+      "scope": "target",
+      "sha256": "682d8c46b5922ee4b4cb5978626f1276bf04e1c2a9540468d92d4fe8620ee6a8"
+    },
+    "ZS1-088": {
+      "bytes": 592,
+      "path": "src/lib.rs",
+      "scope": "target",
+      "sha256": "2b429ff43bfba672fea949a9fb51ee6eda41a2975589dbc852a50bef2e13d575"
+    },
+    "ZS1-089": {
+      "bytes": 2480,
+      "path": ".github/workflows/ci.yml",
+      "scope": "target",
+      "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+    },
+    "ZS1-094": {
+      "bytes": 54632,
+      "path": "src/layout.rs",
+      "scope": "target",
+      "sha256": "218c1b1cb7853da8f5c03b51e09d552f0634efb82284e029cbcfaeb434dac05a"
+    },
+    "ZS1-095": {
+      "bytes": 27606,
+      "path": "src/approval.rs",
+      "scope": "target",
+      "sha256": "c592686334a95047f749d7c61c793abc03ce93d5312b22aadeefa5aed9c85844"
+    },
+    "ZS1-096": {
+      "bytes": 30217,
+      "path": "src/render.rs",
+      "scope": "target",
+      "sha256": "6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7"
+    },
+    "ZS1-097": {
+      "bytes": 1001,
+      "path": "Cargo.toml",
+      "scope": "target",
+      "sha256": "94c25405859cbec9d1a02e7c1a0a4e0dbbfd96e5c6bc476c23b9dc8be7229a65"
+    },
+    "ZS1-098": {
+      "bytes": 42724,
+      "path": "Cargo.lock",
+      "scope": "target",
+      "sha256": "f822e2d73d49727fdb4898180d26ff75bf95a4f81b638b613cb457e3171a30e1"
+    },
+    "ZS1-300": {
+      "bytes": 374943,
+      "path": "codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "scope": "reference:codex",
+      "sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da"
+    },
+    "ZS1-301": {
+      "bytes": 91601,
+      "path": "codex-rs/tui/src/bottom_pane/textarea.rs",
+      "scope": "reference:codex",
+      "sha256": "8cb5241c9e818210bfff63975e703f45a25a3da91bdb395667893903f7cb4b45"
+    },
+    "ZS1-302": {
+      "bytes": 24594,
+      "path": "codex-rs/tui/src/bottom_pane/paste_burst.rs",
+      "scope": "reference:codex",
+      "sha256": "c80558dfd3cbde437f2fec9a855b01a3180542a53bb135dc92ce7c81299f1ee7"
+    },
+    "ZS1-303": {
+      "bytes": 57262,
+      "path": "codex-rs/tui/src/bottom_pane/approval_overlay.rs",
+      "scope": "reference:codex",
+      "sha256": "c924923b402b198f8f77b249f0d37892896c0b84002c0f6e48330917da80cecc"
+    },
+    "ZS1-304": {
+      "bytes": 4105,
+      "path": "codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs",
+      "scope": "reference:codex",
+      "sha256": "a401d7c6ba3051fcf2c20152a9e86a3f4f8751a87470cbc7f518001326618a2f"
+    },
+    "ZS1-305": {
+      "bytes": 72998,
+      "path": "codex-rs/tui/src/bottom_pane/mod.rs",
+      "scope": "reference:codex",
+      "sha256": "97af02eed39dbfdf69d1ec3e14dc13b9a91f4b33f5e4b985cc1f2cbae4105823"
+    },
+    "ZS1-306": {
+      "bytes": 8020,
+      "path": "codex-rs/tui/src/slash_command.rs",
+      "scope": "reference:codex",
+      "sha256": "9e53ca5bff5a5e7b86aa97731da985082db5d130c453e2d363edb9c5758ebc5a"
+    },
+    "ZS1-307": {
+      "bytes": 4009,
+      "path": "codex-rs/tui/src/file_search.rs",
+      "scope": "reference:codex",
+      "sha256": "7aaa33ac7fd28cbe5fa3405cd3490b30e614272122bb572c9c352acc418b71d9"
+    },
+    "ZS1-308": {
+      "bytes": 3306,
+      "path": "codex-rs/tui/src/key_hint.rs",
+      "scope": "reference:codex",
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    "ZS1-309": {
+      "bytes": 15810,
+      "path": "codex-rs/tui/src/status_indicator_widget.rs",
+      "scope": "reference:codex",
+      "sha256": "e35e3efbd18784b55343366b2001bda08dfc1543f7e4a88700a715562d519cc5"
+    }
+  },
+  "baseline_snapshot_sha256": "9b0c63151bf3a04582fd35912f9c14394879c42176337e2dbf9ca49df9cb56d5",
+  "blueprint": "Docs/stage_1_v3_pi_mono_blueprint.md",
+  "blueprint_version": "3.1.20",
+  "requirement_digest": "8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645",
+  "run_id": "zenpi-stage1-20260911",
+  "schema_version": "stage1-selector/v1",
+  "snapshot_sha256": "20e38b23c6550422c993cc241f9ffa9daeb4443e6d4f050fdd370ba6d54268f9",
+  "target_baseline": "current-worktree-with-user-changes"
+}

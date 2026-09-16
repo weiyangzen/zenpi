@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "/usr/bin/sandbox-exec",
+    "-f",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/sandbox.sb",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/zenpi",
+    "--mode",
+    "tui",
+    "--backend",
+    "openai",
+    "--model",
+    "fixture-126",
+    "--session",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial/l/m-owner.jsonl"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "ZENPI_HOME": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial/g",
+  "network": "child sandbox denies network*",
+  "prompts": "slash commands only",
+  "user_data": "HOME/CODEX_HOME read-data denied outside fixture except binary; user writes denied outside fixture"
+}

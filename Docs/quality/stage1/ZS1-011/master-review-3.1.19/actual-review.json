@@ -1,0 +1,48 @@
+{
+  "cases": 9,
+  "children": [
+    {
+      "case": "agent_dual_queues_wait_for_actual_parallel_batch",
+      "pid": 90625,
+      "id": "A",
+      "code": 0
+    },
+    {
+      "case": "agent_dual_queues_wait_for_actual_parallel_batch",
+      "pid": 90626,
+      "id": "B",
+      "code": 0
+    },
+    {
+      "case": "context_tool_snapshot_and_prepare_with_context_precedence",
+      "pid": 90627,
+      "id": "A",
+      "code": 0
+    },
+    {
+      "case": "context_tool_snapshot_and_prepare_with_context_precedence",
+      "pid": 90628,
+      "id": "B",
+      "code": 0
+    },
+    {
+      "case": "agent_abort_actual_children_sequential",
+      "pid": 90629,
+      "id": "A",
+      "code": 23
+    },
+    {
+      "case": "agent_abort_actual_children_parallel",
+      "pid": 90630,
+      "id": "A",
+      "code": 23
+    },
+    {
+      "case": "agent_abort_actual_children_parallel",
+      "pid": 90631,
+      "id": "B",
+      "code": 23
+    }
+  ],
+  "all_source_and_1385_dependency_hashes_rechecked": true
+}

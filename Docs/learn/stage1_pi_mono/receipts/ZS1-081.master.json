@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-081",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-081",
+  "source_path": "src/domain_execution.rs",
+  "source_hash": "2f5ee732fdf80b99af0ab973eb4594b2369786ae4acc6a86768fc3ba49be890f",
+  "read_ranges": [
+    [
+      0,
+      112548
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/domain_execution.rs_learn.md",
+      "bytes": 2158,
+      "sha256": "abbbc96ca231df2249d4b6e9504b77be8583c917cabc9f3d20b1bd95fb92ac8e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-081/master-review-current/review.md",
+      "bytes": 402,
+      "sha256": "a9f67fd7ccb03ba599108d9e1466079139ad50acf6ed718c65790ff465988084"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-081/master-review-current/review.md",
+      "bytes": 402,
+      "sha256": "a9f67fd7ccb03ba599108d9e1466079139ad50acf6ed718c65790ff465988084"
+    },
+    "findings": "完整读取 domain_execution.rs，覆盖 durable receipts、external handoff、budgeted selection、bounded stores、evidence validation 与 non-execution boundary。"
+  }
+}

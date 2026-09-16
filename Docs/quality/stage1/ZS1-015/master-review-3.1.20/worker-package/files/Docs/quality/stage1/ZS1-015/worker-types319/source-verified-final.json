@@ -1,0 +1,22 @@
+{
+  "name": "source-verified-final",
+  "argv": [
+    "python3",
+    "Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "started_at": "2026-09-12T06:36:13.702695+00:00",
+  "ended_at": "2026-09-12T06:36:13.771548+00:00",
+  "elapsed_seconds": 0.068722125,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 20201472,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log",
+  "bytes": 949,
+  "sha256": "22f966c571dd6e5344fd5dcf2c1d1e4e1f1721304915744d9beda38df671de8d"
+}

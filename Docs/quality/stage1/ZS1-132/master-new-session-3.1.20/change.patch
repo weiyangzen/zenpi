@@ -1,0 +1,2759 @@
+--- a/src/slash.rs
++++ b/src/slash.rs
+@@ -208,6 +208,7 @@
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(rename_all = "snake_case")]
+ pub enum SessionAction {
++    New,
+     List,
+     Search {
+         query: String,
+@@ -406,6 +407,9 @@
+             Self::Resources { .. } => "resources",
+             Self::Layout { .. } => "layout",
+             Self::Pane { .. } => "pane",
++            Self::Session {
++                action: SessionAction::New,
++            } => "new",
+             Self::Session { .. } => "session",
+             Self::Mailbox { .. } => "mailbox",
+             Self::Resume { .. } => "resume",
+@@ -480,6 +484,13 @@
+ /// deliberately listed so clients can complete them, while their route keeps
+ /// execution in the b3ehive runtime rather than the local agent core.
+ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
++    SlashCommandSpec {
++        name: "new",
++        aliases: NO_ALIASES,
++        route: SlashRoute::Local,
++        usage: "/new",
++        summary: "start a fresh conversation in the current project",
++    },
+     SlashCommandSpec {
+         name: "yolo",
+         aliases: NO_ALIASES,
+@@ -1049,6 +1060,13 @@
+             };
+             SlashCommand::Yolo { enabled }
+         }
++        "new" => unit_command(
++            args,
++            "new",
++            SlashCommand::Session {
++                action: SessionAction::New,
++            },
++        )?,
+         "approval" | "approvals" => {
+             let mode = args.first().cloned().unwrap_or_else(|| "ask".into());
+             if args.len() > 1 {
+--- a/src/session.rs
++++ b/src/session.rs
+@@ -110,6 +110,8 @@
+     Json(#[from] serde_json::Error),
+     #[error("session record is invalid: {0}")]
+     InvalidRecord(String),
++    #[error("new session candidate retained: {0}")]
++    CandidateRetained(String),
+ }
+ 
+ #[derive(Debug, Deserialize)]
+@@ -158,6 +160,123 @@
+     tree: Option<crate::session_tree::SessionTree>,
+ }
+ 
++/// An unpublished journal is written through its exclusively created file,
++/// never by reopening a path that another process may have replaced.
++pub(crate) struct NewSessionFile {
++    path: PathBuf,
++    file: File,
++    retained: bool,
++}
++
++#[cfg(windows)]
++fn windows_file_identity(file: &File) -> io::Result<(u32, u32, u32)> {
++    use std::os::windows::io::AsRawHandle;
++    // BY_HANDLE_FILE_INFORMATION consists of thirteen DWORDs, including the
++    // three FILETIMEs. File index and volume identify the opened object.
++    #[repr(C)]
++    struct Information {
++        words: [u32; 13],
++    }
++    #[link(name = "kernel32")]
++    unsafe extern "system" {
++        fn GetFileInformationByHandle(handle: *mut std::ffi::c_void, info: *mut Information)
++        -> i32;
++    }
++    let mut information = Information { words: [0; 13] };
++    // SAFETY: File owns a live Windows handle and Information has the Win32
++    // structure's layout and size; the call writes only that structure.
++    if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) } == 0 {
++        return Err(io::Error::last_os_error());
++    }
++    Ok((
++        information.words[7],
++        information.words[11],
++        information.words[12],
++    ))
++}
++
++impl NewSessionFile {
++    pub(crate) fn verify(&self) -> Result<(), SessionError> {
++        let actual = fs::symlink_metadata(&self.path)?;
++        #[cfg(unix)]
++        let owned = self.file.metadata()?;
++        #[cfg(unix)]
++        let same = {
++            use std::os::unix::fs::MetadataExt;
++            actual.dev() == owned.dev() && actual.ino() == owned.ino()
++        };
++        #[cfg(windows)]
++        let same = {
++            use std::os::windows::fs::OpenOptionsExt;
++            let current = OpenOptions::new()
++                .read(true)
++                .custom_flags(0x00200000)
++                .open(&self.path)?;
++            windows_file_identity(&current)? == windows_file_identity(&self.file)?
++        };
++        #[cfg(not(any(unix, windows)))]
++        let same = false;
++        if !actual.is_file() || actual.file_type().is_symlink() || !same {
++            return Err(SessionError::InvalidRecord(format!(
++                "new session candidate was replaced; retained path {}",
++                self.path.display()
++            )));
++        }
++        Ok(())
++    }
++
++    pub(crate) fn append_event(
++        &self,
++        session: &mut SessionStore,
++        event: Value,
++    ) -> Result<(), SessionError> {
++        self.verify()?;
++        let _lock = AppendLock::new(&self.file)?;
++        session.append_json_to_file(&json!({"kind": "event", "event": event}), &self.file)?;
++        session.events += 1;
++        session.event_values.push(event);
++        Ok(())
++    }
++
++    pub(crate) fn retain(&mut self) {
++        self.retained = true;
++    }
++
++    pub(crate) fn cleanup(&mut self) -> Result<(), SessionError> {
++        if self.retained {
++            return Ok(());
++        }
++        self.retained = true;
++        match fs::symlink_metadata(&self.path) {
++            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
++            Err(error) => {
++                return Err(SessionError::CandidateRetained(format!(
++                    "new session cleanup failed; retained {}: {error}",
++                    self.path.display()
++                )));
++            }
++            Ok(_) => {}
++        }
++        self.verify().map_err(|error| {
++            SessionError::CandidateRetained(format!("{}: {error}", self.path.display()))
++        })?;
++        fs::remove_file(&self.path).map_err(|error| {
++            SessionError::CandidateRetained(format!(
++                "new session cleanup failed; retained {}: {error}",
++                self.path.display()
++            ))
++        })
++    }
++}
++
++impl Drop for NewSessionFile {
++    fn drop(&mut self) {
++        if let Err(error) = self.cleanup() {
++            eprintln!("zenpi: {error}");
++        }
++    }
++}
++
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+ pub struct SessionSummary {
+     pub path: String,
+@@ -201,6 +320,89 @@
+ }
+ 
+ impl SessionStore {
++    /// Create a distinct, empty journal in the already validated current
++    /// session directory. Existing files (including links) are never opened.
++    pub(crate) fn create_fresh(
++        parent: &Path,
++        cwd: &Path,
++        name_digest: &str,
++        cancelled: &dyn Fn() -> bool,
++    ) -> Result<(Self, NewSessionFile), SessionError> {
++        let parent = parent.canonicalize()?;
++        let cwd = cwd.canonicalize()?;
++        if !parent.is_dir()
++            || !cwd.is_dir()
++            || cwd.to_str().is_none()
++            || name_digest.len() != 64
++            || !name_digest.bytes().all(|ch| ch.is_ascii_hexdigit())
++        {
++            return Err(SessionError::InvalidRecord(
++                "invalid new session directory or identity".into(),
++            ));
++        }
++        for attempt in 0..16 {
++            if cancelled() {
++                return Err(SessionError::InvalidRecord(
++                    "new session creation cancelled".into(),
++                ));
++            }
++            let path = parent.join(format!("new-{name_digest}-{attempt}.jsonl"));
++            let mut options = OpenOptions::new();
++            options.read(true).append(true).create_new(true);
++            #[cfg(unix)]
++            options
++                .mode(0o600)
++                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
++            let file = match options.open(&path) {
++                Ok(file) => file,
++                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
++                Err(error) => return Err(error.into()),
++            };
++            let mut guard = NewSessionFile {
++                path: path.clone(),
++                file,
++                retained: false,
++            };
++            let mut store = Self {
++                path,
++                header: SessionHeader {
++                    version: SESSION_VERSION,
++                    session_id: generate_id("session"),
++                    created_at_ms: now_ms(),
++                    cwd: cwd.display().to_string(),
++                },
++                turns: Vec::new(),
++                handoffs: Vec::new(),
++                handoff_records: Vec::new(),
++                runtime_intents: Vec::new(),
++                events: 0,
++                event_values: Vec::new(),
++                records: Vec::new(),
++                warnings: Vec::new(),
++                needs_separator: false,
++                next_seq: 0,
++                observed_bytes: 0,
++                tree: None,
++            };
++            let header = store.header.clone();
++            let result = store.append_json_to_file(&json!({"kind":"session", "version":header.version,
++                "session_id":header.session_id, "created_at_ms":header.created_at_ms, "cwd":header.cwd}), &guard.file)
++                .and_then(|_| guard.verify());
++            if let Err(error) = result {
++                return match guard.cleanup() {
++                    Ok(()) => Err(error),
++                    Err(cleanup) => Err(SessionError::CandidateRetained(format!(
++                        "{error}; {cleanup}"
++                    ))),
++                };
++            }
++            return Ok((store, guard));
++        }
++        Err(SessionError::InvalidRecord(
++            "new session name collision limit reached".into(),
++        ))
++    }
++
+     /// Open or create a session at `path` and recover all valid records.
+     pub fn open(path: impl AsRef<Path>) -> Result<Self, SessionError> {
+         Self::open_with_options(path, true, None)
+@@ -237,6 +439,49 @@
+             ));
+         }
+         Self::open_with_options(path, true, None)
++    }
++
++    /// Reconcile duplicate startup audits from a competing host after a
++    /// rejected new-session proposal. Keep this session's owner and input
++    /// port: the only admissible tail repeats its current extension selection.
++    pub(crate) fn refresh_extension_audit_tail(&mut self) -> Result<(), SessionError> {
++        let metadata = session_path_metadata(&self.path)?
++            .ok_or_else(|| SessionError::InvalidRecord("session journal disappeared".into()))?;
++        if metadata.len() == self.observed_bytes {
++            return Ok(());
++        }
++        let current = Self::open_existing(&self.path)?;
++        let selected = self
++            .event_values
++            .iter()
++            .rev()
++            .find(|event| event["type"] == "extensions_selected");
++        let prefix_matches =
++            current.header == self.header
++                && current.records.len() >= self.records.len()
++                && current.records.iter().zip(&self.records).all(|(a, b)| {
++                    a.sequence == b.sequence && a.kind == b.kind && a.value == b.value
++                });
++        let tail = current
++            .records
++            .get(self.records.len()..)
++            .unwrap_or_default();
++        if !prefix_matches
++            || !current.warnings.is_empty()
++            || tail.is_empty()
++            || tail.len() > 64
++            || !tail.iter().all(|record| {
++                record.kind == "event"
++                    && selected.is_some_and(|event| &record.value["event"] == event)
++            })
++        {
++            return Err(SessionError::InvalidRecord(
++                "session changed beyond repeated extension startup audits; reopen the journal"
++                    .into(),
++            ));
++        }
++        *self = current;
++        Ok(())
+     }
+ 
+     /// Open a project journal with an explicit canonical workspace. Existing
+@@ -1471,6 +1716,27 @@
+     }
+ 
+     fn append_json(&mut self, value: &Value) -> Result<(), SessionError> {
++        let (record, encoded, following_sequence) = self.encode_record(value)?;
++        reject_session_symlink(&self.path)?;
++        let mut options = OpenOptions::new();
++        options.create(true).append(true);
++        #[cfg(unix)]
++        {
++            options.mode(0o600);
++            options.custom_flags(libc::O_NOFOLLOW);
++        }
++        let file = options.open(&self.path)?;
++        let _append_lock = AppendLock::new(&file)?;
++        let _transport = guard_transport_writer(&self.path)?;
++        self.append_encoded(record, encoded, following_sequence, &file)
++    }
++
++    fn append_json_to_file(&mut self, value: &Value, file: &File) -> Result<(), SessionError> {
++        let (record, encoded, following_sequence) = self.encode_record(value)?;
++        self.append_encoded(record, encoded, following_sequence, file)
++    }
++
++    fn encode_record(&self, value: &Value) -> Result<(Value, Vec<u8>, u64), SessionError> {
+         if !value.is_object() {
+             return Err(SessionError::InvalidRecord(
+                 "session record must be an object".into(),
+@@ -1496,17 +1762,17 @@
+             )));
+         }
+         encoded.push(b'\n');
+-        reject_session_symlink(&self.path)?;
+-        let mut options = OpenOptions::new();
+-        options.create(true).append(true);
+-        #[cfg(unix)]
+-        {
+-            options.mode(0o600);
+-            options.custom_flags(libc::O_NOFOLLOW);
+-        }
+-        let file = options.open(&self.path)?;
+-        let _append_lock = AppendLock::new(&file)?;
+-        let _transport = guard_transport_writer(&self.path)?;
++        Ok((record, encoded, following_sequence))
++    }
++
++    fn append_encoded(
++        &mut self,
++        record: Value,
++        encoded: Vec<u8>,
++        following_sequence: u64,
++        mut file: &File,
++    ) -> Result<(), SessionError> {
++        let sequence = self.next_seq;
+         // A second writer must reopen its projection rather than append a
+         // sequence computed from stale history. The append guard explicitly
+         // unlocks on return; process death also releases the OS-owned lock.
+@@ -1516,11 +1782,11 @@
+             ));
+         }
+         if self.needs_separator {
+-            (&file).write_all(b"\n")?;
++            file.write_all(b"\n")?;
+             self.needs_separator = false;
+         }
+-        (&file).write_all(&encoded)?;
+-        (&file).flush()?;
++        file.write_all(&encoded)?;
++        file.flush()?;
+         file.sync_data()?;
+         self.observed_bytes = file.metadata()?.len();
+         self.next_seq = following_sequence;
+@@ -3704,6 +3970,79 @@
+         ));
+     }
+     Ok(())
++}
++
++#[cfg(test)]
++mod new_session_audit_recovery_tests {
++    use super::*;
++
++    #[test]
++    fn duplicate_startup_audit_allows_next_append_without_rewriting_history() {
++        let root = tempfile::tempdir().unwrap();
++        let path = root.path().join("session.jsonl");
++        let mut owner = SessionStore::open_in_workspace(&path, root.path()).unwrap();
++        let selected = json!({"type":"extensions_selected","generation":2,"tools":[]});
++        owner.append_event(selected.clone()).unwrap();
++        let identity = owner.session_id().to_owned();
++        let mut other = SessionStore::open_existing_writable(&path).unwrap();
++        other.append_event(selected).unwrap();
++        let original = fs::read(&path).unwrap();
++        owner.refresh_extension_audit_tail().unwrap();
++        assert_eq!(owner.session_id(), identity);
++        assert_eq!(fs::read(&path).unwrap(), original);
++        owner
++            .append_event(json!({"type":"next_owned_audit"}))
++            .unwrap();
++        assert!(fs::read(&path).unwrap().starts_with(&original));
++        let read = SessionStore::open_existing(&path).unwrap();
++        assert!(read.warnings.is_empty());
++        assert_eq!(read.events().last().unwrap()["type"], "next_owned_audit");
++    }
++
++    #[test]
++    fn semantic_external_changes_require_explicit_recovery_and_preserve_owner() {
++        for foreign in [
++            json!({"type":"model_selected","model":"different"}),
++            json!({"type":"approval_decision","decision":"allow"}),
++            json!({"type":"extensions_selected","generation":2,"tools":["new_tool"]}),
++        ] {
++            let root = tempfile::tempdir().unwrap();
++            let path = root.path().join("session.jsonl");
++            let mut owner = SessionStore::open_in_workspace(&path, root.path()).unwrap();
++            owner
++                .append_event(json!({"type":"extensions_selected","generation":2,"tools":[]}))
++                .unwrap();
++            let records = owner.records().to_vec();
++            let mut other = SessionStore::open_existing_writable(&path).unwrap();
++            other.append_event(foreign).unwrap();
++            let original = fs::read(&path).unwrap();
++            assert!(owner.refresh_extension_audit_tail().is_err());
++            assert_eq!(owner.records(), records);
++            assert_eq!(fs::read(&path).unwrap(), original);
++        }
++    }
++
++    #[test]
++    fn malformed_tail_cannot_become_an_appendable_projection() {
++        use std::io::Write;
++        let root = tempfile::tempdir().unwrap();
++        let path = root.path().join("session.jsonl");
++        let mut owner = SessionStore::open_in_workspace(&path, root.path()).unwrap();
++        owner
++            .append_event(json!({"type":"extensions_selected","generation":2,"tools":[]}))
++            .unwrap();
++        let records = owner.records().to_vec();
++        OpenOptions::new()
++            .append(true)
++            .open(&path)
++            .unwrap()
++            .write_all(b"{broken\n")
++            .unwrap();
++        let original = fs::read(&path).unwrap();
++        assert!(owner.refresh_extension_audit_tail().is_err());
++        assert_eq!(owner.records(), records);
++        assert_eq!(fs::read(&path).unwrap(), original);
++    }
+ }
+ 
+ #[cfg(all(test, unix))]
+--- a/src/core.rs
++++ b/src/core.rs
+@@ -5030,6 +5030,97 @@
+         Ok(())
+     }
+ 
++    /// A fresh conversation reuses this owner and its configured tool policy.
++    /// All preparation is cancellable; the host checkpoint is the commit point.
++    pub(crate) fn new_session_with_commit(
++        &mut self,
++        digest: &str,
++        cancelled: &dyn Fn() -> bool,
++        commit: impl FnOnce(
++            &mut SessionStore,
++            &crate::session::NewSessionFile,
++        ) -> Result<(), AgentError>,
++    ) -> Result<(), AgentError> {
++        if self.phase == AgentPhase::Closed {
++            return Err(AgentError::Closed);
++        }
++        if self.phase != AgentPhase::Idle {
++            return Err(AgentError::NotIdle);
++        }
++        let queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
++            .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
++        if queue.has_pending()
++            || !self.unknown_tool_outcomes().is_empty()
++            || !self.operation_recovery().is_empty()
++            || !self.pending_attachments.is_empty()
++        {
++            return Err(AgentError::InvalidTurn(
++                "new session requires settled operations and no pending input or attachments"
++                    .into(),
++            ));
++        }
++        if cancelled() {
++            return Err(BackendError::Cancelled.into());
++        }
++        let old_path = self
++            .session
++            .path()
++            .canonicalize()
++            .map_err(crate::session::SessionError::from)?;
++        let parent = old_path
++            .parent()
++            .ok_or_else(|| AgentError::InvalidTurn("session has no durable parent".into()))?;
++        let (mut replacement, mut file) = SessionStore::create_fresh(
++            parent,
++            Path::new(&self.session.header().cwd),
++            digest,
++            cancelled,
++        )?;
++        let result = (|| {
++            if let Some(descriptor) = self.backend.model_descriptor(self.model.as_deref())? {
++                file.append_event(
++                    &mut replacement,
++                    serde_json::json!({
++                        "type":"model_selected", "model":self.model,
++                        "descriptor":descriptor, "digest":descriptor.digest(),
++                        "reasoning_effort":self.backend.reasoning_effort(),
++                    }),
++                )?;
++            }
++            file.append_event(
++                &mut replacement,
++                serde_json::json!({"type":"persona_selected", "persona":self.persona()}),
++            )?;
++            self.replace_session_with_commit(replacement, cancelled, |replacement| {
++                file.verify()?;
++                commit(replacement, &file)?;
++                file.retain();
++                Ok(())
++            })
++        })();
++        match result {
++            Ok(()) => Ok(()),
++            Err(error) => match file.cleanup() {
++                Ok(()) => {
++                    // A competing headless host may have appended its identical
++                    // startup selection before winning the project checkpoint.
++                    // Refresh that audit projection so this unchanged owner can
++                    // accept the next turn with a current journal sequence.
++                    self.session
++                        .refresh_extension_audit_tail()
++                        .map_err(|refresh| {
++                            AgentError::InvalidTurn(format!("{error}; {refresh}"))
++                        })?;
++                    Err(error)
++                }
++                Err(cleanup) => Err(crate::session::SessionError::CandidateRetained(format!(
++                    "{error}; {cleanup}"
++                ))
++                .into()),
++            },
++        }
++    }
++
+     /// Replace the session only while idle.  The old store is moved out only
+     /// after the new path has recovered successfully.
+     pub fn resume_session(&mut self, path: impl Into<PathBuf>) -> Result<(), AgentError> {
+@@ -5069,6 +5160,15 @@
+         }
+         drop(inspected);
+         let replacement = SessionStore::open_existing_writable(path)?;
++        self.replace_session_with_commit(replacement, &|| false, |replacement| commit(replacement))
++    }
++
++    fn replace_session_with_commit(
++        &mut self,
++        mut replacement: SessionStore,
++        cancelled: &dyn Fn() -> bool,
++        commit: impl FnOnce(&mut SessionStore) -> Result<(), AgentError>,
++    ) -> Result<(), AgentError> {
+         let replacement_governance = self
+             .governance
+             .as_ref()
+@@ -5080,17 +5180,20 @@
+         let replacement_resources = self
+             .resource_loader
+             .as_ref()
+-            .map(|loader| restore_resource_state(&replacement, loader.paths().clone(), &|| false))
++            .map(|loader| restore_resource_state(&replacement, loader.paths().clone(), &cancelled))
+             .transpose()?;
+         let replacement_model = self.selected_model_for_session(&replacement)?;
+         let replacement_extensions = self
+             .extensions
+             .as_ref()
+             .map(|runtime| {
+-                self.prepare_extensions(runtime.root(), replacement.session_id(), &|| false)
++                self.prepare_extensions(runtime.root(), replacement.session_id(), cancelled)
+             })
+             .transpose()?;
+-        commit(&replacement)?;
++        if cancelled() {
++            return Err(BackendError::Cancelled.into());
++        }
++        commit(&mut replacement)?;
+         // A saved port belongs to one session owner. Revoke that handle before
+         // replacing it so old clones can never acquire the new turn's scope.
+         self.input_port.set_scope(None);
+--- a/src/project_workspace.rs
++++ b/src/project_workspace.rs
+@@ -295,6 +295,104 @@
+                 .to_string(),
+             session_id: agent.session().session_id().to_owned(),
+         }
++    }
++}
++
++#[derive(Debug, Clone)]
++pub(crate) struct NewSessionPlan {
++    context: ProjectContext,
++    old_path: PathBuf,
++    workspace: ProjectWorkspace,
++    sessions: std::collections::BTreeMap<String, PathBuf>,
++    checkpoint: PathBuf,
++    previous: Option<Vec<u8>>,
++    request_id: Option<String>,
++    fingerprint: String,
++    version: u16,
++}
++
++#[derive(Debug)]
++pub(crate) struct NewSessionCommit {
++    pub(crate) context: ProjectContext,
++    pub(crate) path: PathBuf,
++    pub(crate) data: serde_json::Value,
++    checkpoint_bytes: Vec<u8>,
++}
++
++impl NewSessionPlan {
++    pub(crate) fn execute(
++        self,
++        agent: &mut crate::core::Agent,
++        cancelled: &dyn Fn() -> bool,
++    ) -> Result<NewSessionCommit, crate::core::AgentError> {
++        use crate::core::AgentError;
++        if agent.session().session_id() != self.context.session_id
++            || agent
++                .session()
++                .path()
++                .canonicalize()
++                .map_err(crate::session::SessionError::from)?
++                != self
++                    .old_path
++                    .canonicalize()
++                    .map_err(crate::session::SessionError::from)?
++        {
++            return Err(AgentError::InvalidTurn(
++                "new session request belongs to an old owner".into(),
++            ));
++        }
++        let digest = format!(
++            "{:x}",
++            Sha256::digest(
++                format!(
++                    "{}:{}:{}",
++                    self.context.session_id,
++                    self.request_id.as_deref().unwrap_or("tui"),
++                    self.fingerprint
++                )
++                .as_bytes()
++            )
++        );
++        let mut committed = None;
++        agent.new_session_with_commit(&digest, cancelled, |replacement, file| {
++            let path = replacement.path().to_path_buf();
++            let mut context = self.context.clone();
++            context.session_id = replacement.session_id().to_owned();
++            let data = serde_json::json!({
++                "command":"new", "route":"local", "created":true,
++                "project_id":context.project_id, "cwd":context.cwd,
++                "old_session_id":self.context.session_id, "old_session_path":self.old_path,
++                "new_session_id":context.session_id, "new_session_path":path,
++            });
++            file.append_event(
++                replacement,
++                serde_json::json!({
++                    "type":"session_new_transition", "version":self.version,
++                    "request_id":self.request_id, "fingerprint":self.fingerprint,
++                    "project":context, "data":data,
++                }),
++            )?;
++            let mut sessions = self.sessions;
++            sessions.insert(context.project_id.clone(), path.clone());
++            let bytes = serde_json::to_vec(&serde_json::json!({
++                "schema_version":1, "workspace":self.workspace, "sessions":sessions
++            }))
++            .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
++            file.verify()?;
++            if cancelled() {
++                return Err(crate::backend::BackendError::Cancelled.into());
++            }
++            write_owner_checkpoint(&self.checkpoint, self.previous.as_deref(), &bytes)
++                .map_err(AgentError::InvalidTurn)?;
++            committed = Some(NewSessionCommit {
++                context,
++                path,
++                data,
++                checkpoint_bytes: bytes,
++            });
++            Ok(())
++        })?;
++        Ok(committed.expect("successful new session committed its checkpoint"))
+     }
+ }
+ 
+@@ -372,6 +470,48 @@
+         self.sessions
+             .insert(id.to_owned(), agent.session().path().to_path_buf());
+     }
++    /// A worker owns only a checkpoint proposal, never another Agent. The
++    /// existing compare-and-replace writer rejects concurrent host changes.
++    pub(crate) fn new_session_plan(
++        &self,
++        id: &str,
++        request_id: Option<String>,
++        fingerprint: String,
++        version: u16,
++    ) -> Result<NewSessionPlan, String> {
++        let (path, previous) = self
++            .checkpoint
++            .clone()
++            .ok_or("new session requires a durable project owner checkpoint")?;
++        Ok(NewSessionPlan {
++            context: self.contexts.get(id).ok_or("project not found")?.clone(),
++            old_path: self
++                .sessions
++                .get(id)
++                .ok_or("project session not found")?
++                .clone(),
++            workspace: self.workspace.clone(),
++            sessions: self.sessions.clone(),
++            checkpoint: path,
++            previous,
++            request_id,
++            fingerprint,
++            version,
++        })
++    }
++
++    pub(crate) fn accept_new_session(&mut self, committed: &NewSessionCommit) {
++        self.contexts.insert(
++            committed.context.project_id.clone(),
++            committed.context.clone(),
++        );
++        self.sessions
++            .insert(committed.context.project_id.clone(), committed.path.clone());
++        if let Some((_, previous)) = &mut self.checkpoint {
++            *previous = Some(committed.checkpoint_bytes.clone());
++        }
++    }
++
+     /// Commit a fully prepared resume while the caller still holds the old
+     /// Agent. Only the infallible Agent replacement may follow this method.
+     pub(crate) fn commit_resumed_session(
+--- a/src/headless.rs
++++ b/src/headless.rs
+@@ -164,6 +164,38 @@
+         response
+     }
+     fn open(session: &SessionStore) -> Result<Self, HeadlessError> {
++        let mut state = Self::open_unseeded(session)?;
++        for event in session
++            .events()
++            .iter()
++            .filter(|event| event["type"] == "session_new_transition")
++        {
++            let Some(id) = event["request_id"].as_str() else {
++                continue;
++            };
++            let Some(fingerprint) = event["fingerprint"].as_str() else {
++                continue;
++            };
++            if state.completed.contains_key(id) {
++                continue;
++            }
++            let version = event["version"].as_u64().unwrap_or(1) as u16;
++            let mut response =
++                StdioResponse::success(Some(id.to_owned()), "new", Some(event["data"].clone()))
++                    .for_version(version);
++            if version == 2 {
++                response.project = Some(serde_json::from_value(event["project"].clone())?);
++            }
++            state.unknown.remove(id);
++            state
++                .in_flight
++                .insert(id.to_owned(), fingerprint.to_owned());
++            state.remember_terminal(id.to_owned(), encode_line(&response)?)?;
++        }
++        Ok(state)
++    }
++
++    fn open_unseeded(session: &SessionStore) -> Result<Self, HeadlessError> {
+         let (journal, entries) = ReconnectJournal::open(session)?;
+         let mut state = Self::default();
+         for entry in entries {
+@@ -364,7 +396,7 @@
+                 .cloned()
+                 .map(|fingerprint| (id.to_owned(), fingerprint))
+         });
+-        let mut next = Self::open(session)?;
++        let mut next = Self::open_unseeded(session)?;
+         if let Some((id, fingerprint)) = current {
+             match next.admit(Some(&id), &fingerprint)? {
+                 RequestIdAdmission::New => {}
+@@ -771,6 +803,7 @@
+ /// operations. Shell output is kept as JSON so the headless wire can expose
+ /// the complete supervised outcome without manufacturing a provider turn.
+ enum AsyncProcessResult {
++    NewSession(crate::project_workspace::NewSessionCommit),
+     Turn(ProcessResult),
+     UserShell(serde_json::Value),
+     ResourceControl(serde_json::Value),
+@@ -1683,8 +1716,8 @@
+             older_than_ms: policy.older_than_seconds.saturating_mul(1_000),
+             confirmed: policy.confirm,
+         },
+-        SessionAction::Open { .. } => {
+-            return Err("session open must use the active session owner".into());
++        SessionAction::New | SessionAction::Open { .. } => {
++            return Err("session switch must use the active project session owner".into());
+         }
+     };
+     let receipt = execute_session_lifecycle(request, active_session, unix_time_ms())
+@@ -1780,6 +1813,7 @@
+ fn session_action_name(action: &crate::slash::SessionAction) -> &'static str {
+     use crate::slash::SessionAction;
+     match action {
++        SessionAction::New => "new",
+         SessionAction::List => "list",
+         SessionAction::Search { .. } => "search",
+         SessionAction::Agents => "agents",
+@@ -3744,6 +3778,7 @@
+ }
+ 
+ enum AsyncTurn {
++    NewSession(crate::project_workspace::NewSessionPlan),
+     ToolOutput(crate::protocol::OutputRequest),
+     Tree(crate::protocol::TreeRequest),
+     ResourceControl(String),
+@@ -3757,6 +3792,7 @@
+ 
+ struct AsyncRequest {
+     owner: Option<Arc<Mutex<Agent>>>,
++    expected_session: Option<String>,
+     turn: AsyncTurn,
+     events: Arc<Mutex<AsyncEventBuffer>>,
+     started_turn_id: Arc<Mutex<Option<String>>>,
+@@ -3767,7 +3803,8 @@
+ type AsyncRequestParts = (AsyncRequest, ProviderEventQueue, StartedTurn);
+ 
+ impl AsyncRequest {
+-    fn with_owner(mut self, owner: &Arc<Mutex<Agent>>) -> Self {
++    fn with_owner(mut self, owner: &Arc<Mutex<Agent>>, project: &ProjectContext) -> Self {
++        self.expected_session = Some(project.session_id.clone());
+         self.owner = Some(Arc::clone(owner));
+         self
+     }
+@@ -3778,6 +3815,7 @@
+         (
+             Self {
+                 owner: None,
++                expected_session: None,
+                 turn: AsyncTurn::Standard(request),
+                 events: Arc::clone(&events),
+                 started_turn_id: Arc::clone(&started_turn_id),
+@@ -3793,6 +3831,7 @@
+         (
+             Self {
+                 owner: None,
++                expected_session: None,
+                 turn: AsyncTurn::Reissue {
+                     message,
+                     superseded_turn_id,
+@@ -3828,6 +3867,7 @@
+         (
+             Self {
+                 owner: None,
++                expected_session: None,
+                 turn: AsyncTurn::UserShell(input),
+                 events: Arc::clone(&events),
+                 started_turn_id: Arc::clone(&started_turn_id),
+@@ -4236,14 +4276,21 @@
+     input: R,
+     mut output: W,
+ ) -> Result<(), HeadlessError> {
+-    let mut replay = ReplayState::open(agent.session())?;
+-    let workspace = fs::canonicalize(&agent.session().header().cwd)?;
+-    let mut agent = agent;
+-    agent.register_live_owner(
+-        replay.owner_epoch,
+-        workspace.display().to_string(),
+-        unix_time_ms(),
+-    )?;
++    let root_owner = Arc::new(Mutex::new(agent));
++    let mut pool = ProjectOwnerPool::new(Arc::clone(&root_owner)).map_err(io::Error::other)?;
++    pool.restore_checkpoint().map_err(io::Error::other)?;
++    let mut shared = pool.active();
++    let mut replay = {
++        let mut agent = shared.lock().map_err(|_| event_mailbox_headless_error())?;
++        let replay = ReplayState::open(agent.session())?;
++        let workspace = fs::canonicalize(&agent.session().header().cwd)?;
++        agent.register_live_owner(
++            replay.owner_epoch,
++            workspace.display().to_string(),
++            unix_time_ms(),
++        )?;
++        replay
++    };
+     let mut event_sequence = replay.next_sequence;
+     let (line_tx, line_rx) = mpsc::sync_channel::<ReaderMessage>(32);
+     thread::Builder::new()
+@@ -4280,10 +4327,6 @@
+         })
+         .map_err(|error| HeadlessError::Io(io::Error::other(error)))?;
+ 
+-    let root_owner = Arc::new(Mutex::new(agent));
+-    let mut pool = ProjectOwnerPool::new(Arc::clone(&root_owner)).map_err(io::Error::other)?;
+-    pool.restore_checkpoint().map_err(io::Error::other)?;
+-    let mut shared = pool.active();
+     let mut approval = shared
+         .lock()
+         .ok()
+@@ -4300,6 +4343,15 @@
+                 .unwrap_or(&worker_state)
+                 .lock()
+                 .map_err(|_| AgentError::InvalidTurn("agent lock poisoned".into()))?;
++            if request
++                .expected_session
++                .as_deref()
++                .is_some_and(|id| id != agent.session().session_id())
++            {
++                return Err(AgentError::InvalidTurn(
++                    "request belongs to an old session".into(),
++                ));
++            }
+             let events = Arc::clone(&request.events);
+             let started_turn_id = Arc::clone(&request.started_turn_id);
+             let mut sink = |event: ProviderEvent| {
+@@ -4321,6 +4373,18 @@
+                 tool_sink,
+                 |agent| -> Result<AsyncProcessResult, AgentError> {
+                     match request.turn {
++                        AsyncTurn::NewSession(plan) => {
++                            let result = plan.execute(agent, &|| token.is_cancelled());
++                            if matches!(
++                                &result,
++                                Err(AgentError::Session(
++                                    crate::session::SessionError::CandidateRetained(_)
++                                ))
++                            ) {
++                                token.mark_completed();
++                            }
++                            Ok(AsyncProcessResult::NewSession(result?))
++                        }
+                         AsyncTurn::ToolOutput(request) => Ok(AsyncProcessResult::ResourceControl(
+                             agent
+                                 .tool_output_control(request, &|| token.is_cancelled())
+@@ -4508,6 +4572,7 @@
+                     &mut output,
+                     &mut event_sequence,
+                     &mut replay,
++                    &mut pool,
+                     &mut pending_steers,
+                     &mut pending_shutdown,
+                     stopping,
+@@ -4565,6 +4630,7 @@
+                             &mut output,
+                             &mut event_sequence,
+                             &mut replay,
++                            &mut pool,
+                             &mut pending_steers,
+                             &mut pending_shutdown,
+                             true,
+@@ -4700,6 +4766,7 @@
+     output: &mut W,
+     event_sequence: &mut u64,
+     replay: &mut ReplayState,
++    pool: &mut ProjectOwnerPool,
+     pending_steers: &mut VecDeque<PendingSteer>,
+     pending_shutdown: &mut Option<(Option<String>, String, u16)>,
+     stopping: bool,
+@@ -4796,6 +4863,22 @@
+                 return Ok(false);
+             };
+             replay.emission_project = Some(meta.project.clone());
++            if let JobOutcome::Succeeded(AsyncProcessResult::NewSession(committed)) = &outcome {
++                pool.accept_new_session(committed);
++                replay.emission_project = Some(committed.context.clone());
++                if let Some(id) = &meta.id {
++                    replay
++                        .request_projects
++                        .insert(id.clone(), committed.context.clone());
++                }
++                let owner = pool
++                    .owner(&committed.context.project_id)
++                    .ok_or_else(|| io::Error::other("committed new session owner missing"))?;
++                let agent = owner.lock().map_err(|_| event_mailbox_headless_error())?;
++                replay.reset_for_session(agent.session(), meta.id.as_deref(), *event_sequence)
++                    .map_err(|error| io::Error::other(format!("new session created and committed at {}; reconnect to recover receipt: {error}", committed.path.display())))?;
++                *event_sequence = (*event_sequence).max(replay.next_sequence);
++            }
+             let event_request_id = meta.id.clone();
+             if let Some(request_id) = meta.id.as_ref() {
+                 request_to_job.remove(request_id);
+@@ -4843,6 +4926,7 @@
+             match outcome {
+                 JobOutcome::Succeeded(result) => {
+                     let data = match result {
++                        AsyncProcessResult::NewSession(committed) => committed.data,
+                         AsyncProcessResult::Turn(result) => json!({
+                             "submission": result.submission,
+                             "assistant": result.assistant,
+@@ -5171,7 +5255,7 @@
+                 return Ok(());
+             }
+             let (request, events, turn_id) = AsyncRequest::tool_output(request);
+-            let job = match runner.try_submit(request.with_owner(shared)) {
++            let job = match runner.try_submit(request.with_owner(shared, project)) {
+                 Ok(job) => job,
+                 Err(error) => {
+                     write_runtime_rejection(
+@@ -5233,7 +5317,7 @@
+                 write_cached_versioned_response(output, response, request_version, replay)?;
+             } else {
+                 let (request, events, turn_id) = AsyncRequest::tree(request);
+-                let job = match runner.try_submit(request.with_owner(shared)) {
++                let job = match runner.try_submit(request.with_owner(shared, project)) {
+                     Ok(job) => job,
+                     Err(error) => {
+                         write_runtime_rejection(
+@@ -5371,7 +5455,7 @@
+                 } else {
+                     AsyncRequest::new(TurnInputRequest::new(input))
+                 };
+-                let job_id = match runner.try_submit(request.with_owner(shared)) {
++                let job_id = match runner.try_submit(request.with_owner(shared, project)) {
+                     Ok(job_id) => job_id,
+                     Err(error) => {
+                         write_runtime_rejection(
+@@ -5419,7 +5503,7 @@
+                 }
+                 Ok(crate::slash::InputRoute::UserShell(input)) => {
+                     let (request, events, started_turn_id) = AsyncRequest::user_shell(input);
+-                    let job_id = match runner.try_submit(request.with_owner(shared)) {
++                    let job_id = match runner.try_submit(request.with_owner(shared, project)) {
+                         Ok(job_id) => job_id,
+                         Err(error) => {
+                             write_runtime_rejection(
+@@ -5530,6 +5614,89 @@
+                         request_version,
+                         replay,
+                     )?,
++                }
++                return Ok(());
++            }
++            if matches!(
++                &parsed,
++                crate::slash::SlashCommand::Session {
++                    action: crate::slash::SessionAction::New
++                }
++            ) {
++                let busy = jobs
++                    .values()
++                    .any(|work| work.project.project_id == project.project_id)
++                    || pending_inputs
++                        .iter()
++                        .any(|work| work.project.project_id == project.project_id)
++                    || pending_steers
++                        .iter()
++                        .any(|work| work.project.project_id == project.project_id);
++                if busy {
++                    write_retryable_response(
++                        output,
++                        StdioResponse::error_with_code(
++                            id,
++                            command_name,
++                            "agent_busy",
++                            "new session requires settled current-project requests",
++                        )
++                        .for_version(request_version),
++                        replay,
++                    )?;
++                    return Ok(());
++                }
++                let plan = match pool.new_session_plan(
++                    &project.project_id,
++                    id.clone(),
++                    fingerprint.clone(),
++                    request_version,
++                ) {
++                    Ok(plan) => plan,
++                    Err(error) => {
++                        write_cached_versioned_response(
++                            output,
++                            StdioResponse::error_with_code(
++                                id,
++                                command_name,
++                                "session_new_failed",
++                                error,
++                            ),
++                            request_version,
++                            replay,
++                        )?;
++                        return Ok(());
++                    }
++                };
++                let (mut request, events, turn_id) = AsyncRequest::new(TurnInputRequest::new(""));
++                request.turn = AsyncTurn::NewSession(plan);
++                let job_id = match runner.try_submit(request.with_owner(shared, project)) {
++                    Ok(job_id) => job_id,
++                    Err(error) => {
++                        write_runtime_rejection(
++                            output,
++                            id,
++                            command_name,
++                            error,
++                            request_version,
++                            replay,
++                        )?;
++                        return Ok(());
++                    }
++                };
++                jobs.insert(
++                    job_id,
++                    AsyncWork {
++                        project: project.clone(),
++                        id: id.clone(),
++                        command: "new",
++                        version: request_version,
++                        events,
++                        turn_id,
++                    },
++                );
++                if let Some(id) = id {
++                    request_to_job.insert(id, job_id);
+                 }
+                 return Ok(());
+             }
+@@ -5738,7 +5905,7 @@
+                 attachments,
+             };
+             let (request, events, started_turn_id) = AsyncRequest::new(request);
+-            let job_id = match runner.try_submit(request.with_owner(shared)) {
++            let job_id = match runner.try_submit(request.with_owner(shared, project)) {
+                 Ok(job_id) => job_id,
+                 Err(error) => {
+                     write_runtime_rejection(
+@@ -5849,7 +6016,7 @@
+                     attachments: Vec::new(),
+                 };
+                 let (request, events, started_turn_id) = AsyncRequest::new(request);
+-                let job_id = match runner.try_submit(request.with_owner(shared)) {
++                let job_id = match runner.try_submit(request.with_owner(shared, project)) {
+                     Ok(job_id) => job_id,
+                     Err(error) => {
+                         write_runtime_rejection(
+@@ -6017,7 +6184,7 @@
+                 return Ok(());
+             }
+             let (request, events, started_turn_id) = AsyncRequest::user_shell(input);
+-            let job_id = match runner.try_submit(request.with_owner(shared)) {
++            let job_id = match runner.try_submit(request.with_owner(shared, project)) {
+                 Ok(job_id) => job_id,
+                 Err(error) => {
+                     write_runtime_rejection(
+@@ -6370,7 +6537,7 @@
+         if let Some(superseded_turn_id) = pending.superseded_turn_id.clone() {
+             let (request, events, started_turn_id) =
+                 AsyncRequest::reissue(pending.text.clone(), superseded_turn_id);
+-            match runner.try_submit(request.with_owner(&pending.owner)) {
++            match runner.try_submit(request.with_owner(&pending.owner, &pending.project)) {
+                 Ok(job_id) => {
+                     jobs.insert(
+                         job_id,
+@@ -6419,7 +6586,7 @@
+                 attachments: Vec::new(),
+             };
+             let (request, events, started_turn_id) = AsyncRequest::new(request);
+-            match runner.try_submit(request.with_owner(&pending.owner)) {
++            match runner.try_submit(request.with_owner(&pending.owner, &pending.project)) {
+                 Ok(job_id) => {
+                     jobs.insert(
+                         job_id,
+@@ -7283,6 +7450,10 @@
+             create_blueprint_from_plan(agent, &instruction).map(SlashExecution::Response)
+         }
+         SlashCommand::Session { action } => match action {
++            crate::slash::SessionAction::New => Err(SlashDispatchError {
++                code: "session_new_owner_required",
++                message: "new session requires the asynchronous durable project owner".into(),
++            }),
+             crate::slash::SessionAction::List => session_lifecycle_view(
+                 &crate::slash::SessionAction::List,
+                 agent.as_deref().map(|value| value.session().path()),
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -7778,6 +7778,10 @@
+             }
+         }
+         SlashCommand::Session { action } => match action {
++            crate::slash::SessionAction::New => state.push_message(
++                MessageRole::Error,
++                "new session requires the asynchronous durable project owner",
++            ),
+             crate::slash::SessionAction::List => match crate::headless::session_lifecycle_view(
+                 &crate::slash::SessionAction::List,
+                 agent.as_deref().map(|value| value.session().path()),
+@@ -8559,6 +8563,16 @@
+     /// existing UI checkpoint remains responsible for drafts and pane state.
+     pub fn restore_shared_workspace(&mut self, state: &mut TuiState) -> Result<(), String> {
+         if self.pool.restore_checkpoint()? {
++            let previous_session_paths: BTreeMap<_, _> = state
++                .project_metadata
++                .iter()
++                .filter_map(|(id, metadata)| {
++                    metadata
++                        .session_path
++                        .as_ref()
++                        .map(|path| (id.clone(), std::path::PathBuf::from(path)))
++                })
++                .collect();
+             let workspace = self.pool.workspace().clone();
+             let wanted = workspace
+                 .active()
+@@ -8591,11 +8605,21 @@
+             );
+             state.project_workspace = Some(workspace);
+             if let Ok(agent) = self.pool.active().lock() {
++                let changed_session = state
++                    .project_session_cursor(state.active_project())
++                    .map_or_else(
++                        || {
++                            previous_session_paths
++                                .get(state.active_project())
++                                .is_some_and(|path| path.as_path() != agent.session().path())
++                        },
++                        |(id, _)| id != agent.session().session_id(),
++                    );
+                 state
+                     .set_active_project_metadata(ProjectTabMetadata::from_session(agent.session()));
+                 state.refresh_session_snapshot(agent.session());
+                 state.refresh_transcript_status(&agent);
+-                if state.messages.is_empty() {
++                if changed_session || state.messages.is_empty() {
+                     reload_state_from_agent(state, &agent);
+                 }
+             }
+@@ -8724,10 +8748,20 @@
+         state.cached_transcript = None;
+         // A running existing owner needs no lock to switch its saved view.
+         if let Ok(agent) = self.active(state).try_lock() {
++            let changed_session = state
++                .project_session_cursor(state.active_project())
++                .map_or_else(
++                    || {
++                        saved_sessions
++                            .get(state.active_project())
++                            .is_some_and(|path| path.as_path() != agent.session().path())
++                    },
++                    |(id, _)| id != agent.session().session_id(),
++                );
+             state.set_active_project_metadata(ProjectTabMetadata::from_session(agent.session()));
+             state.refresh_session_snapshot(agent.session());
+             state.refresh_transcript_status(&agent);
+-            if state.messages.is_empty() {
++            if changed_session || state.messages.is_empty() {
+                 reload_state_from_agent(state, &agent);
+             }
+         }
+@@ -9111,6 +9145,7 @@
+ 
+ fn session_action_label(action: &crate::slash::SessionAction) -> &'static str {
+     match action {
++        crate::slash::SessionAction::New => "new",
+         crate::slash::SessionAction::List => "list",
+         crate::slash::SessionAction::Search { .. } => "search",
+         crate::slash::SessionAction::Agents => "agents",
+@@ -9539,12 +9574,14 @@
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(rename_all = "snake_case")]
+ enum TuiRequestKind {
++    NewSession,
+     Model,
+     UserShell,
+     ResourceControl,
+ }
+ 
+ enum TuiJobResult {
++    NewSession(crate::project_workspace::NewSessionCommit),
+     Model(crate::core::ProcessResult),
+     UserShell(serde_json::Value),
+     ResourceControl(serde_json::Value),
+@@ -9554,6 +9591,7 @@
+     owner: Option<Arc<Mutex<crate::core::Agent>>>,
+     text: String,
+     kind: TuiRequestKind,
++    new_session: Option<crate::project_workspace::NewSessionPlan>,
+     provider_events: Arc<Mutex<TuiProviderEventBuffer>>,
+ }
+ 
+@@ -9569,6 +9607,7 @@
+                 owner: None,
+                 text,
+                 kind,
++                new_session: None,
+                 provider_events: Arc::clone(&provider_events),
+             },
+             provider_events,
+@@ -10292,6 +10331,23 @@
+                 tool_sink,
+                 |agent| -> Result<TuiJobResult, AgentError> {
+                     Ok(match request.kind {
++                        TuiRequestKind::NewSession => {
++                            let result = request
++                                .new_session
++                                .ok_or_else(|| {
++                                    AgentError::InvalidTurn("new session proposal missing".into())
++                                })?
++                                .execute(agent, &|| token.is_cancelled());
++                            if matches!(
++                                &result,
++                                Err(AgentError::Session(
++                                    crate::session::SessionError::CandidateRetained(_)
++                                ))
++                            ) {
++                                token.mark_completed();
++                            }
++                            TuiJobResult::NewSession(result?)
++                        }
+                         TuiRequestKind::Model => {
+                             let mut attachments = Vec::new();
+                             if !request.text.starts_with('/') {
+@@ -10891,6 +10947,7 @@
+                             .approval_views
+                             .remove(&state.project_tabs[state.active_project]);
+                         active_job = None;
++                        let was_new_session = active_job_kind == Some(TuiRequestKind::NewSession);
+                         active_job_kind = None;
+                         state.set_busy(false);
+                         drain_agent_tool_events(
+@@ -10898,6 +10955,35 @@
+                             &mut state,
+                         );
+                         match outcome {
++                            JobOutcome::Succeeded(TuiJobResult::NewSession(committed)) => {
++                                project_host.pool.accept_new_session(&committed);
++                                let visible = state.active_project().to_owned();
++                                if let Some(index) =
++                                    state.project_index(&committed.context.project_id)
++                                {
++                                    state.select_project_tab(index);
++                                }
++                                if let Some(owner) =
++                                    project_host.pool.owner(&committed.context.project_id)
++                                    && let Ok(agent) = owner.try_lock()
++                                {
++                                    let approval_mode = state
++                                        .project_metadata(state.active_project())
++                                        .map(|m| m.approval_mode)
++                                        .unwrap_or_default();
++                                    let mut metadata =
++                                        ProjectTabMetadata::from_session(agent.session());
++                                    metadata.approval_mode = approval_mode;
++                                    state.set_active_project_metadata(metadata);
++                                    reload_state_from_agent(&mut state, &agent);
++                                    state.refresh_transcript_status(&agent);
++                                    input_controls.remember_owner(state.active_project(), &agent);
++                                    state.set_status("New session ready");
++                                }
++                                if let Some(index) = state.project_index(&visible) {
++                                    state.select_project_tab(index);
++                                }
++                            }
+                             JobOutcome::Succeeded(TuiJobResult::Model(result)) => {
+                                 if let Some(assistant) = result.assistant {
+                                     finish_turn_reasoning(&mut state, id.get(), &assistant);
+@@ -10976,6 +11062,9 @@
+                                 state.set_status("Request failed");
+                             }
+                             JobOutcome::Cancelled => {
++                                if was_new_session && let Some(input) = rejected_input {
++                                    state.restore_submitted_input(input);
++                                }
+                                 state.discard_stream();
+                                 state.finish_running_tools(ToolRunStatus::Cancelled);
+                                 state.set_status("Interrupted");
+@@ -11392,6 +11481,80 @@
+                                 if !state.command_available(command.name()) {
+                                     state.set_status("Command requires an idle project");
+                                     state.set_rejected_input(text);
++                                    scheduler.request();
++                                    continue 'outer;
++                                }
++                                if matches!(
++                                    &command,
++                                    SlashCommand::Session {
++                                        action: crate::slash::SessionAction::New
++                                    }
++                                ) {
++                                    let project = state.active_project().to_owned();
++                                    let busy = active_job.is_some()
++                                        || input_controls.has_pending(&project)
++                                        || pending_inputs.projects.contains(&project)
++                                        || state
++                                            .scheduled_inputs
++                                            .iter()
++                                            .any(|entry| entry.project == project)
++                                        || state.approval_views.contains_key(&project)
++                                        || (active_resource_job.is_some()
++                                            && active_resource_project == project)
++                                        || editor.active();
++                                    let fingerprint = format!(
++                                        "tui-{}",
++                                        std::time::SystemTime::now()
++                                            .duration_since(std::time::UNIX_EPOCH)
++                                            .unwrap_or_default()
++                                            .as_nanos()
++                                    );
++                                    let proposal = if busy {
++                                        Err("new session requires settled requests, approvals and scheduled work".to_owned())
++                                    } else {
++                                        project_host.pool.new_session_plan(
++                                            &project,
++                                            None,
++                                            fingerprint,
++                                            1,
++                                        )
++                                    };
++                                    match proposal {
++                                        Err(error) => {
++                                            state.push_message(MessageRole::Error, error);
++                                            state.restore_rejected_input(&text);
++                                        }
++                                        Ok(plan) => {
++                                            let (mut request, events) = TuiRequest::with_kind(
++                                                text.clone(),
++                                                TuiRequestKind::NewSession,
++                                            );
++                                            request.owner = Some(Arc::clone(&shared));
++                                            request.new_session = Some(plan);
++                                            let submitted =
++                                                state.bind_submitted_input(text.clone());
++                                            match runner.try_submit(request) {
++                                                Ok(id) => {
++                                                    submitted_inputs.insert(id, submitted);
++                                                    stream_buffers.insert(id, events);
++                                                    active_job = Some(id);
++                                                    active_job_project = Some(project);
++                                                    active_job_owner = Some(Arc::clone(&shared));
++                                                    active_job_kind =
++                                                        Some(TuiRequestKind::NewSession);
++                                                    state.set_busy(true);
++                                                    state.set_status("Preparing new session");
++                                                }
++                                                Err(error) => {
++                                                    state.restore_submitted_input(submitted);
++                                                    state.push_message(
++                                                        MessageRole::Error,
++                                                        error.to_string(),
++                                                    );
++                                                }
++                                            }
++                                        }
++                                    }
+                                     scheduler.request();
+                                     continue 'outer;
+                                 }
+--- a/tests/session_new.rs
++++ b/tests/session_new.rs
+@@ -0,0 +1,648 @@
++#![cfg(unix)]
++use serde_json::{Value, json};
++use std::{
++    fs,
++    io::{BufRead, BufReader, Write},
++    os::unix::net::UnixStream,
++    path::Path,
++    thread,
++    time::Duration,
++};
++use tempfile::tempdir;
++use zenpi::{
++    approval::{ApprovalMode, ApprovalPolicy},
++    core::Agent,
++    session::SessionStore,
++    tools::{SideEffectPolicy, ToolContext, ToolRegistry},
++};
++
++// Native fixture compilation and cold executable setup must not compete with
++// the other fixture's real 1000 ms extension initialization deadline.
++static EXTENSION_FIXTURE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
++fn agent(root: &Path) -> Agent {
++    let mut agent = Agent::with_echo(
++        SessionStore::open_in_workspace(root.join("initial.jsonl"), root).unwrap(),
++    );
++    agent.set_tools(
++        ToolRegistry::with_all_builtins().unwrap(),
++        ToolContext::new(root).unwrap(),
++        SideEffectPolicy::all_builtins(),
++    );
++    agent.set_approval_policy(ApprovalPolicy {
++        mode: ApprovalMode::Never,
++        ..Default::default()
++    });
++    agent
++}
++struct Wire {
++    input: UnixStream,
++    output: BufReader<UnixStream>,
++    join: Option<thread::JoinHandle<()>>,
++    records: Vec<Value>,
++}
++impl Wire {
++    fn new(agent: Agent) -> Self {
++        let (input, read) = UnixStream::pair().unwrap();
++        let (write, output) = UnixStream::pair().unwrap();
++        output
++            .set_read_timeout(Some(Duration::from_secs(10)))
++            .unwrap();
++        let join =
++            thread::spawn(move || zenpi::headless::run_async_streams(agent, read, write).unwrap());
++        Self {
++            input,
++            output: BufReader::new(output),
++            join: Some(join),
++            records: Vec::new(),
++        }
++    }
++    fn send(&mut self, value: Value) {
++        writeln!(self.input, "{value}").unwrap();
++    }
++    fn next(&mut self) -> Value {
++        let mut line = String::new();
++        assert!(
++            self.output.read_line(&mut line).unwrap() > 0,
++            "unexpected EOF: {:?}",
++            self.records
++        );
++        let value = serde_json::from_str::<Value>(&line).unwrap();
++        self.records.push(value.clone());
++        value
++    }
++    fn response(&mut self, id: &str) -> Value {
++        loop {
++            let value = self.next();
++            if value["type"] == "response" && value["id"] == id {
++                return value;
++            }
++        }
++    }
++    fn project(&mut self, id: &str, control: Value) -> Value {
++        self.send(json!({"schema_version":2,"type":"project","id":id,"project":control}));
++        self.response(id)
++    }
++    fn finish(mut self) -> Vec<Value> {
++        self.send(json!({"schema_version":2,"type":"shutdown","id":"test-stop"}));
++        assert_eq!(self.response("test-stop")["success"], true);
++        self.input.shutdown(std::net::Shutdown::Write).unwrap();
++        self.join.take().unwrap().join().unwrap();
++        self.records.clone()
++    }
++}
++impl Drop for Wire {
++    fn drop(&mut self) {
++        let _ = self.input.shutdown(std::net::Shutdown::Write);
++    }
++}
++
++impl Wire {
++    fn command(&mut self, id: &str, text: &str) -> Value {
++        self.send(json!({"schema_version":2,"type":"command","id":id,"text":text}));
++        self.response(id)
++    }
++    fn prompt(&mut self, id: &str, text: &str) -> Value {
++        self.send(json!({"schema_version":2,"type":"prompt","id":id,"text":text}));
++        self.response(id)
++    }
++}
++
++#[test]
++fn bare_new_is_the_only_public_syntax_and_is_registered() {
++    use zenpi::slash::{SessionAction, SlashCommand, parse};
++    assert!(matches!(
++        parse("/new").unwrap(),
++        Some(SlashCommand::Session {
++            action: SessionAction::New
++        })
++    ));
++    assert!(parse("/new destination").is_err());
++    assert!(parse("/session new").is_err());
++    assert!(zenpi::slash::spec("new").is_some());
++}
++
++#[test]
++fn old_port_cannot_acquire_the_new_sessions_running_turn() {
++    use std::sync::{
++        Arc,
++        atomic::{AtomicBool, Ordering},
++    };
++    use zenpi::backend::{Backend, BackendError, Completion, CompletionRequest};
++    struct HoldingBackend {
++        started: Arc<AtomicBool>,
++        release: Arc<AtomicBool>,
++    }
++    impl Backend for HoldingBackend {
++        fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
++            self.started.store(true, Ordering::Release);
++            let deadline = std::time::Instant::now() + Duration::from_secs(3);
++            while !self.release.load(Ordering::Acquire) {
++                assert!(
++                    std::time::Instant::now() < deadline,
++                    "test did not release provider"
++                );
++                thread::sleep(Duration::from_millis(1));
++            }
++            Ok(Completion::text("new owner reply"))
++        }
++    }
++    struct ReleaseOnDrop(Arc<AtomicBool>);
++    impl Drop for ReleaseOnDrop {
++        fn drop(&mut self) {
++            self.0.store(true, Ordering::Release);
++        }
++    }
++    let root = tempdir().unwrap();
++    let started = Arc::new(AtomicBool::new(false));
++    let release = Arc::new(AtomicBool::new(false));
++    let _release_on_drop = ReleaseOnDrop(release.clone());
++    let initial = Agent::new(
++        SessionStore::open_in_workspace(root.path().join("initial.jsonl"), root.path()).unwrap(),
++        Box::new(HoldingBackend {
++            started: started.clone(),
++            release: release.clone(),
++        }),
++    );
++    let old_port = initial.input_port();
++    let mut wire = Wire::new(initial);
++    let new = wire.command("new-for-port", "/new");
++    assert_eq!(new["success"], true, "{new}");
++    let new_id = new["data"]["new_session_id"].as_str().unwrap();
++    wire.send(
++        json!({"schema_version":2,"type":"prompt","id":"running-new","text":"new owner input"}),
++    );
++    let deadline = std::time::Instant::now() + Duration::from_secs(3);
++    while !started.load(Ordering::Acquire) {
++        assert!(
++            std::time::Instant::now() < deadline,
++            "new provider never started"
++        );
++        thread::sleep(Duration::from_millis(1));
++    }
++    for session_id in [old_port.session_id(), new_id.to_owned()] {
++        let rejected = old_port.submit(zenpi::protocol::InputQueueRequest {
++            schema_version: 2,
++            id: "old-port-request".into(),
++            kind: "input_queue".into(),
++            session_id,
++            input_queue: zenpi::protocol::InputQueueAction::Enqueue {
++                input_id: "old-port-input".into(),
++                kind: zenpi::input_queue::InputKind::Steer,
++                text: "STALE_INPUT_MUST_NOT_ARRIVE".into(),
++            },
++        });
++        assert!(
++            rejected.is_err(),
++            "revoked old port accepted input during new owner's turn"
++        );
++    }
++    release.store(true, Ordering::Release);
++    let response = wire.response("running-new");
++    assert_eq!(response["success"], true, "{response}");
++    assert_eq!(response["project"]["session_id"], new_id);
++    wire.finish();
++    let bytes = fs::read_to_string(new["data"]["new_session_path"].as_str().unwrap()).unwrap();
++    assert!(!bytes.contains("STALE_INPUT_MUST_NOT_ARRIVE"));
++}
++
++#[test]
++fn new_keeps_project_and_preferences_but_has_empty_history_and_durable_replay() {
++    let temp = tempdir().unwrap();
++    let root = temp.path().join("项目 space");
++    fs::create_dir(&root).unwrap();
++    let mut initial = agent(&root);
++    initial.set_persona("ESFP").unwrap();
++    let old_port = initial.input_port();
++    let old_id = initial.session().session_id().to_owned();
++    let mut wire = Wire::new(initial);
++    assert_eq!(
++        wire.prompt("seed", "old conversation body")["success"],
++        true
++    );
++    assert_eq!(
++        wire.project("tabs-before", json!({"action":"list"}))["data"]["workspace"]["tabs"]
++            .as_array()
++            .unwrap()
++            .len(),
++        1
++    );
++    let old_bytes = fs::read(root.join("initial.jsonl")).unwrap();
++    let new = wire.command("create", "/new");
++    assert_eq!(new["success"], true, "{new}");
++    assert_eq!(new["data"]["old_session_id"], old_id);
++    assert_eq!(new["data"]["project_id"], new["project"]["project_id"]);
++    assert_eq!(
++        new["data"]["cwd"],
++        root.canonicalize().unwrap().display().to_string()
++    );
++    let new_id = new["data"]["new_session_id"].as_str().unwrap();
++    assert_ne!(old_id, new_id);
++    assert_eq!(old_port.session_id(), old_id);
++    let new_path = Path::new(new["data"]["new_session_path"].as_str().unwrap());
++    let session = SessionStore::open_existing(new_path).unwrap();
++    assert!(session.turns().is_empty());
++    assert!(
++        session
++            .events()
++            .iter()
++            .any(|e| e["type"] == "persona_selected" && e["persona"] == "ESFP")
++    );
++    assert!(
++        fs::read(root.join("initial.jsonl"))
++            .unwrap()
++            .starts_with(&old_bytes)
++    );
++    let files = fs::read_dir(&root).unwrap().count();
++    assert_eq!(wire.command("create", "/new"), new);
++    assert_eq!(
++        wire.command("create", "/status")["code"],
++        "request_id_conflict"
++    );
++    assert_eq!(fs::read_dir(&root).unwrap().count(), files);
++    assert_eq!(
++        wire.prompt("next", "fresh conversation body")["success"],
++        true
++    );
++    assert_eq!(
++        SessionStore::open_existing(new_path).unwrap().turns().len(),
++        2
++    );
++    wire.finish();
++    let mut restart = Wire::new(agent(&root));
++    assert_eq!(restart.command("create", "/new"), new);
++    assert_eq!(
++        restart.command("create", "/status")["code"],
++        "request_id_conflict"
++    );
++    let old = restart.command(
++        "open-old",
++        &format!(
++            "/session open {}",
++            serde_json::to_string(&root.join("initial.jsonl")).unwrap()
++        ),
++    );
++    assert_eq!(old["success"], true, "{old}");
++    assert_eq!(old["project"]["session_id"], old_id);
++    assert_eq!(
++        restart.command(
++            "open-new",
++            &format!("/session open {}", serde_json::to_string(new_path).unwrap())
++        )["project"]["session_id"],
++        new_id
++    );
++    restart.finish();
++}
++
++#[test]
++fn running_request_rejects_new_without_cancelling_old_work_then_allows_retry() {
++    let root = tempdir().unwrap();
++    let mut wire = Wire::new(agent(root.path()));
++    wire.send(json!({"schema_version":2,"type":"user_shell","id":"running","text":"!sleep 0.3; printf settled > settled.txt"}));
++    loop {
++        let row = wire.next();
++        if row["request_id"] == "running" && row["event"]["type"] == "request_started" {
++            break;
++        }
++    }
++    let rejected = wire.command("busy-new", "/new");
++    assert_eq!(rejected["code"], "agent_busy", "{rejected}");
++    assert_eq!(wire.response("running")["success"], true);
++    assert_eq!(
++        fs::read_to_string(root.path().join("settled.txt")).unwrap(),
++        "settled"
++    );
++    assert_eq!(wire.command("settled-new", "/new")["success"], true);
++    wire.finish();
++}
++
++#[test]
++fn failed_owner_checkpoint_preserves_old_session_and_removes_candidate() {
++    let root = tempdir().unwrap();
++    let initial = agent(root.path());
++    let old_id = initial.session().session_id().to_owned();
++    let mut wire = Wire::new(initial);
++    assert_eq!(wire.prompt("before", "old request")["success"], true);
++    // A real filesystem replacement defeats the checkpoint CAS; the host must
++    // not overwrite it or leave an unpublished candidate behind.
++    let checkpoint = root.path().join("project-workspace.json");
++    fs::write(&checkpoint, b"foreign checkpoint").unwrap();
++    let rejected = wire.command("failed-new", "/new");
++    assert_eq!(rejected["success"], false, "{rejected}");
++    assert_eq!(fs::read(&checkpoint).unwrap(), b"foreign checkpoint");
++    assert!(!fs::read_dir(root.path()).unwrap().any(|entry| {
++        entry
++            .unwrap()
++            .file_name()
++            .to_string_lossy()
++            .starts_with("new-")
++    }));
++    assert_eq!(
++        wire.prompt("after", "owner still usable")["project"]["session_id"],
++        old_id
++    );
++    wire.finish();
++}
++
++fn gate_extension(root: &Path, initial: &mut Agent) -> std::path::PathBuf {
++    use std::os::unix::fs::PermissionsExt;
++    let extensions = root.join("extensions");
++    let gate = extensions.join("gate");
++    fs::create_dir_all(&gate).unwrap();
++    fs::write(gate.join("extension.toml"), "name='gate'\nversion='1.0.0'\napi_version=2\nexecutable='plugin'\nhook_timeout_ms=1000\nhooks=['session_start']\n").unwrap();
++    fs::write(gate.join("plugin.c"), r#"
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++#include <unistd.h>
++int main(void) {
++    char line[65536];
++    if (!fgets(line, sizeof(line), stdin)) return 2;
++    int initialize = strstr(line, "\"method\":\"initialize\"") != NULL;
++    char *id = strstr(line, "\"id\":");
++    char *cap = strstr(line, "\"capability\":{");
++    if (!id || !cap) return 3;
++    unsigned long request = strtoul(id + 5, NULL, 10);
++    cap += 13;
++    char *end = strchr(cap, '}');
++    if (!end) return 4;
++    end[1] = 0;
++    if (initialize && access("block", F_OK) == 0) {
++        FILE *marker = fopen("entered", "w");
++        if (!marker) return 5;
++        fputs("actual initialize process", marker); fclose(marker);
++        while (access("release", F_OK) != 0) usleep(2000);
++    }
++    printf("{\"jsonrpc\":\"2.0\",\"id\":%lu,\"capability\":%s,\"result\":%s}\n", request, cap,
++        initialize ? "{\"api_version\":2,\"hooks\":[\"session_start\"],\"tools\":[]}" : "{\"action\":\"continue\"}");
++    return 0;
++}
++"#).unwrap();
++    assert!(
++        std::process::Command::new("cc")
++            .args(["-O0", "-o"])
++            .arg(gate.join("plugin"))
++            .arg(gate.join("plugin.c"))
++            .status()
++            .unwrap()
++            .success()
++    );
++    fs::set_permissions(gate.join("plugin"), fs::Permissions::from_mode(0o700)).unwrap();
++    // Establish the executable fixture before timing the real host's
++    // cancellable initialize phase. The cold executable launch is diagnostic,
++    // not a successful extension/cancellation or startup-budget observation.
++    let cold = std::time::Instant::now();
++    let probe = std::process::Command::new(gate.join("plugin"))
++        .current_dir(&gate)
++        .stdin(std::process::Stdio::null())
++        .status()
++        .unwrap();
++    eprintln!(
++        "new_fixture_cold_executable_ms={}",
++        cold.elapsed().as_millis()
++    );
++    assert_eq!(probe.code(), Some(2));
++    initial.configure_extensions(&extensions, || false).unwrap();
++    fs::write(gate.join("block"), "").unwrap();
++    gate
++}
++fn wait_file(path: &Path) {
++    let start = std::time::Instant::now();
++    while !path.exists() {
++        assert!(
++            start.elapsed() < Duration::from_secs(2),
++            "gate never reached: {}",
++            path.display()
++        );
++        thread::sleep(Duration::from_millis(2));
++    }
++}
++
++#[test]
++fn actual_extension_preparation_jsonl_cancel_keeps_owner_and_old_port() {
++    let _fixture_guard = EXTENSION_FIXTURE_LOCK.lock().unwrap();
++    let root = tempdir().unwrap();
++    let mut initial = agent(root.path());
++    let old_id = initial.session().session_id().to_owned();
++    let gate = gate_extension(root.path(), &mut initial);
++    let mut wire = Wire::new(initial);
++    wire.send(json!({"schema_version":2,"type":"command","id":"new-cancel","text":"/new"}));
++    wait_file(&gate.join("entered"));
++    wire.send(json!({"schema_version":2,"type":"cancel","id":"cancel","target_id":"new-cancel"}));
++    assert_eq!(wire.response("cancel")["success"], true);
++    let response = wire.response("new-cancel");
++    assert_eq!(response["code"], "backend_cancelled", "{response}");
++    assert_eq!(response["project"]["session_id"], old_id);
++    assert!(!fs::read_dir(root.path()).unwrap().any(|entry| {
++        entry
++            .unwrap()
++            .file_name()
++            .to_string_lossy()
++            .starts_with("new-")
++    }));
++    assert_eq!(
++        wire.prompt("old-next", "still old")["project"]["session_id"],
++        old_id
++    );
++    fs::write(gate.join("release"), "").unwrap();
++    assert_eq!(wire.command("retry", "/new")["success"], true);
++    wire.finish();
++}
++
++#[test]
++fn replaced_candidate_regular_link_and_directory_are_retained_without_switching() {
++    let _fixture_guard = EXTENSION_FIXTURE_LOCK.lock().unwrap();
++    use std::os::unix::fs::symlink;
++    for kind in ["regular", "link", "directory"] {
++        let root = tempdir().unwrap();
++        let mut initial = agent(root.path());
++        let old_id = initial.session().session_id().to_owned();
++        let gate = gate_extension(root.path(), &mut initial);
++        let mut wire = Wire::new(initial);
++        wire.send(json!({"schema_version":2,"type":"command","id":"replace","text":"/new"}));
++        wait_file(&gate.join("entered"));
++        let path = fs::read_dir(root.path())
++            .unwrap()
++            .map(|e| e.unwrap().path())
++            .find(|p| p.file_name().unwrap().to_string_lossy().starts_with("new-"))
++            .unwrap();
++        fs::remove_file(&path).unwrap();
++        let foreign = root.path().join("foreign");
++        fs::write(&foreign, "FOREIGN BODY").unwrap();
++        match kind {
++            "regular" => fs::write(&path, "FOREIGN BODY").unwrap(),
++            "link" => symlink(&foreign, &path).unwrap(),
++            _ => fs::create_dir(&path).unwrap(),
++        }
++        fs::write(gate.join("release"), "").unwrap();
++        let response = wire.response("replace");
++        assert_eq!(response["success"], false, "{kind}: {response}");
++        assert!(
++            response["error"].as_str().unwrap().contains("retained"),
++            "{response}"
++        );
++        assert_eq!(fs::read_to_string(&foreign).unwrap(), "FOREIGN BODY");
++        assert!(fs::symlink_metadata(&path).is_ok());
++        assert_eq!(
++            wire.prompt("still-old", "owner survives foreign candidate")["project"]["session_id"],
++            old_id
++        );
++        wire.finish();
++    }
++}
++
++#[test]
++fn staged_attachment_is_not_dropped_or_moved_by_new() {
++    let root = tempdir().unwrap();
++    fs::write(root.path().join("attachment.txt"), "attachment payload").unwrap();
++    let mut initial = agent(root.path());
++    let old_id = initial.session().session_id().to_owned();
++    initial
++        .stage_attachment(zenpi::backend::InputAttachment {
++            kind: zenpi::backend::AttachmentKind::File,
++            mime_type: "text/plain".into(),
++            path: Some("attachment.txt".into()),
++            url: None,
++            file_id: None,
++        })
++        .unwrap();
++    let mut wire = Wire::new(initial);
++    let response = wire.command("attached", "/new");
++    assert_eq!(response["success"], false, "{response}");
++    assert_eq!(response["project"]["session_id"], old_id);
++    assert!(response["error"].as_str().unwrap().contains("attachments"));
++    wire.finish();
++}
++
++#[test]
++fn exclusive_names_skip_existing_files_links_directories_and_stop_at_limit() {
++    use sha2::{Digest, Sha256};
++    use std::os::unix::fs::{PermissionsExt, symlink};
++    for limit in [false, true] {
++        let root = tempdir().unwrap();
++        let initial = agent(root.path());
++        let old_id = initial.session().session_id().to_owned();
++        let mut normalized =
++            zenpi::protocol::parse_line(r#"{"schema_version":2,"type":"command","text":"/new"}"#)
++                .unwrap();
++        normalized.id = None;
++        let mut hasher = Sha256::new();
++        hasher.update(b"zenpi-headless-request-v1\0");
++        hasher.update(serde_json::to_vec(&normalized).unwrap());
++        let fingerprint = format!("{:x}", hasher.finalize());
++        let digest = format!(
++            "{:x}",
++            Sha256::digest(format!("{old_id}:collision:{fingerprint}").as_bytes())
++        );
++        let name = |i| root.path().join(format!("new-{digest}-{i}.jsonl"));
++        fs::write(name(0), "FOREIGN").unwrap();
++        symlink(name(0), name(1)).unwrap();
++        fs::create_dir(name(2)).unwrap();
++        if limit {
++            for i in 3..16 {
++                fs::write(name(i), "FOREIGN").unwrap();
++            }
++        }
++        let mut wire = Wire::new(initial);
++        let result = wire.command("collision", "/new");
++        assert_eq!(result["success"], !limit, "{result}");
++        if !limit {
++            assert_eq!(
++                result["data"]["new_session_path"],
++                name(3).canonicalize().unwrap().display().to_string()
++            );
++            assert_eq!(
++                fs::metadata(name(3)).unwrap().permissions().mode() & 0o777,
++                0o600
++            );
++        } else {
++            assert!(
++                result["error"]
++                    .as_str()
++                    .unwrap()
++                    .contains("collision limit")
++            );
++        }
++        assert_eq!(fs::read_to_string(name(0)).unwrap(), "FOREIGN");
++        assert!(
++            fs::symlink_metadata(name(1))
++                .unwrap()
++                .file_type()
++                .is_symlink()
++        );
++        assert!(name(2).is_dir());
++        assert_eq!(wire.prompt("next", "still usable")["success"], true);
++        wire.finish();
++    }
++}
++
++#[test]
++fn actual_directory_permission_failure_keeps_old_owner_usable() {
++    use std::os::unix::fs::PermissionsExt;
++    let root = tempdir().unwrap();
++    let mut wire = Wire::new(agent(root.path()));
++    let before = wire.prompt("before", "old prompt");
++    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o500)).unwrap();
++    let failed = wire.command("permission", "/new");
++    fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
++    assert_eq!(
++        failed["success"], false,
++        "must execute as an ordinary user: {failed}"
++    );
++    assert_eq!(
++        wire.prompt("after", "old still usable")["project"]["session_id"],
++        before["project"]["session_id"]
++    );
++    wire.finish();
++}
++
++#[test]
++fn durable_pending_input_and_unknown_operation_are_not_erased() {
++    for unknown in [false, true] {
++        let root = tempdir().unwrap();
++        let mut store =
++            SessionStore::open_in_workspace(root.path().join("initial.jsonl"), root.path())
++                .unwrap();
++        if unknown {
++            store
++                .begin_operation_with_key(
++                    &zenpi::session::InterruptedOperation {
++                        operation_id: "uncertain".into(),
++                        kind: zenpi::session::OperationKind::Tool,
++                        turn_id: "old-turn".into(),
++                        retry_requires_confirmation: true,
++                    },
++                    "uncertain-key",
++                )
++                .unwrap();
++        }
++        drop(store);
++        let mut initial = agent(root.path());
++        if !unknown {
++            initial
++                .input_queue_request(zenpi::protocol::InputQueueRequest {
++                    schema_version: 2,
++                    id: "queued".into(),
++                    kind: "input_queue".into(),
++                    session_id: initial.session().session_id().to_owned(),
++                    input_queue: zenpi::protocol::InputQueueAction::Enqueue {
++                        input_id: "old-followup".into(),
++                        kind: zenpi::input_queue::InputKind::FollowUp,
++                        text: "preserve queued input".into(),
++                    },
++                })
++                .unwrap();
++        }
++        let old = initial.session().session_id().to_owned();
++        let bytes = fs::read(root.path().join("initial.jsonl")).unwrap();
++        let mut wire = Wire::new(initial);
++        let rejected = wire.command("unsettled", "/new");
++        assert_eq!(rejected["success"], false, "{rejected}");
++        assert_eq!(rejected["project"]["session_id"], old);
++        assert!(
++            fs::read(root.path().join("initial.jsonl"))
++                .unwrap()
++                .starts_with(&bytes)
++        );
++        wire.finish();
++    }
++}
+--- a/tools/tui_session_new_smoke.py
++++ b/tools/tui_session_new_smoke.py
+@@ -0,0 +1,621 @@
++#!/usr/bin/env python3
++"""Actual TUI and JSONL /new identity, recovery and cancellation checks."""
++from __future__ import annotations
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import subprocess
++import threading
++import queue
++import signal
++import time
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++from tui_project_workspace_smoke import Terminal
++
++
++def before_smoke(binary, evidence):
++    requests = []
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args):
++            pass
++
++        def do_POST(self):
++            requests.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
++            events = [
++                {'type': 'response.output_text.delta', 'delta': 'OLD_SESSION_REPLY'},
++                {'type': 'response.completed', 'response': {'id': 'old', 'model': 'gpt-4.1', 'status': 'completed'}},
++            ]
++            raw = ''.join('data: ' + json.dumps(e) + '\n\n' for e in events).encode()
++            self.send_response(200)
++            self.send_header('Content-Type', 'text/event-stream')
++            self.send_header('Content-Length', str(len(raw)))
++            self.end_headers()
++            self.wfile.write(raw)
++
++    evidence = evidence.resolve()
++    root = evidence.with_suffix('.fixture') / '工作 space'
++    config = root / 'fixture'
++    for path in (root / 'initial', root / 'sessions', config):
++        path.mkdir(parents=True)
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    threading.Thread(target=server.serve_forever, daemon=True).start()
++    (config / 'config.toml').write_text(
++        f'backend="openai"\nmodel="gpt-4.1"\nbase_url="http://127.0.0.1:{server.server_port}/v1"\n'
++        'wire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n')
++    (config / 'auth.json').write_text('{"OPENAI_API_KEY":"session-new-fixture"}\n')
++    (config / 'auth.json').chmod(0o600)
++    env = {k: v for k, v in os.environ.items()
++           if not k.startswith(('ZENPI_', 'OPENAI_'))
++           and k.lower() not in ('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')}
++    env.update(ZENPI_HOME=str(config), TERM='xterm-256color')
++    result = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
++              'scope': 'before: actual missing /new, not an implementation pass', 'checks': {}}
++    terminal = None
++    try:
++        terminal = Terminal(binary, root, env)
++        terminal.command('OLD_SESSION_SEED')
++        terminal.expect(b'OLD_SESSION_REPLY')
++        terminal.wait(lambda: terminal.draft() == '')
++        session = root / 'sessions/initial.jsonl'
++        original = session.read_bytes()
++        header = json.loads(original.splitlines()[0])
++        terminal.type_text('/new')
++        terminal.deliberate_enter()
++        terminal.expect(b'unknown slash command')
++        terminal.wait(lambda: terminal.draft() == '/new')
++        assert len(requests) == 1
++        assert session.read_bytes().startswith(original)
++        result['checks']['actual_tui_new_missing_preserves_old_owner_and_draft'] = True
++        terminal.close(preserve_draft=True)
++        rows = [{'schema_version': 2, 'id': 'new-before', 'type': 'command', 'text': '/new'},
++                {'schema_version': 2, 'id': 'stop', 'type': 'shutdown'}]
++        run = subprocess.run([str(binary), '--mode', 'headless', '--backend', 'openai', '--session', str(session)],
++                             input=''.join(json.dumps(r) + '\n' for r in rows), capture_output=True,
++                             text=True, cwd=root / 'initial', env=env, timeout=15)
++        evidence.with_suffix('.jsonl.stdout').write_text(run.stdout)
++        evidence.with_suffix('.jsonl.stderr').write_text(run.stderr)
++        assert run.returncode == 0, run.stderr
++        events = [json.loads(line) for line in run.stdout.splitlines() if line]
++        response = next(event for event in events if event.get('id') == 'new-before' and event.get('type') == 'response')
++        assert response['success'] is False and 'unknown' in json.dumps(response).lower(), response
++        assert json.loads(session.read_bytes().splitlines()[0]) == header
++        assert session.read_bytes().startswith(original) and len(requests) == 1
++        result['checks']['actual_jsonl_new_missing_preserves_identity_and_history'] = True
++        result.update(status='observed_missing', response=response, request_count=len(requests), tui_processes=1, jsonl_processes=1)
++    except BaseException as error:
++        result.update(status='fixture_failed', error=repr(error))
++        raise
++    finally:
++        if terminal:
++            terminal.cleanup()
++            evidence.with_suffix('.pty.log').write_bytes(bytes(terminal.output))
++        server.shutdown()
++        server.server_close()
++        evidence.with_suffix('.http.json').write_text(json.dumps(requests, indent=2) + '\n')
++        evidence.write_text(json.dumps(result, indent=2) + '\n')
++    return result
++
++
++class Jsonl:
++    def __init__(self, binary, root, env):
++        self.process = subprocess.Popen([str(binary), '--mode', 'headless', '--session', str(root / 'sessions/initial.jsonl')],
++            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
++            text=True, bufsize=1, cwd=root / 'initial', env=env, start_new_session=True)
++        self.incoming = queue.Queue()
++        self.rows = []
++        self.responses = {}
++        self.errors = []
++        self.reader_error = None
++        def read():
++            try:
++                for line in self.process.stdout:
++                    row = json.loads(line)
++                    self.rows.append(row)
++                    self.incoming.put(row)
++            except BaseException as error:
++                self.reader_error = repr(error)
++            finally:
++                self.incoming.put(None)
++        self.reader = threading.Thread(target=read, daemon=True)
++        self.reader.start()
++        self.error_reader = threading.Thread(
++            target=lambda: self.errors.extend(self.process.stderr.readlines()), daemon=True)
++        self.error_reader.start()
++
++    def kill(self):
++        # All children here belong to this fixture's freshly created group.
++        try:
++            os.killpg(self.process.pid, signal.SIGKILL)
++        except ProcessLookupError:
++            pass
++        self.process.wait(timeout=5)
++        self.reader.join(timeout=2)
++        self.error_reader.join(timeout=2)
++
++    def send(self, id, **payload):
++        self.process.stdin.write(json.dumps(dict(schema_version=2, id=id, **payload)) + '\n')
++        self.process.stdin.flush()
++
++    def response(self, id):
++        if id in self.responses:
++            return self.responses.pop(id)
++        deadline = time.monotonic() + 15
++        while True:
++            remaining = deadline - time.monotonic()
++            assert remaining > 0, ('response deadline', id, self.rows)
++            row = self.incoming.get(timeout=remaining)
++            assert row is not None, ('headless closed before response', id,
++                                     self.rows, self.errors, self.reader_error)
++            if row.get('type') == 'response':
++                if row.get('id') == id:
++                    return row
++                self.responses[row.get('id')] = row
++
++    def command(self, id, text):
++        self.send(id, type='command', text=text)
++        return self.response(id)
++
++    def close(self):
++        if self.process.poll() is None:
++            self.send('fixture-stop', type='shutdown')
++            assert self.response('fixture-stop')['success']
++            self.process.stdin.close()
++            self.process.wait(timeout=10)
++        assert self.process.returncode == 0
++
++
++def after_smoke(binary, evidence):
++    from tui_project_workspace_smoke import screen_text
++    requests, terminals, wires = [], [], []
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args): pass
++        def do_POST(self):
++            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
++            requests.append(body)
++            prompt = next((row.get('content', '') for row in reversed(body.get('input', [])) if row.get('role') == 'user'), '')
++            events = []
++            if 'NEW_TOOL' in str(prompt) and not any(row.get('type') == 'function_call_output' for row in body.get('input', [])):
++                events.append({'type':'response.output_item.done','item':{'type':'function_call', 'call_id':'new-read', 'name':'read_file', 'arguments':json.dumps({'path':'same-cwd.txt'})}})
++            else:
++                events.append({'type':'response.output_text.delta', 'delta':'REPLY_NEW' if 'NEW_' in str(prompt) else 'REPLY_OLD'})
++            events.append({'type':'response.completed','response':{'id':'fixture','model':body['model'],'status':'completed'}})
++            raw = ''.join('data: ' + json.dumps(row) + '\n\n' for row in events).encode()
++            self.send_response(200)
++            self.send_header('Content-Type','text/event-stream')
++            self.send_header('Content-Length', str(len(raw)))
++            self.end_headers()
++            self.wfile.write(raw)
++    evidence = evidence.resolve()
++    root = evidence.with_suffix('.fixture') / '工作 space'
++    config = root / 'fixture'
++    for path in (root / 'initial', root / 'sessions', config): path.mkdir(parents=True)
++    (root / 'initial/same-cwd.txt').write_text('SAME_CANONICAL_PROJECT')
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    threading.Thread(target=server.serve_forever, daemon=True).start()
++    (config / 'config.toml').write_text(
++        f'backend="openai"\nmodel="gpt-4.1"\nbase_url="http://127.0.0.1:{server.server_port}/v1"\n'
++        'wire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n'
++        '[[model_overrides]]\nprovider="openai"\nid="new-reasoner"\nversion="fixture-1"\n'
++        'context_window=64000\nmax_output_tokens=8192\ntext=true\nimages=true\nfiles=true\ntools=true\nstreaming=true\nreasoning_levels=["low","high"]\n')
++    (config / 'auth.json').write_text('{"OPENAI_API_KEY":"session-new-fixture"}\n')
++    (config / 'auth.json').chmod(0o600)
++    env = {k:v for k,v in os.environ.items() if not k.startswith(('ZENPI_','OPENAI_'))
++           and k.lower() not in ('http_proxy','https_proxy','all_proxy','no_proxy')}
++    env.update(ZENPI_HOME=str(config), TERM='xterm-256color')
++    result = {'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(), 'checks':{}}
++    def saved(): return json.loads((config / 'project-tabs.json').read_text())
++    def active():
++        value = saved()
++        return next(row for row in value['project_state'] if row['name'] == value['projects'][value['active']])
++    def session_path(): return Path(active()['metadata']['session_path'])
++    def session_id(): return saved()['session_cursors'][active()['name']]['session_id']
++    def turns(path): return [row for row in map(json.loads,path.read_text().splitlines()) if row['kind'] == 'turn']
++    def terminal():
++        t = Terminal(binary, root, env); terminals.append(t)
++        t.wait(lambda: len(screen_text(bytes(t.output)).splitlines()) > 1 and b'Ready' in screen_text(bytes(t.output)).splitlines()[1])
++        return t
++    def wire():
++        w = Jsonl(binary, root, env); wires.append(w); return w
++    try:
++        t = terminal()
++        t.command('OLD_CONTEXT_MARKER', b'REPLY_OLD')
++        t.wait(lambda: len(turns(session_path())) == 2)
++        t.command('/pane collapse resources')
++        t.wait(lambda: 'resources' in active()['layout']['collapsed'])
++        old_path, old_id, original = session_path(), session_id(), session_path().read_bytes()
++        project, layout, tabs = active()['name'], active()['layout'], saved()['projects']
++        count = len(requests)
++        t.type_text('/new')
++        t.expect(b'start a fresh conversation')
++        t.deliberate_enter()
++        t.wait(lambda: session_id() != old_id and t.draft() == '')
++        new_path, new_id = session_path(), session_id()
++        assert active()['name'] == project and active()['layout'] == layout and saved()['projects'] == tabs
++        assert not turns(new_path) and len(requests) == count
++        assert old_path.read_bytes().startswith(original)
++        assert all('OLD_CONTEXT_MARKER' not in str(row) for row in active()['messages'])
++        result['checks']['actual_tui_menu_new_same_project_empty_history_zero_http'] = True
++        t.command('NEW_TOOL', b'REPLY_NEW')
++        t.wait(lambda: len(requests) == count + 2)
++        assert all('OLD_CONTEXT_MARKER' not in json.dumps(row) and 'REPLY_OLD' not in json.dumps(row) for row in requests[count:])
++        assert 'SAME_CANONICAL_PROJECT' in json.dumps(requests[-1])
++        result['checks']['next_actual_http_has_only_new_context_and_tool_uses_same_cwd'] = True
++        t.close(preserve_draft=True)
++        w = wire()
++        w.send('restored', type='status')
++        assert w.response('restored')['project']['session_id'] == new_id
++        assert w.command('old-open', '/session open ' + json.dumps(str(old_path), ensure_ascii=False))['project']['session_id'] == old_id
++        w.send('old-status', type='status')
++        assert w.response('old-status')['data']['session']['turn_count'] == 2
++        assert old_path.read_bytes().startswith(original)
++        assert w.command('new-open', '/session open ' + json.dumps(str(new_path), ensure_ascii=False))['project']['session_id'] == new_id
++        w.close()
++        result['checks']['independent_jsonl_restore_old_history_and_open_new_again'] = True
++        t = terminal()
++        t.type_text('/model new-reasoner'); t.write(b'\t'); t.deliberate_enter(); t.expect(b'model selected: new-reasoner')
++        t.type_text('/reasoning high'); t.write(b'\t'); t.deliberate_enter(); t.expect(b'reasoning selected: high')
++        t.command('/persona ESFP')
++        t.wait(lambda: t.draft() == '')
++        draft = '保存 Unicode draft\n' + ''.join(f'折叠 row {i}\n' for i in range(140))
++        t.write(b'\x1b[200~' + draft.encode() + b'\x1b[201~')
++        t.wait(lambda: t.draft() != '' and active()['draft'].get('paste_folds'))
++        draft_state, layout = active()['draft'], active()['layout']
++        t.close(preserve_draft=True)
++        w = wire()
++        count = len(requests)
++        response = w.command('durable-new', '/new')
++        assert response['success'], response
++        created = Path(response['data']['new_session_path'])
++        assert len(requests) == count and not turns(created)
++        assert w.command('durable-new','/new') == response
++        assert w.command('durable-new','/status')['code'] == 'request_id_conflict'
++        files = sorted(str(p) for p in (root/'sessions').glob('new-*.jsonl'))
++        w.close()
++        w = wire()
++        assert w.command('durable-new','/new') == response
++        assert sorted(str(p) for p in (root/'sessions').glob('new-*.jsonl')) == files
++        w.close()
++        result['checks']['same_id_and_independent_restart_replay_no_extra_journal_or_http'] = True
++        t = terminal()
++        t.wait(lambda: session_id() == response['data']['new_session_id'])
++        for key in ('input','cursor','paste_folds','next_paste_id'):
++            assert active()['draft'][key] == draft_state[key], (key, active()['draft'], draft_state)
++        assert active()['layout'] == layout
++        assert not active()['messages'] and len(requests) == count
++        events = [row['event'] for row in map(json.loads,created.read_text().splitlines()) if row['kind'] == 'event']
++        assert any(e.get('type') == 'model_selected' and e['model'] == 'new-reasoner' and e['reasoning_effort'] == 'high' for e in events)
++        assert any(e.get('type') == 'persona_selected' and e['persona'] == 'ESFP' for e in events)
++        result['checks']['saved_unicode_fold_draft_layout_preferences_restore_without_autosubmit'] = True
++        t.clear_input()
++        t.command('NEW_PREFERENCES', b'REPLY_NEW')
++        t.wait(lambda: len(requests) == count + 1)
++        assert requests[-1]['model'] == 'new-reasoner' and requests[-1]['reasoning']['effort'] == 'high'
++        result['checks']['restored_model_effort_used_by_actual_http'] = True
++        t.close(preserve_draft=True)
++
++        gate = config / 'extensions/gate'
++        result['fixture_executable_setup_ms'] = install_gate(gate, evidence)
++        t = terminal()
++        stable_id, stable_path = session_id(), session_path()
++        stable_layout, stable_tabs = active()['layout'], saved()['projects']
++        checkpoint = root / 'sessions/project-workspace.json'
++        stable_checkpoint = checkpoint.read_bytes()
++        count = len(requests)
++        journals = set((root / 'sessions').glob('new-*.jsonl'))
++        (gate / 'block').write_text('')
++        t.type_text('/new')
++        t.deliberate_enter()
++        t.wait(lambda: (gate / 'entered').exists(), timeout=2)
++        assert checkpoint.read_bytes() == stable_checkpoint
++        t.write(b'\x03')
++        t.expect(b'Interrupted')
++        t.wait(lambda: t.draft() == '/new')
++        assert session_id() == stable_id and session_path() == stable_path
++        assert checkpoint.read_bytes() == stable_checkpoint
++        assert active()['layout'] == stable_layout and saved()['projects'] == stable_tabs
++        assert set((root / 'sessions').glob('new-*.jsonl')) == journals
++        assert len(requests) == count
++        (gate / 'block').unlink()
++        (gate / 'release').write_text('')
++        t.clear_input()
++        t.command('NEW_AFTER_TUI_CANCEL', b'REPLY_NEW')
++        t.wait(lambda: len(requests) == count + 1 and t.draft() == '')
++        assert session_id() == stable_id
++        result['checks']['actual_tui_ctrl_c_before_commit_restores_command_owner_layout_and_next_http'] = True
++
++        # A second real JSONL owner commits while the TUI's prepared candidate
++        # is waiting. The first host must reject its stale checkpoint proposal.
++        for name in ('entered', 'release'):
++            (gate / name).unlink(missing_ok=True)
++        (gate / 'block').write_text('')
++        journals = set((root / 'sessions').glob('new-*.jsonl'))
++        count = len(requests)
++        t.type_text('/new')
++        t.deliberate_enter()
++        t.wait(lambda: (gate / 'entered').exists(), timeout=2)
++        candidate = set((root / 'sessions').glob('new-*.jsonl')) - journals
++        assert len(candidate) == 1
++        # The already running extension waits on release; newly initialized
++        # processes can proceed after removing block.
++        (gate / 'block').unlink()
++        w = wire()
++        competing = w.command('second-writer-new', '/new')
++        assert competing['success'], competing
++        competing_checkpoint = checkpoint.read_bytes()
++        assert competing['data']['old_session_id'] == stable_id
++        assert len(requests) == count
++        w.close()
++        (gate / 'release').write_text('')
++        t.expect(b'checkpoint changed in another host')
++        t.wait(lambda: t.draft() == '/new')
++        assert all(not path.exists() for path in candidate)
++        assert checkpoint.read_bytes() == competing_checkpoint
++        assert session_id() == stable_id and active()['layout'] == stable_layout
++        t.clear_input()
++        t.command('NEW_AFTER_CONCURRENT_COMMIT', b'REPLY_NEW')
++        t.wait(lambda: len(requests) == count + 1 and t.draft() == '')
++        assert session_id() == stable_id
++        t.close(preserve_draft=True)
++        assert checkpoint.read_bytes() == competing_checkpoint
++        w = wire()
++        assert w.command('second-writer-new', '/new') == competing
++        w.close()
++        result['checks']['actual_second_headless_writer_wins_cas_first_tui_owner_remains_usable'] = True
++        result.update(status='passed', tui_processes=len(terminals), jsonl_processes=len(wires), request_count=len(requests))
++    except BaseException as error:
++        result.update(status='failed', error=repr(error))
++        raise
++    finally:
++        gate = config / 'extensions/gate'
++        if gate.is_dir():
++            (gate / 'block').unlink(missing_ok=True)
++            (gate / 'release').write_text('')
++        for t in terminals:
++            t.cleanup()
++        for w in wires:
++            if w.process.poll() is None: w.kill()
++        server.shutdown(); server.server_close()
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.http.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2)+'\n')
++        evidence.with_suffix('.jsonl.json').write_text(json.dumps([w.rows for w in wires],ensure_ascii=False,indent=2)+'\n')
++        evidence.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
++    return result
++
++
++def install_gate(gate, evidence):
++    gate.mkdir(parents=True, exist_ok=True)
++    (gate / 'plugin.c').write_text(r'''
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++#include <unistd.h>
++int main(void) {
++char line[65536];
++if (!fgets(line, sizeof(line), stdin)) return 2;
++int initialize = strstr(line, "\"method\":\"initialize\"") != NULL;
++char *id = strstr(line, "\"id\":");
++char *cap = strstr(line, "\"capability\":{");
++if (!id || !cap) return 3;
++unsigned long request = strtoul(id + 5, NULL, 10);
++cap += 13;
++char *end = strchr(cap, '}');
++if (!end) return 4;
++end[1] = 0;
++if (initialize && access("block", F_OK) == 0) {
++    FILE *marker = fopen("entered", "w");
++    if (!marker) return 5;
++    fprintf(marker, "%ld", (long)getpid()); fclose(marker);
++    while (access("release", F_OK) != 0) usleep(2000);
++}
++printf("{\"jsonrpc\":\"2.0\",\"id\":%lu,\"capability\":%s,\"result\":%s}\n", request, cap,
++    initialize ? "{\"api_version\":2,\"hooks\":[\"session_start\"],\"tools\":[]}" : "{\"action\":\"continue\"}");
++return 0;
++}
++''')
++    compiled = subprocess.run(['cc', '-O0', '-o', str(gate / 'plugin'), str(gate / 'plugin.c')],
++                              capture_output=True, text=True, timeout=30)
++    evidence.with_suffix('.cc.log').write_text(compiled.stdout + compiled.stderr)
++    assert compiled.returncode == 0
++    cold = time.monotonic()
++    warm = subprocess.run([str(gate / 'plugin')], stdin=subprocess.DEVNULL,
++                          capture_output=True, timeout=10)
++    elapsed_ms = (time.monotonic() - cold) * 1000
++    assert warm.returncode == 2
++    (gate / 'extension.toml').write_text(
++        "name='gate'\nversion='1.0.0'\napi_version=2\nexecutable='plugin'\n"
++        "hook_timeout_ms=1000\nhooks=['session_start']\n")
++    return elapsed_ms
++
++
++def recovery_smoke(binary, evidence):
++    """Kill actual CLI process groups on either side of the owner checkpoint.
++
++    The extension gate only delays real initialization. No production commit,
++    response, journal or filesystem operation is mocked.
++    """
++    evidence = evidence.resolve()
++    root = evidence.with_suffix('.fixture') / '恢复 project'
++    config = root / 'fixture'
++    gate = config / 'extensions/gate'
++    for path in (root / 'initial', root / 'sessions', gate):
++        path.mkdir(parents=True)
++    requests, wires = [], []
++
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args): pass
++        def do_POST(self):
++            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
++            requests.append(body)
++            events = [{'type': 'response.output_text.delta', 'delta': 'RECOVERY_HTTP_OK'},
++                      {'type': 'response.completed', 'response': {
++                          'id': 'recovery', 'model': body['model'], 'status': 'completed'}}]
++            raw = ''.join('data: ' + json.dumps(row) + '\n\n' for row in events).encode()
++            self.send_response(200)
++            self.send_header('Content-Type', 'text/event-stream')
++            self.send_header('Content-Length', str(len(raw)))
++            self.end_headers()
++            self.wfile.write(raw)
++
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    threading.Thread(target=server.serve_forever, daemon=True).start()
++    (config / 'config.toml').write_text(
++        f'backend="openai"\nmodel="gpt-4.1"\nbase_url="http://127.0.0.1:{server.server_port}/v1"\n'
++        'wire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n')
++    (config / 'auth.json').write_text('{"OPENAI_API_KEY":"recovery-fixture"}\n')
++    (config / 'auth.json').chmod(0o600)
++    env = {k: v for k, v in os.environ.items()
++           if not k.startswith(('ZENPI_', 'OPENAI_'))
++           and k.lower() not in ('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')}
++    env.update(ZENPI_HOME=str(config), TERM='xterm-256color')
++    result = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
++              'checks': {}, 'scope': 'macOS/Unix actual CLI process recovery; not full ZS1-132 acceptance'}
++    checkpoint = root / 'sessions/project-workspace.json'
++    def checkpoint_bytes(): return checkpoint.read_bytes() if checkpoint.exists() else None
++    def wait(predicate, seconds=5):
++        deadline = time.monotonic() + seconds
++        while not predicate():
++            assert time.monotonic() < deadline, 'condition deadline'
++            time.sleep(.002)
++    def wire():
++        w = Jsonl(binary, root, env)
++        wires.append(w)
++        return w
++    def status(w, id):
++        w.send(id, type='status')
++        response = w.response(id)
++        assert response['success'], response
++        return response
++    def prompt(w, id):
++        count = len(requests)
++        w.send(id, type='prompt', text=id)
++        response = w.response(id)
++        assert response['success'] and len(requests) == count + 1, response
++        return response
++    def block(w, id):
++        for name in ('entered', 'release'):
++            (gate / name).unlink(missing_ok=True)
++        (gate / 'block').write_text('')
++        existing = set((root / 'sessions').glob('new-*.jsonl'))
++        w.send(id, type='command', text='/new')
++        wait(lambda: (gate / 'entered').exists(), seconds=2)
++        fresh = set((root / 'sessions').glob('new-*.jsonl')) - existing
++        assert len(fresh) == 1, fresh
++        return fresh.pop()
++    def unblock():
++        (gate / 'block').unlink(missing_ok=True)
++        (gate / 'release').write_text('')
++    try:
++        result['fixture_executable_setup_ms'] = install_gate(gate, evidence)
++        w = wire()
++        old = prompt(w, 'BEFORE_CRASH_SEED')
++        old_id = old['project']['session_id']
++        original_path = root / 'sessions/initial.jsonl'
++        original = original_path.read_bytes()
++        before = checkpoint_bytes()
++        count = len(requests)
++        orphan = block(w, 'precommit-crash')
++        assert checkpoint_bytes() == before
++        assert not any(row.get('event', {}).get('type') == 'session_new_transition'
++                       for row in map(json.loads, orphan.read_text().splitlines()))
++        w.kill()
++        assert w.process.returncode == -signal.SIGKILL
++        unblock()
++        assert checkpoint_bytes() == before and len(requests) == count
++        w = wire()
++        assert status(w, 'precommit-recovered')['project']['session_id'] == old_id
++        assert prompt(w, 'AFTER_PRECOMMIT_CRASH')['project']['session_id'] == old_id
++        assert original_path.read_bytes().startswith(original)
++        result['checks']['actual_precommit_sigkill_restores_old_owner_and_next_http'] = True
++        result['uncommitted_crash_candidate'] = str(orphan)
++
++        # Do not consume a response: the checkpoint itself is the observable
++        # commit point. Kill the independent process as soon as it changes.
++        before = checkpoint_bytes()
++        count = len(requests)
++        w.send('postcommit-crash', type='command', text='/new')
++        wait(lambda: checkpoint_bytes() != before)
++        committed = checkpoint_bytes()
++        mapping = json.loads(committed)
++        new_path = Path(mapping['sessions'][old['project']['project_id']])
++        new_id = json.loads(new_path.read_text().splitlines()[0])['session_id']
++        w.kill()
++        assert w.process.returncode == -signal.SIGKILL and len(requests) == count
++        files = sorted(str(path) for path in (root / 'sessions').glob('new-*.jsonl'))
++        w = wire()
++        assert status(w, 'postcommit-recovered')['project']['session_id'] == new_id
++        replay = w.command('postcommit-crash', '/new')
++        assert replay['success'] and replay['data']['new_session_id'] == new_id, replay
++        assert w.command('postcommit-crash', '/new') == replay
++        assert w.command('postcommit-crash', '/status')['code'] == 'request_id_conflict'
++        assert sorted(str(path) for path in (root / 'sessions').glob('new-*.jsonl')) == files
++        assert len(requests) == count and checkpoint_bytes() == committed
++        assert prompt(w, 'AFTER_POSTCOMMIT_CRASH')['project']['session_id'] == new_id
++        result['checks']['actual_postcommit_sigkill_restores_new_owner_and_replays_once'] = True
++
++        # Force a real post-commit replay-open error, retaining the transition
++        # journal. Removing this fixture-owned obstruction permits recovery.
++        count = len(requests)
++        before = checkpoint_bytes()
++        failed_path = block(w, 'replay-open-failure')
++        obstruction = Path(str(failed_path) + '.reconnect')
++        obstruction.mkdir()
++        unblock()
++        w.process.wait(timeout=10)
++        w.reader.join(timeout=2)
++        w.error_reader.join(timeout=2)
++        assert w.process.returncode != 0
++        assert 'created and committed' in ''.join(w.errors), w.errors
++        assert checkpoint_bytes() != before and obstruction.is_dir()
++        assert not any(row.get('id') == 'replay-open-failure' and row.get('success') is False
++                       for row in w.rows), w.rows
++        transition = next(row['event'] for row in map(json.loads, failed_path.read_text().splitlines())
++                          if row.get('event', {}).get('type') == 'session_new_transition')
++        assert transition['request_id'] == 'replay-open-failure'
++        assert len(requests) == count
++        obstruction.rmdir()
++        files = sorted(str(path) for path in (root / 'sessions').glob('new-*.jsonl'))
++        w = wire()
++        recovered = w.command('replay-open-failure', '/new')
++        assert recovered['success'] and recovered['data'] == transition['data'], recovered
++        assert w.command('replay-open-failure', '/new') == recovered
++        assert len(requests) == count
++        assert sorted(str(path) for path in (root / 'sessions').glob('new-*.jsonl')) == files
++        assert prompt(w, 'AFTER_REPLAY_FAILURE')['project']['session_id'] == recovered['data']['new_session_id']
++        w.close()
++        result['checks']['actual_replay_open_failure_reports_commit_and_recovers_same_receipt'] = True
++        result.update(status='passed', jsonl_processes=len(wires), request_count=len(requests))
++    except BaseException as error:
++        result.update(status='failed', error=repr(error))
++        raise
++    finally:
++        unblock()
++        for w in wires:
++            if w.process.poll() is None:
++                w.kill()
++        server.shutdown()
++        server.server_close()
++        evidence.with_suffix('.http.json').write_text(json.dumps(requests, ensure_ascii=False, indent=2) + '\n')
++        evidence.with_suffix('.jsonl.json').write_text(json.dumps(
++            [{'pid': w.process.pid, 'returncode': w.process.returncode, 'rows': w.rows,
++              'stderr': w.errors, 'reader_error': w.reader_error} for w in wires],
++            ensure_ascii=False, indent=2) + '\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
++    return result
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--binary', required=True, type=Path)
++    parser.add_argument('--evidence', type=Path, default=Path('.ops/session-new-result.json'))
++    parser.add_argument('--before-only', action='store_true')
++    parser.add_argument('--recovery-only', action='store_true')
++    args = parser.parse_args()
++    parser.error('--before-only and --recovery-only are mutually exclusive') if args.before_only and args.recovery_only else None
++    operation = before_smoke if args.before_only else recovery_smoke if args.recovery_only else after_smoke
++    print(json.dumps(operation(args.binary.resolve(), args.evidence), indent=2))
++
++
++if __name__ == '__main__':
++    main()

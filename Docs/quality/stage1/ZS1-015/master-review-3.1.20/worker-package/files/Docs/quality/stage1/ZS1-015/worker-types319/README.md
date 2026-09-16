@@ -1,0 +1,11 @@
+# ZS1-015 pure single-source review / 3.1.19
+
+Only Pi source reviewed: packages/ai/src/types.ts, 37411 bytes, 881 lines, SHA f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0. Read ranges [0,8064), [8064,15965), [15965,28201), [28201,37411) concatenate byte-exactly. 72 named type/interface declarations plus the type-only re-export are accounted for. Target reference evidence contains five Zenpi files and ten excerpts, not directory acceptance.
+
+Report owned path: Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md. Main baseline report was absent; local inherited historical report is preserved as prior-local-report.md and not reused as current evidence. The frozen patch adds the final report to main; it does not modify runtime source, selectors, checkmarks, or prior packages.
+
+verify_source.py checks frozen identity, byte coverage, inventory, target excerpts and the actual G-FILE check_ranges/artifact functions. source-verified-final receipt is integrity/structure evidence only. No TypeScript compiler execution, source consumer runtime tests, provider requests, process-termination tests or depth probes were performed for this task. The earlier source-verified receipt binds the report before the final G-STAGE outcome paragraph; it remains preserved, while final receipt binds final bytes.
+
+Actual G-STAGE against read-only main: structural.ok=true; exit1 solely because ZS1-015.master.json is absent. No master receipt fabricated. Original logs are retained and not converted to a pass. Main must independently review and accept.
+
+Depth work has stopped by main instruction. depth-work-locations.json only lists already-existing candidate/evidence paths and hashes. Unfrozen depth candidate is incomplete and unaccepted; its latest prescribed-after log reports 22 search passes and 4 failures, not investigated further. public_fifo.py was never run. No depth artifacts are incorporated as product changes in this source-review package.

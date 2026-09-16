@@ -1,0 +1,8 @@
+{
+  "before-build": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "before-tests": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "after-tests": "06668033dafd0351f7c915d5786a7b7af8769e010cb39699e753244077a936ae",
+  "direct-interpreter-tests": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+  "fixture-fmt": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+  "negative-startup-delay-tests": "8ef7815b075ed49bb694856bd550d2d7690da1bfe40e6d449b0ae6ced4405743"
+}

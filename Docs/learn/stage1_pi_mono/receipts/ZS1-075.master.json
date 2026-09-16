@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-075",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-075",
+  "source_path": "src/backend.rs",
+  "source_hash": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357",
+  "read_ranges": [
+    [
+      0,
+      98741
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/backend.rs_learn.md",
+      "bytes": 2752,
+      "sha256": "3635916e82b2f4a73bb5b6a0a4ccbd267dfd5b6a26c62c5b2de0b65f283b6bf7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-075/master-review-current/review.md",
+      "bytes": 467,
+      "sha256": "81a168180b2e22dcb5b2aa5833b09598584c4282d63afaf07a19c100a481d56b"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-075/master-review-current/review.md",
+      "bytes": 467,
+      "sha256": "81a168180b2e22dcb5b2aa5833b09598584c4282d63afaf07a19c100a481d56b"
+    },
+    "findings": "完整读取 backend.rs，覆盖 normalized backend、Chat/Responses transport、retry/circuit/cancel、attachments、response/tool parsing、capability 与 fail-closed errors。"
+  }
+}

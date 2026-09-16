@@ -1,0 +1,37 @@
+{
+  "subject": "src/extension_runtime.rs",
+  "whole_file_read": true,
+  "source_sha256": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "chunks": [
+    {
+      "first_line": 1,
+      "last_line": 300,
+      "bytes": 9756,
+      "sha256": "3c9652999195e362615c25647b5a39314318bd9c05f696fb182c5a92c0f414d6",
+      "continuously_read": true
+    },
+    {
+      "first_line": 301,
+      "last_line": 600,
+      "bytes": 10199,
+      "sha256": "0ad4dea13fa45e24ddb1a1b5c5ccd0b71dafe47e06dfcd9ba62e1bdeca97fb19",
+      "continuously_read": true
+    },
+    {
+      "first_line": 601,
+      "last_line": 900,
+      "bytes": 10670,
+      "sha256": "01f063a9dc8b49c399aee918922785c2a6a504a9d26f63f0df65a5fc10b70dd8",
+      "continuously_read": true
+    },
+    {
+      "first_line": 901,
+      "last_line": 1141,
+      "bytes": 9459,
+      "sha256": "d7255b6aacaf6c664b65445b259ed7c52d0df82adf4787fc7ded878d744fb186",
+      "continuously_read": true
+    }
+  ],
+  "historical_log_full_read": true,
+  "other_build_context": "Compilation context only; no other-owner semantic acceptance"
+}

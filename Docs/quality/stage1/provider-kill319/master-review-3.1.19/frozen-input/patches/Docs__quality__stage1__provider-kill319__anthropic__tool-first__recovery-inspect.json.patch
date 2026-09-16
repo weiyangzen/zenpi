@@ -1,0 +1,42 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/tool-first/recovery-inspect.json b/Docs/quality/stage1/provider-kill319/anthropic/tool-first/recovery-inspect.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/tool-first/recovery-inspect.json
+@@ -0,0 +1,37 @@
++{
++  "project": {
++    "project_id": "ecd677010f548d0883b01e306898fa4f2d92816d8ea9c3565b3e657968fc11f3",
++    "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/anthropic/tool-first",
++    "session_id": "session-1789189811224-56815-0"
++  },
++  "schema_version": 2,
++  "id": "inspect",
++  "type": "response",
++  "command": "recovery",
++  "success": true,
++  "data": {
++    "accepted": true,
++    "action": {
++      "action": "inspect"
++    },
++    "automatic_retry": false,
++    "command": "recovery",
++    "execution_started": false,
++    "new_attempt_required": false,
++    "operations": [
++      {
++        "idempotency_key": "provider-c2f761d503e936e2b4b9cb761bd9c5dbdea58687f52bbf8a4a17f27a7f6d2709",
++        "kind": "provider",
++        "operation_id": "provider-turn-1789189811251-1",
++        "retry_requires_confirmation": true,
++        "state": "unknown_outcome",
++        "turn_id": "turn-1789189811251-1"
++      }
++    ],
++    "pending_count": 1,
++    "route": "local",
++    "tools": [],
++    "truncated": false
++  },
++  "code": "ok"
++}

@@ -1,0 +1,115 @@
+{
+  "item": "ZS1-098",
+  "ready": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready",
+  "owned_paths": [
+    "Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.lock_learn.md"
+  ],
+  "payload_regular": 61,
+  "all_regular": 62,
+  "identities": {
+    "manifest": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/manifest.json",
+      "bytes": 10594,
+      "lines": 319,
+      "sha256": "023da349ffef4049db88dc5d94a18c96bed76f7ea7d57240e008362d2e00b6b5"
+    },
+    "report": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.lock_learn.md",
+      "bytes": 53446,
+      "lines": 487,
+      "sha256": "fa9e7fabcba0d878afbab49a112dd71a66c270dbddd88d53e52c0af7b258fd8c"
+    },
+    "report.patch": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/report.patch",
+      "bytes": 54037,
+      "lines": 490,
+      "sha256": "aeb398781c8991720924d67fa3210083a8112ccbcaf8a1b19a8ab32e884f7392"
+    },
+    "rollback.patch": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/rollback.patch",
+      "bytes": 54037,
+      "lines": 490,
+      "sha256": "e0a3db43cbb8d713122c93441e608556c0caae15103dbd025f3af89585328d2d"
+    },
+    "worker-report.patch": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/worker-report.patch",
+      "bytes": 43010,
+      "lines": 290,
+      "sha256": "9d19f0559dc81435b5af6c39117f725ee46ecc97dab69b90d9e0dfe4df82c861"
+    },
+    "worker-rollback.patch": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/worker-rollback.patch",
+      "bytes": 43010,
+      "lines": 290,
+      "sha256": "f70d3a7e33a298a4d51c9366670b05944c50ce3e3caa836e579c688a97fa393e"
+    },
+    "verify.py": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/verify.py",
+      "bytes": 13446,
+      "lines": 94,
+      "sha256": "af6d8fea3da205fc52f4d06a750e55e7482886cdec09e5a879ce134332c408cb"
+    },
+    "auditor-static-review.json": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready/auditor-static-review.json",
+      "bytes": 499,
+      "lines": 18,
+      "sha256": "3eed5a0d09fa2c789a72dc7d7e3c8d6d0d50f1928d7d1055c0c23f41de5aeb7b"
+    },
+    "auditor-once.log": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321/auditor-once.log",
+      "bytes": 42819,
+      "lines": 860,
+      "sha256": "eb93145df5bce2d2fc8ddb8de71d63acd33510292bb639242fd7570548045b55"
+    },
+    "auditor-once-receipt.json": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321/auditor-once-receipt.json",
+      "bytes": 584,
+      "lines": 19,
+      "sha256": "6419c9cd2bd3b3a4cbe76a1b6e93902820e230f59e6ba79aee351c07c6f82fb4"
+    }
+  },
+  "audit": {
+    "start": "2026-09-13T03:22:15.881694+00:00",
+    "end": "2026-09-13T03:22:16.052235+00:00",
+    "exit_code": 0,
+    "frozen_auditor_runs": 1,
+    "ready": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321-ready",
+    "log": {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target098-lock321/auditor-once.log",
+      "bytes": 42819,
+      "lines": 860,
+      "sha256": "eb93145df5bce2d2fc8ddb8de71d63acd33510292bb639242fd7570548045b55"
+    },
+    "summary": {
+      "checks": 859,
+      "failed": 0,
+      "structural_only": true,
+      "runtime_execution": false
+    }
+  },
+  "preservation": {
+    "old_ready_count": 110,
+    "old_regular_count": 33592,
+    "tracked_count": 145,
+    "external_regular_count": 0,
+    "inherited_report_unchanged": true,
+    "differences": []
+  },
+  "preparation_issues": [
+    {
+      "script": "capture.py",
+      "exit_code": 1,
+      "error": "FileNotFoundError: missing new history directory before inherited report copy",
+      "raw_log": "capture-failure.log",
+      "recovery": "new finish-capture.py continues from preserved captures; original capture.py not rerun or changed",
+      "frozen_auditor_execution": false
+    }
+  ],
+  "master_state": "[_]",
+  "product_or_network_runs": 0,
+  "external_files": [
+    "auditor-once.log",
+    "auditor-once-receipt.json",
+    "delivery.json"
+  ]
+}

@@ -1,0 +1,39 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -50,13 +50,32 @@
+         run: python3 tools/check_rust_loc.py
+ 
+       - name: Run runtime and size budget gate
+-        run: python3 tools/bench_runtime.py --samples 3 --output /tmp/zenpi-runtime-budget.json
++        id: runtime_budget
++        shell: bash
++        env:
++          BUDGET_EVIDENCE_DIR: ${{ runner.temp }}/zenpi-runtime-budget-${{ github.run_id }}-${{ github.run_attempt }}
++        run: |
++          mkdir "$BUDGET_EVIDENCE_DIR"
++          set +e
++          python3 tools/bench_runtime.py --samples 3 \
++            --output "$BUDGET_EVIDENCE_DIR/summary.json" \
++            --startup-evidence-dir "$BUDGET_EVIDENCE_DIR/startup" \
++            2>&1 | tee "$BUDGET_EVIDENCE_DIR/budget.log"
++          budget_status=("${PIPESTATUS[@]}")
++          set -e
++          printf '%s\n' "${budget_status[0]}" > "$BUDGET_EVIDENCE_DIR/exit-code.txt"
++          if [ "${budget_status[0]}" -ne 0 ]; then
++            exit "${budget_status[0]}"
++          fi
++          exit "${budget_status[1]}"
+ 
+       - name: Upload runtime budget receipt
++        if: ${{ always() && steps.runtime_budget.outcome != 'skipped' }}
+         uses: actions/upload-artifact@v4
+         with:
+-          name: zenpi-runtime-budget-${{ github.run_id }}
+-          path: /tmp/zenpi-runtime-budget.json
++          name: zenpi-runtime-budget-${{ github.run_id }}-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/zenpi-runtime-budget-${{ github.run_id }}-${{ github.run_attempt }}
++          if-no-files-found: error
+ 
+       - name: Check two-mode boundary
+         run: python3 tools/check_modes.py

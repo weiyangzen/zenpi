@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/usr/bin/sandbox-exec",
+    "-f",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-pty-3.1.20/offline-selfcheck/sandbox.sb",
+    "/bin/cat",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-pty-3.1.20/offline-selfcheck/outside-fixture.txt"
+  ],
+  "exit_code": 1,
+  "expected_exit_code": 1,
+  "no_PTY_HTTP_Cargo": true
+}

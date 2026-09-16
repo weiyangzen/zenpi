@@ -1,0 +1,125 @@
+{
+  "artifacts": [
+    {
+      "bytes": 50912,
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/extensions/types.ts_learn.md",
+      "sha256": "e14d2c4437ac989fb9c5d8ef8d9c4570da50c9914a03952662862013fa9427ad"
+    },
+    {
+      "bytes": 6580,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/accept.py",
+      "sha256": "7790c18cd57ea02a5fe7fcdea57d43ff9b5a87ea82b9708b6525d3585160a523"
+    },
+    {
+      "bytes": 1086,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/additional-context.json",
+      "sha256": "c3ad1f3a1825accd85b71cbc90b4907f238eb868de106dba3af0294243186eb0"
+    },
+    {
+      "bytes": 1345,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/append.md",
+      "sha256": "e725e7b600f396aa9261fad8acb7b37d5d989653528737267eb42794f713b77c"
+    },
+    {
+      "bytes": 4369,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/current-context.json",
+      "sha256": "b5b02556fd55fb33d6814e7639d93d34615da149d7ea3b8242f0c1d2250c29d4"
+    },
+    {
+      "bytes": 1133,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/extension_runtime.rs.641-685.txt",
+      "sha256": "28ef3be08be18b32a9437415a8eefbc663b5e90d61d22389ef653fe6195d9ade"
+    },
+    {
+      "bytes": 1353,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/final-report-checks.json",
+      "sha256": "b5a883770f00c5a1e2d9f1e1c7410388008ab46e29cb6e0b61127c7140fa5f32"
+    },
+    {
+      "bytes": 50912,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/final-report.md",
+      "sha256": "e14d2c4437ac989fb9c5d8ef8d9c4570da50c9914a03952662862013fa9427ad"
+    },
+    {
+      "bytes": 51231,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/final-report.patch",
+      "sha256": "aab469071d1e3d9b1e0e9af29c3330678d9525c989819cc501d4e782cd679b1c"
+    },
+    {
+      "bytes": 2883,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/loader.ts.175-242.txt",
+      "sha256": "7bc07ae35a942da129c498eebd4f8dad6fdcef3781f85b8dd782d1d0cb31d978"
+    },
+    {
+      "bytes": 1105,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/offline-verification.log",
+      "sha256": "3c47cad21376a0d11356050de84b66764eb97ba297e4f7cd4645bcef27acb60e"
+    },
+    {
+      "bytes": 377,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/offline-verification.run.json",
+      "sha256": "f7a0e8f3bc7e3f307cfd554fc51c6adc5b34e3cd6ea225e89444edde8fde62d1"
+    },
+    {
+      "bytes": 7112,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/review.md",
+      "sha256": "0121eccafe4347ad79c6c45d006bc40a0e231ea35d623fb28c941900bdba991b"
+    },
+    {
+      "bytes": 117,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/runner.ts.613-617.txt",
+      "sha256": "450315ca1fa2eb999613e6fff4b2e16b105900537e82366d91b60ac9d775e117"
+    },
+    {
+      "bytes": 674,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/source-read.json",
+      "sha256": "48b8d2921dfe46bbbdec483c55759697621021d3d4861c0d72c2fc0b098e4614"
+    },
+    {
+      "bytes": 7164,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/worker-manifest.json",
+      "sha256": "479214a4b74915116bd670b94558afdf608017454bd485b0ed1148c8f5ad299e"
+    },
+    {
+      "bytes": 179984,
+      "path": "Docs/quality/stage1/ZS1-022/master-review-3.1.20/worker-ready.tar.gz",
+      "sha256": "02de4179dee83c7e474a082640a3a3dc095ae8b1eb8bee35feeefde02b8d2ab6"
+    },
+    {
+      "bytes": 2829,
+      "path": "Docs/quality/stage1/ZS1-022/master-rebind-3.1.21/review.md",
+      "sha256": "3cf6ed08ad1fcd9767d90a995638b73f7fe6c3a6e155ea136239ae4406500504"
+    }
+  ],
+  "attempt_id": "source022-current-3.1.20",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "item_id": "ZS1-022",
+  "read_ranges": [
+    [
+      0,
+      16483
+    ],
+    [
+      16483,
+      31020
+    ],
+    [
+      31020,
+      46547
+    ],
+    [
+      46547,
+      63623
+    ]
+  ],
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "reviewer": "worker-A source candidate with controller appended qualification",
+  "role": "worker",
+  "run_id": "zenpi-stage1-20260911",
+  "schema_version": "stage1-receipt/v1",
+  "source_hash": "96e20f8038027f0b0172f311b6b9d9ddf42123b2f5b2a018f533af026fd3371e",
+  "source_path": "packages/coding-agent/src/core/extensions/types.ts",
+  "validators": "G-FILE；G-STAGE --item ZS1-022"
+}

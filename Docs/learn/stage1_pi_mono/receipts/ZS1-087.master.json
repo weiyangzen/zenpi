@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-087",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-087",
+  "source_path": "src/slash_actions.rs",
+  "source_hash": "413a1ddba252ef2d435459af257cefa0cf45ef4c0b6ff9007b0b1454d69a8e9d",
+  "read_ranges": [
+    [
+      0,
+      76441
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/slash_actions.rs_learn.md",
+      "bytes": 1802,
+      "sha256": "515a288f978dd2fb028867e5648044ab0e94984d99231da0d2da2fda61d2d9f6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-087/master-review-current/review.md",
+      "bytes": 390,
+      "sha256": "2110dd0ea100579244088e91dc7e884557365a80e6f5f067875dd29de11864cf"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-087/master-review-current/review.md",
+      "bytes": 390,
+      "sha256": "2110dd0ea100579244088e91dc7e884557365a80e6f5f067875dd29de11864cf"
+    },
+    "findings": "完整读取 slash_actions.rs，覆盖 slash/TUI/headless owner、bounded cancellable diff、binary/untracked handling 与安全 attachment staging。"
+  }
+}

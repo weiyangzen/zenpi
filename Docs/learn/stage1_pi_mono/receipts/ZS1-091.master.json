@@ -1,0 +1,45 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-091",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-DIR；G-STAGE --item ZS1-091",
+  "scope": "target",
+  "folder_path": ".",
+  "children": [
+    "ZS1-090",
+    "ZS1-093",
+    "ZS1-097",
+    "ZS1-098",
+    "ZS1-405",
+    "ZS1-406"
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/current_folder_learn.md",
+      "bytes": 1784,
+      "sha256": "8e2de362def2bea928c3eeab56f953b6f7a3e10791f2be0674290c077fd6b575"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-091/master-review-current/review.md",
+      "bytes": 402,
+      "sha256": "f8d1c27220390a22631ba1b9dfe517c5748543cf8f4d690aa0be99533fb6ac27"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-091/master-review-current/review.md",
+      "bytes": 402,
+      "sha256": "f8d1c27220390a22631ba1b9dfe517c5748543cf8f4d690aa0be99533fb6ac27"
+    },
+    "findings": "跨 root 生产源、测试、vendor、Cargo、workflow 与 Docs evidence 边界完成整合核对。"
+  }
+}

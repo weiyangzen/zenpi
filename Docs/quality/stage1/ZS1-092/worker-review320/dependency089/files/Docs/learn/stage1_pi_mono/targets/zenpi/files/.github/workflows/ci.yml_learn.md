@@ -1,0 +1,136 @@
+# ZS1-089 — .github/workflows/ci.yml
+
+Worker candidate: [_]. learn_mode: understand. Main semantic review required. Authority3.1.16 / requirement digest `c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f`.
+
+source_path `.github/workflows/ci.yml`; original blueprint and current read-only main are both2480bytes/77lines, SHA256 `5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6`. All77lines were read sequentially, including every blank/comment, trigger, permission/concurrency field and each of16steps. The current bytes equal the frozen blueprint hash, so the original content is preserved identically rather than replaced by a newer CI description. No prior local/main report existed. Exact byte interval/capture time are in worker-owner-review/input-manifest.json. Main reports116 integrated/production checks passed;122 remains scratch-only. Workflow bytes do not change merely because other owners' code changes.
+
+## Triggers, execution boundary and every step
+
+Lines1–5 name the workflow zenpi CI and declare push and pull_request events without branch/path filters. There is no workflow_dispatch, schedule or other event in this file. Lines7–8 request contents:read. Lines10–12 group concurrency by the literal zenpi prefix, workflow name and github.ref, and enable cancel-in-progress. This is workflow-run concurrency, not a resource lock inside zenpi or cancellation semantics for its sessions. Lines14–19 contain one job, verify, displayed as Format, lint, test, and contract checks, on ubuntu-latest with a15-minute job timeout. There is no OS/version matrix, job dependency graph, container, custom shell or working-directory override here.
+
+| Lines | Step | Actual command/action and boundary |
+| --- | --- | --- |
+|20–21|Check out source|actions/checkout@v4, with no input overrides. This is runner checkout, not the worker's shared-main checkout.|
+|23–26|Install stable Rust|dtolnay/rust-toolchain@stable requests rustfmt and clippy. Stable is selected here; there is no explicit MSRV/nightly/version matrix.|
+|28–29|Cache Cargo artifacts|Swatinem/rust-cache@v2 with no explicit cache-key/path overrides. A cache action is not a correctness receipt.|
+|31–32|Formatting|cargo fmt --all -- --check; check-only rather than rewriting source.|
+|34–35|Clippy|cargo clippy --all-targets --all-features -- -D warnings. Warnings are errors. This command has no --locked flag, unlike the test command.|
+|37–41|Tests|cargo test --all-targets --all-features --locked -- --test-threads=1. The comment explains serial libtest scheduling for short-lived loopback fixture contention. It does not create an OS/toolchain matrix or prevent tests from internally creating threads/processes; ignored tests remain ignored unless explicitly invoked by a parent.|
+|43–44|Execution blueprint/Gantt|python3 tools/validate_blueprint.py, without arguments. Inspected script defaults target Docs/Zenpi_Execution_Blueprint.md, Execution_Spec and Execution_Gantt; this is the older validator, not the stage1 checker.|
+|46–47|v2 review draft|python3 tools/validate_blueprint_v2.py defaults to Docs/Zenpi_Execution_Blueprint_v2.md and calls it a non-authoritative review draft. It does not validate the current stage1 blueprint merely because this workflow runs on current source.|
+|49–50|Rust inventory|python3 tools/check_rust_loc.py reports physical Rust source inventory. Its inspected default is informational; no --max-lines argument is passed. Do not call it an aggregate LOC rejection gate.|
+|52–53|Runtime/size gate|python3 tools/bench_runtime.py --samples3 --output/tmp/zenpi-runtime-budget.json. Script context includes8limits, builds/measures and atomically writes its receipt, then returns failure when the report fails unless no-fail is selected (not selected here). Three samples are not p95 evidence.|
+|55–59|Receipt upload|actions/upload-artifact@v4 uploads that fixed/tmp JSON path as zenpi-runtime-budget-${github.run_id}. Only this receipt is configured for artifact upload; neither release archive nor alltestlogs are uploaded by another step here. There is no if:always condition to retain the receipt after a failed preceding budget step.|
+|61–62|Two-mode boundary|python3 tools/check_modes.py. Inspected context checks RunModeTui/Headless and builds/inspects the binary; it is not a prohibition on auxiliary core CLI commands.|
+|64–65|Debug JSONL smoke|cargo build --features dev-fixtures then, only if build succeeds via &&, ZENPI_BIN=target/debug/zenpi tools/headless_smoke.sh. Build has no --locked on this line. No allow-skip flag is passed.|
+|67–68|Installed release user paths|ZENPI_SMOKE_FEATURES=dev-fixtures python3 tools/user_smoke.py. This explicitly requests fixture-enabled user-path smoke. The script's isolated_env changes child HOME and removes CODEX_HOME before setting ZENPI_HOME; those legacy fixture choices cannot be represented as complying with this task's preserve-real-HOME/CODEX_HOME rule. This review does not execute it.|
+|70–71|Release JSONL smoke|cargo build --release --features dev-fixtures then ZENPI_BIN=target/release/zenpi tools/headless_smoke.sh --release. This build is fixture-enabled, and success does not alone prove the later production artifact excludes fixture functionality.|
+|73–77|Production package/checks|Run tools/release.sh; enter dist and verify every matching *.sha256; then negate tar-list piped to case-insensitive regex grep for auth.json/.codex/.zenpi/fixture/.env names. Actual shell/negative behavior is analyzed and exercised below.|
+
+All referenced local entry scripts exist in main at capture; path/byte/hash inventory and limited inspected excerpts are evidence, not a full sibling-script review. Action refs use major/stable labels, and ubuntu-latest/toolchainstable are not immutable version identities; no exact resolved image/toolchain/action commit or successful hosted workflow run is claimed. No deploy, release publish, push or notification step is present.
+
+## Failure, cancellation, shell and artifact boundaries
+
+GitHub documents unspecified Linux shell as `bash -e {0}`; explicit shell:bash additionally enables pipefail. This workflow supplies no shell override. Normal later steps depend on earlier success, so its receipt upload is not guaranteed after a budget failure. These shell/default-step statements were checked against [GitHub's workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax); the evidence records the source URL/access date. This is deliberately not an assumption that every run block starts with pipefail.
+
+The build&&smoke pairs stop before smoke when build fails. The multiline package step relies on shell error handling for release.sh and checksum failure, but the final `!` negates a pipeline status. That negated condition has its own semantics and is not guaranteed safe by general fail-fast behavior. Workflow timeout/cancel-in-progress can stop a run, but the file has no always-run cleanup, diagnostic upload or durable recovery procedure. It does not establish that host subprocess/session cancellation/reap invariants hold; those must be tested in zenpi owners. Re-running a workflow starts its commands again; a restored cache is not journal/session recovery.
+
+The fully inspected release.sh context stages only the built binary, README, LICENSE and SBOM, creates a tar.gz and SHA256 sidecar, and uses a --release --locked --target build without dev-fixtures. This separates production packaging from earlier fixture-enabled smoke. It is a local package build, not deployment. The source-package SBOM gathers Cargo metadata; no security audit or vulnerability verdict is inferred. The final workflow filename regex inspects archive entry names only, not file content or executable feature behavior. The checksum detects mismatch against its sidecar, not semantic validity when both bytes and checksum agree.
+
+## Actual bounded archive-gate counterexample
+
+Before proposing any workflow fix, the worker executed the exact captured lines76–77 using real bash-e, shasum, tar and grep on three temporary local fixtures. No release build/script, GitHub runner, Linux execution, real credentials or shared-main mutation was involved. HOME/CODEX_HOME were preserved. Results:
+
+| Actual input | Checksum | Independent tar listing | Exact final gate exit |
+| --- | --- | --- | --- |
+|Valid archive with harmless README|OK|0|0, accepted|
+|Valid archive with a harmless-byte file named .env|OK|0|1, rejected|
+|Malformed archive with a checksum matching those malformed bytes|OK|nonzero/error|0, incorrectly accepted|
+
+Successful probe receipt/log is worker-owner-review/archive-gate-counterexample.json/.log, log SHA256 `f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407`. It records actual GNUbash3.2 and BSDtar tool versions on local macOS. Three actual cases demonstrate the shell gate's pass/fail behavior; they are not three hosted CI passes. The malformed archive causes tar to fail and produce no names; grep has no match and exits1, so `!` returns success. This is a confirmed validation defect in the exact gate, not a claim that current release.sh normally generates malformed archives. Main was sent the counterexample/log and proposed owned correction path .github/workflows/ci.yml before any product work; this package changes only report/evidence and includes no correction. A future fix should require successful complete archive listing separately from forbidden-name rejection, then preserve both positive and negative cases; main owns that decision.
+
+## Stage1 coverage, source mapping and evidence limits
+
+The unchanged workflow explicitly calls v1/v2 validators but contains no validate_stage1_blueprint.py, G-STAGE--item or stage1_host_smoke invocation. It therefore does not directly enforce this current blueprint's per-item evidence/master-receipt gates through a named CI step. Cargo can run stage1 Rust tests through the all-targets invocation, but Rust test success is not the same as independently accepted learning reports or stage1 semantic receipts. The workflow's older contract naming must not be relabeled current-stage acceptance. It also does not explicitly run Python unit suites or an MSRV/macOS/Windows/default-only feature test matrix. These are exact scope observations, not claims those checks fail elsewhere.
+
+Existing local115 native-fixture/pipe packages have real Rust/productionJSONL/lint/budget evidence under their own toolchains and scopes. They are referenced only as local evidence, not as a hosted Ubuntu run of this77-line workflow. The budget implementation's eight limits are16normaldependencies/8MiBrelease/1000mscoldmax/96MiBRSS/2000usqueue/10000usrender/100uslayout/onecoalescedframe; those constants were read from the called script, and historical measurements are not rerun here. The new archive probe is the only089 behavior execution. No workflow run is triggered, no GitHub artifact is uploaded, and no dangerous release-script cleanup command is executed during review.
+
+Pi-mono source test/runtime reports supply behavior comparisons for target owners, not proof that this GitHub Actions workflow covers every source case. ZS1-092 workflow-directory integration remains separate; other file/root acceptance is not inherited. Main's116 status and future122 changes are context only. All77lines and every step are documented; the file is not substituted with a directory summary.
+
+G-FILE requires main's independent semantic review. G-STAGE is run separately against read-only main with bytecode writes disabled; missing master receipt/structural validity is not acceptance. Evidence verification covers current=original hash, full77-line interval, sixteenorderedsteps, copied script context/reference hashes and actual probe receipt. Candidate adds this report and089evidence only; rollback removes them and restores no product file because none was changed. No commits, newtasks/subagents, sharedroot edits or acceptance promotion.
+
+
+---
+
+# 3.1.20 独立完整复核：ZS1-089
+
+本节是当前结论；上方12050字节旧报告原样保留，属于3.1.16时点，不能将其中“current=77行”“未修复归档缺陷”“唯一089行为运行”等描述套用到本轮。主库本报告接收基线仍为 absent，本地旧前缀 SHA256 `60ecb71dd2898ae62ed20169442f4ec36a58894dfb380d50fea1ed2fd965f96e`。本轮候选状态 `[_]`，无主控验收替代。
+
+## 正式范围与完整阅读
+
+本轮先核对主库 `Docs/stage_1_v3_pi_mono_blueprint.md` 3.1.20：ZS1-089正式对象仅 `.github/workflows/ci.yml`，layer L1，依赖ZS1-001，Owned path为此报告；验证器G-FILE、G-STAGE --item ZS1-089；回退仅本报告/本项状态，不覆盖源码。ZS1-092/093目录整合独立。requirement digest `8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645`。
+
+先连续全文读取77行冻结基线，再连续全文读取94行当前文件，包括所有空行、注释、表达式、16个步骤和多行shell的全部分支。基线2480B SHA256 `5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6`；当前3104B SHA256 `b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd`。冻结全文件、单连续字节区间、时间及原路径见worker-review320/input-manifest.json；完整有序step-index是阅读后的辅助核对，不替代正文理解。基线前76行与当前前76行相同，最后旧pipeline被18行显式控制流替换。
+
+本轮只写此报告和独立证据，保留65份现有ready manifest及旧候选全部字节。没有产品修改、主库写入、Cargo/PTY/HTTP、发布、git提交或验收勾选；新增真实行为运行数0。无需读取正在变动的TUI。必要调用脚本按捕获时间与整文件hash绑定片段，明确未接受整兄弟owner。
+
+## 当前文件逐字段、逐步骤语义
+
+L1–5名称与push/pull_request触发，无branch/path过滤、schedule、手动入口；L7–8只声明contents:read；L10–12按workflow/ref分组并cancel-in-progress，这是Actions运行并发控制，不代表zenpi会话取消或锁。L14–19仅一个verify job、ubuntu-latest、15分钟，无OS/toolchain/feature matrix、工作目录或shell override。四个外部action引用均为版本标签/分支，没有完整commit SHA；runner latest和Rust stable也非冻结身份。没有从PR标题等非可信表达式拼接到run shell；github.workflow/ref只用于concurrency，run_id只用于artifact名。checkout未覆盖默认inputs。这里只描述声明，不声称平台运行时权限、缓存来源或外部action当前实现已独立审查。
+
+| 当前行 | 步骤 | 输入、作用及失败边界 |
+| --- | --- | --- |
+|20–21|Check out source|actions/checkout@v4，无附加with；不操作本次worker主库。|
+|23–26|Install stable Rust|dtolnay/rust-toolchain@stable，components为rustfmt、clippy；不提供MSRV版本矩阵。|
+|28–29|Cache Cargo artifacts|Swatinem/rust-cache@v2，无本文件级key覆盖；缓存命中不是正确性验收。|
+|31–32|Check formatting|cargo fmt --all -- --check，检查而非改写。|
+|34–35|Run Clippy|cargo clippy --all-targets --all-features -- -D warnings；warnings失败，无显式--locked。|
+|37–41|Run tests|cargo test --all-targets --all-features --locked -- --test-threads=1；注释为loopback资源争用而串行libtest，不能解释成内部不创建并发或包含ignored用例。|
+|43–44|Validate execution blueprint and Gantt|python3 tools/validate_blueprint.py；当前入口常量指向旧Zenpi_Execution_Blueprint/Spec/Gantt，不是stage1 checker。|
+|46–47|Validate v2 blueprint review draft|python3 tools/validate_blueprint_v2.py，默认非权威v2 review draft。|
+|49–50|Report Rust source inventory|python3 tools/check_rust_loc.py，默认informational且未传--max-lines；不能写成LOC硬拒绝。|
+|52–53|Run runtime and size budget gate|bench_runtime.py --samples 3 --output /tmp/zenpi-runtime-budget.json；无--no-fail，当前main先采集/测量，最终写JSON后按8个gate返回；前期异常可能没有汇总文件。|
+|55–59|Upload runtime budget receipt|upload-artifact@v4，仅上传该/tmp汇总JSON；name含run_id，没有failure/always条件或startup evidence目录。|
+|61–62|Check two-mode boundary|check_modes.py检查RunMode与帮助，然后执行默认cargo build；当前main全文读过53行。它限制public mode，并不禁止其它管理CLI。|
+|64–65|Exercise headless JSONL protocol|fixture-enabled debug build成功后才运行指定ZENPI_BIN的headless_smoke.sh；本行无--locked，不传allow-skip。|
+|67–68|Exercise the installed release user paths|ZENPI_SMOKE_FEATURES=dev-fixtures user_smoke.py；当前main先生产release build/install与生产入口检查，再fixture build/install与echo/TUI检查，不能因环境变量把整步说成仅fixture。|
+|70–71|Exercise the release headless protocol|fixture-enabled release build成功后运行指定binary的--release JSONL smoke；不是最终package binary行为证明。|
+|73–94|Package and verify the production artifact|release.sh→dist sidecars校验→mktemp→逐archive成功listing→拒绝禁止名称或grep异常；下面逐分支说明。|
+
+流程中没有continue-on-error；正常步骤的success依赖和默认shell语义此前已按GitHub官方文档核对，原访问记录2026-09-10保留在旧089包external-reference.json，本轮未联网重新验证。这里不把本地bash回放写成GitHub托管执行。job的15分钟以及cancel-in-progress可能打断后续步骤，但源码本身无法证明运行耗时是否会超限，也不能从取消声明推断产品子进程已reap。
+
+## 当前归档检查完整分支与已有修复
+
+L75运行release.sh，L76在dist校验匹配sidecar。L77取得临时清单路径，L78注册EXIT清理。L79遍历每个dist/*.tar.gz；L80先完整执行tar listing到清单，L81–83在失败分支打印archive来源并exit1，不再借grep状态掩盖tar错误。L84–86有禁止名称match则失败；L87–92无match分支捕获grep的实际退出码，只有1视为普通未匹配，0在前面拒绝，其它非零保留错误码失败。L93–94闭合条件和循环。路径变量均引用，grep模式与基线相同；新增逻辑不解压、不执行归档内容。各archive先清空同一个临时清单再检查，不将多archive交给单个tar参数解释。
+
+这是当前已实现的修复，不应继续提“修复 !tar pipeline”为新缺陷。已有历史修复包stage117-ci-archive-ready的candidate-ci.yml与本轮current逐字节相等，基线亦完全绑定。两份历史probe源码已全文读完：旧089 probe22行，117 replay55行；只摘出checksum/listing shell，明确排除release.sh，不调用产品。前者本地构造三个case；后者对每case给旧/新两个shell相同archive字节，核验checksum成功、独立tar状态、临时清单清理，并保留base64及hash。
+
+| 相同历史输入 | 旧归档gate | 当前归档gate | 实际含义 |
+| --- | --- | --- | --- |
+|有效README归档|0|0|允许正常名称|
+|含无害测试字节.env条目|1|1|拒绝禁止名称|
+|checksum相符但格式损坏|0|1|旧误通过已转为显式tar失败|
+
+117 three-case-replay实际wrapper退出0，日志hash `58d1f5f757016f2e2ef9c9befc618984670d0baf7f4ddfcf832ab00e84d76426`；0指断言了预期正负结果，不是六次gate都成功。原089反例日志 `f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407`继续保留。历史candidate-shell-syntax实际0只对应抽出的shell语法，不能替代完整Actions YAML语义验证。
+
+历史工具为macOS arm64 bash3.2/BSD tar，未提供托管Ubuntu实际run。多个归档、缺失归档、grep读取错误、取消中清理没有增加成历史已执行case；它们仅有控制流解释。名称regex只查列出的路径字符串，不查内容、symlink目标、文件类型或二进制feature。校验和只能保证与sidecar一致，不能证明来源真实性。release.sh实际stage为binary、README、LICENSE、SBOM，默认无dev-fixtures的--release --locked --target构建；无部署/上传。上述限制是此门禁职责，不凭假想恶意归档将其写成远程执行漏洞。
+
+## 当前调用方更新与仍需处理的差距
+
+调用引用均冻结整文件身份，但只保存必要内容：validate_blueprint/v2与LOC是入口片段；bench_runtime是预算常量和main片段；headless_smoke是参数/build选择片段；user_smoke是isolated_env与main片段；check_modes/release是小文件全文。未全文审查user_smoke各测试helper，也未读取全部Cargo测试；本文件本身无inline tests。没有将兄弟脚本全文hash转换为兄弟文件验收。
+
+1. **P2，预算失败后的诊断留存未闭合。** CI的Upload紧跟budget且无显式失败条件，按既有平台默认success规则，budget返回1后这一步不会正常保留结果。当前bench_runtime还把逐样本stdout/stderr/身份写到新的.ops/runtime-budget时间目录，而workflow只上传/tmp汇总；汇总有样本内容/摘要不能替代保留所有独立诊断文件。建议后续只做这个具体改动：为有界预算产物设置失败可达上传，保留真实budget非零，并清晰区分未生成文件与测量失败。本轮未运行失败CI验证，当前源码可见缺口与以前相同。
+
+2. **P2，当前Stage1验收未由本workflow直接执行。** 步骤明确运行旧v1/v2 checker，没有validate_stage1_blueprint.py、G-STAGE --item或报告master receipt验证入口。Rust all-targets可能覆盖Stage1实现测试，但不等同于学习文档/语义receipt验收。建议由主控决定在已确定的权威范围内添加结构门禁及必要生产入口回归，不用一个CI绿灯概括整个蓝图。此条是接线缺口，不声称其它自动化都没检查。
+
+3. **P2，归档修复回归只留在历史证据包。** 当前workflow直接执行正常release packaging，没有显式运行上述坏归档/禁止名称before-after回归脚本。源码已修复，历史三个case已通过预期断言，但后续改坏分支可能缺少持续回归覆盖。建议把有限归档门禁case放入维护的测试入口，并在Ubuntu实际CI记录其正负结果；本轮不另行运行/迁移测试。
+
+4. **版本身份与验证范围限制。** Actions major/stable标签、ubuntu-latest与stable toolchain浮动，文件不能给出精确执行依赖身份；可后续固定外部action提交并由维护流程更新。Clippy/debug/release smoke行没有统一--locked，而test/budget/release.sh/user_smoke多处有锁文件约束。没有OS/MSRV/feature组合测试矩阵，不代表生产default从未测试：当前user_smoke明确新增了production install/provider/tool approval/shell/EOF/GC/blueprint入口。不要沿用旧报告遗漏该部分的概括。
+
+5. **工作环境边界。** 当前user_smoke isolated_env仍移除CODEX_HOME并设置child HOME。它是该脚本隔离fixture环境的现状，不应替用户决定把此模式推广到本轮工作；本轮没有执行它，真实HOME/CODEX_HOME保持。仅凭这个helper不判定产品安全缺陷。shell脚本的STAGE删除是release脚本运行语义，本次只读，不执行release cleanup。
+
+## 完整性、接收和回退
+
+旧089候选18个member、旧117修复候选22个member连同两个manifest完整复制到本项reused证据，逐文件校验，保留历史authority/日志/失败案例而不篡改到3.1.20。旧manifest分别为`e4584db1d96af2d80ad3e8a660daa3a47c69f244b0998526f5efcb10e8605d47`、`160a2115a98abc13ba7cd022f2aad28dff583b5e8573c867393799e8fb409d37`。脚本只做字节/结构验证，不重跑历史probe，不构建产品、不触发Actions。
+
+本项独立checker验证authority、主库确切路径、冻结77/94全文覆盖、16步骤顺序、diff、相同旧前缀、历史manifest40个成员、base64字节、真实receipt/log hash、调用方捕获身份、65旧ready和未改working CI。frozen模式可在封包files目录脱离live主库验证。G-STAGE原始exit/log单独记录；主master receipt缺失时保留非零和`[_]`，不改状态。接收补丁以主库absent报告为基线携带完整旧前缀+本节及全新证据；不是把主库文件force覆盖。所有正逆apply/check在临时目录进行，回退只删除本次新路径。候选完成后交主控，ZS1-092/093或其它owner均未接收。

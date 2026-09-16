@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "build",
+    "--offline",
+    "--locked",
+    "--bin",
+    "zenpi"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "env_diff": {
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null"
+  },
+  "started_at": "2026-09-12T13:51:01.881532+00:00",
+  "elapsed_seconds": 4.641235915999999,
+  "exit_code": 0,
+  "log_sha256": "8095a86b603595e2abd890fad50ae600689cdd3d8b61b47b82f704e050aa6078"
+}

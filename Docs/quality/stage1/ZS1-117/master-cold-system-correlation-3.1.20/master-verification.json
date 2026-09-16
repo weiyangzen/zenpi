@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-12T15:33:01.036591+00:00",
+  "worker_manifest_sha256": "24edf0ea9aab3adf2e7b87b5ff6a8e98be9e865c64872f8e5940c40f0e8bb34a",
+  "original_main_artifacts_identical": {
+    "budget.run.json": true,
+    "budget.log": true,
+    "summary.json": true,
+    "zenpi": true,
+    "inputs-before.json": true
+  },
+  "independent_raw_event_count": 6,
+  "scan_to_result_ms": 1044.2375,
+  "master_full_reads": [
+    "diagnosis.md",
+    "README.md",
+    "experiment-plan.md",
+    "verify.py",
+    "tools/bench_runtime.py:1-338",
+    "src/main.rs:1-11"
+  ],
+  "master_bounded_raw_reads": [
+    "two exact-window log JSONs and command receipts",
+    "signature display",
+    "mach timebase and boot identity"
+  ],
+  "worker_other_source_context": "archived/hash verified, not newly independently read or accepted here",
+  "root_cause_proven": false,
+  "product_changes": false,
+  "master_accepted": false,
+  "original_budget_failed": true,
+  "new_product_executions": 0
+}

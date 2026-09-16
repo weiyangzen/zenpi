@@ -1,0 +1,31 @@
+/// Runtime effort is native adaptive effort only for the frozen supported
+/// model. Unknown models still work as conservative text-only registry entries.
+pub(crate) fn validate_effort(model: &str, effort: Option<&str>) -> Result<(), BackendError> {
+    if let Some(e) = effort
+        && (model != "claude-sonnet-4-6"
+            || !matches!(e, "none" | "low" | "medium" | "high" | "max"))
+    {
+        return Err(config("unsupported Anthropic model/effort combination"));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_history_wire(turns: &[Turn], wire: &str) -> Result<(), BackendError> {
+    for turn in turns {
+        for a in turn
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("annotations"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if a["type"] == "native_history" && a["wire"] != wire {
+                return Err(config(
+                    "native signed history cannot be represented by the selected wire",
+                ));
+            }
+        }
+    }
+    Ok(())
+}

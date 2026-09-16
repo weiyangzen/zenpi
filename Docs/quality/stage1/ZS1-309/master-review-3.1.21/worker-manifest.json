@@ -1,0 +1,1083 @@
+{
+  "item": "ZS1-309",
+  "version": "3.1.21",
+  "report": "Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md",
+  "created_at": "2026-09-12T23:48:39.889916+00:00",
+  "files": {
+    "candidate.patch": {
+      "bytes": 23567,
+      "lines": 140,
+      "sha256": "50a7c6344a94c20e7e0ea8daf108d155b748dce7395c8b6b1ad66fc8fd3b5eb5"
+    },
+    "evidence/analyze-initial.py": {
+      "bytes": 7512,
+      "lines": 29,
+      "sha256": "fd1dc541048f0bad8e63743c0461b6ad63101a62158b79e440c2f1b0c78bdcd2"
+    },
+    "evidence/analyze.py": {
+      "bytes": 7571,
+      "lines": 65,
+      "sha256": "6302609909b56196ea51ac5f8e177aa5d694f6d0149216161a5047f55eba37be"
+    },
+    "evidence/capability-matrix.json": {
+      "bytes": 7120,
+      "lines": 114,
+      "sha256": "dd6eac374ce50f2141e2cd3318688e9833cd156005022ac83ab10f61f64223e7"
+    },
+    "evidence/capture/codex/AGENTS.md": {
+      "bytes": 15131,
+      "lines": 195,
+      "sha256": "932e35f307f93af625f62d6cea1c2bba356c56823b4c084ae4de803b8cf4aa9e"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/app_event_sender.rs": {
+      "bytes": 891,
+      "lines": 28,
+      "sha256": "5ed1c6b6cbb04e3cc207e5df0322a740a6017936cc6d9588024d9445ed76ca6c"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/bottom_pane/mod.rs": {
+      "bytes": 72998,
+      "lines": 1974,
+      "sha256": "97af02eed39dbfdf69d1ec3e14dc13b9a91f4b33f5e4b985cc1f2cbae4105823"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/chatwidget.rs": {
+      "bytes": 380782,
+      "lines": 9546,
+      "sha256": "0453f643d88c62d0ad11aa01217af783719400b6c966b71d980ae8c4eac4829a"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/exec_cell/mod.rs": {
+      "bytes": 341,
+      "lines": 12,
+      "sha256": "652521b7edd4b85198f2a226101ff143dfc1515c55cc64ae18f2a139a0b1c75a"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/exec_cell/render.rs": {
+      "bytes": 34993,
+      "lines": 968,
+      "sha256": "d9606ff20ecf8be44a4f40a34a5df120608d902e03e9d8986dd01b9301cc8962"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/key_hint.rs": {
+      "bytes": 3306,
+      "lines": 112,
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/line_truncation.rs": {
+      "bytes": 2664,
+      "lines": 100,
+      "sha256": "1295628ba66a4f340e3728a16f25900f1a9bfd9489ae7c4ab782fab89fce6259"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/shimmer.rs": {
+      "bytes": 2691,
+      "lines": 80,
+      "sha256": "7c9ecdf410c892d21c6f7f1f74d0c1b3db47bc06f4f119b843b657b712bbee46"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/snapshots/codex_tui__status_indicator_widget__tests__renders_truncated.snap": {
+      "bytes": 134,
+      "lines": 6,
+      "sha256": "8dff35f2dd6280dafbf6e1b682be3ece379257c45e9338efe2558a78dc111258"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/snapshots/codex_tui__status_indicator_widget__tests__renders_with_queued_messages.snap": {
+      "bytes": 756,
+      "lines": 12,
+      "sha256": "90bff1fc387840d4c60fe892d0bc4a971cf281998cd2bd26f9711c5653536a9f"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/snapshots/codex_tui__status_indicator_widget__tests__renders_with_queued_messages@macos.snap": {
+      "bytes": 779,
+      "lines": 13,
+      "sha256": "8292a18eee6e897b4ba2bf9e4d5893e855d97c506dfac1fb81a580ba2be29b9f"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/snapshots/codex_tui__status_indicator_widget__tests__renders_with_working_header.snap": {
+      "bytes": 252,
+      "lines": 6,
+      "sha256": "92ff237e2aefa9fba6e756baa0457a45cd822681872135144f67b5bf4f9fb191"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/snapshots/codex_tui__status_indicator_widget__tests__renders_wrapped_details_panama_two_lines.snap": {
+      "bytes": 185,
+      "lines": 7,
+      "sha256": "6c7b58356fc0bd55a3e04407e4701a0bba7dc23d7444f2d57ca598f55aab2993"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/status_indicator_widget.rs": {
+      "bytes": 15810,
+      "lines": 440,
+      "sha256": "e35e3efbd18784b55343366b2001bda08dfc1543f7e4a88700a715562d519cc5"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/text_formatting.rs": {
+      "bytes": 19746,
+      "lines": 580,
+      "sha256": "824b6c7297bf0f6a22fb3ecaac4fe68d545384e179233b6dd0dff1685e02c155"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/tui/frame_requester.rs": {
+      "bytes": 14112,
+      "lines": 354,
+      "sha256": "629599433594ebaf4dd1037efa31198686879833e2f8816478bd388c49080174"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/tui.rs": {
+      "bytes": 19312,
+      "lines": 546,
+      "sha256": "7d5102a2cdc01a59d142449299bada718cdb79ebe3e0c2f1e7b2869ea7f40d2e"
+    },
+    "evidence/capture/codex/codex-rs/tui/src/wrapping.rs": {
+      "bytes": 47396,
+      "lines": 1407,
+      "sha256": "55505c7cfc6cf6c334caac29bfbbc2b2a7781654e8441a5b608fc0238671c38b"
+    },
+    "evidence/capture/zenpi/Docs/execution/active_requirement.json": {
+      "bytes": 9853,
+      "lines": 1,
+      "sha256": "2bf826b534e9347ca410be321a6eb11b94fd619a200d6b095cc4640fe7fb7568"
+    },
+    "evidence/capture/zenpi/Docs/learn/stage1_pi_mono/references/codex/file_learn_index.tsv": {
+      "bytes": 2229,
+      "lines": 11,
+      "sha256": "43ea54c4989e2a1fbe1c3888c4a34abb0302c58ce422bd5ef8119716d6d2f672"
+    },
+    "evidence/capture/zenpi/Docs/learn/stage1_pi_mono/references/codex/source_manifest.tsv": {
+      "bytes": 3821,
+      "lines": 11,
+      "sha256": "a714cdb8b43e0283da9cc757880104f3930e5201b0eab2b39804fdf38c970c6e"
+    },
+    "evidence/capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md": {
+      "bytes": 153896,
+      "lines": 632,
+      "sha256": "e4197a9fb55d6f4a3a8ab87ebc631bdfecf3c139fb03c5fecac41bed292274b6"
+    },
+    "evidence/capture/zenpi/src/render.rs": {
+      "bytes": 60098,
+      "lines": 1706,
+      "sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d"
+    },
+    "evidence/capture/zenpi/src/tui.rs": {
+      "bytes": 638305,
+      "lines": 15607,
+      "sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557"
+    },
+    "evidence/capture/zenpi/src/view_model.rs": {
+      "bytes": 42009,
+      "lines": 1255,
+      "sha256": "094833f051ab66d30ce3f6cc74fcc0334ed938e79f5fd8e9269341b62bed08fe"
+    },
+    "evidence/capture/zenpi/tests/tui_approval_focus.rs": {
+      "bytes": 14718,
+      "lines": 428,
+      "sha256": "6399e0f364781639a49e27643596c2eb965773147c2aae965db1a69318026b87"
+    },
+    "evidence/capture/zenpi/tests/tui_bentobox.rs": {
+      "bytes": 19019,
+      "lines": 508,
+      "sha256": "0b847c54c537ec5c81a175d23cac846824a6545d522e7b5934043018bc22be17"
+    },
+    "evidence/capture/zenpi/tests/tui_transcript_ux.rs": {
+      "bytes": 16949,
+      "lines": 486,
+      "sha256": "26562ab62ebf73a8eae1fd951ac0a247eb4adb9fc8711e87a3fc55d0b5ebd5d7"
+    },
+    "evidence/capture.json": {
+      "bytes": 10449,
+      "lines": 247,
+      "sha256": "c17e61b71400cb6c80dcfd5d69d263ffb820855e20e8902b7b2f5dc816f5675a"
+    },
+    "evidence/capture.py": {
+      "bytes": 3817,
+      "lines": 24,
+      "sha256": "c42d4e359b58d743a04050dc8bb9b47a778a0abfec2d6de9ac9e197cf1a90757"
+    },
+    "evidence/capture_resume.py": {
+      "bytes": 3608,
+      "lines": 25,
+      "sha256": "a83ac1c167fe5624598f7028b25f2c8a1dced10669e4a0c110af11d55bf506a1"
+    },
+    "evidence/capture_resume2.py": {
+      "bytes": 3739,
+      "lines": 25,
+      "sha256": "ede1d612673a5bf17e4684e6e28028bf520b63b21c2278251f2c80de246f1779"
+    },
+    "evidence/external-preservation-before.json": {
+      "bytes": 25740,
+      "lines": 539,
+      "sha256": "92649aa5ac0ec7af0340c0282804f4c38fffde6d7f7e595cc1df62a37bd334bd"
+    },
+    "evidence/freeze-capture/capture/zenpi/src/tui.rs": {
+      "bytes": 639010,
+      "lines": 15622,
+      "sha256": "b15661a160a855ef974e82dfb40a63c8d0c5777623cd553d1d4cf2069d8b59a1"
+    },
+    "evidence/freeze-input-state.json": {
+      "bytes": 18205,
+      "lines": 597,
+      "sha256": "a7770fa7c9b8968ae042b02d9f419a1d5a9ab4e42dded8b079d10d3dcfcd162f"
+    },
+    "evidence/freeze.py": {
+      "bytes": 5715,
+      "lines": 48,
+      "sha256": "80a64067cb391a81c3c403e8f77266ba8bc685b2a1405632ce1b61bf8d8772ed"
+    },
+    "evidence/function-inventory.json": {
+      "bytes": 3056,
+      "lines": 218,
+      "sha256": "f0a08766be4cf9c597352957d02af0ae90d0c93adf85557b78d963a0e158a4f7"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/current_folder_learn.md": {
+      "bytes": 1701,
+      "lines": 9,
+      "sha256": "d68fc811344190f9d268ba3a940f3344d2d4715b4c9b25cfac05d6baa0054302"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/current_folder_learn.md": {
+      "bytes": 1705,
+      "lines": 9,
+      "sha256": "56966e36c997caff4bbfd487ff8ccd16206d7564d418a89aef00bde6eb81f3c1"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/bottom_pane/current_folder_learn.md": {
+      "bytes": 1704,
+      "lines": 9,
+      "sha256": "480a344340b3b85c1f0aa8e07132cc46db725fda59f00fa51c5a55ae8a85c881"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/current_folder_learn.md": {
+      "bytes": 1709,
+      "lines": 9,
+      "sha256": "efc4754784eb93da9f74ea6f78a8516f75bfa6cc18f49df068c71abb09e32469"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/current_folder_learn.md": {
+      "bytes": 1713,
+      "lines": 9,
+      "sha256": "cab2a14ea88b1a48aa8a702b8e72b7934004e31ff638321b50b663038d5b702e"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/approval_overlay.rs_learn.md": {
+      "bytes": 3623,
+      "lines": 16,
+      "sha256": "29c2cbd33bbc44f2b1f4ec3f2c78ee1c783182236cc923ea521036feb08b2472"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/chat_composer.rs_learn.md": {
+      "bytes": 8227,
+      "lines": 27,
+      "sha256": "424f21990557651a7b32ac9bdc0e9542904ed6a38424279069a8dc1a25f16fd4"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/mod.rs_learn.md": {
+      "bytes": 4060,
+      "lines": 18,
+      "sha256": "f5836e5029337fe104b139c99e086c985873e0acf53dfb338c9b52ffab970c55"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/paste_burst.rs_learn.md": {
+      "bytes": 2669,
+      "lines": 16,
+      "sha256": "741572c24e1348d0271b353c13c07b607a31d2f23d18f69ceb7d1906198d6067"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs_learn.md": {
+      "bytes": 1891,
+      "lines": 14,
+      "sha256": "ffc1ef71262191c43aee1f05650427b2b041625c3459bf286afd5fa901e236b0"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/textarea.rs_learn.md": {
+      "bytes": 3504,
+      "lines": 16,
+      "sha256": "5066bf1f7593b09e593111aad12f36d0fe974d76c71ea1be5a8a0cdb7b1dbb35"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/file_search.rs_learn.md": {
+      "bytes": 2040,
+      "lines": 14,
+      "sha256": "eb836e68285dea1791ca042f633bd0f252f0f66ea51555ec970ab83659400d2d"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md": {
+      "bytes": 1537,
+      "lines": 20,
+      "sha256": "37e21c9bd266b6acc24f596b467e291e1c7abaa42b025414ee1ef56a5da36755"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/slash_command.rs_learn.md": {
+      "bytes": 1835,
+      "lines": 14,
+      "sha256": "6445fcc0f0c31b1d40812608459c265f2ee851a6f80dee5b9555db46b7fee004"
+    },
+    "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md": {
+      "bytes": 1875,
+      "lines": 20,
+      "sha256": "697590640b31170f46becab07b6db969f11b2da655f8c04be517a13ded9dbfc6"
+    },
+    "evidence/history/codex-reference-ready/Docs/quality/stage1/codex-composer-chunks.json": {
+      "bytes": 545,
+      "lines": 18,
+      "sha256": "99264b18df3ec7efa5aeb628453a2fb039e0ac1e22aba850b27ec55ac8ab0363"
+    },
+    "evidence/history/codex-reference-ready/manifest.json": {
+      "bytes": 3582,
+      "lines": 72,
+      "sha256": "ddeedf88d21d8980c5e7de68f85f44e91519856dab2fcee1317969b53c8392cd"
+    },
+    "evidence/history/zs1-309-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md": {
+      "bytes": 28091,
+      "lines": 216,
+      "sha256": "f8392c09463e9f81fe6b1ea2cbecbb2d9074b77cef07bd45652569cefc5f9813"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/capability-matrix.json": {
+      "bytes": 4632,
+      "lines": 93,
+      "sha256": "c36d8339118c6972a8dca9170325c57f4eeb1920aebd509ff9f17cb3526377b2"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/check_static.py": {
+      "bytes": 7272,
+      "lines": 70,
+      "sha256": "42855ca224b1ebbf5f9eacc8cffaba328738068caec77df7505a46f55161fce0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/blueprint-3.1.20.md": {
+      "bytes": 146422,
+      "lines": 608,
+      "sha256": "60f407c1bed414a6fa78ed37acd27f828c8dc8727c28b56ec49899fb73fe195c"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L1000-1047.txt": {
+      "bytes": 1580,
+      "lines": 48,
+      "sha256": "12bf05edfc5df736e7c52291e24976e1586bc39e2c9e9a0a06dfe2d395c4b12e"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L1110-1158.txt": {
+      "bytes": 2078,
+      "lines": 49,
+      "sha256": "ff02167ff09fd4acb6d672a24ee5d7dcc7a671784a48fc2703da2f6d25825ce0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L407-452.txt": {
+      "bytes": 2002,
+      "lines": 46,
+      "sha256": "016654f3accbc01fda283f51c9e8fc45c869b9cf2c3460c840a6a176ede8e1df"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L628-651.txt": {
+      "bytes": 915,
+      "lines": 24,
+      "sha256": "b75f47905c5423ac07bdce7bf56d4e2de9888c05199400adac1f7dd32471bbb8"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L717-767.txt": {
+      "bytes": 1827,
+      "lines": 51,
+      "sha256": "c5f03e5651567035fba6c4676cdc047bfc01a92ad39c6e8b3d07838043f4e4e4"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L838-859.txt": {
+      "bytes": 984,
+      "lines": 22,
+      "sha256": "fb2a9beea0c9888c1487235f24872678e2d549a3a8f2a65e8e9cbe7057fc57d9"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-bottom-pane.L902-950.txt": {
+      "bytes": 1713,
+      "lines": 49,
+      "sha256": "f3b3c6edde1ef8625086e9dffff171253992435dcbb6e06828d9558fecf71377"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-chatwidget.L1727-1758.txt": {
+      "bytes": 1551,
+      "lines": 32,
+      "sha256": "d44e1a321cad0d51966226ade86b6e0a7881ada21ae087f1e5d243284cd9b2f0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-chatwidget.L2964-2980.txt": {
+      "bytes": 693,
+      "lines": 17,
+      "sha256": "dedfa55ff37e64b9d639c6975835f9e1e00f0284ee96edafb91b313f858c0764"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-chatwidget.L3113-3133.txt": {
+      "bytes": 1169,
+      "lines": 21,
+      "sha256": "9cb6a35c5d088effd7da0fb8a7ce30d875549a697efdfddbb32cad63990ceeb8"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-frame-requester.L23-67.txt": {
+      "bytes": 1554,
+      "lines": 45,
+      "sha256": "fd8c39bf2099db20dde1765b5dcf876947e3bfed2bb2efd60ef2668cba344f80"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-shimmer.L14-38.txt": {
+      "bytes": 909,
+      "lines": 25,
+      "sha256": "5a95d280be5e43f3b9cf3a3f10df77ca0859a8848223a95efa3a0c7e457c31de"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/codex-spinner.L182-196.txt": {
+      "bytes": 554,
+      "lines": 15,
+      "sha256": "3502c0a8cf7391c801444e84106cca1c6ace404799ea669caeacd64f143c7628"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/historical-helper.L70-79.txt": {
+      "bytes": 1765,
+      "lines": 10,
+      "sha256": "7cfd38d9c5cc67ffb40ecaf1e180b8adb212a2481dabf58800f8b7baa3761fde"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tests.L10-28.txt": {
+      "bytes": 762,
+      "lines": 19,
+      "sha256": "765a244f08e1a5c402b093c92b4185f0bfe8378a7b2e2f4ec4c6a52682d9e347"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tests.L193-245.txt": {
+      "bytes": 1532,
+      "lines": 53,
+      "sha256": "6a74e92a110af48a7a82af1962ba722871fe49442268733ef418917c1b763285"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L11568-11600.txt": {
+      "bytes": 1352,
+      "lines": 33,
+      "sha256": "14705d83f603d1587cd4266a3526dabf1dbe72fe4e46e06554662b63dd2abdd1"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L11609-11640.txt": {
+      "bytes": 1496,
+      "lines": 32,
+      "sha256": "eb317957f75dbcaac9674d20a49c974396558381ef82d91bf29431d64890797c"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L12252-12291.txt": {
+      "bytes": 2180,
+      "lines": 40,
+      "sha256": "0453bb9c94b336d8a8ba9c9a603a125b1a2169384ab2b2c657350fca565936ac"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L12308-12338.txt": {
+      "bytes": 1519,
+      "lines": 31,
+      "sha256": "ee6e23f06e50b76ea636fa5a01d247aa543913da97b1b225337ba3c4055ba227"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L1232-1252.txt": {
+      "bytes": 537,
+      "lines": 21,
+      "sha256": "fa223eebac88c3ad3e040854397d426c1530d356e380e3980a2fef27e2938537"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L1915-1960.txt": {
+      "bytes": 2397,
+      "lines": 46,
+      "sha256": "98a0bee153f42ee730a34b3c7d452300d434c7b4ec4d78eb30609a6ba6fff5ff"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L1985-2010.txt": {
+      "bytes": 1145,
+      "lines": 26,
+      "sha256": "5b52b2b527ba243f1f81c41b856b0533b613e11572232477ddade53e13a90221"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L3198-3232.txt": {
+      "bytes": 1131,
+      "lines": 35,
+      "sha256": "4c8010e34c4a5ad058a11a211f8fafb7542bfb422c1b1b976226cbda9439e05a"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L3490-3506.txt": {
+      "bytes": 685,
+      "lines": 17,
+      "sha256": "a03a7e8a000cce8da7dd23ae63ea5abd9e45962d17ccd2a9be701e4f22b8ff71"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L3550-3566.txt": {
+      "bytes": 778,
+      "lines": 17,
+      "sha256": "80f71a7cc11baf5f3f9936320507bb354bdcd262700efb08829ee59b5d02b487"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L3605-3642.txt": {
+      "bytes": 1540,
+      "lines": 38,
+      "sha256": "c62759dc64a834c83436b1307a77c1bb0a4430b24d65f50c82643a51cbfd1d2e"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L3691-3730.txt": {
+      "bytes": 1732,
+      "lines": 40,
+      "sha256": "70d8ef7db1ca85faa93aded7fe482040124ec2cd85dcfa632d4eac33b2abab87"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L5184-5202.txt": {
+      "bytes": 1014,
+      "lines": 19,
+      "sha256": "9cd463941031396d7e2f1b7971888416fa6eaa51a77024f512c50f5c81b74f60"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L5478-5497.txt": {
+      "bytes": 666,
+      "lines": 20,
+      "sha256": "dae8912f8d5ca423c89b0f1e0004067d1a6b754af88b901162f75417028345eb"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L6055-6155.txt": {
+      "bytes": 4093,
+      "lines": 101,
+      "sha256": "ac79e677196ebe6b06e4882d7df92064ffdeab484b2547ed278d74aca2724856"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context/target-tui.L735-782.txt": {
+      "bytes": 1327,
+      "lines": 48,
+      "sha256": "a716a942da0343128c873855663c50bc78adee7bc2e5572fc19e934075036c91"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context-capture.json": {
+      "bytes": 16386,
+      "lines": 426,
+      "sha256": "c3ca9a60cf2dcf211032fe1ddee3b180c143b030684340a359ee34878649ddd0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/context-tests.json": {
+      "bytes": 485,
+      "lines": 20,
+      "sha256": "80367b3ce6c29a589775bc2b411fb0bf5018e94a0d977584b6a5a5f7999e6be0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/function-inventory.json": {
+      "bytes": 3065,
+      "lines": 164,
+      "sha256": "a410dc23fa30f718619fe27a4b737bf272b083a80ae1fecc23690d2e4571affa"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/historical-result-summary.json": {
+      "bytes": 9790,
+      "lines": 224,
+      "sha256": "ea67dac9a30c0254cc32905d4d1a26296e126836d9a5aa2cb2c97fe8ab63911b"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/README.md": {
+      "bytes": 1551,
+      "lines": 11,
+      "sha256": "c77951bf65265bf261541629c1f1bded34594b060dcc7798e1357738ba91ec9e"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/manifest.json": {
+      "bytes": 1727,
+      "lines": 44,
+      "sha256": "59b1c25b9cbf36c3ef5282b99c9565a21e6bf05cb4cc6db5f1a363c2ed33d789"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/ux125-project-regression.json": {
+      "bytes": 640,
+      "lines": 19,
+      "sha256": "ddbafcd9059b59d59dc9e53787a76e46e5fc0b82ea270620901f753eb72e9b98"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/ux125-pty-result.json": {
+      "bytes": 662,
+      "lines": 19,
+      "sha256": "a0c26409643abfa981255ea9170f0da47e1c5b414aac20c00fc6e8def6da060a"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/ux125-pty-run.log": {
+      "bytes": 662,
+      "lines": 19,
+      "sha256": "a0c26409643abfa981255ea9170f0da47e1c5b414aac20c00fc6e8def6da060a"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/old-transcript/ux125-tests.txt": {
+      "bytes": 999,
+      "lines": 40,
+      "sha256": "484752f70e7357207c525805d23dbe27f6bbcca1adcade69477fe865575d557e"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/original-ready-manifest.json": {
+      "bytes": 3582,
+      "lines": 72,
+      "sha256": "ddeedf88d21d8980c5e7de68f85f44e91519856dab2fcee1317969b53c8392cd"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/original-worker-report.md": {
+      "bytes": 1875,
+      "lines": 20,
+      "sha256": "697590640b31170f46becab07b6db969f11b2da655f8c04be517a13ded9dbfc6"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/approval.json": {
+      "bytes": 812,
+      "lines": 21,
+      "sha256": "0288074bed404262ce19d028b5cb196a9dacbec49fc8635264c9fe5db70a9774"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/approval.run.json": {
+      "bytes": 1050,
+      "lines": 26,
+      "sha256": "2264675c26e8c15a811f6800c818fb372c27f1a1336b3cd39bed98ac2172d41c"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/background.json": {
+      "bytes": 7985,
+      "lines": 18,
+      "sha256": "9efa34503a281019b06b2902e3000ea6d7593b6b3811d49186f72daca1ceaa53"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/background.run.json": {
+      "bytes": 1076,
+      "lines": 27,
+      "sha256": "3e3bf949a25ef9dacbe6c6538c4942f582df60b8d8cba47017b1b4309c63a740"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/bentobox.json": {
+      "bytes": 1271,
+      "lines": 50,
+      "sha256": "2a77d0dbd087b8353d34fac25de9a191b6de4cd7fac1a6b77a9a40b5e62f0716"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/bentobox.run.json": {
+      "bytes": 1073,
+      "lines": 28,
+      "sha256": "23aa0ade02b94cb3ce332cc27c0c626cd038c7c2a0ce96cb7c633450bc30ace2"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/binary.json": {
+      "bytes": 103,
+      "lines": 4,
+      "sha256": "f6b576b7f6b8269dfd22134b7af04a4cf50723b705ce2121836bcdedd72c33de"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/budget.json": {
+      "bytes": 17297,
+      "lines": 327,
+      "sha256": "423695ea985aa557671cddd7b35ad5eac69ef90495d8ae51fee401260b638ffa"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/budget.run.json": {
+      "bytes": 936,
+      "lines": 26,
+      "sha256": "ecd1457eae959cd79279f70027eab672ebda8138c4128ffb263f3561fd7783e4"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/build-inputs.json": {
+      "bytes": 31944,
+      "lines": 906,
+      "sha256": "268f5b93248697a221e5e5b8329925a321c12cf67a9e65e768db7e5f3d1b8118"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/manifest.json": {
+      "bytes": 22044,
+      "lines": 533,
+      "sha256": "4a3e21c0fb5738b18abbda180fea89282c69932cbf7d916aa9aa87bd800ece7f"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/master-verification.json": {
+      "bytes": 393,
+      "lines": 12,
+      "sha256": "98b7822704ce7d6ac0a283a8c1c12c8926b777f7ea38abcc0479ede4beaac6d8"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/new.json": {
+      "bytes": 852,
+      "lines": 18,
+      "sha256": "98413ddd7aba7e49e207f22dca69c41aee8ca743392fbb5dcff14cca4662a906"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/new.run.json": {
+      "bytes": 1114,
+      "lines": 26,
+      "sha256": "451f2793df1b202f365555d1bdde8d47cf15ddb4657a0195b7cfe4d84154d196"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/picker.json": {
+      "bytes": 640,
+      "lines": 19,
+      "sha256": "98012909025866d28e6d9df3ef64831b2d686dfb4e8f96235befa8fbb4feb9a8"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/picker.run.json": {
+      "bytes": 1128,
+      "lines": 26,
+      "sha256": "75d1ce54e23188506632aa16af46cb3243fbd9bc1d6a6ac334d3c11f5a57c4ef"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/policy.json": {
+      "bytes": 1066,
+      "lines": 20,
+      "sha256": "2442fafb674ff56da66fe54b11226d2153bd9c3ed398720f4dd194bdba28ace9"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/policy.run.json": {
+      "bytes": 1144,
+      "lines": 27,
+      "sha256": "fd7f6dd2e75dfa5348f72efcf916d0e9b40a334d28f7a56ed99d198ee3963419"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/recovery.json": {
+      "bytes": 763,
+      "lines": 14,
+      "sha256": "929bc5f74f9c14276183c94146e33ef2cf26542d2a7b20dc62122789c8a9f3dd"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/recovery.run.json": {
+      "bytes": 1151,
+      "lines": 27,
+      "sha256": "11a49b52899789a659ede6e9b5c26dd46aff863f94dd4d8c3b3643fe26d3f863"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/review.md": {
+      "bytes": 5393,
+      "lines": 31,
+      "sha256": "c56e46fa5a2f82bcad853cfd1be52fae62b287abff9353eb3af5fafa134c0031"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/history/release/ux-run-summary.json": {
+      "bytes": 360,
+      "lines": 30,
+      "sha256": "0859dbc6936f78108ed5f42543a740d88399b8b14933d4df17db9625c31ba56f"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/inputs.json": {
+      "bytes": 29512,
+      "lines": 603,
+      "sha256": "78fca9aa98ca34b255aa862846a030fbd66edbce2acef53393de53541966410c"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/master-baseline.json": {
+      "bytes": 274,
+      "lines": 8,
+      "sha256": "1a4bf4b3d63f68f95296a6b7c2c43df3acf4e1a94890c306811548371d5a46f9"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/patch-replay.json": {
+      "bytes": 4340,
+      "lines": 139,
+      "sha256": "1bcf5bb7fc2effaf45b36d9f387f0800a8771910152bc23f7e4e8520371cc945"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/preparation-attempts.json": {
+      "bytes": 379,
+      "lines": 8,
+      "sha256": "c3c61afad826874ae90dacfdcc93adc0c35ecb15162ac4c743394d0f006fccd0"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/read-log.json": {
+      "bytes": 691,
+      "lines": 30,
+      "sha256": "cd6136a005935fba156c3972e2b4a8ef526898a4acef6dfcaae8fea3986c1a6f"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source/status_indicator_widget.rs": {
+      "bytes": 15810,
+      "lines": 440,
+      "sha256": "e35e3efbd18784b55343366b2001bda08dfc1543f7e4a88700a715562d519cc5"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source-drift.json": {
+      "bytes": 4966,
+      "lines": 50,
+      "sha256": "9403aa770ff9ded18d35ebfec87c7e5e911ac8fc70df86d535baf27a38665dc9"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source-snapshots/renders_truncated.snap": {
+      "bytes": 134,
+      "lines": 6,
+      "sha256": "8dff35f2dd6280dafbf6e1b682be3ece379257c45e9338efe2558a78dc111258"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source-snapshots/renders_with_working_header.snap": {
+      "bytes": 252,
+      "lines": 6,
+      "sha256": "92ff237e2aefa9fba6e756baa0457a45cd822681872135144f67b5bf4f9fb191"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source-snapshots/renders_wrapped_details_panama_two_lines.snap": {
+      "bytes": 185,
+      "lines": 7,
+      "sha256": "6c7b58356fc0bd55a3e04407e4701a0bba7dc23d7444f2d57ca598f55aab2993"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/source-tests.json": {
+      "bytes": 1530,
+      "lines": 86,
+      "sha256": "4ec4b8c5b8856dd26f49d1a6670548059b4c0f10b1d915fbf1fb75969f691179"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/static-check.json": {
+      "bytes": 1700,
+      "lines": 77,
+      "sha256": "e72feec49101e0c5f9c6e917b0393e0edbea799b1f0644b8bb5e5c4d24b273e5"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/verify_package.py": {
+      "bytes": 2853,
+      "lines": 47,
+      "sha256": "9b30421d698278046b7733d1f8195dd35c268d52686af0252133bfec0b285bfe"
+    },
+    "evidence/history/zs1-309-ready/Docs/quality/stage1/ZS1-309/worker-status-indicator-review-3.1.20/worker-review-receipt.json": {
+      "bytes": 1508,
+      "lines": 39,
+      "sha256": "61ef3be09ca4b68fb8b8ee8ad2dd0525d2db423040f46d2dc29a69539e2627c7"
+    },
+    "evidence/history/zs1-309-ready/README.md": {
+      "bytes": 1544,
+      "lines": 14,
+      "sha256": "89ff6f5f0b02ae1185e57a16b1507bffe709c907124d20e3424d1072c3255b63"
+    },
+    "evidence/history/zs1-309-ready/manifest.json": {
+      "bytes": 19296,
+      "lines": 368,
+      "sha256": "6df39987202ba51f35d30baa6bf8dca4dcab43aa380d52b1e65aa05c08e90b81"
+    },
+    "evidence/history/zs1-309-ready/master.patch": {
+      "bytes": 28447,
+      "lines": 219,
+      "sha256": "31a19cf4957a478108275ba274e448b1182b09e6a90649d29e95f5e1f686127f"
+    },
+    "evidence/history/zs1-309-ready/worker.patch": {
+      "bytes": 30437,
+      "lines": 239,
+      "sha256": "9788dc80aae6d047eabba81e5178aef766e55df3a05de83aac8e3d3052cd34ea"
+    },
+    "evidence/history-comparison.json": {
+      "bytes": 15555,
+      "lines": 309,
+      "sha256": "3a50516a4f4c6d9c4139337e1e100e26e2d5eb84d688f2be5fdfbb0954e83dea"
+    },
+    "evidence/preparation-issues.json": {
+      "bytes": 1120,
+      "lines": 18,
+      "sha256": "06b6fb0b36c050a94168752112d600f8294f78fe72ea5a30ed450880b0c5b1d3"
+    },
+    "evidence/preservation-after.json": {
+      "bytes": 152,
+      "lines": 8,
+      "sha256": "fb85b55f751b3a31e925a5db232ee5fecd98ae0ddd1a7683f501144c45b32fb1"
+    },
+    "evidence/preservation-before.json": {
+      "bytes": 7304981,
+      "lines": 148471,
+      "sha256": "d3fb75d1b3deb90e1bf0ee35f03aeea1d5e35df96be1668710579705f3d5167f"
+    },
+    "evidence/read-binding.json": {
+      "bytes": 22463,
+      "lines": 866,
+      "sha256": "c7a431db8640fe2d16e68a26ca46a9966b8fde84a4b3f229256e707ab426d89a"
+    },
+    "evidence/read.py": {
+      "bytes": 905,
+      "lines": 5,
+      "sha256": "bc1ee86e7c6b8e63849a108be901fdb895be10b9ec8a11addca16505657c0aa4"
+    },
+    "evidence/reads/001.txt": {
+      "bytes": 5082,
+      "lines": 154,
+      "sha256": "90af891141a9b430a366880bf4a074e1f00c9c1e8dade67d06c406c9ae05a73f"
+    },
+    "evidence/reads/002.txt": {
+      "bytes": 5347,
+      "lines": 156,
+      "sha256": "69d26ef29ae80b225fc92bfb11837a1a646974e076520550dd6dc13cbd7ec879"
+    },
+    "evidence/reads/003.txt": {
+      "bytes": 5381,
+      "lines": 130,
+      "sha256": "afd6eda990a9a3dc1b63323b7fd755261992fa09bc8d71d90eceaecadfe58f80"
+    },
+    "evidence/reads/004.txt": {
+      "bytes": 5434,
+      "lines": 152,
+      "sha256": "aff28c705a5f4a4174c9e76471692f397953f6906724ca42526b2ce7570af86a"
+    },
+    "evidence/reads/005.txt": {
+      "bytes": 1096,
+      "lines": 35,
+      "sha256": "7b018cc54324ed5c54346ee3d41c26b1382a41c7b49420e55e884a3d9d006790"
+    },
+    "evidence/reads/006.txt": {
+      "bytes": 2000,
+      "lines": 71,
+      "sha256": "be037639a588c0a7d41c238558fa5f2059a7227078f3aa663446081b12ac96fc"
+    },
+    "evidence/reads/007.txt": {
+      "bytes": 2470,
+      "lines": 81,
+      "sha256": "87e0d9461d0f8d43c03b1e3018b9144235408cf1fb376713b57ad1a1a6f46337"
+    },
+    "evidence/reads/008.txt": {
+      "bytes": 3682,
+      "lines": 91,
+      "sha256": "cfc8d50e2bb1868eed2684567974083d73ea18adb7cf72b569bfc04e817b9688"
+    },
+    "evidence/reads/009.txt": {
+      "bytes": 5621,
+      "lines": 150,
+      "sha256": "9cb91deb2576535e57b39c8d5f0bd88e48e77c7089a94d9861153bccd5248b35"
+    },
+    "evidence/reads/010.txt": {
+      "bytes": 11968,
+      "lines": 73,
+      "sha256": "6af003f7c2897eb5c8270dfc32be6710d99f3e42ebf24b669641f6fd0219877f"
+    },
+    "evidence/reads/011.txt": {
+      "bytes": 10992,
+      "lines": 73,
+      "sha256": "ff92854bea89b8ca4c1ec4896c062f16963a819c1689c4749f83055256434990"
+    },
+    "evidence/reads/012.txt": {
+      "bytes": 5131,
+      "lines": 70,
+      "sha256": "9c0dad81a0ec3e457e1fdcc414ac77ed112f7e7b7e865b125e155ec1145b660e"
+    },
+    "evidence/reads/013.txt": {
+      "bytes": 2309,
+      "lines": 58,
+      "sha256": "81442d6f0ceb832e27b39ea78c10a1605055cebd7ec6163810bdaf4b706ad747"
+    },
+    "evidence/reads/014.txt": {
+      "bytes": 1287,
+      "lines": 31,
+      "sha256": "6092d5cb50d7793f5756c65987db5e796fe89321a675f4633d2b7698bcd7cba1"
+    },
+    "evidence/reads/015.txt": {
+      "bytes": 1749,
+      "lines": 51,
+      "sha256": "42eaecf54ea28a6115688bd7d4abdb55d40958608d68f3a7d6db76c54564100e"
+    },
+    "evidence/reads/016.txt": {
+      "bytes": 3082,
+      "lines": 76,
+      "sha256": "f318d303154ef122b4fe1992592ed0d787588ed9f8fcaddb47e11f36edd4beed"
+    },
+    "evidence/reads/017.txt": {
+      "bytes": 891,
+      "lines": 28,
+      "sha256": "5ed1c6b6cbb04e3cc207e5df0322a740a6017936cc6d9588024d9445ed76ca6c"
+    },
+    "evidence/reads/018.txt": {
+      "bytes": 2691,
+      "lines": 80,
+      "sha256": "7c9ecdf410c892d21c6f7f1f74d0c1b3db47bc06f4f119b843b657b712bbee46"
+    },
+    "evidence/reads/019.txt": {
+      "bytes": 736,
+      "lines": 18,
+      "sha256": "1d57e4fbfe1319eda73450c43a021e6164ce43f4031a46274283306946ab89fd"
+    },
+    "evidence/reads/020.txt": {
+      "bytes": 554,
+      "lines": 15,
+      "sha256": "3502c0a8cf7391c801444e84106cca1c6ace404799ea669caeacd64f143c7628"
+    },
+    "evidence/reads/021.txt": {
+      "bytes": 1577,
+      "lines": 62,
+      "sha256": "da367c83dc585942a13f328247b30cd45ca07794769cb2c52ca5ca9af4ef6085"
+    },
+    "evidence/reads/022.txt": {
+      "bytes": 1087,
+      "lines": 38,
+      "sha256": "c3107cc929cf6ef1e5200d39dde680e57abe1562ec799fdb8f3885070bbb145b"
+    },
+    "evidence/reads/023.txt": {
+      "bytes": 1861,
+      "lines": 39,
+      "sha256": "173ce266004ed8336da0d76dbe8b34717f716fa8e0174fe3c713bb03adfe7089"
+    },
+    "evidence/reads/024.txt": {
+      "bytes": 1207,
+      "lines": 31,
+      "sha256": "bd137e561a43c11e649819188be3df109c484e5a7764a742c7dab47d45a63c35"
+    },
+    "evidence/reads/025.txt": {
+      "bytes": 1609,
+      "lines": 33,
+      "sha256": "6e18a8469feb69701a53024366a24e3e95fdc64e8a919705f06f110885388bad"
+    },
+    "evidence/reads/026.txt": {
+      "bytes": 4663,
+      "lines": 108,
+      "sha256": "d071e05cc21e23d76b6704addc15ee0c0baf5a427d8164cc7c1fbf3af6debce0"
+    },
+    "evidence/reads/027.txt": {
+      "bytes": 1899,
+      "lines": 46,
+      "sha256": "10a85cd0d009ebc7c921ede2743295c6c7d653485f08fb05761757b68cc07311"
+    },
+    "evidence/reads/028.txt": {
+      "bytes": 2466,
+      "lines": 47,
+      "sha256": "8483f2e90cbd9bd0a5be0b4da002e52f8d5d8923eefb43e6343482a52490ad43"
+    },
+    "evidence/reads/029.txt": {
+      "bytes": 1292,
+      "lines": 35,
+      "sha256": "42d124ce2a7f5cc84e2e48114ffe0b290459adc4c1324ce0eb40fdd02683cbea"
+    },
+    "evidence/reads/030.txt": {
+      "bytes": 927,
+      "lines": 28,
+      "sha256": "5aea9aba3bf50524892a849176af62d3bc7de20d97cdfa7c39e592e60356008c"
+    },
+    "evidence/reads/031.txt": {
+      "bytes": 1066,
+      "lines": 28,
+      "sha256": "40e6324f8a9de2e242433c96a46d94e444273e9b768131b2d8c1901e29334892"
+    },
+    "evidence/reads/032.txt": {
+      "bytes": 2286,
+      "lines": 73,
+      "sha256": "199337341b45184af8a4631ea5e65c3a7500285634c01e7f5544fc1c8ec0d282"
+    },
+    "evidence/reads/033.txt": {
+      "bytes": 1696,
+      "lines": 69,
+      "sha256": "ce884358f86e0ebc4a4df2010ce7f6af7194a1b0968ce87a57fe28fee1fc6496"
+    },
+    "evidence/reads/034.txt": {
+      "bytes": 1887,
+      "lines": 43,
+      "sha256": "7bacebc6e32bd1bbf09310cc58a9ea271c19790833d3cae477f6221d714e2b38"
+    },
+    "evidence/reads/035.txt": {
+      "bytes": 610,
+      "lines": 16,
+      "sha256": "a7b8d07e6bb173c97bf5ad1f88fb871b5d92e0a4cf9774a27a0869cd9e8ee86a"
+    },
+    "evidence/reads/036.txt": {
+      "bytes": 2244,
+      "lines": 41,
+      "sha256": "a55c01bedbf4e3cb38ee980f7fa21d65abe9f233caf951d24f902164547fede7"
+    },
+    "evidence/reads/037.txt": {
+      "bytes": 1382,
+      "lines": 30,
+      "sha256": "202b3d79a1073ecd0b83a1eda4047cc930fba1834f8bd0ae2657b0a77a4e5ee5"
+    },
+    "evidence/reads/038.txt": {
+      "bytes": 1205,
+      "lines": 26,
+      "sha256": "87f7841e6925a9020590d45aaa3e8a88d42a73a5e79c1b9baacd259d4eedace5"
+    },
+    "evidence/reads/039.txt": {
+      "bytes": 1104,
+      "lines": 28,
+      "sha256": "9837f577ea15d5d419465c5d10827a42912bc207b0697e481d76a2e50e2a9409"
+    },
+    "evidence/reads/040.txt": {
+      "bytes": 134,
+      "lines": 6,
+      "sha256": "8dff35f2dd6280dafbf6e1b682be3ece379257c45e9338efe2558a78dc111258"
+    },
+    "evidence/reads/041.txt": {
+      "bytes": 252,
+      "lines": 6,
+      "sha256": "92ff237e2aefa9fba6e756baa0457a45cd822681872135144f67b5bf4f9fb191"
+    },
+    "evidence/reads/042.txt": {
+      "bytes": 185,
+      "lines": 7,
+      "sha256": "6c7b58356fc0bd55a3e04407e4701a0bba7dc23d7444f2d57ca598f55aab2993"
+    },
+    "evidence/reads/043.txt": {
+      "bytes": 1875,
+      "lines": 20,
+      "sha256": "697590640b31170f46becab07b6db969f11b2da655f8c04be517a13ded9dbfc6"
+    },
+    "evidence/reads/044.txt": {
+      "bytes": 1081,
+      "lines": 24,
+      "sha256": "93f2082b34c65c2dd6285cff7e2daae5ef817812a7eafec5f4efde7bf33773cd"
+    },
+    "evidence/reads/045.txt": {
+      "bytes": 644,
+      "lines": 19,
+      "sha256": "3a69fd8b1e0bc5b0af4c538dce83a4065cca1daf4a0212e27f7d7092fd0f238f"
+    },
+    "evidence/reads/046.txt": {
+      "bytes": 1558,
+      "lines": 32,
+      "sha256": "a8234b0d57c89d22fe67d1e322d200c3e3586985daa6891fc2ac3a30b3271a66"
+    },
+    "evidence/reads/047.txt": {
+      "bytes": 725,
+      "lines": 25,
+      "sha256": "18cde3845b3228a20f327a49322d0653e62b7467a80ff986dc99373a395f024b"
+    },
+    "evidence/reads/048.txt": {
+      "bytes": 3351,
+      "lines": 13,
+      "sha256": "cc9d32ede10fd862fd866fd7d0723cbd0b70302d952aaf58cab5a8515fcfa255"
+    },
+    "evidence/reads/049.txt": {
+      "bytes": 6132,
+      "lines": 14,
+      "sha256": "82dd2db493e7b42122a841529595f99fd8cde3ad864ee8e5f50d704b82fa82da"
+    },
+    "evidence/reads/050.txt": {
+      "bytes": 1053,
+      "lines": 4,
+      "sha256": "dbc6a6d8d6622bea39da7fecd94063c791359d3dbfe2c82eda3432ff6c6e124d"
+    },
+    "evidence/reads/051.txt": {
+      "bytes": 1044,
+      "lines": 32,
+      "sha256": "a100e040048181ef7e362fdcdeb7c00cf76f0bdc498dfa82f6985697da081c98"
+    },
+    "evidence/reads/052.txt": {
+      "bytes": 570,
+      "lines": 1,
+      "sha256": "5b5211926b883dff7654f7bd7efa46162871a1a8a069ce43dbe4b47d9bf27971"
+    },
+    "evidence/reads/053.txt": {
+      "bytes": 459,
+      "lines": 1,
+      "sha256": "9329f272e80434453f452fa47410c258dd97f775f5afdcb289b8b77defe81571"
+    },
+    "evidence/reads/054.txt": {
+      "bytes": 1834,
+      "lines": 29,
+      "sha256": "ac5785d4ab5651bab5628278bb89c648beef70a735f4d6a9d82889fa51ab7a6c"
+    },
+    "evidence/report-binding.json": {
+      "bytes": 418,
+      "lines": 13,
+      "sha256": "ec890ede9a5ff4c3cea972678f23029de7150f5c2d52b24e04feff3147b3ca00"
+    },
+    "evidence/report.py": {
+      "bytes": 19494,
+      "lines": 106,
+      "sha256": "a0a59ffd8397c0ae28c1523835d236cac96d74d8a248b7ec3b1b5566e1bd1a3c"
+    },
+    "evidence/run_frozen_verify.py": {
+      "bytes": 969,
+      "lines": 5,
+      "sha256": "8fe84e7a5f82719b565b42b5d7309809ef4265e7f0e891d5c47ea47f1e42013c"
+    },
+    "evidence/source-tests.json": {
+      "bytes": 1639,
+      "lines": 72,
+      "sha256": "b31fb384fd0703c976bed8ced4897d7264730cf5b99503100a04c6a3a0aaa8a0"
+    },
+    "evidence/source-units.json": {
+      "bytes": 9525,
+      "lines": 422,
+      "sha256": "46fa2d6c7d14d3c4cca8dfdfca6b4223bb553cfd0d10de79fc6b30d39019ab57"
+    },
+    "files/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md": {
+      "bytes": 23290,
+      "lines": 137,
+      "sha256": "97dd06e7a5f49a84558b0119b6e76a6f055f83313ec4110edd2ef9b6e4c05d6f"
+    },
+    "rollback.patch": {
+      "bytes": 23567,
+      "lines": 140,
+      "sha256": "ce3eb12bd5c9a6eef1710f2894f2543298811580929075f460fc224c831ed892"
+    },
+    "verify.py": {
+      "bytes": 4383,
+      "lines": 39,
+      "sha256": "5a7dfdfc5ecefbce7c68431784efb0cc4c57dc3cc1102288043c6015b71441ed"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "project": {
+    "project_id": "94db8acb0ed7f6e5ee52692c39ee92682db7f99d4774af86ba73f04d77f9d883",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/provider-kill-integration/actual/anthropic/partial-master",
+    "session_id": "session-1789190499925-61809-0"
+  },
+  "schema_version": 2,
+  "id": "inspect",
+  "type": "response",
+  "command": "recovery",
+  "success": true,
+  "data": {
+    "accepted": true,
+    "action": {
+      "action": "inspect"
+    },
+    "automatic_retry": false,
+    "command": "recovery",
+    "execution_started": false,
+    "new_attempt_required": false,
+    "operations": [
+      {
+        "idempotency_key": "provider-0262590bd208ff5ebb91f48d32f39c2e0a054473d7202d2ab639d0926c5f6ce7",
+        "kind": "provider",
+        "operation_id": "provider-turn-1789190499959-1",
+        "retry_requires_confirmation": true,
+        "state": "unknown_outcome",
+        "turn_id": "turn-1789190499959-1"
+      }
+    ],
+    "pending_count": 1,
+    "route": "local",
+    "tools": [],
+    "truncated": false
+  },
+  "code": "ok"
+}

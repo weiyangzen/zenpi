@@ -1,0 +1,15 @@
+{
+  "source": "packages/coding-agent/src/core/tools/output-accumulator.ts",
+  "checks": [
+    "empty/default/no-spill/idempotent-close",
+    "split-UTF8/current-line/finish/append-after-finish",
+    "byte-threshold-spills-prefix-and-tail",
+    "line-threshold/trailing-newline/raw-preservation",
+    "decoded-byte-count-differs-from-raw-invalid-UTF8",
+    "finish-flushes-incomplete-decoder-and-spills",
+    "rolling-trim-aligns-UTF8-and-complete-line",
+    "single-long-line-retains-tail",
+    "path-existence-is-not-write-completion/error-close-rejects"
+  ],
+  "passed": true
+}

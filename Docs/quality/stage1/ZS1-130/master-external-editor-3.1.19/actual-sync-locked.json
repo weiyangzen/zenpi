@@ -1,0 +1,23 @@
+{
+  "started": "2026-09-12T06:01:41.238722+00:00",
+  "production_binary_sha256": "7a374a3b0764c7a4db9b3b53e36dc07d3d8b17b80f5711805a932a2090e60774",
+  "build_argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "build",
+    "--offline",
+    "--manifest-path",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-sync-locked.sync-build/Cargo.toml"
+  ],
+  "build_cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "source_lock_sha256": "7311d1133e06e428707d9aa10c95c6a0c1efa983865472f6b5e24b640f4b1348",
+  "checks": {
+    "public_sync_host_editor_roundtrip_then_explicit_submit_exact": true
+  },
+  "build_exit": 0,
+  "consumer_lock_sha256": "67c512ec5149af8b4dd26d248c1a5495cca446d615676bd2b7161ef8454a5d49",
+  "probe_sha256": "1e73c4c63ac88a1496f742e2fb5a926c8a818c24e96faa79d00b460fde2610d9",
+  "status": "passed",
+  "exit": 0,
+  "ended": "2026-09-12T06:02:12.613888+00:00"
+}

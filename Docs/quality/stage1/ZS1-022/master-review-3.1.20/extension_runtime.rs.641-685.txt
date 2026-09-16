@@ -1,0 +1,45 @@
+    }
+}
+
+// Match the command owner's fail-closed platform boundary. Blocking anonymous
+// pipe workers cannot provide this contract; a native cancellable pipe adapter
+// is required before enabling executable extensions on another platform.
+#[cfg(not(unix))]
+fn exchange_frame(
+    _command: &mut Command,
+    _encoded: &[u8],
+    _limit: usize,
+    _timeout: Duration,
+    _lease: Option<&ExtensionLease>,
+    _cancelled: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, ToolError> {
+    Err(ToolError::Unsupported(
+        "cancellable extension pipe I/O is unavailable on this platform".into(),
+    ))
+}
+
+#[cfg(unix)]
+struct OwnedChild(Child, bool);
+#[cfg(unix)]
+impl OwnedChild {
+    fn terminate(&mut self) {
+        if self.1 {
+            return;
+        }
+        self.1 = true;
+        #[cfg(unix)]
+        unsafe {
+            libc::kill(-(self.0.id() as i32), libc::SIGKILL);
+        }
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+#[cfg(unix)]
+impl Drop for OwnedChild {
+    fn drop(&mut self) {
+        self.terminate();
+    }
+}
+
+// Reject duplicate members before converting any hook reply to Value. In

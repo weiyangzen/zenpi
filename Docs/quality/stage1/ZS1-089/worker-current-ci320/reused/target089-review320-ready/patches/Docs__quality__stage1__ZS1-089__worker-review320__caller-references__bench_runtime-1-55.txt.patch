@@ -1,0 +1,60 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-1-55.txt b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-1-55.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/bench_runtime-1-55.txt
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""Reproducible zenpi size/startup/RSS/runtime/render/layout budget probe.
++
++This is a regression gate, not a statistical latency benchmark.  Every timed
++case reports all raw samples plus min/median/max; it deliberately makes no p95
++claim. Run from the repository root after installing the declared Rust MSRV.
++On Apple Silicon macOS it selects the repository's stable ARM64 toolchain.
++"""
++
++from __future__ import annotations
++
++import argparse
++import base64
++import datetime as dt
++import hashlib
++import json
++import os
++import pathlib
++import platform
++import statistics
++import signal
++import subprocess
++import sys
++import tempfile
++import time
++from typing import Any
++
++
++ROOT = pathlib.Path(__file__).resolve().parents[1]
++
++BUDGETS = {
++    "normal_dependencies_max": 16,
++    "release_binary_bytes_max": 8 * 1024 * 1024,
++    "cold_start_max_ms_max": 1000.0,
++    "cold_start_peak_rss_max_bytes": 96 * 1024 * 1024,
++    "queue_round_trip_max_us": 2000.0,
++    "render_max_us": 10000.0,
++    "layout_max_us": 100.0,
++    "coalesced_frames_max": 1,
++}
++
++
++def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
++    # CI and developer machines may have a host-default toolchain that does
++    # not match the checked-in macOS ARM build target. Keep the probe aligned
++    # with the release commands used by this repository while preserving the
++    # platform default elsewhere.
++    if command and command[0] == "cargo" and platform.system() == "Darwin" and platform.machine() == "arm64":
++        command = ["cargo", "+stable-aarch64-apple-darwin", *command[1:]]
++    return subprocess.run(command, cwd=ROOT, text=True, check=True, **kwargs)
++
++
++def summary(samples: list[float]) -> dict[str, Any]:
++    return {
++        "samples": samples,

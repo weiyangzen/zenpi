@@ -1,0 +1,5 @@
+# ZS1-088 complete library index review [_]
+
+Current42lines844bytes and original31lines592bytes bothreadcompletely. Current3d6a3b... snapshot has40publicmod declarations;29oldretained11added, providersusesmod.rs and39useNAME.rs. Everyentry resolveduniquely; module-resolution records fullsourcehash as context only. No runtime code inthisfile; fullperlinetable andcompile/runtime/cancel/recovery/publicvisibility boundaries are innewreport. No priorreport existed.
+
+Authority3.1.16.116integrated/8productionchecks aremainreported;122scratchonly. Currentindexmatcheslib.rs intheactual079main-snapshotcompile inputs; originalreceipt/log reused, not088testexecution. Currentmodulesiblingcontentmaydifferlaterandisnotaccepted throughthisindex. Main/Cargoentry context frozen. No newbehavior/cargorun. Structuralchecks/hash/range/reference verification distinctfromG-FILEsemantic acceptance. G-STAGEread-only missingmaster isnotpass. Rollback removesnewreport/evidence only;no product/CI/moduleindexchanges.

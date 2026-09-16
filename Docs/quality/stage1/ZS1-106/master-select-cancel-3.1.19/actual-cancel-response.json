@@ -1,0 +1,17 @@
+{
+  "project": {
+    "project_id": "ab7dc64cde7d4a74daad195f26196fd447db77261ae419335d044ff73be08246",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/branch106-select-cancel-integration/actual/fixture/initial",
+    "session_id": "session-1789194792524-19964-0"
+  },
+  "schema_version": 2,
+  "id": "cancel-select-now",
+  "type": "response",
+  "command": "cancel",
+  "success": true,
+  "data": {
+    "cancel_requested": true,
+    "target_id": "cancel-this-select"
+  },
+  "code": "ok"
+}

@@ -1,0 +1,282 @@
+{
+  "item": "ZS1-115",
+  "status": "[_]",
+  "authority_version": "3.1.16",
+  "authority_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f",
+  "observed_authority_file_sha256": "fb1521f0835eabcfd8991871f6bbfb8509d14e106d1e56d0168897a1fae4930f",
+  "worktree": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "scope": "Test-only replacement of generalAPI2 Python fixture with compiled real subprocess helper+dedicatedFD3. All17 originaltest assertions preserved;17actualpass+5repeatedinittrials;strictlint;no product budget/code changes.",
+  "source": {
+    "path": "tests/stage1_extension_hooks.rs",
+    "base_sha256": "046911e0258202bcd1358cadc7f5c6e7f62f54fd71fbcfd1f8633c1d889c1fae",
+    "sha256": "aa7ed6e8fefe1ec513fcbf0753f17e082b103e381b0eb8c653a6b4cd126d0453",
+    "bytes": 36581,
+    "lines": 1025,
+    "legacy_scripts": "unchanged bodies;twofilepathrenames only",
+    "main_code": "readonly/current116not overwritten"
+  },
+  "files": [
+    {
+      "path": "tests/stage1_extension_hooks.rs",
+      "base_exists": true,
+      "base_sha256": "046911e0258202bcd1358cadc7f5c6e7f62f54fd71fbcfd1f8633c1d889c1fae",
+      "base_bytes": 33207,
+      "sha256": "aa7ed6e8fefe1ec513fcbf0753f17e082b103e381b0eb8c653a6b4cd126d0453",
+      "bytes": 36581,
+      "lines": 1025,
+      "patch_sha256": "af9522a7b862d36680aa782d8624491f22d4894f7bffbea74a3be2008e70210a",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/README.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "46170a945a44a3eee784406401639a9a749e3ac96c68a93647a15e262f7560bf",
+      "bytes": 4741,
+      "lines": 15,
+      "patch_sha256": "f755e8274085530e876142b120a28e94f7bcd022870c915e2832045144f54fba",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/artifact-index.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "8ed839dfcf49af75cf5db456ee01d7627b34777aaf34e31521ab4b44fa650fd4",
+      "bytes": 3963,
+      "lines": 102,
+      "patch_sha256": "ebe6f18bbcc056c778b1305b8455ca36593e2fd4209b32f614d28ba0ff87ae4d",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/base-manifest.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "7515e46b8f0944d45661df74333e3cc455563109ce79de5f4d5ca0a0d219863a",
+      "bytes": 3370,
+      "lines": 80,
+      "patch_sha256": "a2fa84748113ba0997b59ec4af591daab46e7949ea0a844461f93163f2832d8c",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/baseline-stage1-extension-hooks.rs",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "046911e0258202bcd1358cadc7f5c6e7f62f54fd71fbcfd1f8633c1d889c1fae",
+      "bytes": 33207,
+      "lines": 931,
+      "patch_sha256": "d6eb23391ef60eb57a1431dc35185124d7f787fecdb6547099895deef1298181",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/clippy-final.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "d9beeb65b2a841e5c9762bb78e6cb1881869219fe02588b531e6c01746835281",
+      "bytes": 907,
+      "lines": 29,
+      "patch_sha256": "889bf1251eeb0b97b52e5d66790d74169ec4e1c53e153346e9116001523efbe2",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/clippy-final.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "b65fcfc28837853138c420eb774a9be6a0213a9cc6dcbfd1017f819690befad2",
+      "bytes": 147,
+      "lines": 2,
+      "patch_sha256": "39860961817416b908e0a3e8bf28420470f556889bbbb8ce99f1bc67b8161038",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/evidence-verified.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "37f0d4a3986f14997bf74a396b2d43a254874fbfd69864997e697ac5480bd8bf",
+      "bytes": 850,
+      "lines": 22,
+      "patch_sha256": "6ace4f137397bc9f39704a84925a94ed76820739c6597a1e12fc41a540caf9fe",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/evidence-verified.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "08a215368962202da9b3a3bed20fe1acf8312569f207aba9ac265a0e4f781d3d",
+      "bytes": 2651,
+      "lines": 56,
+      "patch_sha256": "b166853f62662eba5ffefcb7672e93f0b6e8e14a0724ee4b7b322cc93cb3d2ec",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/fmt-final.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "75b452fcb123042a3aff8e8195d98621121c0ed1e910fff3ba57e02e2d187071",
+      "bytes": 838,
+      "lines": 26,
+      "patch_sha256": "0278dfe3457ec534e0760d96453cf53ccf34e583fa6bf80363356cb540296009",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/fmt-final.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "lines": 0,
+      "patch_sha256": "6e0dc478d27074a12ea6551c31fc2bf303c817ea6ed88524a4697b21e084f43a",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/initialization-five-processes.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "2878f4663d8b8182c47881c834b17694fa819506d1faca233bdd59c66e58fd36",
+      "bytes": 879,
+      "lines": 22,
+      "patch_sha256": "b9bc341c490333c5e5f12ccea725f81c1cc10421063b7892d7e2958b2a794288",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/initialization-five-processes.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "89fb4b84077342c91def449ef65492aff1510aa487700e1243d0bac06a8c6686",
+      "bytes": 3336,
+      "lines": 100,
+      "patch_sha256": "0974f316959999e159cc6c156df6fe2cbfc2094df11389efc898f19363895fff",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/main-before-owner-tests.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "d82bed0ac0c8e64224192141f29800fe0d9dba5ce52ba68f71fab0534614083a",
+      "bytes": 13520,
+      "lines": 29,
+      "patch_sha256": "b42920b79a4d5f936bbf0e62d05fc78a53275be173dfa503d9c9ca375a83ed0e",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/main-before-owner-tests.run.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "7e75dc160016e74e7cdeaa5bf8552e47f9a440d4af86fa9aaee908b02edc8939",
+      "bytes": 940,
+      "lines": 30,
+      "patch_sha256": "ed644574cee5b0107856dafcd8063ec007e65a56b6d137450fdff50116f8ca44",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/main-earlier-extension115-first-tests.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "a129b60bf68784300f6572b36909d554dd09af1f6ad1d8d3c836d5bce9398dd0",
+      "bytes": 5395,
+      "lines": 97,
+      "patch_sha256": "8ed87dabcc1aacc71d7d6116a1807e804c256f1a37a139246eb07061ea0a9e2e",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/main-integrated-tests.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "e0366178773fd3b23684b3917a8490ae3b8b0b2784f3747480b09c5b5beca866",
+      "bytes": 12028,
+      "lines": 196,
+      "patch_sha256": "3cbb006b9da323b889ae1a9017dae87956b4807f033c9c7e1d02963372168188",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/main-integrated-tests.run.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "26b97a3f8ea6336a5bad8b77e65426e474804af8a8b8c157eacdbc896338986a",
+      "bytes": 1294,
+      "lines": 48,
+      "patch_sha256": "d16064536af650385b03ed3ee17d249917271f1ed706d419ae2060baf31dd4b2",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/native-owner-17.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "fae9d5bc0b31ace1443639a27e0644f07963b00745c857e223f997f6f9c48fc7",
+      "bytes": 918,
+      "lines": 28,
+      "patch_sha256": "e95e8b9918a88399fb9b0dff3e81113e0484b701e345b263bc8df8e095e9ac56",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/native-owner-17.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "1c8bd339c6a5d22ab2156a0e22a45b016f51b66c3192ddb188b6cca1dcc465f6",
+      "bytes": 1745,
+      "lines": 26,
+      "patch_sha256": "c45e3e24f0455107fec9351b21eaf82e6112f58867c03d25e2d9a71daedeb535",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/repeat_initialization.py",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "9115fec750e88d0386206db04b5a41c72071474be7175af9b01d909be1e2c6e8",
+      "bytes": 1127,
+      "lines": 12,
+      "patch_sha256": "87919d2c3934c8f7e1f5c469b952b01a96f6ed05aeea344a5e3f8a68836974b7",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-115/worker-native-fixture/verify_evidence.py",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "5e871de3de6fdec0fa599370f5e0b69fec0ccd6c7a323ed8584621f394cb80e5",
+      "bytes": 3138,
+      "lines": 28,
+      "patch_sha256": "3aa42b34306aae5f0951cf8b533017de50c4430e3bce8a44b77fff3e1b4d9a20",
+      "status": "[_]"
+    }
+  ],
+  "validators": [
+    "native-owner-17",
+    "initialization-five-processes",
+    "clippy-final",
+    "fmt-final",
+    "evidence-verified"
+  ],
+  "evidence_directory": "Docs/quality/stage1/ZS1-115/worker-native-fixture",
+  "patch_sha256": "9fe35acb39cf0b9482b82ca6a7757862ae6f1c6c738af3e2259fcb5a4cb20b3e",
+  "patch_bytes": 113495,
+  "runner_sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8",
+  "verification": "git apply --check, forward full-byte hash verification, reverse --check and exact base restoration; new evidence paths removed by reverse",
+  "immutable_prior_manifest_hashes": {
+    "extension115-ready": "300d3a1cb9c7c58ecee77a459e6846637bc9354bfdedf2996f10fb1f6bf6a2f4",
+    "transport-ready": "4d717a16524918b80d06eeb44ecb6c95f17b94e5f522d978f89fd72d7b06799d",
+    "anthropic-ready": "6e931d64d957735fd624792d83b7c83a5e62258fb40f9a39dd00db218f62295a",
+    "gemini-ready": "a3f4c6b9ab250885ac15bcf04a0b5bb326f35286702c294dbac4059c66e83e26"
+  },
+  "frozen_at": "2026-09-10T22:06:51.663916+00:00",
+  "integration": "Main reviews and integrates only this candidate delta; shared main repository was read-only. No acceptance mark or commit."
+}

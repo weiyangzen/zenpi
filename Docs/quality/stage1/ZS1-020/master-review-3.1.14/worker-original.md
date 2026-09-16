@@ -1,0 +1,43 @@
+# ZS1-020 — packages/coding-agent/src/core/prompt-templates.ts
+
+Worker candidate: [_]. learn_mode: understand. Master semantic review remains required.
+
+source_id: `SRC-0925`
+source_path: `packages/coding-agent/src/core/prompt-templates.ts`
+source_hash: `e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a`
+source_bytes: 8079
+source_lines: 285
+coverage: complete byte range [0,8079); lines 1–285, read in order, including comments, declarations and tests. No input exceeds 256 KiB. Hash matches the frozen blueprint input.
+review_baseline: inherited dirty snapshot at HEAD `6f252a20c628e9b1ede14e2887acc04657c71d7c`; this report describes that input, not subsequent implementation.
+
+## Complete behavior review
+
+- Imports and PromptTemplate (1–18) combine name, description, optional argumentHint, eager body content, SourceInfo and absolute filePath. Templates and skill metadata are distinct records.
+- `parseCommandArgs` (24–54) scans once, joins adjacent quoted/unquoted fragments and splits all unquoted whitespace. Single/double quote delimiters disappear; opposite quote inside a quote remains literal. Empty quoted strings disappear, unmatched quote accepts accumulated text, backslashes do not escape quotes. No subprocess or shell expansion occurs.
+- `substituteArgs` (71–107) uses one regex replacement over original template: $N, $@, $ARGUMENTS; ${N:-default}, ${@:-default}, ${ARGUMENTS:-default}; ${@:N[:L]}. Missing positional indices become empty, defaults apply for missing/empty, slices are one-based with zero clamped to first and length zero empty. The callback inserts argument/default strings literally, never scans replacements again. Multi-digit placeholders are consumed wholly; unknown syntax remains, backslash is not a dollar escape, $1.5 replaces only $1.
+- `loadTemplateFromFile` (109–142) reads UTF-8, removes frontmatter via parser, derives name from basename without .md, takes description or first nonempty body line truncated at 60 JS code units plus ellipsis; optional nonempty argument-hint is retained. It catches all read/parse errors and returns null.
+- `loadTemplatesFromDir` (147–185) scans only direct .md file children, follows file symlinks, skips broken links and directories, returns accumulated results after directory failure. It does not recurse, apply ignore rules, sort, deduplicate or bound input/body size.
+- Options and `loadPromptTemplates` with `isUnderPath`/`getSourceInfo` (187–263) normalize cwd/agent and explicit paths. Default order is global then project, then explicit; paths are resolved relative to cwd with trimming. User/project/temporary SourceInfo uses path ancestry, temporary baseDir is file parent or directory. Missing explicit paths, unsupported extensions and reads are silently skipped. Duplicate names remain in returned array.
+- `expandPromptTemplate` (269–285) only considers leading slash at byte zero; regex permits newline-separated arguments; first exact case-sensitive template-name match is parsed/substituted. Unknown commands, non-slash inputs and slash-only input are returned unchanged. This is template expansion, not a control-command authorization layer.
+
+## Errors, cancellation, recovery and side effects
+
+All functions are synchronous with no cancellation or persistence; replacement is pure and discovery only reads files. Reload requires caller to invoke loader again, otherwise retained bodies become stale. Failure diagnostics are absent. Standard JS slicing may split a description surrogate pair; Rust should choose a UTF-8-safe boundary. Empty quotes and unmatched quote leniency intentionally differ from existing zenpi slash tokenizer; do not change the control parser to emulate template parsing.
+
+## Source tests and behavior criteria
+
+`test/prompt-templates.test.ts` inspected for substitution, positional defaults, slicing, quote/special/unicode handling, newline invocation and argument-hint fixtures. Assertions explicitly require nonrecursive inserted $1/$ARGUMENTS/defaults, zero/oversized slice handling, literal backslash, skipped empty quotes. Source test execution not claimed. Useful independent criteria: substitute "$1 $ARGUMENTS" with ["$2", "$(touch marker)"] produces literal markers and no file; expand unknown /name is unchanged only inside template expansion, never bypasses host slash denial.
+
+## Zenpi mapping and gaps
+
+Baseline `src/skills.rs` has eager TOML instructions and hooks but no independent templates. `src/slash.rs::tokenize` preserves empty quotes, supports escapes and rejects unmatched delimiters; it has fixed commands and rejects unknown slash text. `src/slash_actions.rs` implements diff/attachment owners only. ZS1-114 needs its own template parser/loader and coordinated host admission after built-in control resolution, preserving existing public grammar. No implementation credited from this report, no shell feature implied by bash-style placeholder syntax. Directory closure belongs to ZS1-056.
+
+## 3.1.13 actual-source supplement
+
+The earlier baseline review above is retained as historical evidence. Its pre-supplement SHA256 is 6bb8c16025b942203683892f6d7cdb2d5bde5faa793c22c0fd763b1d83fc6f71. For this supplement the entire unchanged 285-line source was reread in order, along with relevant actual frontmatter/path/source-info dependencies and current target prompt implementation. Existing resources-ready manifest SHA256 c4dc9f3f1dc49ba0d672c6bbf6904ee4793743755839f39068cfe8d9e60949d5 and Rust validation are referenced by hash in Docs/quality/stage1/ZS1-020/worker-source-probe/reused-evidence.json. Those existing successful validators were not rerun simply to manufacture evidence. Source bytes remain e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a.
+
+The new probe invokes the unchanged TypeScript exports through Bun, actual filesystem, actual yaml 2.9.0 and all real imported helpers, with zero mocks. All 27 independent cases pass; source-native.json/log retains the exact invocation and result. Besides the earlier static criteria, execution demonstrates that default order preserves duplicate names and expansion chooses global first; explicit repeated file paths stay duplicated; source follows file symlinks and silently skips broken/directory links, bad YAML and missing files; malformed UTF8 decodes to replacement characters; empty bodies and non-string frontmatter metadata are accepted; unterminated frontmatter remains ordinary body; 60 UTF16-unit truncation can split a surrogate pair. These are source observations, not recommended target behavior. Pure substitution treats inserted shell-like strings literally and never creates the marker file. Old returned bodies remain eager snapshots after a file changes, while calling the loader again rereads it.
+
+Current target src/prompt_templates.rs SHA256 1b3f2531d6f292a0d1ab24b9b4c69f3780cefb528437102bea316ec5e8197a06 and tests/stage1_prompt_resources.rs SHA256 1bbdbff6927a996a06c08bb7afe84d9a94f25722b89c757d7bd1867a9c46a40f still exactly match the earlier resources-ready files. PromptTemplates::load:80 sorts direct files, checks bounds/cancellation, rejects symlinks and malformed/missing explicit resources, deduplicates same-file references, selects explicit > project > user and reports collisions. expand:203 returns None for unknown names so host control denial remains authoritative. parse_command_args:248 preserves source template quoting separately from the control parser; substitute_args:278/placeholder:341 implements single-pass bounded UTF8-safe substitution. read_template:387 validates filenames, metadata types and nonempty text; split_frontmatter:462 rejects unclosed YAML and additionally accepts a YAML `...` terminator, unlike source extraction. Source's permissive invalid inputs, duplicate order, symlink behavior and UTF16 truncation are intentional target differences. NUL/input/catalogue/output limits and cancellation are target guarantees, not source guarantees. The existing 12-test resource suite and later 68-pass host/dependency recheck are historical supporting evidence, not current full-tree acceptance.
+
+Only this existing report and new source evidence changed. No budget rerun, upstream full test suite, tsc, race/permission fault injection, live service or Windows execution is claimed. Synchronous discovery has no source cancellation, session persistence or transactional owner; target resource owner is reviewed separately under 021. File and directory remain worker candidates [_].

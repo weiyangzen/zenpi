@@ -1,0 +1,24 @@
+{
+  "name": "source-run",
+  "argv": [
+    "env",
+    "NODE_BIN=/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "sh",
+    ".ops/stage1_execution/source027-integration/work/run.sh"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-10T23:01:57.477361+00:00",
+  "ended_at": "2026-09-10T23:02:00.300810+00:00",
+  "elapsed_seconds": 2.823329583,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 145260544,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source027-integration/source-run.log",
+  "bytes": 219,
+  "sha256": "28f1505512cd72e886d97697f29212f25fb1a35f54b5a2bf258a73eb2a1bdd56"
+}

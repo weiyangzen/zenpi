@@ -1,0 +1,137 @@
+{
+  "complete": false,
+  "artifacts": {
+    "integrate_shutdown_321_current.py": {
+      "bytes": 4406,
+      "sha256": "d086879b597f6eda6f0e6fc33b3c2b4b9296874295f3c497f67117b78c7f1c6c"
+    },
+    "inputs-after.json": {
+      "bytes": 31648,
+      "sha256": "6fa4e2fcc9ebb73eab1afd43d6d63cfadf2f6282290cc2cdb7b33bb36b2b8ccb"
+    },
+    "release_shutdown_escape_321.py": {
+      "bytes": 3347,
+      "sha256": "e8146732cddfd2eae4c24c28c40f31f30fb3e9391bdf51719eee038555f7c7b6"
+    },
+    "root-tests.log": {
+      "bytes": 6413,
+      "sha256": "a87df0e2ee5a6631877918f511beab181c392bb5a50b03bbf4e45040406c4a24"
+    },
+    "embedding-binary.json": {
+      "bytes": 103,
+      "sha256": "a347835ad2e58a68a036758f82b1c7f08af1dc628a646eafaeb76afbab3389fb"
+    },
+    "root-tests.run.json": {
+      "bytes": 646,
+      "sha256": "a4395afb0d3be276bb595e2af30d27430131fed0bbba1303b14d553a01df3b13"
+    },
+    "root-clippy.run.json": {
+      "bytes": 588,
+      "sha256": "5a109a3afb06268eb46b2b317352a8a23d77d8eca05b3a3bd00ce29806babede"
+    },
+    "root-fmt.run.json": {
+      "bytes": 485,
+      "sha256": "6b98dc5c6a6d84d37386d98c135267b2e09a7af006137d41f097d76caa2b1a3e"
+    },
+    "embedding-inputs.json": {
+      "bytes": 31786,
+      "sha256": "c9d1abf7bb2ca47dc286a324ca6bce9806ec60476f7053bc0a0901449239e5b1"
+    },
+    "embedding-input-drift.json": {
+      "bytes": 580,
+      "sha256": "3b61e4d682763ef7fd4a37e2b01199e3371e1f153f4d7a8edb29359a59541add"
+    },
+    "inputs-before.json": {
+      "bytes": 31648,
+      "sha256": "16be38c6daace4cef3844825efaf1c97f7ceec67a5f05ba488fea3630376bf5e"
+    },
+    "master-verification.json": {
+      "bytes": 34291,
+      "sha256": "591a74410ff88fcf36019fb45f072db7eceab1c8ceb52559bab4bdc2dfebed7e"
+    },
+    "controller-raw-probe-verification.json": {
+      "bytes": 2161,
+      "sha256": "f01b94aef1fb59ab1e7d091367b99820eb922925314d49454aa2e96a2a54baf5"
+    },
+    "controller-gantt-draft.json": {
+      "bytes": 431,
+      "sha256": "31bf1f5e5ee28c5e8afd35551ca404ac7e69e6238e08ee730190c9d5667d4a00"
+    },
+    "review.md": {
+      "bytes": 5982,
+      "sha256": "c5e10cf463b1d8393eddc71cc0d634b77414a1bb408e0a7e67ec49bd89ea6f0b"
+    },
+    "integration-evidence.tar.gz": {
+      "bytes": 72425359,
+      "sha256": "fd1fe9523e242547ba93275302c85a2609bdd05621177c157dcde7a20078fb0f"
+    },
+    "publish.py": {
+      "bytes": 9346,
+      "sha256": "52bc2448be8b53219f780b47aab79073adba4b1b88b1aa64ff04199a89ce1541"
+    },
+    "release-hosts/zenpi-release": {
+      "bytes": 6073392,
+      "sha256": "6891df5d13a373eff656f8c99a5b5367f9ddb4e502f159d0d925162ec6bccbc4"
+    },
+    "release-hosts/budget.log": {
+      "bytes": 12590,
+      "sha256": "ca58971cae1effa00e39ac5bee3e918225cccb952ae71832a7681e68920a260b"
+    },
+    "release-hosts/kill-yank.log": {
+      "bytes": 1027789,
+      "sha256": "863b6172037ee7abbf48671b638be03749a7661a0fc4341ba70392cf90266d80"
+    },
+    "release-hosts/kill-yank.http.json": {
+      "bytes": 56382,
+      "sha256": "6876bac84473c67ca0b8bba493da969213b3eb9233a857502f4fae502970f9bc"
+    },
+    "release-hosts/kill-yank.pty.log": {
+      "bytes": 166559,
+      "sha256": "31b39936f122691d1ed1a9b41862fd4921bfd9189eef2c9d76ccc8374755f375"
+    },
+    "release-hosts/project-plus.json": {
+      "bytes": 640,
+      "sha256": "6b685df32d5724cf50c7a88673b7495c7d6a3328eba6feda3c33b5ea85b642e3"
+    },
+    "release-hosts/project-plus.run.json": {
+      "bytes": 764,
+      "sha256": "cfea4afbfa041d72988fdeeb03397ed7c1dd8c39c9eeeaeda9badbfccc0e8c56"
+    },
+    "release-hosts/kill-yank.json": {
+      "bytes": 823213,
+      "sha256": "2e979796399176590a8c7faeb30a5896d1d50d685eb412e9efe9f3406abd7e18"
+    },
+    "release-hosts/project-plus.log": {
+      "bytes": 578,
+      "sha256": "c1cef32805cc6edbacff5f418cd6ab36bbc038c7ef04402c0b2f21596ec5be34"
+    },
+    "release-hosts/budget.run.json": {
+      "bytes": 778,
+      "sha256": "51651caeec0e040b7a1a18a082a966d356b9db1fae7c9fc3afaf137956da825a"
+    },
+    "release-hosts/budget.json": {
+      "bytes": 11631,
+      "sha256": "756bcea12d782113e8cec8f9affcefd10706fd83940e4ce1606bb880c045ef01"
+    },
+    "release-hosts/kill-yank.run.json": {
+      "bytes": 780,
+      "sha256": "fa7e611ee0d80e5a567c05050336b738bed5ecde4b829be1029f67d459030fad"
+    },
+    "release-hosts/binary.json": {
+      "bytes": 103,
+      "sha256": "05a1b1df5c754fb02864adbe9741a31b4607329bda9a9ae7bc209c8a9ba4e5f8"
+    },
+    "release-hosts/startup/sample-00.json": {
+      "bytes": 2567,
+      "sha256": "d4f6567d177a0876c8ba8cd62729a4d589704ef77adf3a9a7e1ef539141ce862"
+    },
+    "release-hosts/startup/sample-01.json": {
+      "bytes": 2562,
+      "sha256": "51b87b221c05217139e70361a9139d2ae6b8d3b445f047d29427f95d1b1f4afa"
+    },
+    "release-hosts/startup/sample-02.json": {
+      "bytes": 2564,
+      "sha256": "800d3882634abbbbace20f4dc5779a96e20fc79772e3659a2d0a01c479d3df32"
+    }
+  }
+}

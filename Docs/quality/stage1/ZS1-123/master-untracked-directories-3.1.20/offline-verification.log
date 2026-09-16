@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "kind": "offline structural checks only",
+  "before_sha256": "eb8cd91d6f84ea977454fe69a2304a2ff56ef714b8356e90e51526f5ce1dfcc3",
+  "after_sha256": "7006078ff6a612b1d7a3cde59965e629919444ff0fb51034f5e86c7dca239831",
+  "manifest_sha256": "ff518bb7cf8213e980f91cfd82d9e2be479bbc473c03c1726774e487e3cf51ed",
+  "patch_exact_apply_reverse": "passed",
+  "only_production_change": "git status untracked-files normal to all plus explanatory comment",
+  "runtime_receipts_verified": 9,
+  "final_inputs": 226,
+  "inherited_unchanged_inputs": 223,
+  "top_level_tests": 39,
+  "nested_env_children_excluded": 6,
+  "unborn_gap_observation_in_total": 1,
+  "new_product_executions": 0,
+  "whole_item_123_acceptance": false
+}

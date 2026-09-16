@@ -1,0 +1,12 @@
+{
+  "tools/generate_stage1_gantt.py": {
+    "previous": {
+      "bytes": 13008,
+      "sha256": "057d15a6f73d12df890a8e94faced766776a72fd0aef2d1534e69fd8b1d0afab"
+    },
+    "current": {
+      "bytes": 13024,
+      "sha256": "be4c66f22b3bc9ce92d6a750caaad11a96ae12124d4ab626d8b66ddbc77313fc"
+    }
+  }
+}

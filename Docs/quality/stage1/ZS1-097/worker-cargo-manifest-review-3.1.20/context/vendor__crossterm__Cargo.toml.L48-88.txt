@@ -1,0 +1,41 @@
+[features]
+bracketed-paste = []
+default = [
+    "bracketed-paste",
+    "events",
+    "windows",
+    "derive-more",
+]
+derive-more = ["dep:derive_more"]
+event-stream = [
+    "dep:futures-core",
+    "events",
+]
+events = [
+    "dep:mio",
+    "dep:signal-hook",
+    "dep:signal-hook-mio",
+]
+osc52 = ["dep:base64"]
+serde = [
+    "dep:serde",
+    "bitflags/serde",
+]
+use-dev-tty = [
+    "filedescriptor",
+    "rustix/process",
+]
+windows = [
+    "dep:winapi",
+    "dep:crossterm_winapi",
+]
+
+[lib]
+name = "crossterm"
+path = "src/lib.rs"
+
+[[example]]
+name = "copy-to-clipboard"
+path = "examples/copy-to-clipboard.rs"
+required-features = ["osc52"]
+

@@ -1,0 +1,25 @@
+{
+  "name": "fmt",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T04:55:14.322961+00:00",
+  "ended_at": "2026-09-12T04:55:15.301837+00:00",
+  "elapsed_seconds": 0.9787461660000001,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 101236736,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/reader-reset-integration/fmt.log",
+  "bytes": 0,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

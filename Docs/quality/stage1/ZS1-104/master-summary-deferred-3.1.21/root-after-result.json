@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "binary": {
+    "bytes": 50751592,
+    "sha256": "380c896c217db04e1f24f7ff2b531dfd6a98e7617180213005041a5e05843e66"
+  },
+  "owned": {
+    "src/context.rs": {
+      "bytes": 30066,
+      "sha256": "fc1138b9d5b3696a10135e70210c9aeb01ecea942dc8c0f19d6885607a835997"
+    },
+    "tests/stage1_semantic_compaction.rs": {
+      "bytes": 42443,
+      "sha256": "a9ca5d8396af6ae2a4ae212607f17d66ae8204b19905bd0cec64dd7579e61a7e"
+    }
+  },
+  "scope": "104 deferred summary rejection through real HTTP adapter; full semantic product acceptance pending"
+}

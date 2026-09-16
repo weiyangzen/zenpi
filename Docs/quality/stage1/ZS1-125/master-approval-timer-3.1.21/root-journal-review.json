@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "executes_product": false,
+  "source": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-approval-timer-integration-3.1.21/root-pty-evidence/workspace/session.jsonl",
+  "source_sha256": "b2778045ed2411e435358680f91b3b75828ff8d4edc0d77558c991898e454658",
+  "source_bytes": 6424,
+  "corrected_counts": {
+    "session": 1,
+    "extensions_selected": 1,
+    "user_shell_input": 1,
+    "approval_resolved": 1,
+    "operation_started": 1,
+    "tool_execution_started": 1,
+    "tool_output_captured": 1,
+    "turn": 1,
+    "tool_execution_finished": 1,
+    "operation_finished": 1
+  },
+  "local_shell_result": {
+    "origin": "user_shell",
+    "exit_code": 0,
+    "child_reaped": true,
+    "stdout": "TIMER-GATE-COMPLETED\n"
+  },
+  "original_pty_driver_exit": 1,
+  "product_exit": 0,
+  "original_pty_behavior_checks_passed": 12,
+  "original_extra_journal_check_passed": false,
+  "explanation": "The extra counter read event.type for every row, but session and turn use top-level kind. The original run/check/log remain unchanged. This separate offline review reads all original JSONL rows and verifies the local user-shell turn and approval-before-execution order; no second PTY or model call."
+}

@@ -1,0 +1,5 @@
+{
+  "path": ".ops/stage1_execution/new132-ownership-integration/candidate-first/tools/tui_user_shell_smoke.py",
+  "sha256": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319",
+  "note": "Frozen missing transitive helper before any runtime test; original import failure retained."
+}

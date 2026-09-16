@@ -1,0 +1,15 @@
+{
+  "pid": 9503,
+  "argv": [
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/bin/binary-only",
+    "--mode",
+    "headless",
+    "--session",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/actual/ZS1-112/worker-public319/match-limit-root-binary-only/session.jsonl"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/actual/ZS1-112/worker-public319/match-limit-root-binary-only",
+  "ZENPI_HOME": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/actual/ZS1-112/worker-public319/match-limit-root-binary-only/user",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "binary_sha256": "24721d51a33955057380e20126cbc569706ac17b82c3ce8c370a059a19674c77"
+}

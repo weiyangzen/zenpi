@@ -1,0 +1,11 @@
+[
+  {
+    "name": "workflows",
+    "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows",
+    "relative_path": ".github/workflows",
+    "kind": "directory",
+    "scope": "in-scope",
+    "item": "ZS1-092",
+    "snapshot_method": "immediate lstat only; child contents bind through092 snapshot"
+  }
+]

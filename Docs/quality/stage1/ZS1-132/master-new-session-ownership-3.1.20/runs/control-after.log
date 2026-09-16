@@ -1,0 +1,49 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-retry/tools/tui_session_new_smoke.py", line 865, in <module>
+    main()
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-retry/tools/tui_session_new_smoke.py", line 861, in main
+    print(json.dumps(operation(args.binary.resolve(), args.evidence), indent=2))
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-retry/tools/tui_session_new_smoke.py", line 328, in after_smoke
+    t.expect(b'Interrupted')
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/candidate-retry/tools/tui_project_workspace_smoke.py", line 318, in expect
+    raise AssertionError(f'missing {text!r}: {screen_text(bytes(self.output)).decode(errors="replace")}')
+AssertionError: missing b'Interrupted':  zenpi | projects: [initial]                                                                                                     [<] [>] [+]
+ zenpi    Request failed | model new-reasoner | tokens — | history ~26/64000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-
+┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐
+│● NEW_PREFERENCES                                     ││Blueprints 0  Goals 0  gen 0                                                      │
+│● REPLY_NEW                                           ││No persisted Blueprint or Goal                                                    │
+│● tool: tool execution was cancelled                  ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+└──────────────────────────────────────────────────────┘│                                                                                  │
+┌ Goal ────────────────────────────────────────────────┐│                                                                                  │
+│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+┌ Commands / files 1/1 ────────────────────────────────────────────────────────────────────────────────────────┐                           │
+│/new                                                                                                          │                           │
+│start a fresh conversation in the current project                                                             │                           │
+│Up/Down select · Tab/Enter complete · Esc dismiss                                                             │                           │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘───────────────────────────┘
+┌ Prompt  • command palette active ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│/new                                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      

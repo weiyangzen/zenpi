@@ -1,0 +1,147 @@
+{
+  "clock_contract_valid": true,
+  "metadata": {
+    "clock_id": 6,
+    "pid": 99639,
+    "ppid": 99638,
+    "clock_errors": 0,
+    "thread_errors": 0
+  },
+  "markers": {
+    "M0": {
+      "ns": 2028734480651000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M1": {
+      "ns": 2028734483465000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M2": {
+      "ns": 2028734492456000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M3": {
+      "ns": 2028734498780000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M4": {
+      "ns": 2028734506253000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M5": {
+      "ns": 2028734513700000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M6": {
+      "ns": 2028734521143000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M7": {
+      "ns": 2028734521190000,
+      "tid": 30184765,
+      "count": 1
+    },
+    "M8": {
+      "ns": 2028734521261000,
+      "tid": 30184765,
+      "count": 1
+    }
+  },
+  "stages": [
+    {
+      "stage": "parent launch → M0",
+      "start_ns": 2028733384626000,
+      "end_ns": 2028734480651000,
+      "duration_ns": 1096025000,
+      "duration_ms": 1096.025,
+      "scope": "time包装/调度/加载/Rust main入口前的合计，不能继续分解"
+    },
+    {
+      "stage": "M0 → M1",
+      "start_ns": 2028734480651000,
+      "end_ns": 2028734483465000,
+      "duration_ns": 2814000,
+      "duration_ms": 2.814,
+      "scope": "CLI/config/backend"
+    },
+    {
+      "stage": "M1 → M2",
+      "start_ns": 2028734483465000,
+      "end_ns": 2028734492456000,
+      "duration_ns": 8991000,
+      "duration_ms": 8.991,
+      "scope": "session/open/Agent/recovery"
+    },
+    {
+      "stage": "M2 → M3",
+      "start_ns": 2028734492456000,
+      "end_ns": 2028734498780000,
+      "duration_ns": 6324000,
+      "duration_ms": 6.324,
+      "scope": "tools/resources/extensions/model"
+    },
+    {
+      "stage": "M3 → M4",
+      "start_ns": 2028734498780000,
+      "end_ns": 2028734506253000,
+      "duration_ns": 7473000,
+      "duration_ms": 7.473,
+      "scope": "stdio owner/replay initialization and spawn return"
+    },
+    {
+      "stage": "M4 → M5",
+      "start_ns": 2028734506253000,
+      "end_ns": 2028734513700000,
+      "duration_ns": 7447000,
+      "duration_ms": 7.447,
+      "scope": "main-loop/channel command handling; not worker-ready latency"
+    },
+    {
+      "stage": "M5 → M6",
+      "start_ns": 2028734513700000,
+      "end_ns": 2028734521143000,
+      "duration_ns": 7443000,
+      "duration_ms": 7.443,
+      "scope": "shutdown dispatch/runtime close/persisted ack+flush"
+    },
+    {
+      "stage": "M6 → M7",
+      "start_ns": 2028734521143000,
+      "end_ns": 2028734521190000,
+      "duration_ns": 47000,
+      "duration_ms": 0.047,
+      "scope": "post-ack runtime join plus replay/owner close"
+    },
+    {
+      "stage": "M7 → M8",
+      "start_ns": 2028734521190000,
+      "end_ns": 2028734521261000,
+      "duration_ns": 71000,
+      "duration_ms": 0.071,
+      "scope": "remaining core return/main result"
+    },
+    {
+      "stage": "M8 → parent wait",
+      "start_ns": 2028734521261000,
+      "end_ns": 2028734522194000,
+      "duration_ns": 933000,
+      "duration_ms": 0.933,
+      "scope": "diagnostic file dump, runtime/OS exit, time wrapper and parent observation"
+    }
+  ],
+  "total_parent_ms": 1137.568,
+  "main_M0_M8_ms": 40.61,
+  "popen_return_ms": 1.635,
+  "parent_stdout_first_after_M6_ms": 0.046,
+  "all_markers_same_main_thread": true,
+  "largest_stage": "parent launch → M0",
+  "production_budget_replaced": false,
+  "additional_launches": 0
+}

@@ -1,0 +1,11 @@
+import { ensureTool } from './source/packages/coding-agent/src/utils/tools-manager.ts';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const statuses=[];
+const path=await ensureTool('fd',s=>{statuses.push(s);console.log(JSON.stringify(s));});
+if(!path)throw Error('Actual upstream ensureTool could not provision fd');
+const version=spawnSync(path,['--version'],{encoding:'utf8'});
+const bytes=readFileSync(path);
+const receipt={path,statuses,version:version.stdout.trim(),versionExit:version.status,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),platform:process.platform,arch:process.arch};
+writeFileSync(new URL('./fd-provision.json',import.meta.url),JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt));

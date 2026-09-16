@@ -1,0 +1,414 @@
+[
+  [
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210047387-4284-1"
+      },
+      "schema_version": 2,
+      "id": "restored",
+      "type": "response",
+      "command": "status",
+      "success": true,
+      "data": {
+        "active_turn_id": null,
+        "backend": "openai-compatible",
+        "last_error": null,
+        "model": "gpt-4.1",
+        "phase": "idle",
+        "session": {
+          "created_at_ms": 1789210047387,
+          "event_count": 10,
+          "handoff_count": 0,
+          "handoff_record_count": 0,
+          "next_seq": 15,
+          "path": "<session:new-8fc8d1a2cfbea783b0b90de6c4418fe187cd84dab6ac264370f46c611e237d7d-0.jsonl>",
+          "recovery_warnings": 0,
+          "runtime_intent_count": 0,
+          "session_id": "session-1789210047387-4284-1",
+          "turn_count": 4
+        }
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210045866-4284-0"
+      },
+      "schema_version": 2,
+      "id": "old-open",
+      "type": "response",
+      "command": "session",
+      "success": true,
+      "data": {
+        "accepted": true,
+        "action": "open",
+        "command": "session",
+        "route": "local",
+        "session": {
+          "created_at_ms": 1789210045866,
+          "event_count": 4,
+          "handoff_count": 0,
+          "handoff_record_count": 0,
+          "next_seq": 7,
+          "path": "<session:initial.jsonl>",
+          "recovery_warnings": 0,
+          "runtime_intent_count": 0,
+          "session_id": "session-1789210045866-4284-0",
+          "turn_count": 2
+        }
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210045866-4284-0"
+      },
+      "schema_version": 2,
+      "id": "old-status",
+      "type": "response",
+      "command": "status",
+      "success": true,
+      "data": {
+        "active_turn_id": null,
+        "backend": "openai-compatible",
+        "last_error": null,
+        "model": "gpt-4.1",
+        "phase": "idle",
+        "session": {
+          "created_at_ms": 1789210045866,
+          "event_count": 4,
+          "handoff_count": 0,
+          "handoff_record_count": 0,
+          "next_seq": 7,
+          "path": "<session:initial.jsonl>",
+          "recovery_warnings": 0,
+          "runtime_intent_count": 0,
+          "session_id": "session-1789210045866-4284-0",
+          "turn_count": 2
+        }
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210047387-4284-1"
+      },
+      "schema_version": 2,
+      "id": "new-open",
+      "type": "response",
+      "command": "session",
+      "success": true,
+      "data": {
+        "accepted": true,
+        "action": "open",
+        "command": "session",
+        "route": "local",
+        "session": {
+          "created_at_ms": 1789210047387,
+          "event_count": 10,
+          "handoff_count": 0,
+          "handoff_record_count": 0,
+          "next_seq": 15,
+          "path": "<session:new-8fc8d1a2cfbea783b0b90de6c4418fe187cd84dab6ac264370f46c611e237d7d-0.jsonl>",
+          "recovery_warnings": 0,
+          "runtime_intent_count": 0,
+          "session_id": "session-1789210047387-4284-1",
+          "turn_count": 4
+        }
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210047387-4284-1"
+      },
+      "schema_version": 2,
+      "id": "fixture-stop",
+      "type": "response",
+      "command": "shutdown",
+      "success": true,
+      "data": {
+        "closing": true,
+        "drained": true
+      },
+      "code": "ok"
+    }
+  ],
+  [
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210047387-4284-1"
+      },
+      "schema_version": 2,
+      "sequence": 0,
+      "type": "event",
+      "request_id": "durable-new",
+      "event": {
+        "queued": false,
+        "runtime_job_id": 1,
+        "type": "request_accepted"
+      }
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210047387-4284-1"
+      },
+      "schema_version": 2,
+      "sequence": 1,
+      "type": "event",
+      "request_id": "durable-new",
+      "event": {
+        "runtime_job_id": 1,
+        "type": "request_started"
+      }
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "id": "durable-new",
+      "type": "response",
+      "command": "new",
+      "success": true,
+      "data": {
+        "command": "new",
+        "created": true,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "new_session_id": "session-1789210051383-4294-0",
+        "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl",
+        "old_session_id": "session-1789210047387-4284-1",
+        "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-8fc8d1a2cfbea783b0b90de6c4418fe187cd84dab6ac264370f46c611e237d7d-0.jsonl",
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "route": "local"
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "id": "durable-new",
+      "type": "response",
+      "command": "new",
+      "success": true,
+      "data": {
+        "command": "new",
+        "created": true,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "new_session_id": "session-1789210051383-4294-0",
+        "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl",
+        "old_session_id": "session-1789210047387-4284-1",
+        "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-8fc8d1a2cfbea783b0b90de6c4418fe187cd84dab6ac264370f46c611e237d7d-0.jsonl",
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "route": "local"
+      },
+      "code": "ok"
+    },
+    {
+      "schema_version": 2,
+      "id": "durable-new",
+      "type": "response",
+      "command": "command",
+      "success": false,
+      "error": "request ID was already used for a different request",
+      "code": "request_id_conflict"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "id": "fixture-stop",
+      "type": "response",
+      "command": "shutdown",
+      "success": true,
+      "data": {
+        "closing": true,
+        "drained": true
+      },
+      "code": "ok"
+    }
+  ],
+  [
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "id": "durable-new",
+      "type": "response",
+      "command": "new",
+      "success": true,
+      "data": {
+        "command": "new",
+        "created": true,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "new_session_id": "session-1789210051383-4294-0",
+        "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl",
+        "old_session_id": "session-1789210047387-4284-1",
+        "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-8fc8d1a2cfbea783b0b90de6c4418fe187cd84dab6ac264370f46c611e237d7d-0.jsonl",
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "route": "local"
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "id": "fixture-stop",
+      "type": "response",
+      "command": "shutdown",
+      "success": true,
+      "data": {
+        "closing": true,
+        "drained": true
+      },
+      "code": "ok"
+    }
+  ],
+  [
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "sequence": 0,
+      "type": "event",
+      "request_id": "second-writer-new",
+      "event": {
+        "queued": false,
+        "runtime_job_id": 1,
+        "type": "request_accepted"
+      }
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210051383-4294-0"
+      },
+      "schema_version": 2,
+      "sequence": 1,
+      "type": "event",
+      "request_id": "second-writer-new",
+      "event": {
+        "runtime_job_id": 1,
+        "type": "request_started"
+      }
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210055196-4329-0"
+      },
+      "schema_version": 2,
+      "id": "second-writer-new",
+      "type": "response",
+      "command": "new",
+      "success": true,
+      "data": {
+        "command": "new",
+        "created": true,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "new_session_id": "session-1789210055196-4329-0",
+        "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-76256fc6335bd3ae75e700a7ee0f49c16aef7d8a78b836f8f0607958bf81eb24-0.jsonl",
+        "old_session_id": "session-1789210051383-4294-0",
+        "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl",
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "route": "local"
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210055196-4329-0"
+      },
+      "schema_version": 2,
+      "id": "fixture-stop",
+      "type": "response",
+      "command": "shutdown",
+      "success": true,
+      "data": {
+        "closing": true,
+        "drained": true
+      },
+      "code": "ok"
+    }
+  ],
+  [
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210055196-4329-0"
+      },
+      "schema_version": 2,
+      "id": "second-writer-new",
+      "type": "response",
+      "command": "new",
+      "success": true,
+      "data": {
+        "command": "new",
+        "created": true,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "new_session_id": "session-1789210055196-4329-0",
+        "new_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-76256fc6335bd3ae75e700a7ee0f49c16aef7d8a78b836f8f0607958bf81eb24-0.jsonl",
+        "old_session_id": "session-1789210051383-4294-0",
+        "old_session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/sessions/new-e6c7c96c525359cf56fbf19f1553b68cc41f2c77869eaf3eaba02fd479a9f951-0.jsonl",
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "route": "local"
+      },
+      "code": "ok"
+    },
+    {
+      "project": {
+        "project_id": "850d93d9950d695ea64b7c20d8cddc653a49c85e15c21cbb84e47ff9c02cb5b5",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/new.fixture/工作 space/initial",
+        "session_id": "session-1789210055196-4329-0"
+      },
+      "schema_version": 2,
+      "id": "fixture-stop",
+      "type": "response",
+      "command": "shutdown",
+      "success": true,
+      "data": {
+        "closing": true,
+        "drained": true
+      },
+      "code": "ok"
+    }
+  ]
+]

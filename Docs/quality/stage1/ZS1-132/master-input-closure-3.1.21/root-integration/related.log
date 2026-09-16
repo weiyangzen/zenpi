@@ -1,0 +1,140 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.52s
+     Running tests/headless_domain_owner.rs (target/debug/deps/headless_domain_owner-f8575d96a256f2dc)
+
+running 7 tests
+test goal_create_respects_explicit_version_and_does_not_mutate_on_rejection ... ok
+test headless_goal_create_links_one_persisted_blueprint_without_provider_work ... ok
+test headless_goal_run_resume_and_cancel_aliases_are_durable ... ok
+test headless_goal_status_is_a_durable_typed_owner_operation ... ok
+test headless_layout_and_pane_owner_persist_project_state_and_fail_closed ... ok
+test headless_plan_creates_bounded_sequential_blueprint_without_provider_work ... ok
+test missing_or_malformed_goal_status_fails_without_creating_a_store ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s
+
+     Running tests/headless_project_workspace.rs (target/debug/deps/headless_project_workspace-0f8536dfd6d0456e)
+
+running 13 tests
+test busy_diff_uses_selected_project_through_new_replay_switch_and_cancel ... ok
+test busy_switch_keeps_queued_owners_events_approval_and_tools_in_their_project ... ok
+test cancelled_invalid_and_mismatched_requests_leave_selection_and_journal_unchanged ... ok
+test project_capacity_and_checkpoint_permission_failure_preserve_the_previous_owner ... ok
+test project_controls_are_real_idempotent_and_restore_across_independent_hosts ... ok
+test project_envelope_preserves_strict_identity_and_action_parsing ... ok
+test project_protocol_is_strict_versioned_bounded_and_owned ... ok
+test rejected_resume_checkpoint_keeps_actual_owner_and_host_usable ... ok
+test resumed_journal_restores_as_the_real_agent_in_the_shared_project_pool ... ok
+test selected_project_bounds_inspection_resume_and_reopening_the_initial_tab ... ok
+test shared_checkpoint_rejects_concurrent_stale_writer_and_corrupt_input_atomically ... ok
+test tui_and_jsonl_share_the_checkpoint_and_actual_session_owner ... ok
+test typed_tree_mutation_runs_in_the_selected_project_owner ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.53s
+
+     Running tests/headless_protocol.rs (target/debug/deps/headless_protocol-4970f6db765b37c2)
+
+running 43 tests
+test approval_command_is_typed_and_bounded ... ok
+test async_eof_denies_unanswerable_side_effect_approval_without_hanging ... ok
+test async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it ... ok
+test async_reader_bounds_overlong_and_invalid_frames_without_stopping ... ok
+test async_recovery_event_does_not_overtake_turn_admission ... ok
+test async_runtime_lifecycle_events_are_correlated_ordered_and_replayable ... ok
+test async_shutdown_acknowledges_only_after_prior_turn_terminal_response ... ok
+test async_user_shell_runs_through_bounded_runtime_and_shutdown ... ok
+test checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence ... ok
+test checkpoint_pages_and_mailbox_are_local_durable_and_addressed ... ok
+test cross_process_owner_lock_survives_contention_and_releases_after_kill ... ok
+test disconnected_wire_preserves_unknown_or_completed_outcome_without_retry ... ok
+test headless_common_model_and_doctor_commands_are_redacted_and_local ... ok
+test headless_domain_put_commands_persist_and_round_trip ... ok
+test headless_session_lifecycle_and_queue_slash_commands_use_typed_owner ... ok
+test headless_slash_commands_are_control_plane_only ... ok
+test in_flight_duplicate_request_id_is_suppressed_before_side_effects ... ok
+test inspection_responses_redact_paths_and_reject_domain_escape ... ok
+test live_steer_cancels_and_reissues_without_losing_or_duplicating_input ... ok
+test mailbox_retirement_is_confirmed_and_owned_in_both_hosts ... ok
+test malformed_frame_isolated_from_all_commands ... ok
+test protocol_v2_accepts_resume_sequence_and_v1_remains_supported ... ok
+test reconnect_process_fixture ... ok
+test reconnect_restores_terminal_events_ack_and_monotonic_sequence ... ok
+test recovery_slash_is_durable_confirmed_and_never_dispatches_retry ... ok
+test resume_path_rejects_missing_journals_without_creating_them ... ok
+test resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history ... ok
+test sequential_steer_and_eof_are_safe_terminal_paths ... ok
+test session_control_requests_roundtrip_into_typed_commands ... ok
+test session_control_validation_is_bounded_and_rejects_origin_confusion ... ok
+test session_controls_remain_readable_while_provider_is_in_flight ... ok
+test session_slash_list_and_open_use_real_session_owner_paths ... ok
+test shutdown_promotes_a_steer_admitted_before_the_shutdown_frame ... ok
+test stale_session_writers_are_rejected_without_duplicate_sequences ... ok
+test status_snapshots_redact_session_paths_in_sync_and_async_hosts ... ok
+test steer_shell_guard_keeps_expected_turn_rejection_before_side_effects ... ok
+test steer_shell_guard_preserves_valid_owned_shell_execution ... ok
+test steer_shell_guard_rejects_attachments_before_side_effects ... ok
+test steer_shell_guard_rejects_mode_before_side_effects ... ok
+test synchronous_replay_and_control_idempotency_are_explicit ... ok
+test unowned_session_controls_are_fail_closed_without_session_or_provider_effects ... ok
+test unsupported_version_and_missing_id_are_rejected ... ok
+test user_shell_echo_is_explicit_and_does_not_call_provider ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.99s
+
+     Running tests/resume_compact_owner.rs (target/debug/deps/resume_compact_owner-d1b0f505d5153347)
+
+running 6 tests
+test compact_checkpoint_is_durable_and_reconstructs_after_restart ... ok
+test headless_resume_replays_durable_records_and_writes_marker ... ok
+test headless_slash_resume_and_compact_are_real_owner_commands ... ok
+test resume_projection_stays_bounded_and_exposes_a_continuation_cursor ... ok
+test resume_rejects_future_sequence_without_mutating_journal ... ok
+test tui_resume_restores_cleared_transcript_and_compact_reports_status ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s
+
+     Running tests/stage1_input_host.rs (target/debug/deps/stage1_input_host-8357ce56818ce0e5)
+
+running 25 tests
+test acceptance101_sync_tui_probe ... ignored, PTY driver only; requires isolated root and fixture URL
+test all_mode_groups_each_lane_and_keeps_follow_ups_at_would_stop ... ok
+test cancelled_turn_rejects_late_tickets_before_new_turn_or_project_owner ... ok
+test cancelling_a_ticket_does_not_cancel_provider_or_another_ticket ... ok
+test empty_prepare_poll_consumes_late_input_once_in_one_mode ... ok
+test empty_prepare_poll_respects_all_mode ... ok
+test explicit_shutdown_can_cancel_after_admission_before_any_provider_delta ... ok
+test headless_jsonl_and_slash_share_busy_queue_owner_without_cancelling_tools ... ok
+test input_host_crash_probe ... ignored, separate-process crash-window helper
+test input_receipts_remain_responsive_during_tool_approval ... ok
+test main_turn_cancel_preserves_received_follow_up_and_joins_parallel_tools ... ok
+test nonempty_prepare_poll_freezes_even_all_mode ... ok
+test nonempty_prepare_poll_keeps_late_input_for_later_model_turns ... ok
+test one_at_a_time_drains_full_follow_up_capacity_without_spending_tool_iterations ... ok
+test parallel_batch_waits_for_every_result_before_steer_context ... ok
+test predispatch_begin_marker_failure_returns_idle_without_losing_user_turn ... ok
+test predispatch_budget_failure_releases_scope_and_preserves_received_inputs ... ok
+test predispatch_reservation_write_failure_releases_only_its_new_concurrency_slot ... ok
+test projection_collision_fails_closed_before_new_user_admission_or_provider ... ok
+test resume_replaces_input_port_identity_and_never_reactivates_old_session_handles ... ok
+test separate_process_received_applied_and_projection_crash_windows_recover_before_provider ... ok
+test serial_batch_receipts_edit_cancel_and_follow_up_use_real_owner ... ok
+test shared_slash_queue_preserves_payload_bytes_for_multiline_edit_roundtrip ... ok
+test strict_queue_and_shared_slash_controls_are_local_and_validate_before_mutation ... ok
+test ticket_and_durable_queue_capacity_are_visible_without_eviction ... ok
+
+test result: ok. 23 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.46s
+

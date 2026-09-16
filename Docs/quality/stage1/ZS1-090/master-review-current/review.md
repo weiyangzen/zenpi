@@ -1,0 +1,3 @@
+# ZS1-090 current master review
+
+The `src` directory integration report cross-checked all 22 accepted child owners required by the blueprint: domain/session/governance state, core/runtime/backend/protocol/headless hosts, resource/slash/tool loaders, TUI/view model/layout/approval/render/context, and module wiring. It records the shared Agent/SessionStore ownership flow, directory-first project picker and isolated tab/session/tool-root semantics, BentoBox preservation, bounded replay/view/event joins, and the explicit non-worker integration boundary. Per-file reads remain authoritative and no source owner is reaccepted by this directory receipt.

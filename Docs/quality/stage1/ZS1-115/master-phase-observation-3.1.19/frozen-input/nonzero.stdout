@@ -1,0 +1,5 @@
+api=0 pipe=diagnostic stop=nonzero outer_timeout=false elapsed_ms=6 fixture_pids=["", ""] status=exit status: 17 stdout= stderr=
+fixture_phase_snapshot dir="/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/nonzero" bytes=40 truncated=false phases=1967325.418934000 pid=6732 helper-entry
+
+observed_fixture_success=false
+phase_file_before_cleanup_bytes=40

@@ -1,0 +1,42 @@
+{
+  "name": "joint-tests",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--lib",
+    "--test",
+    "headless_protocol",
+    "--test",
+    "tui_composer",
+    "--test",
+    "stage1_input_queue",
+    "--test",
+    "tui_project_workspace",
+    "--test",
+    "tui_command_palette",
+    "--test",
+    "tui_bentobox",
+    "--test",
+    "layout_persistence",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-10T22:50:42.455542+00:00",
+  "ended_at": "2026-09-10T22:51:11.132558+00:00",
+  "elapsed_seconds": 28.677368375,
+  "exit_code": 101,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 2211692544,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/queue-identity-integration/joint-tests.log",
+  "bytes": 13724,
+  "sha256": "2862fd6371c740d76bba1a114b75fddf72d217e0b1b0fc865ac4fbd5a79e1a06"
+}

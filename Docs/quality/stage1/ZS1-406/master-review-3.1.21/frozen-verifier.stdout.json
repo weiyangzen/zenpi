@@ -1,0 +1,168 @@
+{
+  "schema_version": "zs1-406-offline-review/v1",
+  "root": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tests406-current-3.1.21/worker",
+  "passed": false,
+  "checks": [
+    {
+      "name": "69 regular direct files with no subdirectories or symlinks",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "69 copied and live direct identities",
+      "passed": false,
+      "detail": null
+    },
+    {
+      "name": "only frozen child133 and folder406 closure",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "scope labels one in-scope and68 context",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "accepted133 exact receipt",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all8 receipt artifacts intact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "frozen baseline and current subject identities",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "583 baseline reconstructed around404-line insertion",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "master full-read chunks hashes contiguous",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "canonical full report components exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "3.1.21 requirement baseline binding",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "133406091 individual obligations unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "final captured selector and blueprint current",
+      "passed": false,
+      "detail": null
+    },
+    {
+      "name": "15 initial context snapshots and explicit live overlays",
+      "passed": false,
+      "detail": null
+    },
+    {
+      "name": "postcapture2 source identities preserved",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "last observed Gantt revision explicitly preserved",
+      "passed": false,
+      "detail": null
+    },
+    {
+      "name": "224 initial input capture with explicit live overlays",
+      "passed": false,
+      "detail": null
+    },
+    {
+      "name": "historical combination differs only recorded2 inputs",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "selected archive extractions byte exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt root-tests",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt root-clippy",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt root-fmt",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt shell-before",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical command receipt shell-after",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical result facts reconstructed from actual stdout",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical56 excludes nested1",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "four distinct B observations plus replay and3 gates",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "4532 older ready files unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "only406 candidate path",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready payload hashes",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready exact artifact set",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "candidate": {
+    "bytes": 26865,
+    "sha256": "17cd7ee5d2f7c0c0f8dc78a2b776d18de85c7637004d53b05e8eb964d2d1da32"
+  },
+  "runtime_executions_this_round": 0,
+  "scope": "integrity audit only; semantic directory review requires master"
+}

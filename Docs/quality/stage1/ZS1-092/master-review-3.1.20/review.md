@@ -1,0 +1,13 @@
+# ZS1-092 — 主控独立目录验收
+
+接受冻结target:.github/workflows目录子集的理解与关系闭合。主控完整阅读worker73行目录报告、当前release.yml87行，并已独立完整阅读ci.yml77/94/113三个版本及089完整227行报告；检查当前真实直属entries及子项receipt后补写当前差量，未把历史provisional候选直接升级。
+
+实际直属两个regular文件：ci.yml为正式089，release.yml为context-only；没有直接子目录/特殊文件/symlink。蓝图唯一Depends089与冻结直属文件集合完全相等。089现在[x]且receipt、标准报告、当前CI来源身份一致；旧92包关于089缺失的事实保留为历史，不再作为本次接受时点结论。
+
+主控逐项梳理两个workflow独立触发、共享release.sh但独立build、CI只读与release写权限、预算diagnostics与production归档/tag附件不同持久链、并发取消与matrix fail-fast不同控制、以及不存在本文件显式跨workflow依赖。release全文件仅用于解释关系，不被授予文件或完整安全验收；矩阵可用性和真实Actions结果未验证。
+
+新目录报告精确保留11196B旧前缀，补充ci.yml94→113预算日志/PIPESTATUS/上传条件/独立runattempt目录、已接受089当前hash/receipt和当前目录清单。对无法保证的早期缺summary、runner丢失、旧目录被上传、I/O退出写入失败等均保留089边界。没有把同一历史五shell案例计作新的目录测试，没有恢复旧归档pipeline缺陷或将其无条件移植到release上下文。
+
+旧worker包完整95payload及其manifest校验，frozen verifier退出0，证明历史材料原样保存。当前检查另验证正式直属图、真实entry类型/hash、089receipt及新版report源绑定；最终新报告在新临时Git基线正逆check/apply和sentinel通过后才接收。完整原材料、当前快照、子项receipt、追加文本和实际日志均随本次publication保存。
+
+仅允许092晋升；093、release.yml、117、托管CI/新release/发布动作不在本次接受内。产品文件没有改变。恢复应只撤回本目录新增报告/证据和本项状态，不覆盖用户产品、089或任何已封存旧包。

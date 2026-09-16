@@ -1,0 +1,20 @@
+{
+  "binary_sha256": "bb82450f8de71a0a7a91d828e42f659566cae3c7e4e574dd68706bfa10b94172",
+  "checks": {
+    "held_real_provider_rejects_new_preserves_request_and_allows_retry": true,
+    "pending_real_tool_approval_rejects_new_and_remains_answerable": true,
+    "remembered_human_allow_stays_old_session_new_requires_fresh_approval": true,
+    "remembered_human_deny_stays_old_session_new_can_receive_new_decision": true,
+    "process_only_never_survives_same_process_new_without_persistent_grant": true,
+    "independent_restart_reloads_default_policy_and_does_not_restore_never": true,
+    "idle_project_new_completes_while_other_project_provider_continues": true,
+    "tui_pending_approval_rejects_new_preserves_draft_and_remains_answerable": true,
+    "tui_scheduled_and_restarted_interrupted_work_blocks_new_until_explicit_cancel": true
+  },
+  "scope": "real CLI approval/session scopes; configured Deny and bound worker require separate checks",
+  "status": "passed",
+  "jsonl_processes": 2,
+  "tui_processes": 3,
+  "request_count": 21,
+  "server_errors": []
+}

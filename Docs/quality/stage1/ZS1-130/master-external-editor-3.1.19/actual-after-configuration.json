@@ -1,0 +1,39 @@
+{
+  "started": "2026-09-12T05:52:07.004666+00:00",
+  "binary_sha256": "7a374a3b0764c7a4db9b3b53e36dc07d3d8b17b80f5711805a932a2090e60774",
+  "checks": {
+    "missing_keeps_draft_and_terminal": true,
+    "empty-visual_keeps_draft_and_terminal": true,
+    "nonutf8_keeps_draft_and_terminal": true,
+    "quote_keeps_draft_and_terminal": true,
+    "raw-budget_keeps_draft_and_terminal": true,
+    "argument-budget_keeps_draft_and_terminal": true,
+    "argc-budget_keeps_draft_and_terminal": true,
+    "missing-program_keeps_draft_and_terminal": true,
+    "no-execute_keeps_draft_and_terminal": true,
+    "spawn-error_keeps_draft_and_terminal": true,
+    "environment-budget_keeps_draft_and_terminal": true,
+    "deadline_keeps_draft_and_terminal": true,
+    "fallback": true,
+    "relative-program": true,
+    "captured-path": true,
+    "nonutf8-key": true,
+    "history_focus_blocks_editor": true,
+    "directory_focus_blocks_editor": true,
+    "transcript_focus_blocks_editor": true,
+    "slash_popup_blocks_then_explicit_dismissal_allows_editor": true,
+    "model_popup_blocks_then_explicit_dismissal_allows_editor": true,
+    "file_popup_blocks_then_explicit_dismissal_allows_editor": true,
+    "resource_source_inspector_focus_blocks_editor": true,
+    "second_ctrl_g_reaches_only_current_editor": true,
+    "approval_focus_blocks_editor_and_requires_explicit_denial": true,
+    "near_4mib_checkpoint_rejects_editor_atomically": {
+      "checkpoint_bytes": 4177920,
+      "unchanged_sha256": "91d631468e6e597b3a9aa7c89f6caeed7f3718949021146b0dfcec4e2e8a0c1d",
+      "editor_bytes": 262144
+    }
+  },
+  "status": "passed",
+  "tui_processes": 18,
+  "ended": "2026-09-12T05:52:30.414297+00:00"
+}

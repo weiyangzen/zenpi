@@ -1,0 +1,67 @@
+{
+  "item": "ZS1-023",
+  "scope": "frozen source understanding",
+  "master_accepted": true,
+  "files": {
+    "accept.py": {
+      "bytes": 6893,
+      "sha256": "ba104af675b6a3e6fc3b08a5cf2092a08a3e36bab5393c65813f503f78ff6557"
+    },
+    "after-promotion.json": {
+      "bytes": 4587,
+      "sha256": "aa1e456be529cf78c69ebc4c1f4263147bc100c778252f1c69b8de58b38c6036"
+    },
+    "append.md": {
+      "bytes": 994,
+      "sha256": "1ec837f3b6c5e2bf7d83ea5504bf4006f085dcb346d57cc6e9813fe6222404b7"
+    },
+    "apply.json": {
+      "bytes": 754,
+      "sha256": "0c9a705e5887ede1ac9c501d39f57877a8fa6414965dc26d8a9a6406691b2011"
+    },
+    "before-promotion.json": {
+      "bytes": 4608,
+      "sha256": "66c98000aec741021cc74cf228d008f6f92c2a8e161f03cde1cdb308a270efd4"
+    },
+    "current-context.json": {
+      "bytes": 5427,
+      "sha256": "ad195c610ca63e2e5fa60529eb80117930f53e36327f5fe1452263128b761ff6"
+    },
+    "final-report.md": {
+      "bytes": 36543,
+      "sha256": "2b80ebfd84522d809b8cc4c64fc6895e97c8024c63f5686dcf2084f87f58b185"
+    },
+    "gstage-final.log": {
+      "bytes": 3665,
+      "sha256": "fd97b157662f000496fe5286f00021dffce8cf5cbba562a71fdd4e49e602d821"
+    },
+    "gstage-final.run.json": {
+      "bytes": 353,
+      "sha256": "6bb7759bd8cedd46c2969da60d9549d60574098d55a870b6e3aa7130dbc6a9fd"
+    },
+    "offline-verification.log": {
+      "bytes": 4625,
+      "sha256": "9333ab8c1bdb8f3f2f2c93ac41845e32506184a2ef491bbdd29aede0da53516a"
+    },
+    "offline-verification.run.json": {
+      "bytes": 377,
+      "sha256": "f4b17197adb8c6f99de7c8ec23a035b0c356b17196adbbf4d73da4ed9ccb0faa"
+    },
+    "review.md": {
+      "bytes": 5839,
+      "sha256": "90ef0bffbb68c3b4efae4816ba655d4989b7159a5cf1627a7a91f97c24e6dc2b"
+    },
+    "source-read.json": {
+      "bytes": 1144,
+      "sha256": "c17c62dd9f9a2dbe1e32dbca482b4e0fbc7931722af475be0faba214d49d5bee"
+    },
+    "worker-manifest.json": {
+      "bytes": 8169,
+      "sha256": "3f0aadf8cc8f0d6908dfef2a0eb909f7da3228415b5620ea494fb10cb7f497e3"
+    },
+    "worker-ready.tar.gz": {
+      "bytes": 139810,
+      "sha256": "cb027bb330e9919906a0bd3a12a6f8ff0fb4d903b5591deb276f2e401774fe6d"
+    }
+  }
+}

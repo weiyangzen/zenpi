@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/ci089-master/accept.py", line 101, in <module>
+    v.check_receipt(ROOT,pending,KEY,v.EVIDENCE,v.selector(ROOT,pending,v.BLUEPRINT),sizes,'worker')
+  File "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py", line 623, in check_receipt
+    refs[record['path']] = artifact(root, record)
+  File "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py", line 517, in artifact
+    need(not nonempty or bool(data.strip()), f'empty artifact: {value["path"]}')
+  File "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py", line 53, in need
+    raise BlueprintError(message)
+validate_blueprint.BlueprintError: empty artifact: Docs/quality/stage1/ZS1-089/worker-current-ci320/reused/stage117-ci-evidence320-ready/base/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/fixture-results.json

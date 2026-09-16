@@ -1,0 +1,86 @@
+{
+  "binary_sha256": "d150d6ef355e15bbb32b5176a15e984f2a252d396a2c7c1625cd029dab50bb52",
+  "checks": {
+    "jsonl_0_receipt_identity": true,
+    "jsonl_denied_0": true,
+    "jsonl_denied_1": true,
+    "jsonl_denied_2": true,
+    "jsonl_attachment_commands_zero_http": true,
+    "jsonl_0_one_materialized_file": true,
+    "jsonl_0_exact_bytes": true,
+    "jsonl_0_filename": true,
+    "jsonl_1_receipt_identity": true,
+    "jsonl_1_one_materialized_file": true,
+    "jsonl_1_exact_bytes": true,
+    "jsonl_1_filename": true,
+    "jsonl_durable_identity": true,
+    "jsonl_journal_excludes_file_body": true,
+    "tui_0_stage_zero_http": true,
+    "tui_0_one_materialized_file": true,
+    "tui_0_exact_bytes": true,
+    "tui_0_filename": true,
+    "tui_1_stage_zero_http": true,
+    "tui_1_one_materialized_file": true,
+    "tui_1_exact_bytes": true,
+    "tui_1_filename": true,
+    "tui_durable_identity": true,
+    "tui_journal_excludes_file_body": true,
+    "exactly_four_provider_calls": true,
+    "terminal_restored": true
+  },
+  "status": "passed",
+  "http_count": 4,
+  "jsonl_processes": 1,
+  "tui_processes": 1,
+  "server_errors": [],
+  "receipts": {
+    "0": {
+      "project": {
+        "project_id": "fb368fa27fee949edcb0735362946643b957d2a52a876dad412dea2bd8af5e20",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/after-entry.fixture/jsonl/initial",
+        "session_id": "session-1789215593903-26831-0"
+      },
+      "schema_version": 2,
+      "id": "attach-0",
+      "type": "response",
+      "command": "attach",
+      "success": true,
+      "data": {
+        "accepted": true,
+        "command": "attach",
+        "kind": "file",
+        "message": "attachment staged for the next turn",
+        "mime_type": "text/plain",
+        "path": "note\\report.txt",
+        "pending": 1,
+        "sha256": "158a0e4158111a9f503091627650a30e1cf5a6b46316319c5af6609e86aada19",
+        "size_bytes": 22
+      },
+      "code": "ok"
+    },
+    "1": {
+      "project": {
+        "project_id": "fb368fa27fee949edcb0735362946643b957d2a52a876dad412dea2bd8af5e20",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/after-entry.fixture/jsonl/initial",
+        "session_id": "session-1789215593903-26831-0"
+      },
+      "schema_version": 2,
+      "id": "attach-1",
+      "type": "response",
+      "command": "attach",
+      "success": true,
+      "data": {
+        "accepted": true,
+        "command": "attach",
+        "kind": "file",
+        "message": "attachment staged for the next turn",
+        "mime_type": "text/plain",
+        "path": "note/report.txt",
+        "pending": 1,
+        "sha256": "6e14c08daf8a5befddc661a6a752e7dff903a5e05c558f8b377e3954f68422e5",
+        "size_bytes": 45
+      },
+      "code": "ok"
+    }
+  }
+}

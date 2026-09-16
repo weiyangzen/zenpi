@@ -1,0 +1,9 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/partial-first/after-kill.session.jsonl b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/after-kill.session.jsonl
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/after-kill.session.jsonl
+@@ -0,0 +1,4 @@
++{"created_at_ms":1789189810735,"cwd":"/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/anthropic/partial-first","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789189810735-56811-0","timestamp":"2026-09-12T05:10:10Z","timestamp_ms":1789189810735,"version":1}
++{"event":{"generation":1,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789189810735-56811-0","timestamp":"2026-09-12T05:10:10Z","timestamp_ms":1789189810749}
++{"kind":"turn","schema_version":1,"seq":2,"session_id":"session-1789189810735-56811-0","timestamp":"2026-09-12T05:10:10Z","timestamp_ms":1789189810774,"turn":{"content":"begin interrupted response","created_at_ms":1789189810774,"id":"turn-1789189810774-1","parent_id":null,"role":"user"}}
++{"event":{"idempotency_key":"provider-b2284fd596243afa1c935aebbd9447c27acc21ad49f983c54cee7b7bac322d1c","operation_id":"provider-turn-1789189810774-1","operation_kind":"provider","retry_requires_confirmation":false,"turn_id":"turn-1789189810774-1","type":"operation_started"},"kind":"event","schema_version":1,"seq":3,"session_id":"session-1789189810735-56811-0","timestamp":"2026-09-12T05:10:10Z","timestamp_ms":1789189810784}

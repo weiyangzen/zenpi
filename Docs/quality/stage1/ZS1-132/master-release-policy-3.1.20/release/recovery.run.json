@@ -1,0 +1,27 @@
+{
+  "name": "recovery",
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/new132-release-validation/tools/tui_session_new_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/release-current-20260912/zenpi",
+    "--evidence",
+    ".ops/stage1_execution/new132-release-validation/recovery.json",
+    "--recovery-only"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T10:07:28.384738+00:00",
+  "ended_at": "2026-09-12T10:07:30.874973+00:00",
+  "elapsed_seconds": 2.4880153750000003,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 42123264,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-release-validation/recovery.log",
+  "bytes": 771,
+  "sha256": "f513e5b5ddcc21b45f406e360df604e43910a45157675eed29c1416247b0b4d6"
+}

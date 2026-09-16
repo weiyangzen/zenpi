@@ -1,0 +1,17 @@
+{
+  "product_behavior_runs": 0,
+  "attempts": [
+    {
+      "action": "system Python tomllib import",
+      "outcome": "module unavailable; read-only; no dependencies installed",
+      "resolution": "explicitly narrow text extractor"
+    },
+    {
+      "action": "python3 write_report.py direct execution twice",
+      "outcome": "reported Non-UTF-8 source at line 13 before report creation",
+      "resolution": "verified full file bytes decode as UTF-8; compiled explicitly decoded text and executed successfully; cause not determined",
+      "source_bytes_modified": false
+    }
+  ],
+  "note": "No failed attempt is a product test. Artifact package checks passed independently."
+}

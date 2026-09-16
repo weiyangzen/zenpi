@@ -1,0 +1,43 @@
+{
+  "artifacts": [
+    {
+      "bytes": 8500,
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/session-manager.ts_learn.md",
+      "sha256": "cb1bdde8050bf21c52dbb60e83c3f0b6095cc5106ce022cf5b00cb0e6598f96d"
+    },
+    {
+      "bytes": 555,
+      "path": "Docs/quality/stage1/ZS1-018/master-review-20260913/review.md",
+      "sha256": "8860ea2c62324262ca3a27e3bc43c8dde30d712c30f9737a16ca7ec8fe6f46c2"
+    }
+  ],
+  "attempt_id": "master-review-3.1.22",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "item_id": "ZS1-018",
+  "manual_review": {
+    "decision": "accepted",
+    "evidence": {
+      "bytes": 555,
+      "path": "Docs/quality/stage1/ZS1-018/master-review-20260913/review.md",
+      "sha256": "8860ea2c62324262ca3a27e3bc43c8dde30d712c30f9737a16ca7ec8fe6f46c2"
+    },
+    "findings": "Complete per-file source review independently checked; parent directory and product integration remain separate obligations.",
+    "reviewer": "controller"
+  },
+  "read_ranges": [
+    [
+      0,
+      54054
+    ]
+  ],
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "reviewer": "controller",
+  "role": "master",
+  "run_id": "zenpi-stage1-20260911",
+  "schema_version": "stage1-receipt/v1",
+  "source_hash": "57bc70a751567b96c057535766240ae52d9b76d9013ea78049d74dc3b654e915",
+  "source_path": "packages/coding-agent/src/core/session-manager.ts",
+  "validators": "G-FILE；G-STAGE --item ZS1-018"
+}

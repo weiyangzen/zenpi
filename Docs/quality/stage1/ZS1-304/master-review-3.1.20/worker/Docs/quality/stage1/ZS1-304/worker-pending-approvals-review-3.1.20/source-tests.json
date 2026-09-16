@@ -1,0 +1,23 @@
+[
+  {
+    "id": "T01",
+    "name": "desired_height_empty",
+    "source_line": 109,
+    "assertion_scope": "new空列表在width40的desired_height恰为0；未直接测is_empty/set_threads/空area或窄宽",
+    "execution": "read only; not run"
+  },
+  {
+    "id": "T02",
+    "name": "render_single_thread_snapshot",
+    "source_line": 115,
+    "assertion_scope": "Robie [explorer]在width40的2行内嵌快照；空格换成点，只保留cell首字符；不验证颜色、完整grapheme或/agent执行",
+    "execution": "read only; not run"
+  },
+  {
+    "id": "T03",
+    "name": "render_multiple_threads_snapshot",
+    "source_line": 128,
+    "assertion_scope": "4名称在width44只显示前3名称、全点溢出行和/agent尾行；空格换点使省略号与空白不可区分；不证明恰3项时无溢出或队列上限",
+    "execution": "read only; not run"
+  }
+]

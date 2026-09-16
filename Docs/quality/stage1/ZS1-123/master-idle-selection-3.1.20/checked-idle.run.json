@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "tools/tui_command_palette_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/tui-idle-selection-integration/zenpi-checked",
+    "--idle-selection-only",
+    "--evidence",
+    ".ops/stage1_execution/tui-idle-selection-integration/checked-idle.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T11:36:22.342445+00:00",
+  "elapsed_seconds": 8.181387541,
+  "exit_code": 0,
+  "log_sha256": "f4e29957449e170e7932ce82e930d0ef5c1f6875d46cb97e40270a143f718099",
+  "log_bytes": 201
+}

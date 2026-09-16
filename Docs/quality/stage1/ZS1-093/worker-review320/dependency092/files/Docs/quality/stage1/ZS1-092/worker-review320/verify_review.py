@@ -1,0 +1,30 @@
+from pathlib import Path,PurePosixPath
+import json,hashlib,sys,runpy,stat
+E=Path(__file__).resolve().parent;R=E.parents[4];M=Path('/Users/wangweiyang/GitHub/zenpi');H=lambda b:hashlib.sha256(b).hexdigest();frozen='--frozen' in sys.argv
+def read(p):return json.loads((E/p).read_text())
+m=read('input-manifest.json');assert m['authority']=='3.1.20' and m['requirement_digest']=='8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645';assert m['scope']=='target' and m['folder_path']=='.github/workflows' and m['candidate_kind']=='provisional-directory-integration' and not m['acceptance_eligible'] and m['children']==m['unaccepted_children']==['ZS1-089'] and m['child_blueprint_state']=='[ ]';assert m['formal_direct_files']==[{'item':'ZS1-089','path':'.github/workflows/ci.yml'}] and m['formal_direct_subdirectories']==[]
+inventory=read('directory-inventory.json');assert [r['name'] for r in inventory]==['ci.yml','release.yml'] and [r['scope'] for r in inventory]==['in-scope','context-only']
+for row,count in zip(inventory,[94,87]):
+ b=(R/row['artifact']).read_bytes();assert H(b)==row['sha256'] and len(b)==row['bytes'] and len(b.splitlines())==row['lines']==count and row['kind']=='regular_file'
+ if not frozen:assert Path(row['path']).read_bytes()==b and stat.S_ISREG(Path(row['path']).lstat().st_mode)
+dep=read('dependency-status.json');assert dep['item']=='ZS1-089' and not dep['master_accepted'] and dep['blueprint_state']=='[ ]' and dep['candidate_status']=='[_]' and not dep['main_report_exists'] and not dep['main_receipt_exists'];P=R/dep['copied_artifact'];raw=(P/'manifest.json').read_bytes();assert H(raw)==dep['candidate_manifest_sha256']=='d82de0618e7c6aa00062a0df039ad4016473dcd5c9eba5cf798962245235674c';manifest=json.loads(raw);assert manifest['status']=='[_]' and len(manifest['files'])==dep['members']==74
+for row in manifest['files']:
+ b=(P/'files'/row['path']).read_bytes();assert H(b)==row['sha256'] and len(b)==row['bytes']
+ if not frozen:assert b==(Path(dep['candidate_path'])/'files'/row['path']).read_bytes()
+rb=(P/'files'/dep['report_path']).read_bytes();assert len(rb)==dep['report_bytes']==24526 and H(rb)==dep['report_sha256']=='33e353712730db9dcb9335e8c16c8d9caa83c2488a0d7b851d3042a33dfa670f'
+de=P/'files/Docs/quality/stage1/ZS1-089/worker-review320';assert (de/'current-ci.yml').read_bytes()==(E/'directory-snapshot/ci.yml').read_bytes();dm=json.loads((de/'input-manifest.json').read_text());assert dm['frozen']==m['source_baseline']
+for stem,code in [('integrity-final',0),('integrity-offline',0),('gstage-main',1)]:
+ r=json.loads((de/(stem+'.json')).read_text());b=(de/(stem+'.log')).read_bytes();assert r['exit_code']==code and r['sha256']==H(b) and r['bytes']==len(b)
+authority=read('authority-context.json');assert any('`G-DIR`' in r['text'] and '均已 `[x]`' in r['text'] for r in authority['excerpts']) and any('**ZS1-092**' in r['text'] for r in authority['excerpts'])
+inv=read('report-inventory.json');assert not inv['main_report_existed'] and not inv['local_report_existed'] and inv['owned_path']==m['owned_report'];b=(R/inv['owned_path']).read_bytes();final=read('report-final.json');assert H(b)==final['sha256'] and len(b)==final['bytes'] and b'Provisional' in b and '依赖未闭合'.encode() in b and 'acceptance_eligible=false'.encode() in b
+preserved=read('preserved-ready-manifests.json');assert len(preserved)==67;gate=read('gstage-main.log');receipt=read('gstage-main.json');assert receipt['exit_code']==1 and gate['structural']['ok'] and not gate['ok'] and any('ZS1-092.master.json' in v for v in gate['errors']) and H((E/'gstage-main.log').read_bytes())==receipt['sha256']
+if not frozen:
+ s=json.loads((M/'Docs/execution/active_requirement.json').read_text());assert s['blueprint_version']==m['authority'] and s['requirement_digest']==m['requirement_digest'];assert not (M/inv['owned_path']).exists() and not (M/dep['report_path']).exists() and not (M/dep['main_receipt_path']).exists();assert (R/dep['report_path']).read_bytes()==rb and (Path(dep['candidate_path'])/'manifest.json').read_bytes()==raw
+ assert sorted(p.name for p in (M/m['folder_path']).iterdir())==['ci.yml','release.yml']
+ for row in read('local-working-sources.json'):
+  d=Path(row['path']).read_bytes();assert len(d)==row['bytes'] and H(d)==row['sha256']
+ for name,digest in preserved.items():assert H((R/'.ops'/name/'manifest.json').read_bytes())==digest,name
+ sys.path.insert(0,str(M/'tools'));g=runpy.run_path(str(M/'tools/validate_stage1_blueprint.py'));bp=g['parse']((M/'Docs/stage_1_v3_pi_mono_blueprint.md').read_text());assert bp.requirement==m['requirement_digest'] and bp.folders['ZS1-092']==(m['scope'],m['folder_path'],m['owned_report']) and list(bp.items['ZS1-092'].depends)==m['children'] and bp.items['ZS1-089'].state==dep['blueprint_state']
+ direct=[{'item':f.item_id,'path':f.path} for f in bp.files.values() if f.scope==m['scope'] and str(PurePosixPath(f.path).parent)==m['folder_path']];assert direct==m['formal_direct_files'];dirs=[{'item':k,'path':d} for k,(s,d,a) in bp.folders.items() if s==m['scope'] and d!='.' and str(PurePosixPath(d).parent)==m['folder_path']];assert dirs==[]
+ g['artifact'](R,{'path':inv['owned_path'],'bytes':len(b),'sha256':H(b)})
+print(json.dumps({'ok':True,'meaning':'Provisional evidence integrity only; not G-DIR acceptance','item':'ZS1-092','mode':'frozen-offline' if frozen else 'live-readonly','scope':'target:.github/workflows','physical_direct_files':2,'physical_direct_subdirectories':0,'in_scope':['ci.yml'],'context_only':['release.yml'],'formal_children':['ZS1-089'],'unaccepted_children':['ZS1-089'],'acceptance_eligible':False,'dependency_manifest_sha256':dep['candidate_manifest_sha256'],'dependency_members':74,'dependency_main_report_exists':False,'dependency_master_receipt_exists':False,'report_bytes':len(b),'report_sha256':H(b),'preserved_ready_manifests':67,'gstage_exit':1,'directory_master_receipt_missing':True,'new_behavior_runs':0,'limits':'No main/product/state mutation; no hosted CI/Cargo/PTY/HTTP; no release.yml acceptance or .github-root integration'},indent=2))

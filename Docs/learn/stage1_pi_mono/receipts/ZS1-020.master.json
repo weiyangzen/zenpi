@@ -1,0 +1,123 @@
+{
+  "artifacts": [
+    {
+      "bytes": 10753,
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/prompt-templates.ts_learn.md",
+      "sha256": "a458b3e09f5eda1e9565407c2224d346efd942c2886a2f0ff3dfe0f5069dfbe8"
+    },
+    {
+      "bytes": 1181,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/review.md",
+      "sha256": "141a72df68a573eecf1674034bea1284a926fa4af91f99f82549ffda746419a0"
+    },
+    {
+      "bytes": 8507,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/worker-original.md",
+      "sha256": "6a3925334d76057ad5708a1dd2606e1dd741fbc9782a81c16297d31b1a07abfc"
+    },
+    {
+      "bytes": 7095,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/worker-manifest.json",
+      "sha256": "4047aa8d6757ae656f515938abe444aef5c57f29eef14f38960767f0996688c5"
+    },
+    {
+      "bytes": 9055,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/probe.ts",
+      "sha256": "1a09bed5f34ad6434ee814b08ce68c9c0d0fc34d1fb4e9e9e2f685255ac8f773"
+    },
+    {
+      "bytes": 1286,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/source-hashes.json",
+      "sha256": "d390f90f22bc197153a41022749b694a9805e6429a957eeb6a13e95bf0ae9c5d"
+    },
+    {
+      "bytes": 53,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/package.json",
+      "sha256": "75a40a810308009064259f968abb3c640ef198530b2a6da0bb5376bbea4b1918"
+    },
+    {
+      "bytes": 626,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/package-lock.json",
+      "sha256": "3db7c34510427300a4c8843538067dd2de3a5edfd4c028e9a28f4a33f3d3577f"
+    },
+    {
+      "bytes": 1879,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/reused-evidence.json",
+      "sha256": "a5ec0742cc02c8f02cda73b874a388fbf1c870bd2c40b6bd3137df5314b98426"
+    },
+    {
+      "bytes": 575,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/source-run.json",
+      "sha256": "36d7fa16a4dfdc95e9b18922eb003e2843fbc680566918b50b13d5fcc4809b55"
+    },
+    {
+      "bytes": 3231,
+      "path": "Docs/quality/stage1/ZS1-020/master-review-3.1.14/source-probe.stdout.log",
+      "sha256": "302ec9dc2d270b781209ddca28d683165f180199415702772eeb0b1b85b48aee"
+    },
+    {
+      "bytes": 1123,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.15/review.md",
+      "sha256": "d058065daa9a8b5e27e0561f7863b0c6f0bfa03e354174d3423f44c7e57f908a"
+    },
+    {
+      "bytes": 1388,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.16/review.md",
+      "sha256": "0865279dd0cf24918a79bf42ac77799bb18d11075970055714b7ae9e3b73963b"
+    },
+    {
+      "bytes": 855,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.17/review.md",
+      "sha256": "2c080143387b72c7003686a21b20a56b1c85097e3410af3781a31916dc64a445"
+    },
+    {
+      "bytes": 1011,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.18/review.md",
+      "sha256": "0f912f3920d17507920338e1c77dc2ee42c2cb09072888a44e45ddcfc26f9bd6"
+    },
+    {
+      "bytes": 1128,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.19/review.md",
+      "sha256": "47b90cb57c23211aa3ba7b6e35436deb787506c6a7801e2ce53646b0782380b8"
+    },
+    {
+      "bytes": 1620,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.20/review.md",
+      "sha256": "fd415a9914eea556035df67db5b54e1d3c2ca5a3b660b41539dd109a235111fc"
+    },
+    {
+      "bytes": 2829,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.21/review.md",
+      "sha256": "ab93f7f89034ac23a81569ad9a35484b10f71f7b97b6f11cc99a15ddb30f24f5"
+    }
+  ],
+  "attempt_id": "master-review-3.1.14",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "item_id": "ZS1-020",
+  "manual_review": {
+    "decision": "accepted",
+    "evidence": {
+      "bytes": 2829,
+      "path": "Docs/quality/stage1/ZS1-020/master-rebind-3.1.21/review.md",
+      "sha256": "ab93f7f89034ac23a81569ad9a35484b10f71f7b97b6f11cc99a15ddb30f24f5"
+    },
+    "findings": "ZS1-020 unchanged obligation and exact prior evidence chain individually checked; baseline collection extended by two files only; no new feature acceptance.",
+    "reviewer": "controller"
+  },
+  "read_ranges": [
+    [
+      0,
+      8079
+    ]
+  ],
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "reviewer": "controller",
+  "role": "master",
+  "run_id": "zenpi-stage1-20260911",
+  "schema_version": "stage1-receipt/v1",
+  "source_hash": "e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a",
+  "source_path": "packages/coding-agent/src/core/prompt-templates.ts",
+  "validators": "G-FILE；G-STAGE --item ZS1-020"
+}

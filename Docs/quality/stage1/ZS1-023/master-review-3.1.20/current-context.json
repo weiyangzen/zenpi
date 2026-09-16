@@ -1,0 +1,173 @@
+[
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+    "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+    "id": "T1",
+    "start_line": 35,
+    "end_line": 90,
+    "start_byte": 998,
+    "end_byte": 2542
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+    "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+    "id": "T2",
+    "start_line": 203,
+    "end_line": 344,
+    "start_byte": 6223,
+    "end_byte": 11250
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+    "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+    "id": "T3",
+    "start_line": 345,
+    "end_line": 426,
+    "start_byte": 11250,
+    "end_byte": 14079
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+    "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869",
+    "id": "T4",
+    "start_line": 2104,
+    "end_line": 2210,
+    "start_byte": 82108,
+    "end_byte": 85867
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extensions.rs",
+    "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed",
+    "id": "T5",
+    "start_line": 269,
+    "end_line": 311,
+    "start_byte": 8993,
+    "end_byte": 10537
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
+    "sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
+    "id": "T6",
+    "start_line": 281,
+    "end_line": 317,
+    "start_byte": 9325,
+    "end_byte": 10744
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tests/stage1_extension_hooks.rs",
+    "sha256": "aa7ed6e8fefe1ec513fcbf0753f17e082b103e381b0eb8c653a6b4cd126d0453",
+    "id": "T7",
+    "start_line": 515,
+    "end_line": 542,
+    "start_byte": 18515,
+    "end_byte": 19626
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tests/stage1_extension_hooks.rs",
+    "sha256": "aa7ed6e8fefe1ec513fcbf0753f17e082b103e381b0eb8c653a6b4cd126d0453",
+    "id": "T8",
+    "start_line": 936,
+    "end_line": 953,
+    "start_byte": 33442,
+    "end_byte": 34121
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/loader.ts",
+    "sha256": "c96284a217cd4e2eee8d7335a7c25b106135968c716ce39834b4714f5ff8f771",
+    "id": "C1",
+    "start_line": 178,
+    "end_line": 235,
+    "start_byte": 7230,
+    "end_byte": 9691
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/types.ts",
+    "sha256": "96e20f8038027f0b0172f311b6b9d9ddf42123b2f5b2a018f533af026fd3371e",
+    "id": "C2",
+    "start_line": 1125,
+    "end_line": 1188,
+    "start_byte": 37636,
+    "end_byte": 39517
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/agent-session.ts",
+    "sha256": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237",
+    "id": "C3",
+    "start_line": 482,
+    "end_line": 536,
+    "start_byte": 17412,
+    "end_byte": 19010
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/agent-session.ts",
+    "sha256": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237",
+    "id": "C4",
+    "start_line": 2841,
+    "end_line": 2868,
+    "start_byte": 97848,
+    "end_byte": 98897
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S1",
+    "start_line": 122,
+    "end_line": 158,
+    "start_byte": 3903,
+    "end_byte": 4986
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S2",
+    "start_line": 236,
+    "end_line": 281,
+    "start_byte": 7930,
+    "end_byte": 9745
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S3",
+    "start_line": 419,
+    "end_line": 454,
+    "start_byte": 14576,
+    "end_byte": 15796
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S4",
+    "start_line": 502,
+    "end_line": 527,
+    "start_byte": 17484,
+    "end_byte": 18784
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S5",
+    "start_line": 763,
+    "end_line": 804,
+    "start_byte": 27130,
+    "end_byte": 28502
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S6",
+    "start_line": 854,
+    "end_line": 896,
+    "start_byte": 30097,
+    "end_byte": 31339
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/test/extensions-runner.test.ts",
+    "sha256": "83aacf2e5db37b3a14ee14c61c870f3211180a16a465f53e76aaf36f421fd5cf",
+    "id": "S7",
+    "start_line": 1012,
+    "end_line": 1060,
+    "start_byte": 35345,
+    "end_byte": 37246
+  }
+]

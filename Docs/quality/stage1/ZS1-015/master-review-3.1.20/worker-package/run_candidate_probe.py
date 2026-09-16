@@ -1,0 +1,6 @@
+import datetime,hashlib,json,os,pathlib,resource,subprocess,sys,time
+root=pathlib.Path.cwd();out=root/sys.argv[1];name=sys.argv[2];argv=sys.argv[3:];log=out/(name+'.log');started=datetime.datetime.now(datetime.timezone.utc).isoformat();tick=time.monotonic()
+env=os.environ.copy();env['RUSTUP_TOOLCHAIN']='stable-aarch64-apple-darwin'
+with log.open('wb') as stream: result=subprocess.run(argv,cwd=root,env=env,stdout=stream,stderr=subprocess.STDOUT)
+receipt={'name':name,'argv':argv,'cwd':str(root),'started_at':started,'ended_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'elapsed_seconds':time.monotonic()-tick,'exit_code':result.returncode,'environment_overrides':{'RUSTUP_TOOLCHAIN':'stable-aarch64-apple-darwin'},'HOME_preserved':env.get('HOME')==os.environ.get('HOME'),'CODEX_HOME_preserved':env.get('CODEX_HOME')==os.environ.get('CODEX_HOME'),'maxrss_command_tree_observed':resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,'maxrss_note':'macOS bytes; build/tool tree, not product-only runtime','output':str(log),'bytes':log.stat().st_size,'sha256':hashlib.sha256(log.read_bytes()).hexdigest()}
+(out/(name+'.json')).write_text(json.dumps(receipt,indent=2)+'\n');print(json.dumps(receipt));sys.exit(result.returncode)

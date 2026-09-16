@@ -1,0 +1,26 @@
+[
+  {
+    "name": "ci.yml",
+    "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/ci.yml",
+    "relative_path": ".github/workflows/ci.yml",
+    "kind": "regular_file",
+    "scope": "in-scope",
+    "bytes": 3104,
+    "lines": 94,
+    "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd",
+    "artifact": "Docs/quality/stage1/ZS1-092/worker-review320/directory-snapshot/ci.yml",
+    "read": "full file read for directory relationships; only ci has assigned L1 candidate"
+  },
+  {
+    "name": "release.yml",
+    "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/release.yml",
+    "relative_path": ".github/workflows/release.yml",
+    "kind": "regular_file",
+    "scope": "context-only",
+    "bytes": 3779,
+    "lines": 87,
+    "sha256": "caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd",
+    "artifact": "Docs/quality/stage1/ZS1-092/worker-review320/directory-snapshot/release.yml",
+    "read": "full file read for directory relationships; only ci has assigned L1 candidate"
+  }
+]

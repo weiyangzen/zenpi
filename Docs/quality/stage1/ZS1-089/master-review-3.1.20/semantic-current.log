@@ -1,0 +1,98 @@
+{
+  "passed": true,
+  "yaml_loader": "BaseLoader",
+  "yaml_version": "6.0.3",
+  "steps": 16,
+  "changed_steps_previous_to_current": [
+    10,
+    11
+  ],
+  "changed_steps_baseline_to_previous": [
+    16
+  ],
+  "other_14_steps_byte_identical": true,
+  "current_ci_sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9",
+  "contexts": [
+    {
+      "source": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+      "sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c",
+      "excerpts": 3
+    },
+    {
+      "source": "/Users/wangweiyang/GitHub/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "sha256": "20e38b23c6550422c993cc241f9ffa9daeb4443e6d4f050fdd370ba6d54268f9",
+      "excerpts": 2
+    },
+    {
+      "source": "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
+      "sha256": "d04fa4e6fcf1b768adc26d82944468a568a8477d739f34290a42f429110cb185",
+      "excerpts": 2
+    }
+  ],
+  "bash_syntax": [
+    {
+      "step": 4,
+      "name": "Check formatting",
+      "exit_code": 0
+    },
+    {
+      "step": 5,
+      "name": "Run Clippy",
+      "exit_code": 0
+    },
+    {
+      "step": 6,
+      "name": "Run tests",
+      "exit_code": 0
+    },
+    {
+      "step": 7,
+      "name": "Validate execution blueprint and Gantt",
+      "exit_code": 0
+    },
+    {
+      "step": 8,
+      "name": "Validate v2 blueprint review draft",
+      "exit_code": 0
+    },
+    {
+      "step": 9,
+      "name": "Report Rust source inventory",
+      "exit_code": 0
+    },
+    {
+      "step": 10,
+      "name": "Run runtime and size budget gate",
+      "exit_code": 0
+    },
+    {
+      "step": 12,
+      "name": "Check two-mode boundary",
+      "exit_code": 0
+    },
+    {
+      "step": 13,
+      "name": "Exercise headless JSONL protocol",
+      "exit_code": 0
+    },
+    {
+      "step": 14,
+      "name": "Exercise the installed release user paths",
+      "exit_code": 0
+    },
+    {
+      "step": 15,
+      "name": "Exercise the release headless protocol",
+      "exit_code": 0
+    },
+    {
+      "step": 16,
+      "name": "Package and verify the production artifact",
+      "exit_code": 0
+    }
+  ],
+  "workflow_run_commands_executed": 0,
+  "new_behavior_runs": 0,
+  "remote_actions_runs": 0,
+  "semantic_acceptance_by_checker": false
+}

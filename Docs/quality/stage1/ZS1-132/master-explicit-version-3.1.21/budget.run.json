@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "python3",
+    "tools/bench_runtime.py",
+    "--samples",
+    "3",
+    "--output",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/version-release-3.1.21/budget.json",
+    "--startup-evidence-dir",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/version-release-3.1.21/startup"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T17:25:01.142125+00:00",
+  "ended_at": "2026-09-12T17:26:35.745317+00:00",
+  "exit_code": 0,
+  "pid": 31713,
+  "reaped": true,
+  "timed_out": false,
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "log": {
+    "bytes": 12437,
+    "sha256": "fe128609e93879ce28a0ef7e4342a001fdb0d4bdd67d3de1e07d899c95fb11a9"
+  }
+}

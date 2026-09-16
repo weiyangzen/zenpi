@@ -1,0 +1,16 @@
+[
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target089-owner-ready",
+    "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready",
+    "manifest_sha256": "e4584db1d96af2d80ad3e8a660daa3a47c69f244b0998526f5efcb10e8605d47",
+    "members": 18,
+    "scope": "Exact historical package members; old authority and actual before/after results retained, not rerun"
+  },
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage117-ci-archive-ready",
+    "artifact": "Docs/quality/stage1/ZS1-089/worker-review320/reused/stage117-ci-archive-ready",
+    "manifest_sha256": "160a2115a98abc13ba7cd022f2aad28dff583b5e8573c867393799e8fb409d37",
+    "members": 22,
+    "scope": "Exact historical package members; old authority and actual before/after results retained, not rerun"
+  }
+]

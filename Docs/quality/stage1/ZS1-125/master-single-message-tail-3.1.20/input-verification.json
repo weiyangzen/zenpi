@@ -1,0 +1,9 @@
+{
+  "changed": [
+    "src/render.rs",
+    "src/tui.rs",
+    "tests/tui_transcript_ux.rs"
+  ],
+  "unchanged_files": 194,
+  "all_other_inputs_preserved": true
+}

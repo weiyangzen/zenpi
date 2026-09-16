@@ -1,0 +1,36 @@
+{
+  "item": "ZS1-088",
+  "status": "[_]",
+  "authority_version": "3.1.16",
+  "authority_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f",
+  "current": {
+    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs",
+    "bytes": 844,
+    "lines": 42,
+    "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
+  },
+  "original_frozen": {
+    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs",
+    "bytes": 592,
+    "lines": 31,
+    "sha256": "2b429ff43bfba672fea949a9fb51ee6eda41a2975589dbc852a50bef2e13d575"
+  },
+  "report": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/lib.rs_learn.md",
+  "prior_report": "ABSENT inlocal/main; newreport",
+  "captured_at": "2026-09-10T22:15:03.341378+00:00",
+  "ordered_read_chunks": [
+    {
+      "first_line": 1,
+      "last_line": 42,
+      "byte_start": 0,
+      "byte_end": 844,
+      "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
+    }
+  ],
+  "original_read": "all31lines/592bytes",
+  "temporal_boundary": "116integrated per main;122scratchonly",
+  "new_behavior_cases": 0,
+  "new_behavior_runs": 0,
+  "structural_checks": "40modulepathresolutions;29retained11added",
+  "main_source_at_capture": "/Users/wangweiyang/GitHub/zenpi/src/lib.rs"
+}

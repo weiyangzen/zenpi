@@ -1,0 +1,53 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt
+@@ -0,0 +1,48 @@
++
++/// Definition sent to a model. `input_schema` is JSON-Schema-shaped discovery
++/// metadata; tool implementations remain the authoritative validators.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ToolDefinition {
++    pub name: String,
++    pub description: String,
++    pub input_schema: Value,
++    pub side_effect: ToolSideEffect,
++}
++
++impl ToolDefinition {
++    pub fn validate(&self) -> Result<(), ToolError> {
++        validate_identifier(&self.name, "tool name", MAX_TOOL_NAME_BYTES)?;
++        if self.description.trim().is_empty() || self.description.len() > 1_024 {
++            return Err(ToolError::InvalidDefinition(
++                "tool description must be non-empty and at most 1024 bytes".into(),
++            ));
++        }
++        if self.input_schema.get("type").and_then(Value::as_str) != Some("object") {
++            return Err(ToolError::InvalidDefinition(
++                "tool input schema must describe an object".into(),
++            ));
++        }
++        if serde_json::to_vec(&self.input_schema)
++            .map_err(ToolError::Json)?
++            .len()
++            > MAX_TOOL_CALL_BYTES
++        {
++            return Err(ToolError::InvalidDefinition(
++                "tool input schema is too large".into(),
++            ));
++        }
++        Ok(())
++    }
++}
++
++/// A model-requested tool invocation. Arguments must be a JSON object.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ToolCall {
++    pub id: String,
++    pub name: String,
++    #[serde(default = "empty_object")]
++    pub arguments: Value,
++}
++
++fn empty_object() -> Value {
++    Value::Object(Map::new())

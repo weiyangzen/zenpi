@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "rustc",
+    "+stable-aarch64-apple-darwin",
+    "--edition=2024",
+    "-D",
+    "warnings",
+    "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe.rs",
+    "--extern",
+    "libc=/Users/wangweiyang/.codex/worktrees/2267/zenpi/target/debug/deps/liblibc-639f435d40576036.rlib",
+    "-o",
+    "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+  "started": "2026-09-12T06:02:51.023189+00:00",
+  "candidate_source_sha256": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "baseline_source_sha256": "3cd763f944b7a6dd5cbdc0959d71c5f514c240d501239773d443c87bb8e97f7a",
+  "watchdog_tail_byte_identical": true,
+  "extracted_phase_sha256": "58e00b1173f4f7d5b9a1a80172e8bc7791a871820349c78e5717fda239283481",
+  "extracted_watchdog_sha256": "9292ef5934b2fc5b0a6ff0921918a78cc42460321b5c32994e98a88727083926",
+  "libc_sha256": "36b93c38e7d92b6e662d769ff1523f78d220285c9be74d72045cb926592b3282",
+  "probe_source_sha256": "7350883719fe56de1a70b0690012744b424f356cf9ff7e9ea1eca55b07956df2",
+  "exit": 0,
+  "ended": "2026-09-12T06:02:51.181605+00:00",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "probe_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a"
+}

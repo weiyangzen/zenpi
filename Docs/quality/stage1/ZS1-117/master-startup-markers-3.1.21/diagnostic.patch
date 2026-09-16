@@ -1,0 +1,147 @@
+--- a/src/core.rs
++++ b/src/core.rs
+@@ -6079,6 +6079,7 @@
+         };
+     }
+     let backend = make_backend(&options)?;
++    crate::startup_diag::mark(1);
+     let session = SessionStore::open(&options.session)?;
+     let mut agent = Agent::new(session, backend);
+     agent.project_overrides = crate::config::ConfigOverrides {
+@@ -6088,6 +6089,7 @@
+         ..crate::config::ConfigOverrides::default()
+     };
+     let _ = agent.acknowledge_recovery()?;
++    crate::startup_diag::mark(2);
+     // Advertise the complete bounded tool set. Side effects still cannot run
+     // until the local approval policy grants the individual call.
+     let workspace = env::current_dir()?;
+@@ -6119,8 +6121,11 @@
+         agent.restore_model_selection()?;
+     }
+     match options.mode {
+-        RunMode::Headless => crate::headless::run_stdio_owned(agent)
+-            .map_err(|error| ZenpiError::Message(error.to_string())),
++        RunMode::Headless => {
++            crate::startup_diag::mark(3);
++            crate::headless::run_stdio_owned(agent)
++                .map_err(|error| ZenpiError::Message(error.to_string()))
++        },
+         RunMode::Tui => crate::tui::run_async_with_profile(agent, options.profile),
+     }
+ }
+--- a/src/headless.rs
++++ b/src/headless.rs
+@@ -4507,6 +4507,8 @@
+     let mut stopping_since: Option<Instant> = None;
+     let mut shutdown_sent = false;
+     let mut pending_shutdown: Option<(Option<String>, String, u16)> = None;
++    // M4 means spawn calls returned, not background-thread readiness.
++    crate::startup_diag::mark(4);
+     let loop_result = (|| -> Result<(), HeadlessError> {
+         loop {
+             shared = pool.active();
+@@ -4745,6 +4747,8 @@
+             replay.owner_epoch,
+         )
+     })();
++    // Both shutdown_and_join and the close_result closure have returned.
++    crate::startup_diag::mark(7);
+     match loop_result {
+         Err(error) => {
+             let _ = join_result;
+@@ -5075,6 +5079,8 @@
+                     version,
+                     replay,
+                 )?;
++                // write_cached_response completed write_all and flush.
++                crate::startup_diag::mark(6);
+             }
+             Ok(stopping && shutdown_sent && jobs.is_empty())
+         }
+@@ -6339,6 +6345,7 @@
+             // have reached their terminal response.
+             pending_shutdown.replace((id, name, request_version));
+             *stopping = true;
++            crate::startup_diag::mark(5);
+         }
+         Command::Approve {
+             approval_id,
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -6,6 +6,8 @@
+ pub mod config;
+ pub mod context;
+ pub mod core;
++#[doc(hidden)]
++pub mod startup_diag;
+ pub mod diagnostics;
+ pub mod directory_picker;
+ pub mod domain_execution;
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,11 +1,18 @@
+ use std::process::ExitCode;
+ 
+ fn main() -> ExitCode {
+-    match zenpi::core::run() {
++    let m0_ns = zenpi::startup_diag::clock_ns();
++    zenpi::startup_diag::record_at(0, m0_ns);
++    let outcome = match zenpi::core::run() {
+         Ok(()) => ExitCode::SUCCESS,
+         Err(error) => {
+             eprintln!("zenpi: {error}");
+             ExitCode::FAILURE
+         }
++    };
++    zenpi::startup_diag::mark(8);
++    if let Err(error) = zenpi::startup_diag::dump() {
++        eprintln!("zenpi startup diagnostic output failed: {error}");
+     }
++    outcome
+ }
+--- /dev/null
++++ b/src/startup_diag.rs
+@@ -0,0 +1,42 @@
++//! Private one-launch diagnostic. No protocol IO or allocation at marker sites.
++use std::fmt::Write as FmtWrite;
++use std::io::Write as IoWrite;
++use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
++static TIMES: [AtomicU64; 9] = [const { AtomicU64::new(0) }; 9];
++static THREADS: [AtomicU64; 9] = [const { AtomicU64::new(0) }; 9];
++static COUNTS: [AtomicU32; 9] = [const { AtomicU32::new(0) }; 9];
++static CLOCK_ERRORS: AtomicU32 = AtomicU32::new(0);
++static THREAD_ERRORS: AtomicU32 = AtomicU32::new(0);
++pub fn clock_ns() -> u64 {
++    let mut value = libc::timespec { tv_sec: 0, tv_nsec: 0 };
++    let rc = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut value) };
++    if rc != 0 || value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1_000_000_000 {
++        CLOCK_ERRORS.fetch_add(1, Ordering::Relaxed);
++        return 0;
++    }
++    (value.tv_sec as u64) * 1_000_000_000 + value.tv_nsec as u64
++}
++pub fn record_at(stage: usize, ns: u64) {
++    let mut tid = 0_u64;
++    if unsafe { libc::pthread_threadid_np(libc::pthread_self(), &mut tid) } != 0 {
++        THREAD_ERRORS.fetch_add(1, Ordering::Relaxed);
++    }
++    COUNTS[stage].fetch_add(1, Ordering::Relaxed);
++    THREADS[stage].store(tid, Ordering::Relaxed);
++    TIMES[stage].store(ns, Ordering::Release);
++}
++pub fn mark(stage: usize) { let ns = clock_ns(); record_at(stage, ns); }
++pub fn dump() -> std::io::Result<()> {
++    let mut text = String::with_capacity(2048);
++    let _ = writeln!(text, "clock_id\t{}\tpid\t{}\tppid\t{}\tclock_errors\t{}\tthread_errors\t{}",
++        libc::CLOCK_MONOTONIC, unsafe { libc::getpid() }, unsafe { libc::getppid() },
++        CLOCK_ERRORS.load(Ordering::Relaxed), THREAD_ERRORS.load(Ordering::Relaxed));
++    for stage in 0..9 {
++        let _ = writeln!(text, "M{}\t{}\t{}\t{}",stage,TIMES[stage].load(Ordering::Acquire),
++            THREADS[stage].load(Ordering::Relaxed),COUNTS[stage].load(Ordering::Relaxed));
++    }
++    let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(DIAGNOSTIC_PATH)?;
++    file.write_all(text.as_bytes())?;
++    file.flush()
++}
++const DIAGNOSTIC_PATH: &str = "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-single-markers-3.1.21/evidence/markers.tsv";

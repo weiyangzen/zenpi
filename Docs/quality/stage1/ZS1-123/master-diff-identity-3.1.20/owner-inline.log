@@ -1,0 +1,62 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.11s
+     Running unittests src/lib.rs (target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 14 tests
+test slash_actions::attachment_identity_tests::normalized_relative_attachment_remains_a_native_path ... ok
+requested="note\\report.txt" receipt={"accepted":true,"command":"attach","kind":"file","message":"attachment staged for the next turn","mime_type":"text/plain","path":"note\\report.txt","pending":1,"sha256":"b8f8c46452fd38ce6f5ee97460586fa3ca711fe7ad7987be1770179152df4625","size_bytes":26} staged=InputAttachment { kind: File, mime_type: "text/plain", path: Some("note\\report.txt"), url: None, file_id: None } materialized={"file_id":null,"kind":"file","mime_type":"text/plain","path":"note\\report.txt","sha256":"b8f8c46452fd38ce6f5ee97460586fa3ca711fe7ad7987be1770179152df4625","size_bytes":26,"url":null}
+test slash_actions::attachment_identity_tests::attachment_symlink_components_remain_denied ... ok
+test slash_actions::attachment_identity_tests::literal_backslash_attachment_needs_no_directory_counterpart ... ok
+requested="note/report.txt" receipt={"accepted":true,"command":"attach","kind":"file","message":"attachment staged for the next turn","mime_type":"text/plain","path":"note/report.txt","pending":1,"sha256":"419005b1b3ae7ae30bf9a7ea79282faf073ece1b8c7d8cf0cd8acdec66dd02a5","size_bytes":40} staged=InputAttachment { kind: File, mime_type: "text/plain", path: Some("note/report.txt"), url: None, file_id: None } materialized={"file_id":null,"kind":"file","mime_type":"text/plain","path":"note/report.txt","sha256":"419005b1b3ae7ae30bf9a7ea79282faf073ece1b8c7d8cf0cd8acdec66dd02a5","size_bytes":40,"url":null}
+test slash_actions::attachment_identity_tests::literal_backslash_and_directory_attachment_keep_distinct_identities ... ok
+tracked=false literal_inode=12719007 nested_inode=12719010 result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git \"a/./note\\\\report.txt\" \"b/./note\\\\report.txt\"\nnew file mode 100644\nindex 0000000..25a3f3c\n--- /dev/null\n+++ \"b/./note\\\\report.txt\"\n@@ -0,0 +1 @@\n+EXPECTED_LITERAL_CONTENT\n"), "path": String("note\\report.txt"), "route": String("local"), "source": String("git"), "status": String("?? \"note\\\\report.txt\"\n"), "truncated": Bool(false)})
+test slash_actions::diff_identity_tests::unborn_head_preserves_native_paths_in_cached_and_unstaged_fallbacks ... ok
+tracked=true literal_inode=12718990 nested_inode=12718991 result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git \"a/note\\\\report.txt\" \"b/note\\\\report.txt\"\nindex fd03d80..25a3f3c 100644\n--- \"a/note\\\\report.txt\"\n+++ \"b/note\\\\report.txt\"\n@@ -1 +1 @@\n-literal before\n+EXPECTED_LITERAL_CONTENT\n"), "path": String("note\\report.txt"), "route": String("local"), "source": String("git"), "status": String(" M \"note\\\\report.txt\"\n"), "truncated": Bool(false)})
+selected="selected[ab].txt" result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git a/selected[ab].txt b/selected[ab].txt\nindex c25383b..6125804 100644\n--- a/selected[ab].txt\n+++ b/selected[ab].txt\n@@ -1 +1 @@\n-selected before\n+EXPECTED_EXACT_PATH\n"), "path": String("selected[ab].txt"), "route": String("local"), "source": String("git"), "status": String(" M selected[ab].txt\n"), "truncated": Bool(false)})
+test slash_actions::diff_identity_tests::untracked_backslash_diff_reads_only_selected_file ... ok
+test slash_actions::diff_identity_tests::bracket_filename_is_not_a_git_glob ... ok
+selected=":(glob)*.txt" result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git a/:(glob)*.txt b/:(glob)*.txt\nindex c25383b..6125804 100644\n--- a/:(glob)*.txt\n+++ b/:(glob)*.txt\n@@ -1 +1 @@\n-selected before\n+EXPECTED_EXACT_PATH\n"), "path": String(":(glob)*.txt"), "route": String("local"), "source": String("git"), "status": String(" M :(glob)*.txt\n"), "truncated": Bool(false)})
+test slash_actions::diff_identity_tests::deleted_backslash_file_does_not_select_existing_neighbor ... ok
+test slash_actions::diff_identity_tests::magic_filename_is_not_a_git_pathspec_directive ... ok
+test slash_actions::diff_identity_tests::tracked_backslash_diff_reads_only_selected_file ... ok
+test slash_actions::diff_identity_tests::leading_option_filename_is_a_file_in_both_git_modes ... ok
+GIT_GLOB_PATHSPECS=1 child=exit status: 0
+
+running 1 test
+tracked=true literal_inode=12719011 nested_inode=12719013 result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git \"a/note\\\\report.txt\" \"b/note\\\\report.txt\"\nindex fd03d80..25a3f3c 100644\n--- \"a/note\\\\report.txt\"\n+++ \"b/note\\\\report.txt\"\n@@ -1 +1 @@\n-literal before\n+EXPECTED_LITERAL_CONTENT\n"), "path": String("note\\report.txt"), "route": String("local"), "source": String("git"), "status": String(" M \"note\\\\report.txt\"\n"), "truncated": Bool(false)})
+test slash_actions::diff_identity_tests::tracked_backslash_diff_reads_only_selected_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 127 filtered out; finished in 0.37s
+
+
+
+test slash_actions::attachment_identity_tests::attachment_path_and_file_limits_remain_enforced ... ok
+GIT_ICASE_PATHSPECS=1 child=exit status: 0
+
+running 1 test
+tracked=true literal_inode=12719341 nested_inode=12719342 result=Ok(Object {"accepted": Bool(true), "changed": Bool(true), "command": String("diff"), "diff": String("diff --git \"a/note\\\\report.txt\" \"b/note\\\\report.txt\"\nindex fd03d80..25a3f3c 100644\n--- \"a/note\\\\report.txt\"\n+++ \"b/note\\\\report.txt\"\n@@ -1 +1 @@\n-literal before\n+EXPECTED_LITERAL_CONTENT\n"), "path": String("note\\report.txt"), "route": String("local"), "source": String("git"), "status": String(" M \"note\\\\report.txt\"\n"), "truncated": Bool(false)})
+test slash_actions::diff_identity_tests::tracked_backslash_diff_reads_only_selected_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 127 filtered out; finished in 0.19s
+
+
+
+test slash_actions::diff_identity_tests::inherited_git_pathspec_modes_do_not_break_literal_diff ... ok
+test slash_actions::diff_identity_tests::literal_directory_scope_and_untracked_prefix_bound_remain_intact ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 114 filtered out; finished in 1.01s
+

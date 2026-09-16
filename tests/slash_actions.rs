@@ -78,6 +78,40 @@ fn diff_owner_rejects_escape_and_symlink_paths() {
 }
 
 #[test]
+fn diff_owner_marks_binary_files_without_emitting_text() {
+    let directory = tempdir().unwrap();
+    let root = directory.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("image.bin"), [0_u8, 159, 255, 1]).unwrap();
+    let value = slash_actions::diff_value_at(root, Some("image.bin")).unwrap();
+    assert_eq!(value["binary"], true);
+    assert_eq!(value["changed"], true);
+    assert_eq!(value["diff"], "");
+}
+
+#[test]
+fn diff_owner_redacts_credentials_in_patch_and_status() {
+    let directory = tempdir().unwrap();
+    let root = directory.path();
+    git(root, &["init", "-q"]);
+    std::fs::write(root.join("config.txt"), "safe\n").unwrap();
+    git(root, &["add", "config.txt"]);
+    git(root, &["config", "user.email", "zenpi@example.test"]);
+    git(root, &["config", "user.name", "zenpi test"]);
+    git(root, &["commit", "-qm", "initial"]);
+    std::fs::write(
+        root.join("config.txt"),
+        "Authorization: Bearer sk-live-example\napi_key=sk-query-example\n",
+    )
+    .unwrap();
+    let value = slash_actions::diff_value_at(root, Some("config.txt")).unwrap();
+    let rendered = serde_json::to_string(&value).unwrap();
+    assert!(!rendered.contains("sk-live-example"));
+    assert!(!rendered.contains("sk-query-example"));
+    assert!(rendered.contains("<redacted>"));
+}
+
+#[test]
 fn attach_owner_stages_reference_and_consumes_it_on_next_turn() {
     let directory = tempdir().unwrap();
     let root = directory.path();

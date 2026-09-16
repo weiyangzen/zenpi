@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/zenpi",
+    "--help"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial",
+  "timeout_seconds": 15,
+  "exit_code": 0,
+  "elapsed_seconds": 0.004617750000000004
+}

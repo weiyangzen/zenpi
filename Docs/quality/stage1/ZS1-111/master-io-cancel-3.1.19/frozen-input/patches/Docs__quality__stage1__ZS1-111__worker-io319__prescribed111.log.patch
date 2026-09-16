@@ -1,0 +1,159 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.log b/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.log
+@@ -0,0 +1,154 @@
++warning: unnecessary parentheses around closure body
++  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
++   |
++87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
++   |                                                  ^                            ^
++   |
++   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
++help: remove these parentheses
++   |
++87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
++87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
++   |
++
++warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
++   Compiling zenpi v0.1.0 (/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/output111-io319-current)
++    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.66s
++     Running tests/headless_event_budget.rs (target/debug/deps/headless_event_budget-85c324e55bf0c0bb)
++
++running 1 test
++test slow_consumer_gets_exact_byte_drop_marker_before_terminal_response ... ok
++
++test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
++
++     Running tests/stage1_tool_output.rs (target/debug/deps/stage1_tool_output-4a18213c0c004f77)
++
++running 53 tests
++
++running 1 test
++
++running 1 test
++test final_store_drop_releases_lock_even_while_a_fork_child_retains_descriptor ... ok
++test actual_metadata_permission_denial_remains_interrupted_after_restart ... ok
++test host_capture_disk_reservation_precedes_artifacts_and_shell_effects ... ok
++test command_capture_binding_and_disk_quota_preflight_prevent_wrong_dispatch ... ok
++test actual_process_exit_before_finalize_recovers_as_interrupted ... ok
++test kernel_file_size_limit_helper ... ok
++
++test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.37s
++
++test cleanup_retirement_before_unlink_recovers_and_acked_records_are_not_counted_again ... ok
++test expired_orphan_spill_files_are_cleaned_without_touching_live_writers ... ok
++test kernel_file_size_limit_helper ... ok
++test cleanup_retirements_preserve_private_inode_and_alias_checks ... ok
++test actual_kernel_file_size_limit_preserves_partial_write_identity_on_restart ... ok
++test output_alias::alias_restart_helper ... ignored, independent process fixture
++test command_cancel_reaps_then_flushes_incomplete_prefix_and_stops_updates ... ok
++test cleanup_retirements_keep_quota_until_receipted_and_do_not_expire_unknown_results ... ok
++test interrupted_drop_and_missing_file_are_distinct_from_empty_success ... ok
++test actual_command_updates_precede_terminal_and_reuse_canonical_event ... ok
++test output_alias::ordinary_workspace_hardlinks_remain_readable_and_searchable ... ok
++test async_jsonl_delivers_canonical_output_before_shell_exit ... ok
++
++running 1 test
++test output_alias::raw_hardlink_alias_cannot_read_attach_or_preview_write ... test output_alias::alias_restart_helper ... okok
++
++
++test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.05s
++
++test host_spawn_failure_durably_retains_incomplete_stream_references ... ok
++test output_alias::raw_hardlink_alias_is_absent_from_literal_search ... ok
++test output_alias::private_inode_stays_denied_after_original_unlink_and_independent_process_restart ... ok
++test batch_capture_is_scoped_per_call_and_keeps_following_calls_usable ... ok
++test cleanup_journal_failure_preserves_output_until_intent_is_durable ... ok
++test host_close_releases_private_store_lock_without_deleting_history ... ok
++test per_file_quota_keeps_verified_prefix_and_never_claims_full_output ... ok
++test live_sink_is_restored_after_error_and_unwind ... ok
++test overlapping_registered_values_and_credentials_crossing_syntax_boundaries_are_masked ... ok
++test actual_command_output_over_memory_cap_is_reconstructible_from_raw_artifacts ... ok
++test preserves_exact_raw_bytes_with_split_utf8_and_bounded_display ... ok
++test public_owner::typed_wire_and_shared_slash_enforce_bounds_and_explicit_cleanup ... ok
++test private_permissions_and_symlink_or_hardlink_reads_cannot_escape ... ok
++test output_alias::raw_hardlink_alias_is_absent_from_regex_and_find_even_with_explicit_glob ... ok
++test restart_writer_helper ... ignored, subprocess fixture: must exit without running writer Drop
++test range_limits_metadata_identity_and_tampering_are_rejected ... ok
++test preflight_and_spawn_failures_keep_incomplete_artifact_references ... ok
++test host_user_shell_raw_capture_survives_restart_and_keeps_terminal_order ... ok
++test live_host_output_precedes_shell_exit_and_sink_is_request_scoped ... ok
++test spill_corruption_cannot_produce_a_complete_reference ... ok
++test worker_gate_and_capture_cannot_be_composed_in_either_order ... ok
++test public_owner::incomplete_prefix_keeps_status_and_absent_root_is_not_created ... ok
++test public_owner::journal_reference_pins_hash_even_if_metadata_and_bytes_are_replaced_together ... ok
++test interrupted_credential_prefix_and_oversized_values_never_expose_a_tail ... ok
++test public_owner::model_cannot_supply_paths_authority_or_another_sessions_reference ... ok
++test public_owner::general_search_never_traverses_private_output_directories ... ok
++test public_owner::tree_fork_copied_history_does_not_grant_source_output_authority ... ok
++test session_and_ttl_cleanup_preserve_other_sessions_and_active_writers ... ok
++test real_http_model_command_sends_capture_reference_in_next_request ... ok
++test total_reservations_and_restart_account_for_bytes_on_disk ... ok
++test public_owner::expired_missing_uncorrelated_and_binary_ranges_are_visible_and_bounded ... ok
++test public_model_reader_uses_real_http_reference_and_redacts_selected_raw_range ... ok
++test public_owner::actual_shell_restart_public_read_and_explicit_cleanup ... ok
++test streaming_credentials_are_masked_before_tail_cuts_and_raw_ranges_stay_exact ... ok
++test actual_default_max_artifact_read_measures_in_scan_cancellation ... ok
++
++test result: ok. 51 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 7.48s
++
++     Running tests/tools.rs (target/debug/deps/tools-313d9444d6b7edb3)
++
++running 36 tests
++test reliability_collision_child ... ignored, fresh process for deterministic temporary-name collision fixtures
++test builtins_publish_typed_object_schemas ... ok
++test side_effects_are_denied_before_handler_execution ... ok
++test malformed_calls_and_unknown_arguments_are_typed_errors ... ok
++test read_file_is_bounded_and_workspace_scoped ... ok
++test tool_output::private_inode_tests::marker_detection_error_is_not_unmarked ... ok
++test edit_rejects_a_source_larger_than_the_write_budget ... ok
++test read_file_rejects_a_symlink_that_escapes_the_workspace ... ok
++test list_directory_is_sorted_and_reports_truncation ... ok
++test list_directory_describes_symlinks_without_following_them ... ok
++test search_is_literal_case_configurable_and_bounded ... ok
++test worker_action_budget_is_shared_across_context_clones_and_direct_invocation ... ok
++test reliability_permissions_do_not_add_execute_or_propagate_set_id_bits ... ok
++test precancelled_command_does_not_spawn_and_user_shell_keeps_exit_evidence ... ok
++test worker_commands_are_declared_direct_argv_with_no_shell_expansion ... ok
++test large_tool_results_become_private_retrievable_artifacts ... ok
++test worker_gate_rejects_unbound_origin_cross_origin_and_revocation ... ok
++test worker_gate_refuses_symlinks_and_hardlinks_even_inside_workspace ... ok
++test worker_preflight_rejects_unknown_effects_network_and_general_shell ... ok
++test command_tool_is_bounded_and_scrubs_environment ... ok
++test tool_output::tests::failed_spill_write_preserves_error_and_never_claims_complete ... ok
++test worker_gate_is_immutable_digest_bound_and_deny_over_allow ... ok
++test write_to_directory_fails_without_leaving_atomic_temporary_files ... ok
++test write_preview_rejects_binary_existing_sources_without_writing ... ok
++test write_diff_is_empty_when_content_is_unchanged ... ok
++test write_diff_represents_final_newline_changes_as_a_hunk ... ok
++test worker_search_listing_and_compaction_do_not_leak_prohibited_paths ... ok
++test write_diff_is_bounded_for_large_replacements ... ok
++test write_and_edit_tools_are_atomic_and_policy_guarded ... ok
++test tool_output::tests::failed_metadata_publication_keeps_terminal_reference_and_error ... ok
++test reliability_create_new_collision_never_removes_or_overwrites_another_path ... ok
++test reliability_write_and_edit_preserve_permissions_and_replace_the_inode ... ok
++test timed_out_command_reaps_its_descendant_process_group ... ok
++test reliability_line_ending_diff_is_exact_and_can_be_applied ... ok
++test term_resistant_descendants_die_after_timeout_and_host_cancel ... ok
++test successful_shell_cannot_leave_background_process_or_hold_pipe_forever ... ok
++
++test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.29s
++
++     Running tests/tui_logs.rs (target/debug/deps/tui_logs-75571dd45cbc1dfe)
++
++running 10 tests
++test tool_ids_with_brackets_do_not_update_a_prefix_collision ... ok
++test finishing_without_deltas_adds_one_assistant_message ... ok
++test tool_lifecycle_updates_one_bounded_transcript_entry ... ok
++test streamed_assistant_is_finalized_without_duplicate_transcript_entry ... ok
++test ctrl_o_toggles_tool_log_folding_without_submitting_prompt ... ok
++test approval_diff_is_retained_as_shared_view_block ... ok
++test job_owned_streams_ignore_stale_deltas_and_finalizers ... ok
++test unresolved_tool_entries_can_be_marked_cancelled ... ok
++test folded_logs_do_not_hide_a_pending_approval_prompt ... ok
++test folded_tool_logs_render_a_summary_and_restore_on_toggle ... ok
++
++test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
++

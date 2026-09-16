@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "complete": false,
+  "item": "ZS1-115",
+  "related_gate": "ZS1-117",
+  "full_library_passed": true,
+  "passed_tests": 96,
+  "failed_tests": 0,
+  "ignored_tests": 5,
+  "pipe_subprocess_cases": 12,
+  "production_prefix_unchanged": true,
+  "before": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "after": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+  "release_verified": false,
+  "Linux_verified": false,
+  "checked_at": "2026-09-12T12:31:15.676762+00:00"
+}

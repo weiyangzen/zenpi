@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "entry_payloads": 5,
+  "old_payloads": 32,
+  "source_closure_files": 8,
+  "master014_files": 10,
+  "target_identity_files": 6,
+  "direct_children": 6,
+  "scoped_files": [
+    "ZS1-014"
+  ],
+  "scoped_directories": [],
+  "matching_cases": 23,
+  "new_tests": 0,
+  "new_collections": 0,
+  "scope": "Independent directory semantic review with accepted014 actual replay reuse; no product gate acceptance"
+}

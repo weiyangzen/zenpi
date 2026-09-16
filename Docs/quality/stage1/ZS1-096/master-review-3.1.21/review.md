@@ -1,0 +1,41 @@
+# ZS1-096 主控独立全文理解验收 · 3.1.21
+
+接受 src/render.rs 这一文件的完整现状理解，包含主控随后合入的预览字素换行修复。只接受096文件理解项；124/125完整交互、085整个TUI、117预算和最终阶段交付仍未完成。登记前53/121，requirement保持3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d。
+
+## 独立阅读与当前差异
+
+主控上轮连续读完修复前render60098B/1706L/b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d：1–300 bee85e、301–600 f71bb8、601–900 6503af、901–1200 6e7a9c、1201–1450 7ec500、1451–1706 896348，包括全部23内联测试、2测试helper、42生产函数和EOF。当前59562B/1688L/9e526c42e1394cc2aa888f9627e7e0dfaf5b5e3acd0db3187c65553884d61c0a与该全文只有wrap_segments函数的−536B/18L变化，完整patch已读bccab5，本轮又完整读当前函数7009bd；其余字节通过精确连续匹配对应已读正文。因此不是把旧60098B报告直接套在当前源上，也没有重新宣称本轮从1行开始连续读1688行。
+
+本轮另行完整连续阅读冻结基线30217B/901L/6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7：1–310 ca1fd4、311–620 f7a156、621–901 32e84a，含基线11测试及旧parse_link/underscore反向扫描。当前对基线的变化涵盖头尾接口分离、延迟tab展开、metadata、完整grapheme walker、链接closer缓存及本次头部Span换行复用；基线的source_manifest身份继续冻结，不以现状hash覆盖。
+
+worker280行42574B报告248b6883f7e3910718c1be101151f4c660c738c8f51cf8b66ce4eed29df81d47完整阅读：1–100上轮857a68，101–200本轮61e217，201–280本轮85c552。tests/render_markdown.rs71行4测试、tests/tui_markdown.rs60行4测试本轮从各自1行到EOF读完d53ee6；不把8个外部声明并入23个内联测试，也没有本轮执行它们。
+
+## 模块全部行为判断
+
+六类MarkdownBlock只表示有限终端Markdown子集。解析按code状态优先处理fence关闭，同字符/足够长度/无语言才关闭，EOF未闭仍输出Code；否则按fence、blank、heading、quote、list、rule、paragraph顺序。空白归并、单层quote/list、rule的字节长度与list优先级、language首token和未支持结构均如报告所述，不承诺CommonMark保真。文本解析先接受前256KiB，UTF8字符边界不等于grapheme边界；没有返回input-truncated标志或block数量上限。
+
+头部接口保留首行，width钳1–65535；requested至少1且受4Mi/width限制，显式requested可以超过8192。wrap/inline/parse可能先构造全部中间结果才按行limit保存，返回量不等于峰值内存。公开head role prefix不清控制字符或限bytes，使用body宽求预算又附加缩进，不能套用tail完整width预算结论。实际两个TUI head调用者传空prefix，不能由公开任意prefix推断现实终端注入已经发生。head代码块wrap_plain及truncate_to_width仍按scalar；本次wrap_segments改为grapheme并不覆盖这两个路径。
+
+尾部路径接受的仍是原始前256KiB，在整个接受范围内保持fence和样式语境后选视觉后缀。sanitize_compact不先扩大tab，避免其挤掉合法范围末尾；CRLF/loneCR归一，其他is_control替换?。prefix先限制/清理再grapheme裁宽，body至少一格，行数按最终完整width限cells。它不保存无限流末尾字节，不作全Unicode双向格式安全归一，不自动添加字节截断标记。
+
+walk_wrapped_segments先join文本，扩展字素跨样式边界时取首字节的Style；换行完成一行，tab固定四空格，过宽或行首零宽簇降级为?，最后补一行。计数和保留共用同一状态机，避免行偏移算法漂移；计数虽不创建Line仍需join/扫描。tail保留deque至limit并记录总视觉行，Markdown逆序挑块、code逆序物理行但正序wrap，内部list/code标记只属于原首行。omitted_visual_lines是当前接受内容在当前width布局中的行起点；resize/早期语法变化后不能当持久byte锚点。尾部渲染本身没有message/project/job身份。
+
+行内格式只做单层delimiter、词内underscore保护和链接label。空content失败后保留字面，label可以空，target非空但不校验URL可信性，不打开链接。当前previous_non_underscore避免重复回看；LinkScan两个closer位置含EOF缓存在同一文本/index单调推进前提下有效。T20扫描byte计数只约束该查找部分，不证明整个renderer响应时延或资源峰值。
+
+本文件是纯内存块/Line/Span计算，无IO、任务取消、审批决策、终端模式或会话恢复；分配失败/panic不被此层捕获。copy动作、折叠、滚动、状态时钟、按键匹配应由各宿主owner承担，不能因为生成styled span就宣称它们执行成功。
+
+## 当前宿主接线与仍待验证的差距
+
+本轮完整读TUI transcript_window及邻近14350–14465（5990c5），render_transcript_pane与transcript_messages6990–7165（343fd8）。当前TUI SHA801bffa879a211fc8b1fe3f43463dd38584f7f570b870d91f0c5ba2258d79c02未变。Assistant与System走markdown tail，User/Tool/Error/Reasoning走plain tail；folding只造显示副本，stable message ID加omitted行偏移定位。宿主max_lines约束整窗口，从最新消息取尾，省略时首行提示无position并占一个显示行。阅读锚点优先匹配position，过早则回首，找不到则回退scroll anchor；渲染cache按宽度失效。Goal分支也有独立截断/scroll状态。这些是有界函数接线阅读，不是085整个16376行重新验收。
+
+上轮已读的正文查看器与审批render（e06e5a/9132f8）仍适用；本次实际修复消除了两个空prefix head视图的emoji后字符裁剪，但head行/byte上限仍会截掉较长正文。工具preview.truncated仅反映owner截断，不等于renderer截断，审批UI当前缺少通用渲染省略反馈；保留为124/125下一项真实入口反例验证条件。本轮没有把该静态发现称为已复现或已修复，也没有补测压力样本。
+
+ViewModel的parse再校验128块不能消除parse中间分配，有序marker到canonical List只保ordered+单item。308/309同hash报告/历史保留，按键hint无动作、暂停bool无job身份、详情先wrap后截断等对照限于已有复核结论，未新读其全源或复跑参考测试。
+
+## 验证、证据保全与接受范围
+
+worker immutable564普通文件、其中484历史文件保留，manifest135680B/4b3fc05994c41164db23839fbf1a8fc7c802db26b801c034d890ec8d281e9d48。主控完整静读verify.py（9dbcce），新副本只改PACKAGE为argv并固定manifest hash；原包全部无写权限/无symlink。仅一次新审计6746b9：233结构检查通过、0失败、stderr空、0产品执行。涵盖包/读取段/61连续单元/67函数/23测试77assert/18映射/历史保全/单路径正反patch与sentinel；它只验证已实现的机械一致性，人工语义结论来自上述完整正文。
+
+上一轮125局部修复已有[单独主控记录](../../ZS1-125/master-preview-grapheme-3.1.21/review.md)：原3失败，修复后85Rust（含render23）通过、fmt/clippy/debug0。它用TestBackend并非真实PTY，新debug63e40f29b01a82fd5b0d9f02069d10d466f68f3b707a370e27a44ba2c109714a没有release/预算通过。本轮只绑定保留该记录和确切修复差分，不重新执行、重复计入或把worker的0运行改成85。
+
+worker捕获的旧权威状态、旧096 G-STAGE缺master receipt失败、准备locator错误与旧308/309包原样保留。当前唯一报告此前不存在，接受时创建worker原文加本主控现状限定；不改历史包、源源码或用户数据。096通过后整阶段仅新增一个文件理解项；BentoBox与顶部加号流程未改，124/125/117等整项继续按真实入口和当前构建证据独立闭合。

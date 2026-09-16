@@ -1,0 +1,17 @@
+{
+  "binary_sha256": "7a374a3b0764c7a4db9b3b53e36dc07d3d8b17b80f5711805a932a2090e60774",
+  "checks": {
+    "single_ascii_visible_below_150ms_and_idle_checkpointed": true,
+    "isolated_unicode_visible_below_150ms": true,
+    "enter_after_visible_idle_flush_stays_inside_burst": true,
+    "ordinary_multiline_no_submit_shell_or_exit_and_unicode_intact": true,
+    "cancel_keeps_entire_burst_draft_without_request": true,
+    "independent_restart_restores_burst_without_resend": true,
+    "deliberate_enter_after_quiet_submits_one_complete_message": true
+  },
+  "ascii_visible_ms": 30.66,
+  "unicode_visible_ms": 23.59,
+  "status": "passed",
+  "request_count": 1,
+  "tui_processes": 2
+}

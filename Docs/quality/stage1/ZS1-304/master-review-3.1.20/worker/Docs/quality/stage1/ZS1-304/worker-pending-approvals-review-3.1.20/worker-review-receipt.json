@@ -1,0 +1,34 @@
+{
+  "schema_version": "stage1-single-file-review-candidate/v1",
+  "item": "ZS1-304",
+  "blueprint_version": "3.1.20",
+  "requirement_digest": "8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645",
+  "mode": "understand",
+  "reviewer": "worker B existing task 01a08be3-4677-7463-832b-bdb571ea6b9a",
+  "source_path": "codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs",
+  "source_head": "b3b3d262787f4902a7449f17d793241a34d311ad",
+  "source_sha256": "a401d7c6ba3051fcf2c20152a9e86a3f4f8751a87470cbc7f518001326618a2f",
+  "source_bytes": 4105,
+  "source_lines": 147,
+  "read_ranges": [
+    [
+      0,
+      4105
+    ]
+  ],
+  "source_tests_read": 3,
+  "source_tests_executed": 0,
+  "capability_groups": 10,
+  "report": "Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs_learn.md",
+  "report_bytes": 28429,
+  "report_sha256": "b2e081b19f5f9d52df1b6fd8bce3e9d6a9e9d8a716df5f922b77d7d6004baddb",
+  "prior_worker_report_sha256": "ffc1ef71262191c43aee1f05650427b2b041625c3459bf286afd5fa901e236b0",
+  "master_before": "absent",
+  "semantic_review": "complete worker candidate; master G-FILE pending",
+  "master_accepted": false,
+  "status_authority_modified": false,
+  "new_product_experiments": [],
+  "no_mutable_tui_tracking": true,
+  "target_context_excerpts": 17,
+  "created_at": "2026-09-12T10:14:27.787071+00:00"
+}

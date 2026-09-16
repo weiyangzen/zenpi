@@ -1,0 +1,255 @@
+{
+  "complete": false,
+  "artifacts": [
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/actual-fixture-inputs.json",
+      "bytes": 4503,
+      "sha256": "7fdfc2990860dfe44239307862f58164c23695a5ddc411cc89fd3cb15ef2da4c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/actual-fixtures.tar.gz",
+      "bytes": 6640,
+      "sha256": "2987cfb5a4b87d11b6e9d6fcb5e838ee4e93d55bab13a4657a0bdb2c2d30636d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/baseline/src/tui.rs",
+      "bytes": 557978,
+      "sha256": "a57ff89497a1b3167f68e3dfef67fc7c67b1b8c637e5172b84a253763c097c2d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/baseline/tests/tui_command_palette.rs",
+      "bytes": 17531,
+      "sha256": "2605d1d234ff0ee144938d8556635054c79c4b198dc414feb210e7bc5f152daa"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/baseline/tools/tui_approval_smoke.py",
+      "bytes": 11311,
+      "sha256": "e522c0f655fefb51e9f7614178e6ebf22075ce35800257bd50f980b993c6b909"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/baseline-regression.log",
+      "bytes": 1580,
+      "sha256": "d79b1883620c273c54086fa88263331f7569d96cda2380d0df6b6dc387b3245c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/baseline-regression.run.json",
+      "bytes": 971,
+      "sha256": "d896a14603584a15bf73b89561fcaadb2e97d50fe9e5f0436e5669a85722a65e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/binaries.json",
+      "bytes": 248,
+      "sha256": "cb6981ab97a560e276098802dfb7e72aad53bedb94fc1be295244722f2c74406"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/build.log",
+      "bytes": 819,
+      "sha256": "367eba4e3e7af93e68659ebb0e0330e5f9c652d149c4e3eb630b5e45210ff3d0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/build.run.json",
+      "bytes": 828,
+      "sha256": "3af53afe01ff108dffbf08cfc72e1385bb6303d4e76fbf8ac921ae5496f23502"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/candidate/src/tui.rs",
+      "bytes": 558203,
+      "sha256": "d14c707adcf1cb5b354a0443f9b77afe6eef3194b4cf4af1fdb20bed773959a3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/candidate/tests/tui_command_palette.rs",
+      "bytes": 21110,
+      "sha256": "3bf46fa713dd2ab4252330106c2430f2a34ae9c967419fa42c26595b9000d5ec"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/candidate/tools/tui_approval_smoke.py",
+      "bytes": 19814,
+      "sha256": "f0baed680fdc270e35413675f24f1b4fdaf283a96290d4cfcd912f8346513ff7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/clippy.log",
+      "bytes": 828,
+      "sha256": "429f6bbcd69369f007176e64e270204e2dcc256030479b9adb0ce1272696ce6b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/clippy.run.json",
+      "bytes": 935,
+      "sha256": "280cd109d4dc3e093d1324c7eec47092fbb7d2e8b002e22be615c3108350fb1f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/current-inputs.json",
+      "bytes": 4645,
+      "sha256": "389e18a2628745fbb9ab4112c0d7bff1aaba8d4e257650456f28d26688fa8a03"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/fmt.run.json",
+      "bytes": 805,
+      "sha256": "d810a2103b9d9744ef16ce4381a4a3faf90f84f35c1114c28d4ab400991aa640"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/legacy-approval.json",
+      "bytes": 812,
+      "sha256": "7f49514db94daa346c8a567ceb3e3a26af34bc85aaef53b3ab656a1879ca34a9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/legacy-approval.log",
+      "bytes": 812,
+      "sha256": "7f49514db94daa346c8a567ceb3e3a26af34bc85aaef53b3ab656a1879ca34a9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/legacy-approval.pty.log",
+      "bytes": 179541,
+      "sha256": "0763be3ace0d1078216134953d0887f637fd2058ca3e52bb77ffcf62d718887e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/legacy-approval.run.json",
+      "bytes": 1135,
+      "sha256": "94328f8c1a5159030729107f96c734813fc4b5267879f0ee90fe6b8568e16ae6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/master-verification.json",
+      "bytes": 707,
+      "sha256": "34f311280fceddc9e471c95bff9da97dd8663f336e93b2036d703a4fdafcc6c6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/review.md",
+      "bytes": 3594,
+      "sha256": "fb7fe611e5c08d8e42aba8c4c04208b5aec0ea2bcc447941864ec04abf666222"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-after.http.json",
+      "bytes": 70521,
+      "sha256": "1da581110f5210c462f84284e795374d0444afafa21bdba2b645b67b01429437"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-after.json",
+      "bytes": 66310,
+      "sha256": "33002fe7dfa3e1d147797332bf01553885a6039b6f5eeb21e54e5c13a5dab62f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-after.log",
+      "bytes": 66310,
+      "sha256": "33002fe7dfa3e1d147797332bf01553885a6039b6f5eeb21e54e5c13a5dab62f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-after.pty.log",
+      "bytes": 92341,
+      "sha256": "a79e4ead9190e1d1b995d3d94e2d9583aded0f5dad791f3225aa24b21a37879c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-after.run.json",
+      "bytes": 979,
+      "sha256": "fd990e9ad159b2ded7dd5ea2011703f2b8be5264cc0fbb79d04c0caa206b57b1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-before.http.json",
+      "bytes": 33683,
+      "sha256": "4eccd1edc7e7e941bb72d52737b2b8895d9d602bc1e5fe7ba8b62d4c7c57daa5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-before.json",
+      "bytes": 63670,
+      "sha256": "769d03bef55b4b27146b45fafb77c636ef1255d9dd4df36ea13153d9d65e5730"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-before.log",
+      "bytes": 1026,
+      "sha256": "9036ab3b1d8bbc100cc12d244f6f27786dea04ba604c8838232dc67c8bb451da"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-before.pty.log",
+      "bytes": 84080,
+      "sha256": "abd38b810bfe27666fd298a6e496337719ca91fecfc3e186091733058674efe1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/selector-before.run.json",
+      "bytes": 988,
+      "sha256": "4c96d420989ffbe4ffa315c525def9c3b4a68fce92dc32e9d76a629923183f15"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/targeted-tests.log",
+      "bytes": 2989,
+      "sha256": "429cbe664e9a23395846535ca8ecf73512f798d3e219b38ed4f4e39228681ddc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/targeted-tests.run.json",
+      "bytes": 907,
+      "sha256": "7906f8ee457ce1836045492070e4bb8be9557c3747d306510f2535dce5d07aee"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-REVIEW.md",
+      "bytes": 4014,
+      "sha256": "b759aa165f549885e1071e7d46f4a3a824a1aa727a242da7a6b1b6ca858619b0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-baseline-inputs.json",
+      "bytes": 31226,
+      "sha256": "7e45897fd58bf4ea70f9a780de753fe0bd37eb98835176bf890e9ab607c40d63"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/REVIEW.md",
+      "bytes": 1030,
+      "sha256": "d758ca4574dd88b97ffbf1537fe84c625b1962d37c5a107ecfce630dd5de2ad0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/legacy-ast-audit.json",
+      "bytes": 276,
+      "sha256": "c1a172d1ca627bc0bf15f2f0a98769bb5b292852844f351c42bde2d809786886"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/manifest.json",
+      "bytes": 1513,
+      "sha256": "5287ea492c4b420e4093ab3153f67276e77be5fce10421c7eeb809c32961e940"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/old-approval-final.json",
+      "bytes": 812,
+      "sha256": "21b9edf77e52081a568e6495160c31452593176bc458195b45ebbf719b81f2fe"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/old-approval-final.log",
+      "bytes": 812,
+      "sha256": "21b9edf77e52081a568e6495160c31452593176bc458195b45ebbf719b81f2fe"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/old-approval-final.pty.log",
+      "bytes": 179584,
+      "sha256": "503244287d54a126bc53d8510f7fc8541b6e9fe74eb5968ac7fa27247fefe78e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/run.json",
+      "bytes": 796,
+      "sha256": "06038fe76c8e697ef8da51a89a8270603976e312d60625aef66d8b9b1bf25f72"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/tools/tui_approval_smoke.py",
+      "bytes": 19814,
+      "sha256": "f0baed680fdc270e35413675f24f1b4fdaf283a96290d4cfcd912f8346513ff7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/tools/tui_project_workspace_smoke.py",
+      "bytes": 30738,
+      "sha256": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-legacy-supplement/tools/tui_user_shell_smoke.py",
+      "bytes": 6964,
+      "sha256": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-manifest.json",
+      "bytes": 19100,
+      "sha256": "ee7ef368c27ec81f3aebb39abb051d78aa32af24f08c5673c3b218c6acc4988d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-124/master-approval-submenu-3.1.19/worker-scoped.patch",
+      "bytes": 13974,
+      "sha256": "39c20042ce9700b650a0b98c325bb34885ee15464aaa5a6299bfe8e5451e4332"
+    }
+  ]
+}

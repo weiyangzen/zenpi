@@ -1,0 +1,35 @@
+Running approval
+{
+  "status": "passed",
+  "binary": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+  "binary_sha256": "e9ba9476f7699d715ad3b0b5fe4a07aeee9f280508d3cb495d59cfa94fff6449",
+  "binary_bytes": 6072608,
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "harness_sha256": "e4d160b549040e155448ec256948963ed2370e15f87b0242b91268965e0f339e",
+  "support_sha256": {
+    "tools/stage1_host_smoke.py": "e4d160b549040e155448ec256948963ed2370e15f87b0242b91268965e0f339e",
+    "tools/tui_approval_smoke.py": "9eed4f7d6b81c444808741ab599563166b831bcdfce4a4c830fe4d0de0de93da",
+    "tools/tui_command_palette_smoke.py": "1fdd00aede19060454a2b6840e610796d75af31cebc14466deadc2ba77494ee1",
+    "tools/tui_composer_smoke.py": "35899dc9ab17e84d3ab9a4db75614fec850a426495e9dfbe324891af2f53a389",
+    "tools/tui_project_workspace_smoke.py": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a",
+    "tools/tui_transcript_ux_smoke.py": "da5f91b5ae1c49808d62fff2f5402bd70790c51122819a382d6353a7bb0c41a8",
+    "tools/tui_user_shell_smoke.py": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+  },
+  "cases": {
+    "approval": {
+      "status": "passed",
+      "duration_seconds": 12.929,
+      "script_sha256": "9eed4f7d6b81c444808741ab599563166b831bcdfce4a4c830fe4d0de0de93da",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/wangweiyang/GitHub/zenpi/tools/tui_approval_smoke.py",
+        "--binary",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+        "--evidence",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-approval/approval.json"
+      ],
+      "result_sha256": "df3968e250e478fa7395f5d20eda5e58a3672e3a94f22852aec882f57e06d75b",
+      "check_count": 14
+    }
+  }
+}

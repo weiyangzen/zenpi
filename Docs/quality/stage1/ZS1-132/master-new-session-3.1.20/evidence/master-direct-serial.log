@@ -1,0 +1,197 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/headless_project_workspace.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/headless_project_workspace-0f8536dfd6d0456e)
+
+running 12 tests
+test busy_switch_keeps_queued_owners_events_approval_and_tools_in_their_project ... ok
+test cancelled_invalid_and_mismatched_requests_leave_selection_and_journal_unchanged ... ok
+test project_capacity_and_checkpoint_permission_failure_preserve_the_previous_owner ... ok
+test project_controls_are_real_idempotent_and_restore_across_independent_hosts ... ok
+test project_envelope_preserves_strict_identity_and_action_parsing ... ok
+test project_protocol_is_strict_versioned_bounded_and_owned ... ok
+test rejected_resume_checkpoint_keeps_actual_owner_and_host_usable ... ok
+test resumed_journal_restores_as_the_real_agent_in_the_shared_project_pool ... ok
+test selected_project_bounds_inspection_resume_and_reopening_the_initial_tab ... ok
+test shared_checkpoint_rejects_concurrent_stale_writer_and_corrupt_input_atomically ... ok
+test tui_and_jsonl_share_the_checkpoint_and_actual_session_owner ... ok
+test typed_tree_mutation_runs_in_the_selected_project_owner ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.56s
+
+     Running tests/project_workspace.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/project_workspace-4004c3e78f9d04f0)
+
+running 7 tests
+test bounded_tabs_allow_reselection_at_capacity_and_closing_preserves_active_identity ... ok
+test cancellation_errors_and_failed_host_preparation_leave_selection_and_checkpoint_unchanged ... ok
+test checkpoint_roundtrip_preserves_stable_identity_and_selected_order ... ok
+test confirmation_prepares_a_directory_bound_candidate_without_mutating_current_state ... ok
+test duplicate_basenames_remain_distinct_and_aliases_reselect_existing_project ... ok
+test invalid_checkpoint_is_rejected_atomically ... ok
+test last_tab_and_removed_directory_cannot_be_selected_or_restored ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/resume_compact_owner.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/resume_compact_owner-d1b0f505d5153347)
+
+running 6 tests
+test compact_checkpoint_is_durable_and_reconstructs_after_restart ... ok
+test headless_resume_replays_durable_records_and_writes_marker ... ok
+test headless_slash_resume_and_compact_are_real_owner_commands ... ok
+test resume_projection_stays_bounded_and_exposes_a_continuation_cursor ... ok
+test resume_rejects_future_sequence_without_mutating_journal ... ok
+test tui_resume_restores_cleared_transcript_and_compact_reports_status ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s
+
+     Running tests/session_new.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/session_new-960bff5bb994ad0a)
+
+running 11 tests
+test actual_directory_permission_failure_keeps_old_owner_usable ... ok
+test actual_extension_preparation_jsonl_cancel_keeps_owner_and_old_port ... ok
+test bare_new_is_the_only_public_syntax_and_is_registered ... ok
+test durable_pending_input_and_unknown_operation_are_not_erased ... ok
+test exclusive_names_skip_existing_files_links_directories_and_stop_at_limit ... ok
+test failed_owner_checkpoint_preserves_old_session_and_removes_candidate ... ok
+test new_keeps_project_and_preferences_but_has_empty_history_and_durable_replay ... ok
+test old_port_cannot_acquire_the_new_sessions_running_turn ... ok
+test replaced_candidate_regular_link_and_directory_are_retained_without_switching ... ok
+test running_request_rejects_new_without_cancelling_old_work_then_allows_retry ... ok
+test staged_attachment_is_not_dropped_or_moved_by_new ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.49s
+
+     Running tests/session_recovery.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/session_recovery-e9b47af900cd5982)
+
+running 39 tests
+test addressed_mailbox_deduplicates_and_persists_ack_claim_result ... ok
+test append_rejects_sequence_exhaustion_before_mutating_the_journal ... ok
+test foreign_runtime_intent_before_header_is_quarantined ... ok
+test fork_preserves_events_with_a_new_session_identity ... ok
+test fork_remaps_signed_handoffs_and_preserves_order_without_pending_ownership ... ok
+test invalid_high_sequence_does_not_poison_following_appends ... ok
+test live_owner_claims_one_mailbox_request_without_background_dispatch ... ok
+test live_owner_completion_delivers_a_correlated_reply_to_sender_mailbox ... ok
+test live_owner_keeps_offline_or_wrong_workspace_work_queued ... ok
+test live_owner_reply_retry_is_idempotent_after_recipient_completion ... ok
+test live_owner_result_requires_the_current_owner_epoch ... ok
+test live_session_registry_rejects_stale_or_wrong_epoch_owners ... ok
+test mailbox_export_failure_preserves_preexisting_destination_sidecar ... ok
+test mailbox_lock_torn_tail_and_cross_workspace_access_are_rejected ... ok
+test mailbox_retirement_resumes_after_durable_marker_before_unlink ... ok
+test mailbox_sidecar_survives_export_and_requires_explicit_retirement ... ok
+test mailbox_ttl_pagination_secrets_and_archive_fail_closed ... ok
+test malformed_prefix_is_warned_and_append_remains_recoverable ... ok
+test maximum_sequence_is_ignored_without_poisoning_later_appends ... ok
+test operation_markers_are_idempotent_and_recovery_requires_a_new_decision ... ok
+test out_of_order_envelope_is_warned ... ok
+test records_before_a_header_are_ignored_instead_of_binding_foreign_state ... ok
+test rejected_business_record_does_not_advance_recovery_sequence ... ok
+test session_gc_only_removes_clean_owned_journals_and_reports_skips ... ok
+test session_gc_refuses_the_active_journal_before_any_removal ... ok
+test session_gc_skips_domain_store_and_non_owned_links ... ok
+test session_journal_is_private_to_the_current_user ... ok
+test session_list_import_and_explicit_gc_are_safe ... ok
+test session_listing_includes_legacy_default_journal_without_moving_it ... ok
+test session_listing_rejects_a_symlinked_directory ... ok
+test session_listing_skips_sibling_domain_store_without_mutating_it ... ok
+test session_search_returns_bounded_turn_only_projections ... ok
+test startup_accepts_a_journal_within_the_byte_limit ... ok
+test startup_rejects_an_oversized_journal_without_modifying_it ... ok
+test symlinked_session_is_rejected_without_touching_target ... ok
+test typed_lifecycle_archive_resume_migrate_and_delete_are_restart_safe ... ok
+test unfinished_operations_are_detected_and_never_retried_implicitly ... ok
+test unterminated_tail_gets_a_separator_before_append ... ok
+test validated_records_retain_durable_sequences_for_replay_owners ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+
+     Running tests/slash.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/slash-21634d0e25159df9)
+
+running 19 tests
+test approval_slash_commands_mutate_configured_agent_policy ... ok
+test common_workflow_commands_fail_closed_on_invalid_arguments ... ok
+test common_workflow_commands_have_typed_arguments_and_metadata ... ok
+test compete_and_loop_are_runtime_routes ... ok
+test core_slash_commands_parse_to_typed_values ... ok
+test dispatch_cancel_and_exit_are_control_actions ... ok
+test every_command_spec_has_help_and_completion_entry ... ok
+test history_default_and_completion_are_bounded ... ok
+test local_dispatch_updates_view_without_creating_a_turn ... ok
+test malformed_commands_fail_closed ... ok
+test oversized_slash_input_is_rejected_before_tokenization ... ok
+test recovery_commands_require_explicit_confirmation ... ok
+test route_input_classifies_explicit_user_shell_before_provider ... ok
+test route_input_keeps_slash_commands_out_of_prompt_path ... ok
+test session_open_rejects_missing_target_without_creating_a_journal ... ok
+test session_open_replaces_tui_transcript_from_existing_journal ... ok
+test slash_help_explains_goal_boundary_and_posture_controls ... ok
+test tui_mailbox_receive_labels_correlated_replies ... ok
+test typed_commands_round_trip_for_journal_events ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/tui_bentobox.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/tui_bentobox-0c7b7c0a8727a605)
+
+running 16 tests
+test active_layout_edits_after_restore_replace_cached_project_layout ... ok
+test adapter_translates_and_clips_model_rectangles ... ok
+test ctrl_number_switches_workspace_tab_without_submitting_prompt ... ok
+test disabled_optional_panes_are_not_rendered_or_allocated ... ok
+test gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt ... ok
+test gantt_projection_does_not_create_a_missing_execution_store_and_stays_bounded ... ok
+test gantt_projection_truncates_maximal_valid_blueprint ... ok
+test gantt_refresh_failure_retains_last_valid_projection ... ok
+test production_gantt_pane_renders_bounded_domain_projection ... ok
+test production_resources_pane_renders_completed_snapshot ... ok
+test production_workspace_is_resize_safe_at_tiny_viewports ... ok
+test production_workspace_renders_tabs_and_existing_transcript_prompt ... ok
+test restoring_tab_models_preserves_each_tab_and_clears_dirty_state ... ok
+test tab_switch_keeps_independent_layout_state_and_dirty_bit ... ok
+test terminal_backtab_moves_workspace_focus_backwards ... ok
+test workspace_keyboard_controls_focus_and_split_without_touching_prompt ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/tui_project_workspace.rs (/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target/debug/deps/tui_project_workspace-1eed673f1bf434ae)
+
+running 11 tests
+test asynchronous_transcript_mutations_schedule_checkpoints_without_keyboard_input ... ok
+test canonical_project_checkpoint_restores_session_projection_without_feature_tabs ... ok
+test display_only_ticks_do_not_schedule_project_writes_but_layout_changes_do ... ok
+test invalid_project_config_is_rejected_before_creating_session_or_mutating_visible_owner ... ok
+test picker_confirmation_and_real_tools_bind_two_equal_basename_directories ... ok
+test restart_restores_selected_runtime_and_drafts_without_reusing_startup_owner ... ok
+test session_workspace_mismatch_does_not_rewrite_existing_journal ... ok
+test shared_resume_checkpoint_failure_preserves_actual_owner_draft_layout_and_metadata ... ok
+test stale_resume_writer_and_busy_owner_leave_the_tui_checkpoint_unchanged ... ok
+test switching_while_original_owner_is_locked_preserves_drafts_layout_and_owner ... FAILED
+test topmost_plus_opens_picker_and_cancel_never_creates_a_tab_or_changes_draft ... ok
+
+failures:
+
+---- switching_while_original_owner_is_locked_preserves_drafts_layout_and_owner stdout ----
+
+thread 'switching_while_original_owner_is_locked_preserves_drafts_layout_and_owner' (28627343) panicked at tests/tui_project_workspace.rs:241:5:
+assertion failed: state.messages().any(|m| m.text == "answer one")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    switching_while_original_owner_is_locked_preserves_drafts_layout_and_owner
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+error: test failed, to rerun pass `--test tui_project_workspace`

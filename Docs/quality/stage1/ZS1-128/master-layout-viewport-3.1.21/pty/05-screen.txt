@@ -1,0 +1,7 @@
+ zenpi | projects: [workspace]                                                                                                                                           [<] [>] [+]
+ zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/layout-viewport-integration-3.1.21/root-pty-evidence/workspac
+┌ Conversation ────────────────────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────────────────────────────┐
+┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input                                              

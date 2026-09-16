@@ -1,3 +1,11 @@
+#[path = "../src/search.rs"]
+#[allow(dead_code)]
+mod search;
+#[path = "../src/tool_output.rs"]
+#[allow(dead_code)]
+mod tool_output;
+use zenpi::view_model;
+
 #[path = "../src/security.rs"]
 #[allow(dead_code)]
 mod security;
@@ -46,13 +54,19 @@ fn error_code(result: ToolResult) -> ToolErrorCode {
 fn builtins_publish_typed_object_schemas() {
     let registry = ToolRegistry::with_read_only_builtins().unwrap();
     let definitions = registry.definitions();
-    assert_eq!(definitions.len(), 3);
+    assert_eq!(definitions.len(), 5);
     assert_eq!(
         definitions
             .iter()
             .map(|definition| definition.name.as_str())
             .collect::<Vec<_>>(),
-        ["list_directory", "read_file", "search_text"]
+        [
+            "find",
+            "list_directory",
+            "read_file",
+            "read_tool_output",
+            "search_text"
+        ]
     );
     assert!(definitions.iter().all(|definition| {
         definition.input_schema["type"] == "object"
@@ -377,6 +391,52 @@ fn write_and_edit_tools_are_atomic_and_policy_guarded() {
             ..
         } if patch.contains("-two\n") && patch.contains("+three\n")
     ));
+}
+
+#[test]
+fn write_preview_rejects_binary_existing_sources_without_writing() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("binary.dat");
+    fs::write(&path, [0_u8, 159, 255, 1]).unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let call = call(
+        "write_file",
+        json!({"path":"binary.dat","content":"replacement"}),
+    );
+    let preview = registry.approval_preview(&context, &call).unwrap_err();
+    assert_eq!(preview.code(), ToolErrorCode::InvalidUtf8);
+    assert_eq!(fs::read(&path).unwrap(), [0_u8, 159, 255, 1]);
+    let direct = registry.execute(&context, SideEffectPolicy::all_builtins(), call);
+    assert_eq!(error_code(direct), ToolErrorCode::InvalidUtf8);
+    assert_eq!(fs::read(&path).unwrap(), [0_u8, 159, 255, 1]);
+}
+
+#[test]
+fn write_to_directory_fails_without_leaving_atomic_temporary_files() {
+    let directory = tempdir().unwrap();
+    let target = directory.path().join("destination");
+    fs::create_dir(&target).unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let result = registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("write_file", json!({"path":"destination","content":"new"})),
+    );
+    assert_eq!(error_code(result), ToolErrorCode::NotAFile);
+    assert!(target.is_dir());
+    let leftovers = fs::read_dir(directory.path())
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".destination.zenpi-")
+        })
+        .count();
+    assert_eq!(leftovers, 0);
 }
 
 #[test]
@@ -916,4 +976,256 @@ fn term_resistant_descendants_die_after_timeout_and_host_cancel() {
         std::thread::sleep(std::time::Duration::from_millis(350));
         assert!(!root.path().join("marker").exists());
     }
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "fresh process for deterministic temporary-name collision fixtures"]
+fn reliability_collision_child() {
+    use std::os::unix::fs::symlink;
+    let root = tempdir().unwrap();
+    let target = root.path().join("file.txt");
+    fs::write(&target, "original").unwrap();
+    let temporary = root
+        .path()
+        .join(format!(".file.txt.zenpi-{}-1", std::process::id()));
+    let kind = std::env::var("ZENPI_TEST_COLLISION_KIND").unwrap();
+    let other = root.path().join("other.txt");
+    fs::write(&other, "other owner").unwrap();
+    match kind.as_str() {
+        "file" => fs::write(&temporary, "unowned temporary").unwrap(),
+        "symlink" => symlink(&other, &temporary).unwrap(),
+        "directory" => fs::create_dir(&temporary).unwrap(),
+        _ => panic!("invalid fixture"),
+    }
+    let original_metadata = fs::symlink_metadata(&temporary).unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let result = registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call(
+            "write_file",
+            json!({"path":"file.txt","content":"replacement"}),
+        ),
+    );
+    assert_eq!(error_code(result), ToolErrorCode::Io);
+    assert_eq!(fs::read(&target).unwrap(), b"original");
+    assert_eq!(fs::read(&other).unwrap(), b"other owner");
+    let metadata = fs::symlink_metadata(&temporary).expect("unowned collision path must survive");
+    assert_eq!(metadata.file_type(), original_metadata.file_type());
+    match kind.as_str() {
+        "file" => assert_eq!(fs::read(&temporary).unwrap(), b"unowned temporary"),
+        "symlink" => assert_eq!(fs::read_link(&temporary).unwrap(), other),
+        "directory" => assert_eq!(fs::read_dir(&temporary).unwrap().count(), 0),
+        _ => unreachable!(),
+    }
+    // A subsequent, unique temporary still replaces successfully; the collision stays intact.
+    assert!(
+        registry
+            .execute(
+                &context,
+                SideEffectPolicy::all_builtins(),
+                call("write_file", json!({"path":"file.txt","content":"retry"}))
+            )
+            .is_success()
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"retry");
+    assert_eq!(
+        fs::symlink_metadata(&temporary).unwrap().file_type(),
+        original_metadata.file_type()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn reliability_create_new_collision_never_removes_or_overwrites_another_path() {
+    let mut failures = Vec::new();
+    for kind in ["file", "symlink", "directory"] {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "reliability_collision_child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("ZENPI_TEST_COLLISION_KIND", kind)
+            .output()
+            .unwrap();
+        println!(
+            "collision={kind}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        if !output.status.success() {
+            failures.push(kind);
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "failed collision fixtures: {failures:?}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn reliability_write_and_edit_preserve_permissions_and_replace_the_inode() {
+    use std::io::Read;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    for mode in [0o700, 0o751, 0o640] {
+        for tool in ["write_file", "edit_file"] {
+            let path = root.path().join("file.txt");
+            fs::write(&path, "original\n").unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+            let mut old_reader = fs::File::open(&path).unwrap();
+            let old_inode = old_reader.metadata().unwrap().ino();
+            let args = if tool == "write_file" {
+                json!({"path":"file.txt","content":"replacement\n"})
+            } else {
+                json!({"path":"file.txt","old":"original","new":"replacement"})
+            };
+            let request = call(tool, args);
+            let preview = registry
+                .approval_preview(&context, &request)
+                .unwrap()
+                .unwrap();
+            successful_output(registry.execute_approved(
+                &context,
+                SideEffectPolicy::all_builtins(),
+                request,
+                Some(&preview),
+            ));
+            assert_eq!(fs::read(&path).unwrap(), b"replacement\n");
+            let metadata = fs::metadata(&path).unwrap();
+            assert_ne!(
+                metadata.ino(),
+                old_inode,
+                "must rename a new inode, not truncate the old one"
+            );
+            let mut original = String::new();
+            old_reader.read_to_string(&mut original).unwrap();
+            assert_eq!(
+                original, "original\n",
+                "existing readers retain the complete old file"
+            );
+            assert_eq!(
+                metadata.permissions().mode() & 0o777,
+                mode,
+                "{tool} must preserve rwx bits"
+            );
+            assert_eq!(
+                fs::read_dir(root.path()).unwrap().count(),
+                1,
+                "no temporary leak"
+            );
+        }
+    }
+}
+
+#[test]
+fn reliability_line_ending_diff_is_exact_and_can_be_applied() {
+    let cases = [
+        ("one\r\ntwo\r\n", "one\ntwo\n"),
+        ("one\ntwo\n", "one\r\ntwo\r\n"),
+        ("head\r\nlast", "head\nlast"),
+        ("first\r\nsecond\nlast\r", "first\nsecond\nlast"),
+        ("first\r\nlast", "first\nlast\n"),
+    ];
+    for (before, after) in cases {
+        let root = tempdir().unwrap();
+        let apply_root = tempdir().unwrap();
+        fs::write(root.path().join("file.txt"), before).unwrap();
+        fs::write(apply_root.path().join("file.txt"), before).unwrap();
+        let context = ToolContext::new(root.path()).unwrap();
+        let registry = ToolRegistry::with_all_builtins().unwrap();
+        for tool in ["write_file", "edit_file"] {
+            fs::write(root.path().join("file.txt"), before).unwrap();
+            fs::write(apply_root.path().join("file.txt"), before).unwrap();
+            let args = if tool == "write_file" {
+                json!({"path":"file.txt","content":after})
+            } else {
+                json!({"path":"file.txt","old":before,"new":after})
+            };
+            let request = call(tool, args);
+            let preview = registry
+                .approval_preview(&context, &request)
+                .unwrap()
+                .unwrap();
+            let tools::ToolPreview::Diff {
+                patch,
+                changed,
+                truncated,
+                ..
+            } = &preview;
+            println!("{tool} before={before:?} after={after:?} patch={patch:?}");
+            assert!(*changed);
+            assert!(!truncated);
+            assert!(!patch.is_empty());
+            assert!(
+                patch.contains('\r'),
+                "raw CR bytes must remain in the exact unified diff"
+            );
+            fs::write(apply_root.path().join("change.patch"), patch).unwrap();
+            let applied = std::process::Command::new("git")
+                .current_dir(apply_root.path())
+                .args(["apply", "-p0", "--whitespace=nowarn", "change.patch"])
+                .output()
+                .unwrap();
+            assert!(
+                applied.status.success(),
+                "{}",
+                String::from_utf8_lossy(&applied.stderr)
+            );
+            assert_eq!(
+                fs::read(apply_root.path().join("file.txt")).unwrap(),
+                after.as_bytes()
+            );
+            let output = successful_output(registry.execute_approved(
+                &context,
+                SideEffectPolicy::all_builtins(),
+                request,
+                Some(&preview),
+            ));
+            assert_eq!(output["diff"], *patch);
+            assert_eq!(
+                fs::read(root.path().join("file.txt")).unwrap(),
+                after.as_bytes()
+            );
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn reliability_permissions_do_not_add_execute_or_propagate_set_id_bits() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempdir().unwrap();
+    let context = ToolContext::new(root.path()).unwrap();
+    let registry = ToolRegistry::with_all_builtins().unwrap();
+    let path = root.path().join("file.txt");
+    successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call("write_file", json!({"path":"file.txt","content":"first"})),
+    ));
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o7111,
+        0
+    );
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o4751)).unwrap();
+    successful_output(registry.execute(
+        &context,
+        SideEffectPolicy::all_builtins(),
+        call(
+            "write_file",
+            json!({"path":"file.txt","content":"replacement"}),
+        ),
+    ));
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o7777,
+        0o751
+    );
 }

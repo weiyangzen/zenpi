@@ -1,0 +1,11 @@
+diff --git a/Docs/quality/stage1/provider-kill319/vendor-binding.json b/Docs/quality/stage1/provider-kill319/vendor-binding.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/vendor-binding.json
+@@ -0,0 +1,6 @@
++{
++  "files": 77,
++  "sha256": "a873d9dd2002719bbc9e9f0904a9be02f8c1461aab26522a4cdedca3f295c750",
++  "algorithm": "SHA256(sorted path + NUL + file hex SHA256 + newline)",
++  "files_index": "captured-main-inputs.json"
++}

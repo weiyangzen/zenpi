@@ -1,0 +1,130 @@
+{
+  "passed": true,
+  "binary": {
+    "bytes": 50751592,
+    "sha256": "380c896c217db04e1f24f7ff2b531dfd6a98e7617180213005041a5e05843e66"
+  },
+  "owned": {
+    "src/context.rs": {
+      "bytes": 30066,
+      "sha256": "fc1138b9d5b3696a10135e70210c9aeb01ecea942dc8c0f19d6885607a835997"
+    },
+    "tests/stage1_semantic_compaction.rs": {
+      "bytes": 42443,
+      "sha256": "a9ca5d8396af6ae2a4ae212607f17d66ae8204b19905bd0cec64dd7579e61a7e"
+    }
+  },
+  "scope": "104 local deferred summary repair only; full104 pending",
+  "rust_passed": 118,
+  "suites": {
+    "context": {
+      "passed": 4,
+      "ignored": 0
+    },
+    "core_session": {
+      "passed": 35,
+      "ignored": 0
+    },
+    "session_recovery": {
+      "passed": 39,
+      "ignored": 0
+    },
+    "stage1_context_checkpoint": {
+      "passed": 8,
+      "ignored": 1
+    },
+    "stage1_input_queue": {
+      "passed": 17,
+      "ignored": 1
+    },
+    "stage1_semantic_compaction": {
+      "passed": 15,
+      "ignored": 2
+    }
+  },
+  "new_http_negative_cases": [
+    {
+      "phase": "before",
+      "field": "finish_reason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 2,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "before",
+      "field": "stop_reason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 2,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "before",
+      "field": "stopReason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 2,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "before",
+      "field": "status",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 2,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "after",
+      "field": "finish_reason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 1,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "after",
+      "field": "stop_reason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 1,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "after",
+      "field": "stopReason",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 1,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    },
+    {
+      "phase": "after",
+      "field": "status",
+      "requests": 2,
+      "counts": {
+        "semantic_checkpoint": 1,
+        "semantic_summary_requested": 2,
+        "semantic_summary_response": 2
+      }
+    }
+  ],
+  "before_top_level_failed": 1,
+  "before_control_passed": 1,
+  "review": "Docs/quality/stage1/ZS1-104/master-summary-deferred-3.1.21/review.md"
+}

@@ -1,0 +1,197 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 89 tests
+test approval::tests::accepted_response_is_retained_for_durable_ack_and_first_decision_wins ... ok
+test approval::tests::cancel_all_retains_an_unrevealed_denial_for_durable_ack ... ok
+test approval::tests::coordinator_emits_once_and_correlates_response ... ok
+test approval::tests::explicit_deny_beats_read_only_trust_and_worker_allow ... ok
+test approval::tests::read_only_is_always_allowed_and_headless_denies_side_effects ... ok
+test approval::tests::worker_mode_without_preflight_denies_even_remembered_and_readonly_tools ... ok
+test backend::tests::openai_host_requires_credentials_after_endpoint_normalization ... ok
+test backend::tests::responses_output_text_variants_are_extracted ... ok
+test backend::tests::responses_wire_api_normalizes_and_parses_names ... ok
+test config::environment_snapshot_tests::valid_text_values_are_unchanged_and_editor_bytes_reach_separate_validator ... ok
+test core::extension_resume_commit_tests::rejected_resume_commit_keeps_old_extension_live_until_successful_retry ... ok
+test core::output_cleanup_recovery_tests::cleanup_recovery_process_helper ... ignored, launched by receipt_io_failure_recovers_in_independent_process
+test core::output_cleanup_recovery_tests::pending_intent_rejects_tampered_missing_or_replaced_retirements ... ok
+test core::output_cleanup_recovery_tests::receipt_io_failure_recovers_in_independent_process ... ok
+test core::output_cleanup_recovery_tests::receipt_io_failure_retries_same_agent_without_losing_or_double_counting_removals ... ok
+test domain_store::tests::canonical_digest_is_stable_for_empty_state ... ok
+test extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded ... FAILED
+test extension_runtime::pipe_deadline_tests::escaped_pipe_revoke_is_bounded ... ok
+test extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded ... ok
+test extension_runtime::pipe_deadline_tests::escaped_pipe_unwind_closes_owned_endpoints ... ok
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ignored, subprocess helper with parent-owned deadline and fixture cleanup
+test external_editor::tests::bounded_read_rejects_large_invalid_or_non_private_results ... ok
+test external_editor::tests::cleanup_is_dirfd_relative_and_reports_entry_and_depth_limits ... ok
+test external_editor::tests::private_file_preserves_unicode_and_allows_private_atomic_replacement ... ok
+test external_editor::tests::symlink_fifo_directory_and_missing_result_never_block_or_follow ... ok
+test headless::async_event_buffer_tests::admission_marker_survives_full_byte_mailbox ... ok
+test headless::async_event_buffer_tests::admission_marker_survives_full_count_mailbox ... ok
+test headless::async_event_buffer_tests::admission_still_takes_priority_over_a_full_tool_lifecycle_mailbox ... ok
+test headless::async_event_buffer_tests::agent_admission_drain_and_oversize_drop_keep_exact_bytes ... ok
+test headless::async_event_buffer_tests::agent_lifecycle_events_project_to_canonical_blocks ... ok
+test headless::async_event_buffer_tests::interleaved_admission_markers_are_drained_before_provider_events ... ok
+test headless::async_event_buffer_tests::oversized_provider_event_is_counted_but_never_retained ... ok
+test headless::async_event_buffer_tests::provider_byte_budget_and_take_reset_all_accounting ... ok
+test persona::tests::all_personas_map_to_four_families_with_profiles ... ok
+test render::tests::cell_budget_limits_wide_viewport_allocations ... ok
+test render::tests::crlf_input_does_not_leak_carriage_returns ... ok
+test render::tests::line_limit_is_hard ... ok
+test render::tests::output_is_bounded_for_narrow_unicode_viewports ... ok
+test render::tests::parses_blocks_without_swallowing_unknown_text ... ok
+test render::tests::plain_prefixed_rendering_does_not_interpret_markers ... ok
+test render::tests::prefixed_rendering_keeps_role_and_body_inside_width ... ok
+test render::tests::renders_inline_styles_and_hides_link_target ... ok
+test render::tests::sanitization_bound_applies_after_tab_expansion ... ok
+test render::tests::terminal_control_sequences_are_rendered_as_text ... ok
+test render::tests::unclosed_fence_is_visible_as_code ... ok
+test session::append_lock_tests::forked_child_cannot_extend_a_finished_append_lock ... ok
+test session::session_reliability_tests::gc_live_owner_child ... ignored, independent live reconnect WAL owner held during the parent GC attempt
+test session::session_reliability_tests::gc_reconnect_blocks_an_actual_independent_live_owner_and_preserves_restart_evidence ... ok
+test session::session_reliability_tests::gc_reconnect_preserves_closed_empty_torn_malformed_and_nonfile_states ... ok
+test session::session_reliability_tests::gc_without_reconnect_still_removes_only_inactive_owned_sessions ... ok
+test session::session_reliability_tests::paging_claim_next_honors_byte_pages_and_existing_capacity ... ok
+test session::session_reliability_tests::paging_claim_next_reaches_65th_and_never_reclaims_terminal_or_claimed_messages ... ok
+test session::session_reliability_tests::paging_restart_child ... ignored, independent process verifying claimed work is not re-admitted
+test session::session_reliability_tests::sender_reply_rejects_replaced_sender_path_before_completion ... ok
+test session::session_reliability_tests::sender_reply_rejects_wrong_session_before_completion_and_survives_restart ... ok
+test session::session_reliability_tests::sender_reply_restart_child ... ignored, independent process for persisted reply retry
+test slash::tests::first_class_commands_have_local_route ... ok
+test slash::tests::layout_and_pane_commands_fail_closed_on_invalid_arguments ... ok
+test slash::tests::layout_and_pane_commands_parse_to_bounded_typed_actions ... ok
+test slash::tests::ordinary_text_is_not_a_command ... ok
+test slash::tests::quotes_and_escapes_are_decoded_without_shell_expansion ... ok
+test slash::tests::runtime_commands_are_not_executed_locally ... ok
+test slash::tests::session_gc_requires_explicit_bounded_policy_and_confirmation ... ok
+test slash::tests::session_lifecycle_and_mailbox_commands_are_typed ... ok
+test tool_output::private_inode_tests::marker_detection_error_is_not_unmarked ... ok
+test tool_output::tests::failed_metadata_publication_keeps_terminal_reference_and_error ... ok
+test tool_output::tests::failed_spill_write_preserves_error_and_never_claims_complete ... ok
+test tui::accepted_shell_queue_budget_counts_original_whitespace_and_marker ... ok
+test tui::accepted_shell_queue_owns_original_bytes_through_pop_cancel_and_edit ... ok
+test tui::identical_async_control_receipts_restore_their_bound_snapshot_and_keep_newer_draft ... ok
+test tui::identical_scheduled_payloads_keep_metadata_on_their_actual_queue_identity ... ok
+test tui::normalized_scheduled_shell_rejection_restores_the_exact_original_fold ... ok
+test tui::rejected_paste_restores_metadata_without_overriding_new_terminal_input ... ok
+test tui::resource_source_index_precedes_oversize_unicode_descriptions ... ok
+test tui::tests::canonical_approval_and_drop_events_are_visible ... ok
+test tui::tests::canonical_view_events_project_into_tui_transcript_and_tool_rows ... ok
+test tui::tests::clearing_gantt_snapshot_hides_the_previous_session_immediately ... ok
+test tui::tests::gantt_refresh_tracker_rejects_a_result_from_the_previous_session ... ok
+test tui::tests::gantt_status_suffix_cannot_exceed_pane_row_or_byte_limits ... ok
+test tui::tests::live_tool_snapshots_replace_per_stream_and_reject_late_jobs ... ok
+test tui::tests::normal_unicode_typing_reopens_file_completion_after_escape ... ok
+test tui::tests::pending_shell_fifo_is_bounded_and_preserves_kind ... ok
+test tui::tests::pending_terminal_input_survives_async_submission_rejection ... ok
+test tui::tests::provider_event_buffer_enforces_bytes_and_resets_accounting ... ok
+test tui::tests::provider_stream_overflow_is_visible_in_transcript ... ok
+test tui::tests::session_browser_cursor_is_bounded_and_resets_on_search ... ok
+test tui::tests::session_browser_mouse_click_maps_rows_and_stays_bounded ... ok
+test tui::tests::terminal_snapshot_bound_is_utf8_safe ... ok
+test tui::tests::user_shell_result_renders_nonzero_status_and_redacted_output ... ok
+
+failures:
+
+---- extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded stdout ----
+native_fixture_setup elapsed_ms=89 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpP3HFdA/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpP3HFdA/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=1 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=1006 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(1000))) phases=1966511.227546000 pid=99521 host-start
+1966512.228612000 pid=99521 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 88 filtered out; finished in 1.00s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28319003) panicked at src/extension_runtime.rs:1051:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+native_fixture_setup elapsed_ms=90 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpAQGI2f/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpAQGI2f/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=1 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=1030 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(1000))) phases=1966512.327266000 pid=99537 host-start
+1966513.348529000 pid=99537 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 88 filtered out; finished in 1.02s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28319052) panicked at src/extension_runtime.rs:1051:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+native_fixture_setup elapsed_ms=89 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpo1aHOY/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpo1aHOY/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=950 fixture_pids=["99554", "99558"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1966513.450662000 pid=99553 host-start
+1966514.387170000 pid=99554 native-parent-entry
+1966514.387658000 pid=99554 fork-start
+1966514.388386000 pid=99554 fork-return
+1966514.388502000 pid=99558 native-holder-entry
+1966514.388831000 pid=99558 escaped-ready
+1966514.394456000 pid=99553 host-return
+
+inner_elapsed_ms=944 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 88 filtered out; finished in 0.94s
+
+ stderr=
+native_fixture_setup elapsed_ms=95 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpPyhMUZ/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpPyhMUZ/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=212 fixture_pids=["99573", "99574"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1966514.501757000 pid=99572 host-start
+1966514.641461000 pid=99573 native-parent-entry
+1966514.642117000 pid=99573 fork-start
+1966514.642656000 pid=99573 fork-return
+1966514.642759000 pid=99574 native-holder-entry
+1966514.642988000 pid=99574 escaped-ready
+1966514.707573000 pid=99572 host-return
+
+inner_elapsed_ms=206 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 88 filtered out; finished in 0.21s
+
+ stderr=
+
+thread 'extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded' (28318969) panicked at src/extension_runtime.rs:987:9:
+escaped pipe cancel failures: [(1, "stdout"), (1, "stdin")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded
+
+test result: FAILED. 83 passed; 1 failed; 5 ignored; 0 measured; 0 filtered out; finished in 17.46s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,128 @@
+{
+  "active": 0,
+  "metadata": {
+    "c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/other project",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/sessions/projects/c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff/new-d0c71fc74efaed8a4c09d87eb9c623e13228801b2680584d27b0975c93a9269f-0.jsonl"
+    },
+    "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/initial",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/sessions/new-9c43917b546a109457dfeb472de0d0cf3704cb0462c916d2314f8fd7b67faf1d-0.jsonl"
+    }
+  },
+  "project_name": "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916",
+  "project_state": [
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "GATE_PROVIDER_TUI",
+          "WRITE_TUI_PENDING",
+          "/new",
+          "GATE_PROVIDER_SCHEDULED",
+          "!touch scheduled-new-must-not-run",
+          "/new",
+          "/new",
+          "/scheduled cancel scheduled-1789210062648197000-1",
+          "/new"
+        ],
+        "input": "",
+        "next_paste_id": 1,
+        "paste_folds": [],
+        "presets": {},
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [],
+        "focused": null,
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "project"
+      },
+      "messages": [],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/initial",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/sessions/new-9c43917b546a109457dfeb472de0d0cf3704cb0462c916d2314f8fd7b67faf1d-0.jsonl"
+      },
+      "name": "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916"
+    },
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "/new"
+        ],
+        "input": "",
+        "next_paste_id": 1,
+        "paste_folds": [],
+        "presets": {},
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [],
+        "focused": null,
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "project"
+      },
+      "messages": [],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/other project",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/sessions/projects/c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff/new-d0c71fc74efaed8a4c09d87eb9c623e13228801b2680584d27b0975c93a9269f-0.jsonl"
+      },
+      "name": "c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff"
+    }
+  ],
+  "projects": [
+    "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916",
+    "c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff"
+  ],
+  "scheduled_inputs": [],
+  "schema_version": 3,
+  "session_cursors": {
+    "c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff": {
+      "next_sequence": 4,
+      "session_id": "session-1789210059820-4357-1"
+    },
+    "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916": {
+      "next_sequence": 4,
+      "session_id": "session-1789210064585-4370-0"
+    }
+  },
+  "workspace": {
+    "active": "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916",
+    "schema_version": 1,
+    "tabs": [
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/initial",
+        "id": "d72523ed577c0c7e6ac3f8fe923b462fa1891033f1f689c0227e439ba9420916"
+      },
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-background-20260912/policy.fixture/授权 project/other project",
+        "id": "c54675c0fd6212ab165a8f83960389df1b38328838963543ba19809f3ada3fff"
+      }
+    ]
+  }
+}

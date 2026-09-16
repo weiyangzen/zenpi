@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-074",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-074",
+  "source_path": "src/session.rs",
+  "source_hash": "8fb3ff2c387b13d34d8bbe4533bb2b0a81b5e546f5e03216b74b5cf2c61c9a2b",
+  "read_ranges": [
+    [
+      0,
+      176828
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/session.rs_learn.md",
+      "bytes": 3269,
+      "sha256": "a5f64695104a92e4913a65703bd92e199386d679ba8f8c957a720cadff4cd13d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-074/master-review-current/review.md",
+      "bytes": 423,
+      "sha256": "fbb94250fbfb23f7e9a977bfc4e768e278becd073deec8bedf488f750dcd3521"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-074/master-review-current/review.md",
+      "bytes": 423,
+      "sha256": "fbb94250fbfb23f7e9a977bfc4e768e278becd073deec8bedf488f750dcd3521"
+    },
+    "findings": "完整读取 session.rs，覆盖 append-only recovery、tree/branch、operation/reconnect、session lifecycle/GC 与 mailbox/live owner，并明确跨文件边界。"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "independent_folded_reasoning": true,
+    "live_scroll_anchor": true,
+    "mouse_follow_latest": true,
+    "model_usage_context_and_durable_reasoning": true,
+    "answer_clipboard_exact": true,
+    "code_block_clipboard_exact": true,
+    "long_tool_error_inspection": true,
+    "interrupt_from_inspector": true,
+    "provider_error_inspection": true,
+    "narrow_mouse_project_navigation": true,
+    "terminal_restored": true
+  },
+  "binary": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/transcript-tail-integration/zenpi",
+  "binary_sha256": "98987fe27d6f15a6fd45ce3f35d1adbeb694edc78effb6e418ff4de3389a06cc",
+  "request_count": 3,
+  "passed": true
+}

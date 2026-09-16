@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/file099-escape-3.1.21/worker/verify.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T16:59:46.738522+00:00",
+  "ended_at": "2026-09-12T16:59:46.809110+00:00",
+  "exit_code": 0,
+  "stdout": {
+    "bytes": 349,
+    "sha256": "8a552e56c008223f46b80d962ec995de2e3668c1a30476e2d11d3268c79d49fe"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

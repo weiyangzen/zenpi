@@ -1,0 +1,161 @@
+--- captured/tests/tui_composer.rs
++++ current/tests/tui_composer.rs
+@@ -1249,3 +1249,158 @@
+     )));
+     assert_eq!(saved_draft(&s), before);
+ }
++
++#[test]
++fn terminal_shortcut_modified_characters_never_become_draft_text() {
++    for modifiers in [
++        KeyModifiers::SUPER,
++        KeyModifiers::SUPER | KeyModifiers::SHIFT,
++        KeyModifiers::CONTROL,
++        KeyModifiers::ALT,
++        KeyModifiers::CONTROL | KeyModifiers::ALT,
++    ] {
++        for kind in [
++            KeyEventKind::Press,
++            KeyEventKind::Repeat,
++            KeyEventKind::Release,
++        ] {
++            for character in ['x', '界'] {
++                let mut s = TuiState::default();
++                s.set_input("keep 世界");
++                let before = (s.input().to_owned(), s.cursor());
++                let mut event = KeyEvent::new(KeyCode::Char(character), modifiers);
++                event.kind = kind;
++                assert_eq!(s.handle_event(Event::Key(event)), TuiAction::None);
++                assert_eq!(
++                    (s.input().to_owned(), s.cursor()),
++                    before,
++                    "{modifiers:?} {kind:?} {character:?} must not insert shortcut text"
++                );
++            }
++        }
++    }
++}
++
++#[test]
++fn terminal_shortcut_plain_unicode_keeps_press_repeat_and_release_semantics() {
++    for kind in [
++        KeyEventKind::Press,
++        KeyEventKind::Repeat,
++        KeyEventKind::Release,
++    ] {
++        for character in ['界', 'é', '🙂'] {
++            let mut s = TuiState::default();
++            s.set_input("draft ");
++            let mut event = KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE);
++            event.kind = kind;
++            assert_eq!(s.handle_event(Event::Key(event)), TuiAction::None);
++            let expected = if kind == KeyEventKind::Release {
++                "draft ".to_owned()
++            } else {
++                format!("draft {character}")
++            };
++            assert_eq!((s.input(), s.cursor()), (expected.as_str(), expected.len()));
++        }
++    }
++}
++
++#[test]
++fn terminal_shortcut_super_key_keeps_preceding_held_ascii_without_submitting() {
++    use std::time::{Duration, Instant};
++    for kind in [
++        KeyEventKind::Press,
++        KeyEventKind::Repeat,
++        KeyEventKind::Release,
++    ] {
++        let mut s = TuiState::default();
++        let start = Instant::now();
++        assert_eq!(
++            s.handle_event_at(
++                Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE)),
++                start
++            ),
++            TuiAction::None
++        );
++        assert_eq!(s.input(), "");
++        let mut event = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::SUPER);
++        event.kind = kind;
++        assert_eq!(
++            s.handle_event_at(Event::Key(event), start + Duration::from_millis(1)),
++            TuiAction::None
++        );
++        assert_eq!(
++            s.handle_event_at(Event::Resize(140, 40), start + Duration::from_millis(200)),
++            TuiAction::Redraw
++        );
++        assert_eq!((s.input(), s.cursor()), ("a", 1), "{kind:?}");
++    }
++}
++
++#[test]
++fn terminal_shortcut_existing_control_and_alt_editing_still_dispatch() {
++    for (code, modifiers, expected, cursor) in [
++        (KeyCode::Char('a'), KeyModifiers::CONTROL, "one two", 0),
++        (KeyCode::Char('j'), KeyModifiers::CONTROL, "one two\n", 8),
++        (
++            KeyCode::Char('j'),
++            KeyModifiers::CONTROL | KeyModifiers::ALT,
++            "one two\n",
++            8,
++        ),
++        (KeyCode::Left, KeyModifiers::ALT, "one two", 4),
++    ] {
++        let mut s = TuiState::default();
++        s.set_input("one two");
++        let action = s.handle_event(Event::Key(KeyEvent::new(code, modifiers)));
++        assert!(!matches!(action, TuiAction::Submit(_) | TuiAction::Quit));
++        assert_eq!(
++            (s.input(), s.cursor()),
++            (expected, cursor),
++            "{code:?} {modifiers:?}"
++        );
++    }
++}
++
++#[test]
++fn terminal_shortcut_editor_hint_agrees_with_action_in_the_rendered_state() {
++    fn check(s: &mut TuiState, available: bool, label: &str) {
++        let screen = composer_screen(s, 200);
++        assert_eq!(
++            screen.contains("Ctrl-G editor"),
++            available,
++            "{label}: {screen}"
++        );
++        let before = (s.input().to_owned(), s.cursor());
++        let action = s.handle_event(Event::Key(KeyEvent::new(
++            KeyCode::Char('g'),
++            KeyModifiers::CONTROL,
++        )));
++        assert_eq!(
++            action == TuiAction::OpenExternalEditor,
++            available,
++            "{label}: {action:?}"
++        );
++        assert_eq!((s.input().to_owned(), s.cursor()), before, "{label}");
++    }
++    let mut s = TuiState::default();
++    s.set_input("normal draft");
++    check(&mut s, true, "plain draft");
++    s.set_input("/mo");
++    check(&mut s, false, "visible command choices");
++    s.handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
++    check(&mut s, true, "choices explicitly dismissed");
++    s.set_input("normal draft");
++    s.set_busy(true);
++    check(&mut s, true, "busy draft remains editable");
++    s.handle_event(Event::Key(KeyEvent::new(
++        KeyCode::Char('r'),
++        KeyModifiers::CONTROL,
++    )));
++    check(&mut s, false, "history search");
++    s.handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
++    s.open_directory_picker();
++    check(&mut s, false, "directory picker");
++    s.handle_event(Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
++    s.open_transcript_browser();
++    check(&mut s, false, "transcript browser");
++}

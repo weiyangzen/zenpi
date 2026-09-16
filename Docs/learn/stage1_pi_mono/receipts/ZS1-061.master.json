@@ -1,0 +1,96 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-061",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "directory061-current-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-DIR；G-STAGE --item ZS1-061",
+  "scope": "source",
+  "folder_path": "packages/agent",
+  "children": [
+    "ZS1-057",
+    "ZS1-058"
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/packages/agent/current_folder_learn.md",
+      "bytes": 31522,
+      "sha256": "c458548fda48e1601376f795a8fbc72a23cf8114c2d388942695f56a843a9175"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/review.md",
+      "bytes": 8939,
+      "sha256": "df9f795212fd6d89bb26540db393d42edc4bbd2064ecdede789346883ac59b68"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/worker-report.md",
+      "bytes": 22581,
+      "sha256": "18635eef7236bbfd1f1420bcb05fe01e7f0536549c8a036dace1df27620d3352"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/worker-manifest.json",
+      "bytes": 41409,
+      "sha256": "2bb37eeee4b41724903ee4d5f5bc6b632991588327a615465460dee4fd4954ff"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 2795699,
+      "sha256": "e2a5659f050f86bcc133efe8fa955e65b107d180645bd80c95015bdee62c0eee"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/root-offline.stdout.json",
+      "bytes": 2816,
+      "sha256": "e574c69257eae17d9e281315b5926fdfc6f3d44638dc843b325d8d7181bdd64d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/root-offline.run.json",
+      "bytes": 633,
+      "sha256": "49801b71864f160038de185a1c9ce78560fde873f2582b3c764d1e40e0012bb9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/current-inputs.json",
+      "bytes": 17101,
+      "sha256": "307d118b0756fc042c15da6687f7ff1cd0e00805e1bed1c52f7473705a26b682"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/root-current-inputs.json",
+      "bytes": 47014,
+      "sha256": "c9803327b5993b53709e470fc4e743e9a52578731d3919ecff544d472c4c67e4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/root-reading-progress.json",
+      "bytes": 8460,
+      "sha256": "1588dd620f0286d54bd73cf17f8dc40cab1acfa53fbc8bc39576517f3bd63536"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/accept.py",
+      "bytes": 8301,
+      "sha256": "0191ec24c2517e60fbc27d0b3b156d77ff1421883d0ed3bdcd76aa6bb516c260"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/current-child-receipts/ZS1-057.master.json",
+      "bytes": 3289,
+      "sha256": "13fc251d1f81ed9e0e2731a57bcc4a71cf95d9950c1c65225d495e45cbcebae4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/current-child-receipts/ZS1-058.master.json",
+      "bytes": 11953,
+      "sha256": "70004aa02dba4206d8dca3fa8afc97575b044eb1798c644467613dcdccd0bebc"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-061/master-review-3.1.21/review.md",
+      "bytes": 8939,
+      "sha256": "df9f795212fd6d89bb26540db393d42edc4bbd2064ecdede789346883ac59b68"
+    },
+    "findings": "Independent061 package review:7 files/5 dirs, accepted children057/058;28 full context reads3603lines and three historical child observations independently read;62 fresh offline checks pass;140 current identity records exact. Explicit summary converter and process-local versus durable state qualified. No package-build, parent or product acceptance."
+  }
+}

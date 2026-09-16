@@ -1,0 +1,74 @@
+            let visible_project = state.active_project().to_owned();
+            if let Some(index) = active_job_project
+                .as_ref()
+                .and_then(|key| state.project_index(key))
+            {
+                state.select_project_tab(index);
+            }
+            if let Some(id) = active_job {
+                // Drop buffers belonging to superseded jobs before draining
+                // the active one. This keeps a late cancelled stream from
+                // interleaving with the replacement turn.
+                stream_buffers.retain(|job_id, _| *job_id == id);
+                if let Some(events) = stream_buffers.get(&id)
+                    && drain_tui_provider_events(&mut state, id.get(), events)
+                {
+                    scheduler.request();
+                }
+            }
+            if let Some(coordinator) = approval.as_ref() {
+                let stale: Vec<_> = pending_approvals
+                    .iter()
+                    .filter(|r: &&crate::approval::ApprovalRequest| {
+                        !coordinator.is_pending(&r.request_id)
+                    })
+                    .map(|r| r.request_id.clone())
+                    .collect();
+                for id in stale {
+                    state.retire_approval(&id);
+                    pending_approvals.retain(|r| r.request_id != id);
+                }
+                for request in coordinator.drain_pending() {
+                    state.present_approval(request.clone());
+                    let preview = request.preview.as_ref().map(|preview| {
+                        let text = format!("\n\nProposed change:\n{}", preview.display_text());
+                        let block = match preview {
+                            crate::tools::ToolPreview::Diff { path, patch, .. } => {
+                                crate::view_model::ViewBlock::Diff {
+                                    path: Some(path.clone()),
+                                    patch: patch.clone(),
+                                }
+                            }
+                        };
+                        (text, block)
+                    });
+                    let safe_arguments = crate::security::redact_json(&request.arguments, &[]);
+                    let suffix = preview
+                        .as_ref()
+                        .map(|(text, _)| text.as_str())
+                        .unwrap_or("");
+                    let prompt = format!(
+                        "Approval required: {} {}\nRequest: {}\nPolicy: {}{}\nAlt-A reviews this request; y/n selects, Enter confirms.",
+                        request.tool,
+                        safe_arguments,
+                        request.request_id,
+                        request.policy_digest.as_deref().unwrap_or("unbound"),
+                        suffix,
+                    );
+                    if let Some((_, block)) = preview {
+                        state.push_message_block(MessageRole::System, prompt, block);
+                    } else {
+                        state.push_message(
+                            // Keep the approval prompt visible while tool logs are
+                            // folded; hiding it would leave the user with no way to
+                            // know what the pending y/n response refers to.
+                            MessageRole::System,
+                            prompt,
+                        );
+                    }
+                    // The coordinator itself is bounded by one request per tool
+                    // turn; keep a defensive host bound for malformed providers.
+                    if pending_approvals.len() < 128 {
+                        pending_approvals.push_back(request);
+                    }
+                    state.set_status("Approval required");

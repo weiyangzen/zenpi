@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "--version"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/build-context",
+  "started_at": "2026-09-12T12:00:28.295800+00:00",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "network": "Cargo offline; no HTTP/PTY",
+  "status": "finished",
+  "exit_code": 0,
+  "elapsed_seconds": 0.012758625000000003,
+  "ended_at": "2026-09-12T12:00:28.308903+00:00",
+  "log": "interpreter-version.log",
+  "bytes": 13,
+  "sha256": "fd0fd4290ad100adc37e4a82e45f821faeacbecae70f4d3eba08e85be138c632"
+}

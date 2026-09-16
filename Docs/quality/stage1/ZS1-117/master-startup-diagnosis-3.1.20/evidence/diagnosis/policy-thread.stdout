@@ -1,0 +1,1534 @@
+[{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320610029,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1517104,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.511932+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215958605931,
+  "eventMessage" : "SecTrustReportNetworkingAnalytics",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295355018226434306,
+  "processID" : 97597,
+  "senderProgramCounter" : 1517104,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320610030,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1517104,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.512248+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215958613533,
+  "eventMessage" : "SecTrustReportNetworkingAnalytics",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295355018226434306,
+  "processID" : 97597,
+  "senderProgramCounter" : 1517104,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320610031,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1196944,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691762+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215962921871,
+  "eventMessage" : "SecKeyCopyPublicBytes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295317007765864706,
+  "processID" : 97597,
+  "senderProgramCounter" : 1196944,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611216,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1199376,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691773+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215962922120,
+  "eventMessage" : "SecKeyCopyAttributes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295319550386503938,
+  "processID" : 97597,
+  "senderProgramCounter" : 1199376,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611217,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1196944,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691783+0800",
+  "creatorActivityID" : 9223372037175387024,
+  "machTimestamp" : 47215962922358,
+  "eventMessage" : "SecKeyCopyPublicBytes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295317007800533250,
+  "processID" : 97597,
+  "senderProgramCounter" : 1196944,
+  "parentActivityIdentifier" : 320611216
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611218,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1196944,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691858+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215962924161,
+  "eventMessage" : "SecKeyCopyPublicBytes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295317007765864706,
+  "processID" : 97597,
+  "senderProgramCounter" : 1196944,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611219,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1199376,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691860+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215962924210,
+  "eventMessage" : "SecKeyCopyAttributes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295319550386503938,
+  "processID" : 97597,
+  "senderProgramCounter" : 1199376,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611220,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1196944,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.691860+0800",
+  "creatorActivityID" : 9223372037175387027,
+  "machTimestamp" : 47215962924217,
+  "eventMessage" : "SecKeyCopyPublicBytes",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295317007800533250,
+  "processID" : 97597,
+  "senderProgramCounter" : 1196944,
+  "parentActivityIdentifier" : 320611219
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ received response, status %ld content %c",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 263736,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:51.806154+0800",
+  "machTimestamp" : 47215965667267,
+  "eventMessage" : "Task <6D3C0B81-25CD-48DA-9E00-9EAF211FE34A>.<124> received response, status 200 content K",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485684917729230852,
+  "processID" : 97597,
+  "senderProgramCounter" : 263736,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611221,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1478352,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.806223+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215965668928,
+  "eventMessage" : "SecTrustEvaluateIfNecessary",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295356358256230658,
+  "processID" : 97597,
+  "senderProgramCounter" : 1478352,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ response ended",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1667148,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:51.818254+0800",
+  "machTimestamp" : 47215965957670,
+  "eventMessage" : "Task <6D3C0B81-25CD-48DA-9E00-9EAF211FE34A>.<124> response ended",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485669494501670916,
+  "processID" : 97597,
+  "senderProgramCounter" : 1667148,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ done using Connection %llu",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 2355588,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:51.818285+0800",
+  "machTimestamp" : 47215965958404,
+  "eventMessage" : "Task <6D3C0B81-25CD-48DA-9E00-9EAF211FE34A>.<124> done using Connection 21",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485747422388289540,
+  "processID" : 97597,
+  "senderProgramCounter" : 2355588,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "[C%u] event: client:%{public}s @%u.%03us",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 19546504,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:51.818320+0800",
+  "machTimestamp" : 47215965959266,
+  "eventMessage" : "[C21] event: client:connection_idle @0.607s",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717905243849097220,
+  "processID" : 97597,
+  "senderProgramCounter" : 19546504,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}s %{public}s nw_protocol_notification_type_connection_idle is %{bool}d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 17365348,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:51.818354+0800",
+  "machTimestamp" : 47215965960060,
+  "eventMessage" : "nw_protocol_socket_notify [C21.1.1.1:4] nw_protocol_notification_type_connection_idle is true",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717364035020128260,
+  "processID" : 97597,
+  "senderProgramCounter" : 17365348,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "[C%u] event: client:%{public}s @%u.%03us",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 19546504,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:51.818364+0800",
+  "machTimestamp" : 47215965960311,
+  "eventMessage" : "[C21] event: client:connection_idle @0.607s",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717905243849097220,
+  "processID" : 97597,
+  "senderProgramCounter" : 19546504,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}s %{public}s nw_protocol_notification_type_connection_idle is %{bool}d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 17365348,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:51.818368+0800",
+  "machTimestamp" : 47215965960410,
+  "eventMessage" : "nw_protocol_socket_notify [C21.1.1.1:4] nw_protocol_notification_type_connection_idle is true",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717364035020128260,
+  "processID" : 97597,
+  "senderProgramCounter" : 17365348,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ finished successfully",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 776284,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:51.818419+0800",
+  "machTimestamp" : 47215965961624,
+  "eventMessage" : "Task <6D3C0B81-25CD-48DA-9E00-9EAF211FE34A>.<124> finished successfully",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485495286333177860,
+  "processID" : 97597,
+  "senderProgramCounter" : 776284,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%s",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "security_exception",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3389072,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.946063+0800",
+  "machTimestamp" : 47215969025094,
+  "eventMessage" : "MacOS error: -67062",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295486208036044804,
+  "processID" : 97597,
+  "senderProgramCounter" : 3389072,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Error checking with notarization daemon: %ld",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "SecError",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 2404172,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.946289+0800",
+  "machTimestamp" : 47215969030515,
+  "eventMessage" : "Error checking with notarization daemon: 3",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295495845942657028,
+  "processID" : 97597,
+  "senderProgramCounter" : 2404172,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611222,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1209592,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.947838+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969067684,
+  "eventMessage" : "SecKeyVerifySignature",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295320370725257474,
+  "processID" : 97597,
+  "senderProgramCounter" : 1209592,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611223,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1478352,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.948119+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969074433,
+  "eventMessage" : "SecTrustEvaluateIfNecessary",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295356358256230658,
+  "processID" : 97597,
+  "senderProgramCounter" : 1478352,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611224,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.951646+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969159081,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611225,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.951659+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969159387,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611226,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.951664+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969159499,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611227,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.951668+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969159616,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611228,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.951673+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969159716,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "eventType" : "activityCreateEvent",
+  "formatString" : "",
+  "userID" : 0,
+  "activityIdentifier" : 320611229,
+  "subsystem" : "",
+  "category" : "",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3479128,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:51.952044+0800",
+  "creatorActivityID" : 0,
+  "machTimestamp" : 47215969168635,
+  "eventMessage" : "SecTrustCopyAppleTrustAnchors",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295714309420613890,
+  "processID" : 97597,
+  "senderProgramCounter" : 3479128,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ received response, status %ld content %c",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 263736,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:52.180509+0800",
+  "machTimestamp" : 47215974651792,
+  "eventMessage" : "Task <8EC2EF55-3A5A-462E-B0B2-AB5544934B95>.<125> received response, status 200 content K",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485684917729230852,
+  "processID" : 97597,
+  "senderProgramCounter" : 263736,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ response ended",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 1667148,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:52.180715+0800",
+  "machTimestamp" : 47215974656728,
+  "eventMessage" : "Task <8EC2EF55-3A5A-462E-B0B2-AB5544934B95>.<125> response ended",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485669494501670916,
+  "processID" : 97597,
+  "senderProgramCounter" : 1667148,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}@ done using Connection %llu",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.CFNetwork",
+  "category" : "Default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 2355588,
+        "imageUUID" : "4A3B95C5-AA2E-338C-9398-56895AF82D97"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/CFNetwork.framework\/Versions\/A\/CFNetwork",
+  "timestamp" : "2026-09-12 14:02:52.180746+0800",
+  "machTimestamp" : 47215974657486,
+  "eventMessage" : "Task <8EC2EF55-3A5A-462E-B0B2-AB5544934B95>.<125> done using Connection 21",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 485747422388289540,
+  "processID" : 97597,
+  "senderProgramCounter" : 2355588,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "[C%u] event: client:%{public}s @%u.%03us",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 19546504,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:52.180800+0800",
+  "machTimestamp" : 47215974658763,
+  "eventMessage" : "[C21] event: client:connection_idle @0.969s",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717905243849097220,
+  "processID" : 97597,
+  "senderProgramCounter" : 19546504,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}s %{public}s nw_protocol_notification_type_connection_idle is %{bool}d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 17365348,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:52.180821+0800",
+  "machTimestamp" : 47215974659278,
+  "eventMessage" : "nw_protocol_socket_notify [C21.1.1.1:4] nw_protocol_notification_type_connection_idle is true",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717364035020128260,
+  "processID" : 97597,
+  "senderProgramCounter" : 17365348,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "[C%u] event: client:%{public}s @%u.%03us",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 19546504,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:52.180833+0800",
+  "machTimestamp" : 47215974659566,
+  "eventMessage" : "[C21] event: client:connection_idle @0.969s",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717905243849097220,
+  "processID" : 97597,
+  "senderProgramCounter" : 19546504,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%{public}s %{public}s nw_protocol_notification_type_connection_idle is %{bool}d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.network",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 17365348,
+        "imageUUID" : "1C7E652B-6B94-3180-93A6-EF8DBA3A5448"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Network.framework\/Versions\/A\/Network",
+  "timestamp" : "2026-09-12 14:02:52.180837+0800",
+  "machTimestamp" : 47215974659659,
+  "eventMessage" : "nw_protocol_socket_notify [C21.1.1.1:4] nw_protocol_notification_type_connection_idle is true",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 717364035020128260,
+  "processID" : 97597,
+  "senderProgramCounter" : 17365348,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "[%p] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.xpc",
+  "category" : "connection",
+  "threadID" : 28351588,
+  "senderImageUUID" : "33E44C2D-D65E-37A6-B85F-1A4CF524A050",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 79620,
+        "imageUUID" : "33E44C2D-D65E-37A6-B85F-1A4CF524A050"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/lib\/system\/libxpc.dylib",
+  "timestamp" : "2026-09-12 14:02:52.380985+0800",
+  "machTimestamp" : 47215979463214,
+  "eventMessage" : "[0x7abb435c0] invalidated because the current process cancelled the connection by calling xpc_connection_cancel()",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 9491688779415556,
+  "processID" : 97597,
+  "senderProgramCounter" : 79620,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "GK evaluateScanResult: %lu, %@, %d, %d, %d, %d, %lu, %lu, %d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 378116,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:52.381298+0800",
+  "machTimestamp" : 47215979470730,
+  "eventMessage" : "GK evaluateScanResult: 2, PST: (path: ba2be7534db6fb27), (team: (null)), (id: zenpi-cdb646c6c40059cd), (bundle_id: NOT_A_BUNDLE), 0, 0, 1, 0, 0, 0, 0",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4323941179064324,
+  "processID" : 97597,
+  "senderProgramCounter" : 378116,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Found provenance data on target: %@, %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 527136,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:52.381496+0800",
+  "machTimestamp" : 47215979475487,
+  "eventMessage" : "Found provenance data on target: TA(f0a92c80e0559fd7, 2), PST: (path: ba2be7534db6fb27), (team: (null)), (id: zenpi-cdb646c6c40059cd), (bundle_id: NOT_A_BUNDLE)",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4372332575588356,
+  "processID" : 97597,
+  "senderProgramCounter" : 527136,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Putting executable into provenance with metadata: %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 383860,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:52.381676+0800",
+  "machTimestamp" : 47215979479800,
+  "eventMessage" : "Putting executable into provenance with metadata: TA(f0a92c80e0559fd7, 2)",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4330564018634756,
+  "processID" : 97597,
+  "senderProgramCounter" : 383860,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%s",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "security_exception",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3389072,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.752915+0800",
+  "machTimestamp" : 47215988389523,
+  "eventMessage" : "MacOS error: -67062",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295486208036044804,
+  "processID" : 97597,
+  "senderProgramCounter" : 3389072,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Error checking with notarization daemon: %ld",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "SecError",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 2404172,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.753208+0800",
+  "machTimestamp" : 47215988396571,
+  "eventMessage" : "Error checking with notarization daemon: 3",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295495845942657028,
+  "processID" : 97597,
+  "senderProgramCounter" : 2404172,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%s",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "security_exception",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3389072,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.753898+0800",
+  "machTimestamp" : 47215988413116,
+  "eventMessage" : "MacOS error: -67062",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295486208036044804,
+  "processID" : 97597,
+  "senderProgramCounter" : 3389072,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%s",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "security_exception",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3389072,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.773194+0800",
+  "machTimestamp" : 47215988876228,
+  "eventMessage" : "MacOS error: -67062",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295486208036044804,
+  "processID" : 97597,
+  "senderProgramCounter" : 3389072,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Error checking with notarization daemon: %ld",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "SecError",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 2404172,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.773441+0800",
+  "machTimestamp" : 47215988882169,
+  "eventMessage" : "Error checking with notarization daemon: 3",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295495845942657028,
+  "processID" : 97597,
+  "senderProgramCounter" : 2404172,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "%s",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.securityd",
+  "category" : "security_exception",
+  "threadID" : 28351588,
+  "senderImageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 3389072,
+        "imageUUID" : "9D0387FC-E8F6-3004-9C95-CA68EA715C8B"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/System\/Library\/Frameworks\/Security.framework\/Versions\/A\/Security",
+  "timestamp" : "2026-09-12 14:02:52.774167+0800",
+  "machTimestamp" : 47215988899587,
+  "eventMessage" : "MacOS error: -67062",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 295486208036044804,
+  "processID" : 97597,
+  "senderProgramCounter" : 3389072,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "GK evaluateScanResult: %lu, %@, %d, %d, %d, %d, %lu, %lu, %d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 378116,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.075280+0800",
+  "machTimestamp" : 47215996126293,
+  "eventMessage" : "GK evaluateScanResult: 2, PST: (path: d2cb52e1b4f8ecfc), (team: (null)), (id: (null)), (bundle_id: (null)), 0, 0, 1, 0, 0, 0, 0",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4323941179064324,
+  "processID" : 97597,
+  "senderProgramCounter" : 378116,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Found provenance data on target: %@, %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 527136,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.075626+0800",
+  "machTimestamp" : 47215996134589,
+  "eventMessage" : "Found provenance data on target: TA(f0a92c80e0559fd7, 2), PST: (path: d2cb52e1b4f8ecfc), (team: (null)), (id: (null)), (bundle_id: (null))",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4372332575588356,
+  "processID" : 97597,
+  "senderProgramCounter" : 527136,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Putting executable into provenance with metadata: %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 383860,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.075920+0800",
+  "machTimestamp" : 47215996141658,
+  "eventMessage" : "Putting executable into provenance with metadata: TA(f0a92c80e0559fd7, 2)",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4330564018634756,
+  "processID" : 97597,
+  "senderProgramCounter" : 383860,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "GK evaluateScanResult: %lu, %@, %d, %d, %d, %d, %lu, %lu, %d",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 378116,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.085673+0800",
+  "machTimestamp" : 47215996375731,
+  "eventMessage" : "GK evaluateScanResult: 2, PST: (path: d3baae53f734dd9a), (team: (null)), (id: (null)), (bundle_id: (null)), 0, 0, 1, 0, 0, 0, 0",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4323941179064324,
+  "processID" : 97597,
+  "senderProgramCounter" : 378116,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Found provenance data on target: %@, %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 527136,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.085827+0800",
+  "machTimestamp" : 47215996379423,
+  "eventMessage" : "Found provenance data on target: TA(f0a92c80e0559fd7, 2), PST: (path: d3baae53f734dd9a), (team: (null)), (id: (null)), (bundle_id: (null))",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4372332575588356,
+  "processID" : 97597,
+  "senderProgramCounter" : 527136,
+  "parentActivityIdentifier" : 0
+},{
+  "timezoneName" : "",
+  "messageType" : "Default",
+  "eventType" : "logEvent",
+  "source" : null,
+  "formatString" : "Putting executable into provenance with metadata: %@",
+  "userID" : 0,
+  "activityIdentifier" : 0,
+  "subsystem" : "com.apple.syspolicy.exec",
+  "category" : "default",
+  "threadID" : 28351588,
+  "senderImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "backtrace" : {
+    "frames" : [
+      {
+        "imageOffset" : 383860,
+        "imageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732"
+      }
+    ]
+  },
+  "bootUUID" : "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+  "processImagePath" : "\/usr\/libexec\/syspolicyd",
+  "senderImagePath" : "\/usr\/libexec\/syspolicyd",
+  "timestamp" : "2026-09-12 14:02:53.086081+0800",
+  "machTimestamp" : 47215996385510,
+  "eventMessage" : "Putting executable into provenance with metadata: TA(f0a92c80e0559fd7, 2)",
+  "processImageUUID" : "29E19ED6-1886-31CF-AFFD-D674FB389732",
+  "traceID" : 4330564018634756,
+  "processID" : 97597,
+  "senderProgramCounter" : 383860,
+  "parentActivityIdentifier" : 0
+}]

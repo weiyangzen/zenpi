@@ -1,0 +1,151 @@
+{
+  "item": "ZS1-117",
+  "complete": false,
+  "files": [
+    {
+      "path": "after.yml",
+      "bytes": 3973,
+      "sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9"
+    },
+    {
+      "path": "before.yml",
+      "bytes": 3104,
+      "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+    },
+    {
+      "path": "master-verification.json",
+      "bytes": 444,
+      "sha256": "98a9c3054ab9a2603c5f6f9d27787f030b39e0bf7bab25a1b92ddbd62d9c2a35"
+    },
+    {
+      "path": "product.patch",
+      "bytes": 1662,
+      "sha256": "26f57a1ec753824b22aba4927cf4978560ef8a7b95e80f00380182905e846f59"
+    },
+    {
+      "path": "review.md",
+      "bytes": 2694,
+      "sha256": "28f8205edd534e5b7d5aac2cd1722f09012dd7ee15e7720a948d0cfd16b75e43"
+    },
+    {
+      "path": "run.py",
+      "bytes": 719,
+      "sha256": "b429b37d347332a06100a52600e1964dadc937bdebe0dfcc1176574a9e3e19f8"
+    },
+    {
+      "path": "shell-cases.log",
+      "bytes": 4091,
+      "sha256": "51e6a914276eec1210cc17d4298328b8fd60b2f25aee13987551d02c4b6a4281"
+    },
+    {
+      "path": "shell-cases.run.json",
+      "bytes": 428,
+      "sha256": "83dd9bf34510f39d003deb7df7127097854d78724275ad7e7fe80e41761a0654"
+    },
+    {
+      "path": "source-verification.json",
+      "bytes": 584,
+      "sha256": "342dcfbb76d3c17037cf472c3d15a0de23b0580881d8fb2619106c45433506aa"
+    },
+    {
+      "path": "work/.github/workflows/ci.yml",
+      "bytes": 3973,
+      "sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/active_requirement.json",
+      "bytes": 9516,
+      "sha256": "e65740c7df5925f141461d786a076a4b775761392a5f7f8cbcc7b79fa086f837"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/artifact-index.json",
+      "bytes": 3266,
+      "sha256": "d1f9e2488ed2d66317b0ceddb1883e6f736c887793f77b27758adf8ef093bd10"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/baseline-ci.yml",
+      "bytes": 3104,
+      "sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/baseline-state.json",
+      "bytes": 2036578,
+      "sha256": "600bad1773c44cd062f4b47a1c77dbc8e4ff8546c5de46454db3323dfc1c9077"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/candidate-ci.yml",
+      "bytes": 3973,
+      "sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/fixture-bench.py",
+      "bytes": 729,
+      "sha256": "b194cc4555ff3173b56b6b3de6c4d595f2d4fefb458124375bec86f3871e1856"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/fixture-results.json",
+      "bytes": 4097,
+      "sha256": "39a9062ef01e8415b2ed21f85852c6a5738c287828da820eb9542a3524b117ca"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/gate-disposition.json",
+      "bytes": 8692,
+      "sha256": "a2e7724452b93d485308203b7924ce96c3b1c7f5af18ba1c4bc70b211d8b546a"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/gstage-main.json",
+      "bytes": 931,
+      "sha256": "7faa662e4dca0afc4b22c36de9f6a2ee140b65e17355f1950f60a5e8f4f0cd1a"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/gstage-main.log",
+      "bytes": 408,
+      "sha256": "60eceb06118437035a2b02d9dc72b1fc3223dcba669fe1234f7cf58d4d6fb544"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/integrity-final.json",
+      "bytes": 834,
+      "sha256": "a209ff21513f7fa8d318d55e536e8b0b9a4a0616dba0a7e1311795166f4a5916"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/integrity-final.log",
+      "bytes": 4097,
+      "sha256": "39a9062ef01e8415b2ed21f85852c6a5738c287828da820eb9542a3524b117ca"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/local-fixtures.json",
+      "bytes": 858,
+      "sha256": "ce8540c7067cfc491ea89186602e20e0bfe71e0f5fd9a79fea4bfee7704630a5"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/local-fixtures.log",
+      "bytes": 4097,
+      "sha256": "39a9062ef01e8415b2ed21f85852c6a5738c287828da820eb9542a3524b117ca"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/main-bench-runtime.py",
+      "bytes": 15327,
+      "sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/product.patch",
+      "bytes": 1662,
+      "sha256": "26f57a1ec753824b22aba4927cf4978560ef8a7b95e80f00380182905e846f59"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/review.md",
+      "bytes": 5220,
+      "sha256": "0be505b59c6026d0d2c9b64084c9ccf94d0b446fea5e8437bbd4e821e79ab211"
+    },
+    {
+      "path": "work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/verify.py",
+      "bytes": 8135,
+      "sha256": "6d8aef0c383a11cdd496ff0fe5b3f0732964364f4edd44c80651f7f23121157a"
+    },
+    {
+      "path": "worker-manifest.json",
+      "bytes": 12971,
+      "sha256": "aa68dc426601b6daeabfbb23b37c042a906f69ad28040c2c220a92988bc06909"
+    }
+  ]
+}

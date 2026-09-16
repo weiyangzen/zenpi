@@ -73,6 +73,11 @@ fn collection_returns_process_and_cpu_signals_with_graceful_fallbacks() {
         snapshot.disk.status,
         SignalStatus::Available | SignalStatus::Unavailable
     ));
+    if snapshot.disk.status == SignalStatus::Available {
+        assert!(
+            snapshot.disk.total_bytes.unwrap_or(0) >= snapshot.disk.available_bytes.unwrap_or(0)
+        );
+    }
     assert!(snapshot.collected_at_ms > 0);
 }
 

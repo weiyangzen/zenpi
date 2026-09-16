@@ -1,0 +1,1079 @@
+{
+  "status": "pass",
+  "passed": 267,
+  "failed": 0,
+  "error": null,
+  "checks": [
+    {
+      "name": "external manifest digest",
+      "passed": true
+    },
+    {
+      "name": "unique candidate/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "payload candidate/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "unique capture/Docs/execution/active_requirement.json",
+      "passed": true
+    },
+    {
+      "name": "payload capture/Docs/execution/active_requirement.json",
+      "passed": true
+    },
+    {
+      "name": "unique capture/Docs/learn/stage1_pi_mono/claims.json",
+      "passed": true
+    },
+    {
+      "name": "payload capture/Docs/learn/stage1_pi_mono/claims.json",
+      "passed": true
+    },
+    {
+      "name": "unique capture/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "passed": true
+    },
+    {
+      "name": "payload capture/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "passed": true
+    },
+    {
+      "name": "unique capture/src/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "payload capture/src/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "unique capture/src/tui.rs",
+      "passed": true
+    },
+    {
+      "name": "payload capture/src/tui.rs",
+      "passed": true
+    },
+    {
+      "name": "unique capture.json",
+      "passed": true
+    },
+    {
+      "name": "payload capture.json",
+      "passed": true
+    },
+    {
+      "name": "unique context/tests/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tests/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tests/layout_persistence.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tests/layout_persistence.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/3438-3506.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/3438-3506.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/3566-3779.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/3566-3779.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/5386-5646.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/5386-5646.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/5847-5898.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/5847-5898.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/5960-6020.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/5960-6020.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/6095-6185.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/6095-6185.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/7292-7335.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/7292-7335.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/7426-7550.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/7426-7550.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context/tui/7790-7875.rs",
+      "passed": true
+    },
+    {
+      "name": "payload context/tui/7790-7875.rs",
+      "passed": true
+    },
+    {
+      "name": "unique context-ledger.json",
+      "passed": true
+    },
+    {
+      "name": "payload context-ledger.json",
+      "passed": true
+    },
+    {
+      "name": "unique definitions.json",
+      "passed": true
+    },
+    {
+      "name": "payload definitions.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/capability-matrix.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/capability-matrix.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/check_static.py",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/check_static.py",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/authority-selector.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/authority-selector.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/blueprint-3.1.20.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/blueprint-3.1.20.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/coverage-contract.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/coverage-contract.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-config.L1468-1556.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-config.L1468-1556.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L1915-1959.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L1915-1959.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2760-2779.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2760-2779.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2892-2902.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2892-2902.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2918-2924.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2918-2924.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2986-3018.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L2986-3018.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L3067-3073.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L3067-3073.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L6397-6440.txt",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context/target-tui.L6397-6440.txt",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-capture.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-capture.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests/layout_persistence.rs",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests/layout_persistence.rs",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/context-tests.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/function-inventory.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/function-inventory.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/original-worker-report.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/original-worker-report.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/bentobox.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/bentobox.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/bentobox.run.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/bentobox.run.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/binary.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/binary.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/budget.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/budget.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/budget.run.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/budget.run.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/build-inputs.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/build-inputs.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/manifest.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/manifest.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/review.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/history/release/review.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/inputs.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/inputs.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/master-baseline.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/master-baseline.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/patch-replay.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/patch-replay.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/read-log.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/read-log.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source/baseline-layout.rs",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source/baseline-layout.rs",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source/current-layout.rs",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source/current-layout.rs",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source-drift.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source-drift.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source-tests.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/source-tests.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/static-check.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/static-check.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/verify_package.py",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/verify_package.py",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/worker-review-receipt.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/Docs/quality/stage1/ZS1-094/worker-layout-review-3.1.20/worker-review-receipt.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/README.md",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/README.md",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/manifest.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/manifest.json",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/master.patch",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/master.patch",
+      "passed": true
+    },
+    {
+      "name": "unique historical/zs1-094-ready/worker.patch",
+      "passed": true
+    },
+    {
+      "name": "payload historical/zs1-094-ready/worker.patch",
+      "passed": true
+    },
+    {
+      "name": "unique historical-copy-identity.json",
+      "passed": true
+    },
+    {
+      "name": "payload historical-copy-identity.json",
+      "passed": true
+    },
+    {
+      "name": "unique master-rollback.patch",
+      "passed": true
+    },
+    {
+      "name": "payload master-rollback.patch",
+      "passed": true
+    },
+    {
+      "name": "unique master-state/final-observation.json",
+      "passed": true
+    },
+    {
+      "name": "payload master-state/final-observation.json",
+      "passed": true
+    },
+    {
+      "name": "unique master-state/observed/src/tui.rs",
+      "passed": true
+    },
+    {
+      "name": "payload master-state/observed/src/tui.rs",
+      "passed": true
+    },
+    {
+      "name": "unique master-state/tui.rs.diff",
+      "passed": true
+    },
+    {
+      "name": "payload master-state/tui.rs.diff",
+      "passed": true
+    },
+    {
+      "name": "unique master.patch",
+      "passed": true
+    },
+    {
+      "name": "payload master.patch",
+      "passed": true
+    },
+    {
+      "name": "unique ownership.json",
+      "passed": true
+    },
+    {
+      "name": "payload ownership.json",
+      "passed": true
+    },
+    {
+      "name": "unique read-ledger.json",
+      "passed": true
+    },
+    {
+      "name": "payload read-ledger.json",
+      "passed": true
+    },
+    {
+      "name": "unique verifier-static-review.json",
+      "passed": true
+    },
+    {
+      "name": "payload verifier-static-review.json",
+      "passed": true
+    },
+    {
+      "name": "unique verify_packet.py",
+      "passed": true
+    },
+    {
+      "name": "payload verify_packet.py",
+      "passed": true
+    },
+    {
+      "name": "unique worker-before/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "payload worker-before/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/layout.rs_learn.md",
+      "passed": true
+    },
+    {
+      "name": "unique worker-rollback.patch",
+      "passed": true
+    },
+    {
+      "name": "payload worker-rollback.patch",
+      "passed": true
+    },
+    {
+      "name": "unique worker.patch",
+      "passed": true
+    },
+    {
+      "name": "payload worker.patch",
+      "passed": true
+    },
+    {
+      "name": "unique write_report.py",
+      "passed": true
+    },
+    {
+      "name": "payload write_report.py",
+      "passed": true
+    },
+    {
+      "name": "exact inventory",
+      "passed": true
+    },
+    {
+      "name": "frozen source identity",
+      "passed": true
+    },
+    {
+      "name": "authority binding",
+      "passed": true
+    },
+    {
+      "name": "contiguous read 1",
+      "passed": true
+    },
+    {
+      "name": "contiguous read 321",
+      "passed": true
+    },
+    {
+      "name": "contiguous read 641",
+      "passed": true
+    },
+    {
+      "name": "contiguous read 961",
+      "passed": true
+    },
+    {
+      "name": "contiguous read 1261",
+      "passed": true
+    },
+    {
+      "name": "full source through EOF",
+      "passed": true
+    },
+    {
+      "name": "no inline source tests",
+      "passed": true
+    },
+    {
+      "name": "bounded TUI identity",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/3438-3506.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/3566-3779.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/5386-5646.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/5847-5898.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/5960-6020.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/6095-6185.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/7292-7335.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/7426-7550.rs",
+      "passed": true
+    },
+    {
+      "name": "context range context/tui/7790-7875.rs",
+      "passed": true
+    },
+    {
+      "name": "context tests context/tests/layout.rs",
+      "passed": true
+    },
+    {
+      "name": "context tests context/tests/layout_persistence.rs",
+      "passed": true
+    },
+    {
+      "name": "18 existing context tests, no execution",
+      "passed": true
+    },
+    {
+      "name": "one candidate report",
+      "passed": true
+    },
+    {
+      "name": "report identity",
+      "passed": true
+    },
+    {
+      "name": "before identities",
+      "passed": true
+    },
+    {
+      "name": "exact scoped patch masterFalse",
+      "passed": true
+    },
+    {
+      "name": "exact scoped patch masterTrue",
+      "passed": true
+    },
+    {
+      "name": "exact scoped patch workerFalse",
+      "passed": true
+    },
+    {
+      "name": "exact scoped patch workerTrue",
+      "passed": true
+    },
+    {
+      "name": "77 definition navigation entries",
+      "passed": true
+    },
+    {
+      "name": "report definition 44",
+      "passed": true
+    },
+    {
+      "name": "report definition 56",
+      "passed": true
+    },
+    {
+      "name": "report definition 89",
+      "passed": true
+    },
+    {
+      "name": "report definition 113",
+      "passed": true
+    },
+    {
+      "name": "report definition 119",
+      "passed": true
+    },
+    {
+      "name": "report definition 149",
+      "passed": true
+    },
+    {
+      "name": "report definition 158",
+      "passed": true
+    },
+    {
+      "name": "report definition 187",
+      "passed": true
+    },
+    {
+      "name": "report definition 221",
+      "passed": true
+    },
+    {
+      "name": "report definition 249",
+      "passed": true
+    },
+    {
+      "name": "report definition 256",
+      "passed": true
+    },
+    {
+      "name": "report definition 272",
+      "passed": true
+    },
+    {
+      "name": "report definition 287",
+      "passed": true
+    },
+    {
+      "name": "report definition 301",
+      "passed": true
+    },
+    {
+      "name": "report definition 312",
+      "passed": true
+    },
+    {
+      "name": "report definition 334",
+      "passed": true
+    },
+    {
+      "name": "report definition 347",
+      "passed": true
+    },
+    {
+      "name": "report definition 355",
+      "passed": true
+    },
+    {
+      "name": "report definition 379",
+      "passed": true
+    },
+    {
+      "name": "report definition 427",
+      "passed": true
+    },
+    {
+      "name": "report definition 433",
+      "passed": true
+    },
+    {
+      "name": "report definition 458",
+      "passed": true
+    },
+    {
+      "name": "report definition 472",
+      "passed": true
+    },
+    {
+      "name": "report definition 485",
+      "passed": true
+    },
+    {
+      "name": "report definition 501",
+      "passed": true
+    },
+    {
+      "name": "report definition 510",
+      "passed": true
+    },
+    {
+      "name": "report definition 514",
+      "passed": true
+    },
+    {
+      "name": "report definition 518",
+      "passed": true
+    },
+    {
+      "name": "report definition 522",
+      "passed": true
+    },
+    {
+      "name": "report definition 526",
+      "passed": true
+    },
+    {
+      "name": "report definition 544",
+      "passed": true
+    },
+    {
+      "name": "report definition 559",
+      "passed": true
+    },
+    {
+      "name": "report definition 582",
+      "passed": true
+    },
+    {
+      "name": "report definition 586",
+      "passed": true
+    },
+    {
+      "name": "report definition 601",
+      "passed": true
+    },
+    {
+      "name": "report definition 611",
+      "passed": true
+    },
+    {
+      "name": "report definition 631",
+      "passed": true
+    },
+    {
+      "name": "report definition 639",
+      "passed": true
+    },
+    {
+      "name": "report definition 652",
+      "passed": true
+    },
+    {
+      "name": "report definition 686",
+      "passed": true
+    },
+    {
+      "name": "report definition 753",
+      "passed": true
+    },
+    {
+      "name": "report definition 782",
+      "passed": true
+    },
+    {
+      "name": "report definition 864",
+      "passed": true
+    },
+    {
+      "name": "report definition 868",
+      "passed": true
+    },
+    {
+      "name": "report definition 872",
+      "passed": true
+    },
+    {
+      "name": "report definition 876",
+      "passed": true
+    },
+    {
+      "name": "report definition 880",
+      "passed": true
+    },
+    {
+      "name": "report definition 885",
+      "passed": true
+    },
+    {
+      "name": "report definition 926",
+      "passed": true
+    },
+    {
+      "name": "report definition 937",
+      "passed": true
+    },
+    {
+      "name": "report definition 941",
+      "passed": true
+    },
+    {
+      "name": "report definition 946",
+      "passed": true
+    },
+    {
+      "name": "report definition 950",
+      "passed": true
+    },
+    {
+      "name": "report definition 954",
+      "passed": true
+    },
+    {
+      "name": "report definition 959",
+      "passed": true
+    },
+    {
+      "name": "report definition 969",
+      "passed": true
+    },
+    {
+      "name": "report definition 993",
+      "passed": true
+    },
+    {
+      "name": "report definition 998",
+      "passed": true
+    },
+    {
+      "name": "report definition 1006",
+      "passed": true
+    },
+    {
+      "name": "report definition 1084",
+      "passed": true
+    },
+    {
+      "name": "report definition 1104",
+      "passed": true
+    },
+    {
+      "name": "report definition 1117",
+      "passed": true
+    },
+    {
+      "name": "report definition 1146",
+      "passed": true
+    },
+    {
+      "name": "report definition 1154",
+      "passed": true
+    },
+    {
+      "name": "report definition 1158",
+      "passed": true
+    },
+    {
+      "name": "report definition 1166",
+      "passed": true
+    },
+    {
+      "name": "report definition 1175",
+      "passed": true
+    },
+    {
+      "name": "report definition 1179",
+      "passed": true
+    },
+    {
+      "name": "report definition 1343",
+      "passed": true
+    },
+    {
+      "name": "report definition 1362",
+      "passed": true
+    },
+    {
+      "name": "report definition 1373",
+      "passed": true
+    },
+    {
+      "name": "report definition 1406",
+      "passed": true
+    },
+    {
+      "name": "report definition 1410",
+      "passed": true
+    },
+    {
+      "name": "report definition 1416",
+      "passed": true
+    },
+    {
+      "name": "report definition 1426",
+      "passed": true
+    },
+    {
+      "name": "report definition 1495",
+      "passed": true
+    },
+    {
+      "name": "report definition 1539",
+      "passed": true
+    },
+    {
+      "name": "old094 manifest untouched",
+      "passed": true
+    },
+    {
+      "name": "report-only counters",
+      "passed": true
+    },
+    {
+      "name": "explicit pending and limitations",
+      "passed": true
+    },
+    {
+      "name": "verifier static review binding",
+      "passed": true
+    }
+  ],
+  "structural_only": true,
+  "semantic_acceptance": "Master pending",
+  "product_runs": 0
+}

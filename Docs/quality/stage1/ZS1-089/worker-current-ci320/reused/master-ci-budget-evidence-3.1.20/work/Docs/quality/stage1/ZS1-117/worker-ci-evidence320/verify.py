@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Local YAML/shell evidence tests. Does not run production benchmark or Actions."""
+from pathlib import Path
+import ast, base64, datetime, difflib, hashlib, json, os, subprocess, sys, tempfile
+import yaml
+E=Path(__file__).resolve().parent
+R=E.parents[4]
+sha=lambda b:hashlib.sha256(b).hexdigest()
+state=json.loads((E/'baseline-state.json').read_text())
+frozen='--frozen' in sys.argv
+record='--record' in sys.argv
+class Loader(yaml.BaseLoader): pass
+def mapping(loader,node):
+    pairs=loader.construct_pairs(node)
+    result={}
+    for k,v in pairs:
+        assert k not in result, ('duplicate YAML key',k)
+        result[k]=v
+    return result
+Loader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,mapping)
+before=(E/'baseline-ci.yml').read_bytes(); after=(E/'candidate-ci.yml').read_bytes()
+assert (R/'.github/workflows/ci.yml').read_bytes()==after
+old=yaml.load(before,Loader=Loader); new=yaml.load(after,Loader=Loader)
+oldsteps=old['jobs']['verify']['steps']; steps=new['jobs']['verify']['steps']
+assert len(steps)==len(oldsteps)==16
+changed=[i for i,(a,b) in enumerate(zip(oldsteps,steps)) if a!=b]
+assert changed==[9,10],changed
+copied=yaml.load(after,Loader=Loader);copied['jobs']['verify']['steps']=oldsteps
+assert copied==old
+start=b'      - name: Run runtime and size budget gate\n'; end=b'      - name: Check two-mode boundary\n'
+assert before.split(start)[0]==after.split(start)[0]
+assert before.split(end)[1]==after.split(end)[1]
+gate,upload=steps[9:11]
+assert gate['shell']=='bash' and gate['id']=='runtime_budget'
+assert 'continue-on-error' not in gate
+assert upload['if']=="${{ always() && steps.runtime_budget.outcome != 'skipped' }}"
+assert upload['uses']=='actions/upload-artifact@v4'
+assert upload['with']['path']==gate['env']['BUDGET_EVIDENCE_DIR']
+assert upload['with']['if-no-files-found']=='error'
+assert '${{ github.run_attempt }}' in upload['with']['name']
+assert all(flag not in gate['run'] for flag in ['--no-fail','--near-cap','retry'])
+bench=(E/'main-bench-runtime.py').read_bytes()
+assert sha(bench)==state['main_files']['tools/bench_runtime.py']
+tree=ast.parse(bench)
+flags={n.args[0].value for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='add_argument' and n.args and isinstance(n.args[0],ast.Constant)}
+assert {'--samples','--output','--startup-evidence-dir'}<=flags
+assert b"evidence_dir.exists()" in bench and b"evidence_dir.mkdir(parents=True)" in bench
+selector=json.loads((E/'active_requirement.json').read_text())
+assert selector['blueprint_version']=='3.1.20' and selector['requirement_digest']=='8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645'
+if not frozen:
+    for p,digest in state['tracked_files'].items():
+        if p!='.github/workflows/ci.yml':assert sha((R/p).read_bytes())==digest,p
+    for p,digest in state['prior_ready_files'].items():assert sha((R/p).read_bytes())==digest,p
+    for p,digest in state['main_files'].items():assert sha((Path('/Users/wangweiyang/GitHub/zenpi')/p).read_bytes())==digest,p
+    assert os.environ.get('HOME')==state['HOME'] and os.environ.get('CODEX_HOME')==state['CODEX_HOME']
+fixture='''import argparse,json,os,pathlib,sys
+p=argparse.ArgumentParser()
+p.add_argument('--samples',type=int,required=True)
+p.add_argument('--output',type=pathlib.Path,required=True)
+p.add_argument('--startup-evidence-dir',type=pathlib.Path,required=True)
+a=p.parse_args()
+assert a.samples==3 and not a.startup_evidence_dir.exists()
+a.startup_evidence_dir.mkdir()
+with pathlib.Path('invocations.txt').open('a') as f:f.write('invoked\\n')
+rc=int(os.environ['FIXTURE_BUDGET_RC'])
+os.write(1,b'fixture stdout\\r\\n')
+os.write(2,b'fixture stderr\\r\\n')
+(a.startup_evidence_dir/'sample-00.json').write_text(json.dumps({'fixture':True,'returncode':rc})+'\\n')
+if rc!=17:a.output.write_text(json.dumps({'fixture':True,'ok':rc==0})+'\\n')
+sys.exit(rc)
+'''
+assert (E/'fixture-bench.py').read_text()==fixture
+cases=[]
+for name,bench_rc,tee_rc in [('success',0,0),('budget-failed',1,0),('early-failed',17,0),('logger-failed',0,23),('both-failed',17,23)]:
+    with tempfile.TemporaryDirectory(prefix='zenpi-ci-evidence-') as tmp:
+        root=Path(tmp);(root/'tools').mkdir();(root/'tools/bench_runtime.py').write_text(fixture)
+        evidence=root/'runner temp 空格'/'run-123-attempt-2';evidence.parent.mkdir()
+        sentinel=root/'unrelated-sentinel';sentinel.write_bytes(b'unchanged\r\n')
+        env=os.environ.copy();env.update(BUDGET_EVIDENCE_DIR=str(evidence),FIXTURE_BUDGET_RC=str(bench_rc),PYTHONDONTWRITEBYTECODE='1')
+        if tee_rc:
+            bindir=root/'bin';bindir.mkdir();tee=bindir/'tee'
+            tee.write_text('#!/bin/bash\n/usr/bin/tee "$@"\nexit 23\n');tee.chmod(0o755)
+            env['PATH']=str(bindir)+os.pathsep+env['PATH']
+        argv=['/bin/bash','--noprofile','--norc','-e','-o','pipefail','-c',gate['run']]
+        proc=subprocess.run(argv,cwd=root,env=env,capture_output=True,timeout=10)
+        expected=bench_rc or tee_rc
+        assert proc.returncode==expected,(name,proc.returncode,proc.stderr)
+        assert (evidence/'budget.log').read_bytes()==b'fixture stdout\r\nfixture stderr\r\n'
+        assert proc.stdout==(evidence/'budget.log').read_bytes()
+        assert (evidence/'exit-code.txt').read_text()==str(bench_rc)+'\n'
+        assert (evidence/'startup/sample-00.json').is_file()
+        assert (evidence/'summary.json').exists()==(bench_rc!=17)
+        files={str(p.relative_to(evidence)):base64.b64encode(p.read_bytes()).decode() for p in sorted(evidence.rglob('*')) if p.is_file()}
+        replay=subprocess.run(argv,cwd=root,env=env,capture_output=True,timeout=10)
+        assert replay.returncode!=0 and (root/'invocations.txt').read_text()=='invoked\n'
+        assert files=={str(p.relative_to(evidence)):base64.b64encode(p.read_bytes()).decode() for p in sorted(evidence.rglob('*')) if p.is_file()}
+        assert sentinel.read_bytes()==b'unchanged\r\n'
+        cases.append(dict(case=name,benchmark_exit_code=bench_rc,logger_exit_code=tee_rc,shell_exit_code=proc.returncode,stdout_base64=base64.b64encode(proc.stdout).decode(),stderr_base64=base64.b64encode(proc.stderr).decode(),artifacts_base64=files,repeated_directory_exit_code=replay.returncode,invocations=1,sentinel_unchanged=True))
+patch=(E/'product.patch').read_bytes()
+expected_patch=''.join(difflib.unified_diff(before.decode().splitlines(True),after.decode().splitlines(True),fromfile='a/.github/workflows/ci.yml',tofile='b/.github/workflows/ci.yml')).encode()
+assert patch==expected_patch
+patch_commands=[]
+with tempfile.TemporaryDirectory(prefix='zenpi-ci-patch-') as tmp:
+    scratch=Path(tmp);p=scratch/'.github/workflows/ci.yml';p.parent.mkdir(parents=True);p.write_bytes(before)
+    sentinel=scratch/'.github/workflows/release.yml';sentinel.write_bytes(b'UNRELATED RELEASE SENTINEL\n')
+    for args in [['--check'],[],['--reverse','--check'],['--reverse']]:
+        result=subprocess.run(['git','apply',*args,str(E/'product.patch')],cwd=scratch,capture_output=True,timeout=10)
+        assert result.returncode==0,result.stderr
+        patch_commands.append(dict(argv=['git','apply',*args,'product.patch'],exit_code=result.returncode))
+        assert sentinel.read_bytes()==b'UNRELATED RELEASE SENTINEL\n'
+        if args==[]:assert p.read_bytes()==after
+    assert p.read_bytes()==before
+result=dict(kind='local-controlled-fixture-not-Ubuntu-Actions',yaml_changed_step_indices=changed,before_sha256=sha(before),after_sha256=sha(after),main_bench_sha256=sha(bench),cases=cases,patch_commands=patch_commands,prior_ready_files_verified=0 if frozen else len(state['prior_ready_files']),tracked_files_preserved=0 if frozen else len(state['tracked_files'])-1,real_Actions_run=False,production_benchmark_run=False,acceptance=False)
+if record:
+    assert not (E/'fixture-results.json').exists()
+    (E/'fixture-results.json').write_text(json.dumps(result,indent=2)+'\n')
+else:
+    prior=json.loads((E/'fixture-results.json').read_text())
+    assert prior['cases']==cases and prior['after_sha256']==sha(after)
+print(json.dumps(result,indent=2))

@@ -1,0 +1,297 @@
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -5128,7 +5128,14 @@
+                         .is_some_and(|choice| choice.eq_ignore_ascii_case(&self.input));
+                     let submenu = matches!(
+                         self.input.as_str(),
+-                        "/persona" | "/personas" | "/model" | "/goal" | "/learn" | "/session"
++                        "/persona"
++                            | "/personas"
++                            | "/model"
++                            | "/goal"
++                            | "/learn"
++                            | "/session"
++                            | "/approval"
++                            | "/approvals"
+                     );
+                     if !exact || submenu {
+                         self.choose_slash(&choices);
+--- a/tests/tui_command_palette.rs
++++ b/tests/tui_command_palette.rs
+@@ -49,6 +49,92 @@
+         .collect::<Vec<_>>()
+         .join("\n")
+ }
++
++#[test]
++fn bare_approval_selectors_defer_owner_changes_until_explicit_submit() {
++    use zenpi::{
++        approval::{ApprovalDecision, ApprovalMode},
++        core::Agent,
++        tools::{SideEffectPolicy, ToolContext, ToolRegistry},
++        tui::{TuiAction, dispatch_slash_command},
++    };
++    for alias in ["/approval", "/approvals"] {
++        let root = tempdir().unwrap();
++        let mut state = state(root.path());
++        let session = zenpi::session::SessionStore::open(root.path().join("owner.jsonl")).unwrap();
++        let mut owner = Agent::with_echo(session);
++        owner.set_tools(
++            ToolRegistry::with_all_builtins().unwrap(),
++            ToolContext::new(root.path()).unwrap(),
++            SideEffectPolicy::all_builtins(),
++        );
++        let mut policy = owner.configured_approval_policy().unwrap();
++        policy.mode = ApprovalMode::Never;
++        policy
++            .per_tool
++            .insert("write_file".into(), ApprovalDecision::Deny);
++        owner.set_approval_policy(policy.clone());
++        let project = state.active_project().to_owned();
++        let layout = state.active_project_workspace().clone();
++        let press =
++            |state: &mut TuiState, key| state.handle_key(KeyEvent::new(key, KeyModifiers::NONE));
++
++        state.set_input(alias);
++        assert!(
++            matches!(press(&mut state, KeyCode::Enter), TuiAction::Redraw),
++            "{alias}"
++        );
++        assert_eq!(state.input(), format!("{alias} "));
++        let screen = render(&mut state);
++        for mode in ["ask", "always", "never"] {
++            assert!(screen.contains(&format!("{alias} {mode}")));
++        }
++        press(&mut state, KeyCode::Esc);
++        assert_eq!(state.input(), format!("{alias} "));
++        assert!(state.slash_choices().is_empty());
++        assert_eq!(owner.configured_approval_policy().unwrap(), policy);
++        assert_eq!(state.active_project(), project);
++        assert_eq!(state.active_project_workspace(), &layout);
++
++        state.set_input(alias);
++        assert!(matches!(
++            press(&mut state, KeyCode::Enter),
++            TuiAction::Redraw
++        ));
++        press(&mut state, KeyCode::Down);
++        assert!(matches!(
++            press(&mut state, KeyCode::Enter),
++            TuiAction::Redraw
++        ));
++        assert_eq!(state.input(), format!("{alias} always "));
++        assert_eq!(owner.configured_approval_policy().unwrap(), policy);
++        let TuiAction::Submit(text) = press(&mut state, KeyCode::Enter) else {
++            panic!("explicit confirmation must submit the selected policy for {alias}");
++        };
++        let InputRoute::Slash(command) = zenpi::slash::route_input(&text).unwrap() else {
++            panic!("policy selection must use the real slash owner");
++        };
++        dispatch_slash_command(command, &mut state, Some(&mut owner));
++        policy.mode = ApprovalMode::Always;
++        assert_eq!(owner.configured_approval_policy().unwrap(), policy);
++        assert_eq!(
++            owner.approval_policy().unwrap().per_tool["write_file"],
++            ApprovalDecision::Deny
++        );
++
++        // Explicit arguments keep the existing path; busy policy changes
++        // remain advertised as unavailable instead of gaining a new owner.
++        state.set_input(format!("{alias} never"));
++        assert!(matches!(
++            press(&mut state, KeyCode::Enter),
++            TuiAction::Submit(_)
++        ));
++        state.set_busy(true);
++        assert!(!state.command_available(alias));
++        assert!(!state.command_available(&format!("{alias} always")));
++    }
++}
++
+ #[test]
+ fn catalog_contains_actual_explicit_resources_and_source_but_not_bodies() {
+     let root = tempdir().unwrap();
+--- a/tools/tui_approval_smoke.py
++++ b/tools/tui_approval_smoke.py
+@@ -7,12 +7,181 @@
+ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ from tui_project_workspace_smoke import Terminal, screen_text
+ 
++def selector_smoke(binary, evidence):
++    """Bare policy commands must open a cancellable selector before mutation."""
++    requests, terminals, failures = [], [], []
++    connections = []
++    seen = set()
++    result = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
++              'checks': {}, 'observations': []}
++
++    class Handler(BaseHTTPRequestHandler):
++        def handle(self):
++            connections.append({'client': self.client_address})
++            super().handle()
++
++        def log_message(self, *args):
++            connections.append({'log': args})
++
++        def do_POST(self):
++            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
++            requests.append(body)
++            latest = next(row for row in reversed(body['input']) if row.get('role') == 'user')
++            text = json.dumps(latest)
++            marker = next(m for m in ('CANCEL_0', 'SELECT_0', 'CANCEL_1', 'SELECT_1') if m in text)
++            events = [{'type': 'response.created', 'response': {'id': marker, 'model': body['model']}}]
++            if marker not in seen:
++                seen.add(marker)
++                events.append({'type': 'response.output_item.done', 'item': {
++                    'type': 'function_call', 'call_id': marker, 'name': 'write_file',
++                    'arguments': json.dumps({'path': marker + '.txt', 'content': marker})}})
++            else:
++                events.append({'type': 'response.output_text.delta', 'delta': 'DONE_' + marker})
++            events.append({'type': 'response.completed', 'response': {
++                'id': marker, 'model': body['model'], 'status': 'completed'}})
++            raw = ''.join('data: ' + json.dumps(event) + '\n\n' for event in events).encode()
++            self.send_response(200)
++            self.send_header('Content-Type', 'text/event-stream')
++            self.send_header('Content-Length', str(len(raw)))
++            self.end_headers()
++            self.wfile.write(raw)
++
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    threading.Thread(target=server.serve_forever, daemon=True).start()
++    evidence = evidence.resolve()
++    fixture = evidence.with_suffix('.fixture')
++    fixture.mkdir(parents=True)
++
++    def check(name, value):
++        result['checks'][name] = bool(value)
++        if not value:
++            failures.append(name)
++
++    try:
++        for index, alias in enumerate(('/approval', '/approvals')):
++            root = fixture / str(index)
++            config = root / 'fixture'
++            for path in (root / 'initial', root / 'sessions', config):
++                path.mkdir(parents=True)
++            (config / 'config.toml').write_text(
++                f'backend="openai"\nmodel="gpt-4.1"\nbase_url="http://127.0.0.1:{server.server_port}/v1"\n'
++                'wire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n')
++            (config / 'auth.json').write_text('{"OPENAI_API_KEY":"policy-selector-fixture"}\n')
++            (config / 'auth.json').chmod(0o600)
++            env = {k: v for k, v in os.environ.items()
++                   if not k.startswith(('ZENPI_', 'OPENAI_'))
++                   and k.lower() not in ('http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')}
++            env.update(ZENPI_HOME=str(config), TERM='xterm-256color')
++            t = Terminal(binary, root, env)
++            terminals.append(t)
++            checkpoint = config / 'project-tabs.json'
++
++            def active():
++                saved = json.loads(checkpoint.read_text())
++                return next(row for row in saved['project_state'] if row['name'] == saved['projects'][saved['active']])
++
++            def mode_messages():
++                return json.dumps(active()['messages']).count('approval mode:')
++
++            def idle():
++                t.wait(lambda: b'Ready' in screen_text(bytes(t.output)).splitlines()[1])
++
++            def set_mode(mode):
++                t.clear_input()
++                count = mode_messages()
++                t.command(alias + ' ' + mode)
++                t.wait(lambda: mode_messages() == count + 1 and t.draft() == '')
++
++            def open_selector(label):
++                count, http_count = mode_messages(), len(requests)
++                owner = active()['metadata']
++                layout = active()['layout']
++                t.type_text(alias)
++                t.wait(lambda: t.draft() == alias)
++                t.write(b'\r')
++                t.wait(lambda: t.draft() != alias)
++                screen = screen_text(bytes(t.output)).decode()
++                opened = t.draft() == alias + ' ' and all(alias + ' ' + mode in screen for mode in ('ask', 'always', 'never'))
++                result['observations'].append({'alias': alias, 'stage': label,
++                    'draft': t.draft(), 'mode_messages_before': count,
++                    'mode_messages_after': mode_messages(), 'screen': screen})
++                check(label + '_opens_without_policy_or_http_change',
++                      opened and mode_messages() == count and len(requests) == http_count)
++                check(label + '_preserves_project_session_layout',
++                      active()['metadata'] == owner and active()['layout'] == layout)
++                return opened, count
++
++            set_mode('always')
++            opened, count = open_selector(str(index) + '_always')
++            if opened:
++                t.cancel_picker()
++            check(str(index) + '_escape_keeps_always_and_command_draft',
++                  t.draft() == alias + ' ' and mode_messages() == count)
++            set_mode('never')
++            opened, count = open_selector(str(index) + '_never')
++            if opened:
++                t.cancel_picker()
++            check(str(index) + '_escape_keeps_never_and_command_draft',
++                  t.draft() == alias + ' ' and mode_messages() == count)
++            t.clear_input()
++            marker = 'CANCEL_' + str(index)
++            target = root / 'initial' / (marker + '.txt')
++            t.command(marker)
++            t.wait(lambda: target.exists() or b'Enter confirm' in screen_text(bytes(t.output)))
++            check(str(index) + '_cancelled_selector_retains_actual_no_prompt_write_policy', target.exists())
++            if not target.exists():
++                t.write(b'n\r')
++            t.expect(('DONE_' + marker).encode())
++            idle()
++
++            # Continue the before run for both spellings; a missing submenu is
++            # a retained failure, never repaired by injecting a trailing space.
++            opened, count = open_selector(str(index) + '_select')
++            if opened:
++                t.write(b'\x1b[B\r')
++                t.wait(lambda: t.draft() == alias + ' always ')
++                check(str(index) + '_highlight_requires_separate_confirmation', mode_messages() == count)
++                t.write(b'\r')
++                t.wait(lambda: mode_messages() == count + 1 and t.draft() == '')
++                marker = 'SELECT_' + str(index)
++                target = root / 'initial' / (marker + '.txt')
++                t.command(marker)
++                t.expect(('Call: ' + marker).encode())
++                t.expect(b'Enter confirm')
++                check(str(index) + '_explicit_always_selection_reaches_real_approval_owner', not target.exists())
++                t.write(b'n\r')
++                t.expect(('DONE_' + marker).encode())
++                idle()
++                check(str(index) + '_denied_write_stays_absent', not target.exists())
++            t.close()
++            check(str(index) + '_terminal_restored', b'\x1b[?1049l' in t.output)
++        result.update(status='failed' if failures else 'passed', failures=failures,
++                      request_count=len(requests), tui_processes=len(terminals))
++        assert not failures, failures
++    except BaseException as error:
++        result.update(status='failed', error=repr(error))
++        raise
++    finally:
++        for terminal in terminals:
++            terminal.cleanup()
++        server.shutdown()
++        server.server_close()
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.http.json').write_text(json.dumps(requests, indent=2) + '\n')
++        result['server_connections'] = connections
++        evidence.write_text(json.dumps(result, indent=2) + '\n')
++    return result
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--binary', required=True, type=Path)
+     parser.add_argument('--evidence', type=Path, default=Path('Docs/quality/stage1/ux124-pty-result.json'))
++    parser.add_argument('--selector-only', action='store_true')
+     args = parser.parse_args()
+     binary = args.binary.resolve()
++    if args.selector_only:
++        print(json.dumps(selector_smoke(binary, args.evidence), indent=2))
++        return
+     requests = []
+     seen = set()
+     terminals = []

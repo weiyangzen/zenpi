@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "archived_files": 78,
+  "new_controller_launches": 0,
+  "diagnostic_samples": [
+    50.243208,
+    42.206084,
+    36.007542,
+    40.131875,
+    41.454875
+  ],
+  "historical_scan_interval_ms": 436.6136666666667,
+  "original_gate": "FAIL 1208.732708 > 1000",
+  "cause": "unresolved",
+  "complete": false,
+  "scope": "Raw observation and arithmetic audit; no performance fix or product acceptance"
+}

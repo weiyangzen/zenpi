@@ -58,6 +58,24 @@ fn every_resource_dimension_is_enforced_without_mutating_on_rejection() {
 }
 
 #[test]
+fn elapsed_wall_time_is_rejected_without_an_additional_charge() {
+    let limits = ResourceLimits {
+        max_wall_ms: 1,
+        ..Default::default()
+    };
+    let ledger = BudgetLedger::new(limits, ResourceUsage::default()).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(4));
+    let error = ledger.ensure_within_limits().unwrap_err();
+    assert!(matches!(
+        error,
+        GovernanceError::BudgetExceeded {
+            kind: ResourceKind::WallTime,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn retry_and_process_charges_cannot_bypass_an_exhausted_budget() {
     let mut ledger = BudgetLedger::new(limits(), ResourceUsage::default()).unwrap();
     ledger.charge(ResourceKind::NetworkRequests, 1).unwrap();
@@ -487,6 +505,59 @@ fn elapsed_deadline_and_lease_expiration_issue_durable_cancel_directives() {
     ));
     let restored = WorkerBudgetLedger::restore(&mut session, limits()).unwrap();
     assert!(restored.terminal().is_some());
+}
+
+#[test]
+fn lease_renewal_is_policy_bound_monotonic_and_durable() {
+    let dir = tempdir().unwrap();
+    let mut session = SessionStore::open(dir.path().join("renew.jsonl")).unwrap();
+    let mut ledger = WorkerBudgetLedger::restore(&mut session, limits()).unwrap();
+    let active = lease();
+    let lease_id = active.lease_id.clone();
+    let policy = active.policy_digest.clone();
+    ledger.open_lease(&mut session, active, 100).unwrap();
+    assert!(
+        ledger
+            .renew_lease(&mut session, &lease_id, &"a".repeat(64), 2_000, 200)
+            .is_err()
+    );
+    assert!(
+        ledger
+            .renew_lease(&mut session, &lease_id, &policy, 1_000, 200)
+            .is_err()
+    );
+    ledger
+        .renew_lease(&mut session, &lease_id, &policy, 101_000, 200)
+        .unwrap();
+    let mut restored = WorkerBudgetLedger::restore(&mut session, limits()).unwrap();
+    assert_eq!(restored.operations().len(), 0);
+    assert!(
+        restored
+            .renew_lease(&mut session, &lease_id, &policy, 100_500, 300)
+            .is_err()
+    );
+}
+
+#[test]
+fn expired_lease_cannot_be_renewed_after_expire_and_restart() {
+    let dir = tempdir().unwrap();
+    let mut session = SessionStore::open(dir.path().join("expired-renew.jsonl")).unwrap();
+    let mut ledger = WorkerBudgetLedger::restore(&mut session, limits()).unwrap();
+    let active = lease();
+    let lease_id = active.lease_id.clone();
+    let policy = active.policy_digest.clone();
+    ledger.open_lease(&mut session, active, 100).unwrap();
+    let directives = ledger.expire(&mut session, 101_000).unwrap();
+    assert!(directives.iter().any(|directive| matches!(
+        directive.terminal,
+        BudgetTerminal::LeaseExpired { lease_id: ref expired } if expired == &lease_id
+    )));
+    let mut restored = WorkerBudgetLedger::restore(&mut session, limits()).unwrap();
+    assert!(
+        restored
+            .renew_lease(&mut session, &lease_id, &policy, 102_000, 101_000)
+            .is_err()
+    );
 }
 
 #[test]

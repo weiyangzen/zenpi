@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "meaning": "Provisional evidence integrity, not G-DIR acceptance",
+  "item": "ZS1-093",
+  "mode": "live-readonly",
+  "scope": "target:.github",
+  "physical_direct_files": 0,
+  "physical_direct_subdirectories": [
+    "workflows"
+  ],
+  "formal_children": [
+    "ZS1-092"
+  ],
+  "unaccepted_children": [
+    "ZS1-092"
+  ],
+  "unaccepted_transitive_children": [
+    "ZS1-089"
+  ],
+  "acceptance_eligible": false,
+  "dependency_manifest_sha256": "1eaaba0aa72b5d4730830ff6bb7ae63d3cf5101cd422b7a25a4f1a276fa6eee3",
+  "dependency_members": 95,
+  "dependency_master_accepted": false,
+  "report_bytes": 8676,
+  "report_sha256": "8c50c22fb525eb5e2cef190682d33c45a7fc9fab2609f6d6f15a84276b171748",
+  "preserved_ready_manifests": 68,
+  "gstage_exit": 1,
+  "directory_master_receipt_missing": true,
+  "new_behavior_runs": 0,
+  "limits": "No zenpi-root integration/context promotion/product/main/state changes or Cargo/PTY/HTTP/Actions execution"
+}

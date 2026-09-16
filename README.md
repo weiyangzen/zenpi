@@ -89,7 +89,7 @@ the baseline and selected slices, not every v2 interaction or close hook.
 multiline editing, Markdown rendering, file diff previews, tool lifecycle
 folding, slash-command/domain models, and responsive layout primitives still
 need the end-to-end acceptance work described by their v2 rows. BentoBox tabs,
-durable first-class domain dispatch, browser/PTY panes, and socket-level
+durable first-class domain dispatch, PTY panes, and socket-level
 cancellation are explicitly partial, planned, or deferred rather than hidden
 behind a completion claim. The frozen v1 receipt remains in
 [`Docs/Zenpi_Execution_Blueprint.md`](Docs/Zenpi_Execution_Blueprint.md); the
@@ -160,8 +160,9 @@ lists configured journals (including the legacy `~/.zenpi/session.jsonl`),
 non-overwriting-destination validation. `/session gc --retain-newest N
 --older-than-seconds N --yes` requires a bounded explicit retention policy,
 never removes the active journal, skips domain/unowned data, and returns a
-bounded receipt. The in-workspace session browser remains an explicit host
-error until its owner adapter is accepted. Learn evidence/checkpoint commands
+bounded receipt. The production TUI in-workspace session browser supports
+bounded keyboard and mouse selection plus opening an existing session through
+its owner adapter. Learn evidence/checkpoint commands
 are likewise local and read-only
 with respect to execution: `/learn evidence ID REPOSITORY-RELATIVE-REF`
 stores a bounded hash receipt, while `/learn resume ID` reports a validated
@@ -178,6 +179,11 @@ commands, contact the provider, or start a b3ehive scheduler. Its `succeeded`
 receipt therefore proves the local admission/recovery machinery, **not** that
 the Blueprint item's requested code change or acceptance test was actually
 performed. Real Blueprint work execution remains a v2 gap.
+
+An external worker result can be imported with `/blueprint import ID[@VERSION] PATH`.
+The bounded manifest must match the selected Blueprint digest and receipt identity,
+report successful acceptance, and include acceptance evidence. zenpi hashes and
+records the manifest; it never executes commands from it.
 
 Example:
 
@@ -271,6 +277,9 @@ session，跳过 domain/unowned 数据，并返回有界收据。工作区内 se
 `execution_scope: control_plane_only`；它不调用 provider、shell 或 b3ehive scheduler。
 因此 receipt 中的 `succeeded` 目前只证明本地准入、依赖和恢复机制成功，不代表该 item
 要求的代码修改或验收命令真的执行完成；真实 Blueprint 工作执行仍是 v2 缺口。
+外部 worker 完成 item 后，可用 `/blueprint import ID[@VERSION] PATH` 导入有界结果 manifest；
+manifest 必须匹配目标 Blueprint digest 和 receipt 身份，声明验收成功并包含验收证据。
+zenpi 只计算并保存 manifest checksum，不会执行 manifest 中的命令。
 JSONL 的带路径 `resume` 也只允许切换已有的普通 journal；缺失或符号链接目标
 会在不创建、不修改文件的情况下返回错误；已有 journal 超过 256 MiB 也会在
 解析或修改权限前拒绝，不超过上限的有效 journal 会整体载入内存。
@@ -314,7 +323,7 @@ OpenAI-compatible loopback fixture）、Codex 設定インポート、Responses 
 添付、tool、approval、session、skills/extensions には実行可能なテストがあり、
 複数行入力、Markdown/diff 表示、tool 状態の折りたたみ、slash/domain モデル、
 responsive layout にも境界実装があります。一方、BentoBox の複数 tab、
-blueprint/goal/learn の永続 dispatch、browser/PTY pane、socket 単位の取消は
+blueprint/goal/learn の永続 dispatch、PTY pane、socket 単位の取消は
 v2 の受け入れ行として partial/planned/deferred です。v1 の `CF-*` の印だけで
 完成とは扱いません。凍結した v1 の記録は `Docs/Zenpi_Execution_Blueprint.md`、
 版付き（`2.0.0`）の監査と次の契約は `Docs/Zenpi_Execution_Blueprint_v2.md` にあります。Cargo crate の公開版は `0.1.0` のままです。
@@ -328,14 +337,18 @@ binary data を journal に保存しません。
 だけを source に取り、symlink、壊れた journal、既存 destination を拒否します。旧版
 `~/.zenpi/session.jsonl` も一覧に含まれます。`/session gc
 --retain-newest N --older-than-seconds N --yes` は明示的かつ有界な保持方針を要求し、
-active journal を削除せず domain/unowned data を除外して有界 receipt を返します。workspace session browser、
-外部実行は owner adapter が受理されるまで明示的にエラーです。`/learn evidence ID
+active journal を削除せず domain/unowned data を除外して有界 receipt を返します。production TUI の
+workspace session browser は bounded selection と既存 session open をサポートします。外部実行は
+owner adapter が受理されるまで明示的にエラーです。`/learn evidence ID
 REPOSITORY-RELATIVE-REF` は有界 hash receipt だけを保存し、`/learn resume ID` は
 検証済み checkpoint を表示するだけで worker を起動しません。
 パス付き JSONL `resume` も既存の通常 journal だけを開き、欠落またはシンボリック
 リンクの対象はファイルを作成・変更せずエラーにします。既存 journal の起動読み込み
 には 256 MiB のバイト上限があり、超過時は解析または権限変更の前に拒否します。
 上限内の有効 journal は全体をメモリに読み込みます。
+外部 worker が item を完了した場合は `/blueprint import ID[@VERSION] PATH` で結果 manifest を
+取り込めます。manifest は対象 Blueprint digest と receipt identity に一致し、成功した受入れと
+受入れ証拠を含む必要があります。zenpi は checksum を保存するだけで、manifest のコマンドは実行しません。
 `shutdown` 前に受理された `steer` が turn admission 待ちの場合、owned 経路は
 限定時間内に cancel/reissue を試み、期限後は `runtime_closed` を明示して破棄を隠しません。
 各 Blueprint item には実装・テストコードの `Estimated LOC` 予測（各 item が 5000 未満）を記載します。

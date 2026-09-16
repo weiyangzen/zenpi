@@ -1,0 +1,4 @@
+source_path	revision	git_blob	selected_lines	target_path
+src/ae.c	669b2a1316f5b35ecf964281b77c054ff28dc934	47e1cb56f6d21ba8db8a531f6986a21d02529e63	365-516	files/src/ae.c_learn.md
+src/networking.c	669b2a1316f5b35ecf964281b77c054ff28dc934	6e5c4102d3b6d1367f8a32ae694d500d08329e58	122-200;1725-1795;2935-3115;3778-4148;5463-5525	files/src/networking.c_learn.md
+src/aof.c	669b2a1316f5b35ecf964281b77c054ff28dc934	1a609fb62bfc2134a6364005554506188058572d	1399-1608	files/src/aof.c_learn.md

@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Validate zenpi's authoritative execution blueprint and its Gantt projection.
+
+This intentionally uses only the Python standard library.  The repository's
+blueprint has a small, frozen YAML header and a deliberately regular Markdown
+row format; accepting that format directly avoids making PyYAML a runtime
+dependency of the project being validated.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as _datetime
+import hashlib
+import json
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable
+
+
+ROOT = Path(__file__).resolve().parents[1]
+BLUEPRINT_REL = Path("Docs/Zenpi_Execution_Blueprint.md")
+SPEC_REL = Path("Docs/Zenpi_Execution_Spec.md")
+GANTT_REL = Path("Docs/Zenpi_Execution_Gantt.md")
+STATUS_TO_STATE = {" ": "unclaimed", "_": "self_tested", "x": "master_accepted"}
+HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+EXCLUDED_RUST_DIRECTORIES = {"target", "vendor", "vendored"}
+
+
+@dataclass(frozen=True)
+class Item:
+    item_id: str
+    mark: str
+    layer: str

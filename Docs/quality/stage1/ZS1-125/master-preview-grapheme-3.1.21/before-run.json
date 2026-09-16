@@ -1,0 +1,17 @@
+{
+  "exit_code": 101,
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--test",
+    "tui_preview_graphemes",
+    "--",
+    "--nocapture"
+  ],
+  "started_at": "2026-09-13T02:37:31.541852+00:00",
+  "ended_at": "2026-09-13T02:37:36.388754+00:00",
+  "tests_sha256": "964f5ab2853fd66234ca5d74a5f289298d3710183f4665e438c668fa0af84fad",
+  "render_sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d"
+}

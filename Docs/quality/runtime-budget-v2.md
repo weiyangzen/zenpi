@@ -19,6 +19,14 @@ tail-latency statement, and host-to-host timings are not directly comparable.
 The limits are deliberately loose regression tripwires rather than product
 performance promises.
 
+Optional near-cap evidence is available with `--near-cap`. On the observed
+arm64 Darwin host it generated a valid `251,658,240` byte journal (240 MiB),
+then completed a release headless shutdown in `251.08 ms` with peak RSS of
+`891,158,528` bytes. This is diagnostic evidence rather than a normal startup
+gate; the current recovery owner retains validated records and event payloads
+in memory, so large-valid-journal streaming/indexing remains an explicit
+optimization item.
+
 ## Gates
 
 | Surface | Limit | Meaning |
@@ -38,15 +46,33 @@ uses Ratatui's in-memory TestBackend, so it excludes terminal-driver and PTY
 latency. Those scopes prevent an attractive number from being mistaken for an
 end-to-end user promise.
 
+The CI integration-test gate also runs with one test thread. Several loopback
+provider fixtures use short-lived listeners; on macOS, parallel fixture
+teardown can intermittently return `io: Invalid argument` even when the same
+tests pass repeatedly in isolation. Serial execution retains the full
+`--all-targets --all-features` matrix and removes that resource race from the
+required gate.
+
 ## Current receipt
 
-On the observed `arm64` Darwin host, the 2026-09-05 run passed every gate:
-12 direct normal dependencies; `6,249,216` release bytes; three cold samples
-`808.37/15.35/15.00 ms` (max/median/min); maximum process RSS `3,768,320`
-bytes; queue `1532.64 us/op`; render `791.03 us/frame`; layout `0.883 us/op`;
+On the observed `arm64` Darwin host, the 2026-09-09 run passed every gate:
+12 direct normal dependencies; `6,251,904` release bytes; three cold samples
+`255.80/37.98/31.42 ms` (max/median/min); maximum process RSS `3,899,392`
+bytes; queue `1659.95 us/op`; render `629.52 us/frame`; layout `1.077 us/op`;
 and one scheduled frame after 10,000 dirty requests. The first cold sample
 includes one-time operating-system/cache effects and is retained rather than
-discarded.
+discarded. This receipt is a fresh local measurement after the canonical block
+and external lifecycle changes.
+
+The 2026-09-09 arm64 Darwin rerun after toolchain selection also passed every
+gate: `6,301,904` release bytes; cold samples `317.37/37.15/34.19 ms`; maximum
+process RSS `3,883,008` bytes; queue `1673.05 us/op`; render `630.52 us/frame`;
+layout `1.072 us/op`; and one scheduled frame after 10,000 dirty requests.
+
+The near-cap rerun reached the configured `251,658,240` byte journal boundary
+and completed cleanly in `359.56 ms` with `891,830,272` bytes peak RSS. This
+confirms the refusal boundary is exercised, while also making the retained
+in-memory recovery cost explicit; streaming/indexed recovery remains open.
 
 This receipt is evidence for this host only. Wall-clock results are not
 deterministic, although the workload and pass/fail thresholds are. CI should retain its own JSON

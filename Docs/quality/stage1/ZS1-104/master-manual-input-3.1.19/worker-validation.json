@@ -1,0 +1,24 @@
+{
+  "status": "provisional",
+  "original_files_verified": 138,
+  "patch_applies_and_matches": true,
+  "product_paths": [
+    "src/core.rs"
+  ],
+  "test_paths": [
+    "tests/stage1_semantic_compaction.rs"
+  ],
+  "before": {
+    "failed": 1,
+    "exit_code": 101
+  },
+  "after": {
+    "parent_tests_passed": 1,
+    "outcome_scenarios": 2,
+    "independent_recovery_processes": 2,
+    "exit_code": 0
+  },
+  "old_tests_rerun": 0,
+  "rustfmt_exit": 0,
+  "strict_clippy_exit": 0
+}

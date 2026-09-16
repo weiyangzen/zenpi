@@ -1,0 +1,72 @@
+{
+  "numer": 125,
+  "denom": 3,
+  "clock": "mach absolute ticks; OS log same bootUUID; timebase read on current machine",
+  "scan_start": {
+    "timezoneName": "",
+    "messageType": "Default",
+    "eventType": "logEvent",
+    "source": null,
+    "formatString": "GK performScan: %@",
+    "userID": 0,
+    "activityIdentifier": 0,
+    "subsystem": "com.apple.syspolicy.exec",
+    "category": "default",
+    "threadID": 28351423,
+    "senderImageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732",
+    "backtrace": {
+      "frames": [
+        {
+          "imageOffset": 373496,
+          "imageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732"
+        }
+      ]
+    },
+    "bootUUID": "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+    "processImagePath": "/usr/libexec/syspolicyd",
+    "senderImagePath": "/usr/libexec/syspolicyd",
+    "timestamp": "2026-09-12 14:02:51.944684+0800",
+    "machTimestamp": 47215968992002,
+    "eventMessage": "GK performScan: PST: (path: ba2be7534db6fb27), (team: (null)), (id: (null)), (bundle_id: (null))",
+    "processImageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732",
+    "traceID": 4322656983842820,
+    "processID": 97597,
+    "senderProgramCounter": 373496,
+    "parentActivityIdentifier": 0
+  },
+  "scan_result": {
+    "timezoneName": "",
+    "messageType": "Default",
+    "eventType": "logEvent",
+    "source": null,
+    "formatString": "GK evaluateScanResult: %lu, %@, %d, %d, %d, %d, %lu, %lu, %d",
+    "userID": 0,
+    "activityIdentifier": 0,
+    "subsystem": "com.apple.syspolicy.exec",
+    "category": "default",
+    "threadID": 28351588,
+    "senderImageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732",
+    "backtrace": {
+      "frames": [
+        {
+          "imageOffset": 378116,
+          "imageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732"
+        }
+      ]
+    },
+    "bootUUID": "FED0AF13-2278-4483-A836-B2FAD5427DA6",
+    "processImagePath": "/usr/libexec/syspolicyd",
+    "senderImagePath": "/usr/libexec/syspolicyd",
+    "timestamp": "2026-09-12 14:02:52.381298+0800",
+    "machTimestamp": 47215979470730,
+    "eventMessage": "GK evaluateScanResult: 2, PST: (path: ba2be7534db6fb27), (team: (null)), (id: zenpi-cdb646c6c40059cd), (bundle_id: NOT_A_BUNDLE), 0, 0, 1, 0, 0, 0, 0",
+    "processImageUUID": "29E19ED6-1886-31CF-AFFD-D674FB389732",
+    "traceID": 4323941179064324,
+    "processID": 97597,
+    "senderProgramCounter": 378116,
+    "parentActivityIdentifier": 0
+  },
+  "same_boot": true,
+  "scan_event_interval_ms": 436.6136666666667,
+  "note": "same hashed path joins scan and result; result matches current code signing Identifier, not complete historical SHA/PID. Event interval is not proof of synchronous target-blocking duration or explanation of full1208ms."
+}

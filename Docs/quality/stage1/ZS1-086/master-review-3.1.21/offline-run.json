@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/target086-current-3.1.21/root-offline/audit.py",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/target086-current-3.1.21/worker"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-13T02:27:59.342691+00:00",
+  "ended_at": "2026-09-13T02:27:59.924170+00:00",
+  "auditor_sha256": "3bc9755809ebf461439853733356a867a512387e48b0f82b2dfc2d41f040d75e"
+}

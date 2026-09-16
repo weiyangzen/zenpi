@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/usr/bin/env",
+    "CARGO_TARGET_DIR=/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/cargo-target",
+    "CARGO_NET_OFFLINE=true",
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--offline",
+    "--locked",
+    "--lib",
+    "extension_runtime::pipe_deadline_tests",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/build-context",
+  "started_at": "2026-09-12T11:55:23.595252+00:00",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "network": "Cargo offline; no HTTP/PTY",
+  "status": "finished",
+  "exit_code": 0,
+  "elapsed_seconds": 31.134787457999998,
+  "ended_at": "2026-09-12T11:55:54.730539+00:00",
+  "log": "before-build.log",
+  "bytes": 156603,
+  "sha256": "dc70d2a4890a70d8811cc00cdb41431ddf010c02a55db6d4bdca8fc444abac60"
+}

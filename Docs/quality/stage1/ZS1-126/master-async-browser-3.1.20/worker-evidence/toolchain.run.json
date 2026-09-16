@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "rustc",
+    "+stable-aarch64-apple-darwin",
+    "-vV"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-3.1.20/build",
+  "started_at": "2026-09-12T12:31:01.664467+00:00",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "network": "Cargo offline; no HTTP/PTY",
+  "source_sha256": "79b486ef11cccfe5b4fd017c6682e30f23ffcfb1fb6b191165e8befcb674c05c",
+  "status": "finished",
+  "exit_code": 0,
+  "elapsed_seconds": 0.037303458000000005,
+  "ended_at": "2026-09-12T12:31:01.702413+00:00",
+  "log": "toolchain.log",
+  "bytes": 192,
+  "sha256": "a30ae9f932f04d4426978deb2b626208c9d81ba5b3f9b0069d68b58f0b1d9600"
+}

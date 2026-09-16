@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-086",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-086",
+  "source_path": "src/view_model.rs",
+  "source_hash": "094833f051ab66d30ce3f6cc74fcc0334ed938e79f5fd8e9269341b62bed08fe",
+  "read_ranges": [
+    [
+      0,
+      42009
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/view_model.rs_learn.md",
+      "bytes": 2163,
+      "sha256": "87896b4d78c30ea778e0ac52be9635203abf83e9ec065c88c478dacf765f4ebf"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-086/master-review-current/review.md",
+      "bytes": 404,
+      "sha256": "2c6eaacaba94e23f76884969a90e59b334aefad54ab11bc339c207591a6fa414"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-086/master-review-current/review.md",
+      "bytes": 404,
+      "sha256": "2c6eaacaba94e23f76884969a90e59b334aefad54ab11bc339c207591a6fa414"
+    },
+    "findings": "完整读取 view_model.rs，覆盖跨 TUI/headless 的 bounded block/event model、redaction、terminal lifecycle 与 replay buffer。"
+  }
+}

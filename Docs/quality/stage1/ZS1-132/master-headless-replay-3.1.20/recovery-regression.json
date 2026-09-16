@@ -1,0 +1,14 @@
+{
+  "binary_sha256": "bb82450f8de71a0a7a91d828e42f659566cae3c7e4e574dd68706bfa10b94172",
+  "checks": {
+    "actual_precommit_sigkill_restores_old_owner_and_next_http": true,
+    "actual_postcommit_sigkill_restores_new_owner_and_replays_once": true,
+    "actual_replay_open_failure_reports_commit_and_recovers_same_receipt": true
+  },
+  "scope": "macOS/Unix actual CLI process recovery; not full ZS1-132 acceptance",
+  "fixture_executable_setup_ms": 485.231917,
+  "uncommitted_crash_candidate": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/recovery-regression.fixture/恢复 project/sessions/new-2462f524db070271dc6bbd6aaafd0fc0c868b7f5b8f0a4df168623a795f6d038-0.jsonl",
+  "status": "passed",
+  "jsonl_processes": 4,
+  "request_count": 4
+}

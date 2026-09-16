@@ -1,0 +1,48 @@
+{
+  "actual_pty": false,
+  "cases": [
+    {
+      "after_header": " zenpi  | Draft kept (1s · Ctrl-C) | tokens —                                                                                                                                       ",
+      "after_seconds": 1,
+      "before_header": " zenpi  | Draft kept (0s · Ctrl-C) | tokens —                                                                                                                                       ",
+      "before_seconds": 0,
+      "expected_running": false,
+      "name": "pending_approval_survives_unrelated_status",
+      "passed": false,
+      "pending_approvals": 1
+    },
+    {
+      "after_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (0s · Ctrl-C) | tokens —                                                                                               ",
+      "after_seconds": 0,
+      "before_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (0s · Ctrl-C) | tokens —                                                                                               ",
+      "before_seconds": 0,
+      "expected_running": true,
+      "name": "last_approval_retirement_resumes_without_tool_event",
+      "passed": false,
+      "pending_approvals": 0
+    },
+    {
+      "after_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (1s · Ctrl-C) | tokens —                                                                                               ",
+      "after_seconds": 1,
+      "before_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (0s · Ctrl-C) | tokens —                                                                                               ",
+      "before_seconds": 0,
+      "expected_running": false,
+      "name": "approval_before_busy_stays_paused",
+      "passed": false,
+      "pending_approvals": 1
+    },
+    {
+      "after_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (0s · Ctrl-C) | tokens —                                                                                               ",
+      "after_seconds": 0,
+      "before_header": " zenpi  | Approval pending · Alt-A opens review · draft kept (0s · Ctrl-C) | tokens —                                                                                               ",
+      "before_seconds": 0,
+      "expected_running": false,
+      "name": "other_approval_still_waiting_control",
+      "passed": true,
+      "pending_approvals": 1
+    }
+  ],
+  "failed": 3,
+  "kind": "public-state-component-observation",
+  "provider_requests": 0
+}

@@ -1002,6 +1002,297 @@ fn session_journal_is_private_to_the_current_user() {
     assert_eq!(mode, 0o600);
 }
 
+#[test]
+fn live_session_registry_rejects_stale_or_wrong_epoch_owners() {
+    let mut registry = zenpi::session::LiveSessionRegistry::default();
+    registry
+        .register("recipient", 7, "/workspace", 100)
+        .unwrap();
+    assert!(
+        registry
+            .active("recipient", "/workspace", 200, 150)
+            .is_some()
+    );
+    assert!(!registry.heartbeat("recipient", 8, 210));
+    assert!(registry.heartbeat("recipient", 7, 210));
+    assert!(
+        registry
+            .active("recipient", "/workspace", 300, 50)
+            .is_none()
+    );
+    assert!(!registry.unregister("recipient", 7));
+}
+
+#[test]
+fn session_search_returns_bounded_turn_only_projections() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("search.jsonl");
+    let mut store = SessionStore::open(&path).unwrap();
+    store
+        .append_turn(Turn::new(
+            "u",
+            TurnRole::User,
+            "Need a bounded mailbox review",
+        ))
+        .unwrap();
+    store
+        .append_event(serde_json::json!({"secret":"must not be searched"}))
+        .unwrap();
+    let hits = zenpi::session::search_sessions(dir.path(), "MAILBOX", 4).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].matches, 1);
+    assert!(hits[0].snippets[0].contains("mailbox"));
+    assert!(
+        zenpi::session::search_sessions(dir.path(), "secret", 4)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(zenpi::session::search_sessions(dir.path(), "", 4).is_err());
+    store
+        .append_turn(Turn::new(
+            "u2",
+            TurnRole::User,
+            "Authorization: Bearer sk-search-secret",
+        ))
+        .unwrap();
+    let secret_hits = zenpi::session::search_sessions(dir.path(), "Authorization", 4).unwrap();
+    assert!(!secret_hits[0].snippets[0].contains("sk-search-secret"));
+    let projection = zenpi::headless::session_search_view_in(dir.path(), "MAILBOX").unwrap();
+    assert_eq!(projection["count"], 1);
+    assert_eq!(projection["matches"][0]["matches"], 1);
+    assert!(
+        projection["matches"][0]["snippets"][0]
+            .as_str()
+            .unwrap()
+            .contains("mailbox")
+    );
+}
+
+#[test]
+fn live_owner_claims_one_mailbox_request_without_background_dispatch() {
+    use zenpi::session::{LiveSessionRegistry, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    mailbox
+        .enqueue(
+            &sender,
+            "request-1",
+            serde_json::json!({"job":"lint"}),
+            1000,
+            10,
+        )
+        .unwrap();
+
+    let mut registry = LiveSessionRegistry::default();
+    let workspace = fs::canonicalize(dir.path()).unwrap().display().to_string();
+    registry
+        .register(recipient.session_id(), 3, workspace.clone(), 10)
+        .unwrap();
+    let claimed = registry
+        .claim_next(&recipient, &workspace, 20, 100)
+        .unwrap()
+        .unwrap();
+    assert_eq!(claimed.status, MailboxStatus::Claimed);
+    assert!(
+        registry
+            .claim_next(&recipient, &workspace, 20, 100)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn live_owner_keeps_offline_or_wrong_workspace_work_queued() {
+    use zenpi::session::{LiveSessionRegistry, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    mailbox
+        .enqueue(
+            &sender,
+            "request-1",
+            serde_json::json!({"job":"test"}),
+            1000,
+            10,
+        )
+        .unwrap();
+
+    let mut registry = LiveSessionRegistry::default();
+    let workspace = fs::canonicalize(dir.path()).unwrap().display().to_string();
+    registry
+        .register(recipient.session_id(), 4, workspace.clone(), 10)
+        .unwrap();
+    assert!(
+        registry
+            .claim_next(&recipient, "/other-workspace", 20, 100)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        registry
+            .claim_next(&recipient, &workspace, 500, 100)
+            .unwrap()
+            .is_none()
+    );
+    let page = mailbox.list(&recipient, 0, 10, 500).unwrap();
+    assert_eq!(page.messages.len(), 1);
+    assert_eq!(page.messages[0].status, MailboxStatus::Queued);
+}
+
+#[test]
+fn live_owner_result_requires_the_current_owner_epoch() {
+    use zenpi::session::{LiveSessionRegistry, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    let queued = mailbox
+        .enqueue(
+            &sender,
+            "request-1",
+            serde_json::json!({"job":"build"}),
+            1000,
+            10,
+        )
+        .unwrap();
+    let workspace = fs::canonicalize(dir.path()).unwrap().display().to_string();
+    let mut registry = LiveSessionRegistry::default();
+    registry
+        .register(recipient.session_id(), 8, workspace.clone(), 10)
+        .unwrap();
+    let claimed = registry
+        .claim_next(&recipient, &workspace, 20, 100)
+        .unwrap()
+        .unwrap();
+    let completed = registry
+        .finish_claim(
+            &recipient,
+            &workspace,
+            &queued.digest,
+            serde_json::json!({"status":"ok"}),
+            true,
+            30,
+            100,
+        )
+        .unwrap();
+    assert_eq!(completed.status, MailboxStatus::Succeeded);
+    assert_eq!(completed.claim_token, claimed.claim_token);
+    assert!(
+        registry
+            .finish_claim(
+                &recipient,
+                &workspace,
+                &queued.digest,
+                serde_json::json!({"status":"again"}),
+                true,
+                31,
+                100,
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn live_owner_completion_delivers_a_correlated_reply_to_sender_mailbox() {
+    use zenpi::session::{LiveSessionRegistry, MailboxStatus, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let recipient_mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    let request = recipient_mailbox
+        .enqueue(
+            &sender,
+            "request-1",
+            serde_json::json!({"job":"review"}),
+            1000,
+            10,
+        )
+        .unwrap();
+    let workspace = fs::canonicalize(dir.path()).unwrap().display().to_string();
+    let mut registry = LiveSessionRegistry::default();
+    registry
+        .register(recipient.session_id(), 9, workspace.clone(), 10)
+        .unwrap();
+    registry
+        .claim_next(&recipient, &workspace, 20, 100)
+        .unwrap();
+    let (_, reply) = registry
+        .finish_claim_with_reply(
+            &recipient,
+            &sender,
+            &workspace,
+            &request.digest,
+            serde_json::json!({"status":"done"}),
+            true,
+            30,
+            100,
+        )
+        .unwrap();
+    assert_eq!(reply.status, MailboxStatus::Queued);
+    let sender_mailbox = SessionMailbox::open(sender.path()).unwrap();
+    let page = sender_mailbox.list(&sender, 0, 10, 30).unwrap();
+    assert_eq!(page.messages.len(), 1);
+    assert_eq!(page.messages[0].sender_session_id, recipient.session_id());
+    assert_eq!(page.messages[0].payload["in_reply_to"], request.digest);
+}
+
+#[test]
+fn live_owner_reply_retry_is_idempotent_after_recipient_completion() {
+    use zenpi::session::{LiveSessionRegistry, SessionMailbox};
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(recipient.path()).unwrap();
+    let request = mailbox
+        .enqueue(
+            &sender,
+            "request-1",
+            serde_json::json!({"job":"review"}),
+            1000,
+            10,
+        )
+        .unwrap();
+    let workspace = fs::canonicalize(dir.path()).unwrap().display().to_string();
+    let mut registry = LiveSessionRegistry::default();
+    registry
+        .register(recipient.session_id(), 9, workspace.clone(), 10)
+        .unwrap();
+    registry
+        .claim_next(&recipient, &workspace, 20, 100)
+        .unwrap();
+    let result = serde_json::json!({"status":"done"});
+    registry
+        .finish_claim_with_reply(
+            &recipient,
+            &sender,
+            &workspace,
+            &request.digest,
+            result.clone(),
+            true,
+            30,
+            100,
+        )
+        .unwrap();
+    registry
+        .finish_claim_with_reply(
+            &recipient,
+            &sender,
+            &workspace,
+            &request.digest,
+            result,
+            true,
+            31,
+            100,
+        )
+        .unwrap();
+    let sender_mailbox = SessionMailbox::open(sender.path()).unwrap();
+    let page = sender_mailbox.list(&sender, 0, 10, 31).unwrap();
+    assert_eq!(page.messages.len(), 1);
+}
+
 #[cfg(unix)]
 #[test]
 fn symlinked_session_is_rejected_without_touching_target() {

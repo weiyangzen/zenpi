@@ -1,0 +1,16 @@
+{
+  "formal_source_sha256": "a401d7c6ba3051fcf2c20152a9e86a3f4f8751a87470cbc7f518001326618a2f",
+  "unchanged": true,
+  "mutable_master_tui_reread": false,
+  "target_context_excerpts": 17,
+  "captured_master_tui_sha256": "93a68354f529aed3259b41aa36c10edf3e0c3694b8b0bfbcdd58a0f498778ce8",
+  "master_report_still_absent": true,
+  "prior_frozen_manifests": {
+    ".ops/zs1-303-ready/manifest.json": "5a89f95eaf0db8e42d40537ca6acb0afc4eb996b60ccdf0b3e036016cface7cb",
+    ".ops/zs1-301-ready/manifest.json": "7d556ca63b5def586e4a875fc566c64afb53c0a37377b69714de77c2aa077aa4",
+    ".ops/zs1-302-ready/manifest.json": "50b2453318f0183c2001700c2ae8411060cf195a1ff9452837eebbdc5ad01469",
+    ".ops/zs1-306-ready/manifest.json": "34c9b72c3fe1865085ab6847232c22ae752c7b9762761fca87fc876efce7a596",
+    ".ops/ux129-ready/manifest.json": "8eab5d250ce50e731c19cfb99677c594b3de7d5d8a751a68f5928df830778c22"
+  },
+  "prior_manifest_artifacts_verified": true
+}

@@ -6,10 +6,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import pty
 import re
 import select
 import signal
+import shutil
 import struct
 import subprocess
 import tempfile
@@ -23,6 +25,35 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def cargo_command(*args: str) -> list[str]:
+    """Use a usable installed Rust toolchain on hosts with a stale default."""
+    override = os.environ.get("ZENPI_RUST_TOOLCHAIN", "").strip()
+    if override:
+        return ["cargo", f"+{override}", *args]
+    rustup = shutil.which("rustup")
+    if rustup:
+        listing = subprocess.run(
+            [rustup, "toolchain", "list"], capture_output=True, text=True, check=False
+        ).stdout.splitlines()
+        machine = platform.machine().lower()
+        target_fragment = {
+            "arm64": "aarch64-apple-darwin",
+            "aarch64": "aarch64-apple-darwin",
+            "x86_64": "x86_64-apple-darwin",
+            "amd64": "x86_64-apple-darwin",
+        }.get(machine)
+        if platform.system() == "Linux":
+            target_fragment = "aarch64-unknown-linux" if machine in {"arm64", "aarch64"} else "x86_64-unknown-linux"
+        if platform.system() == "Windows":
+            target_fragment = "aarch64-pc-windows" if machine in {"arm64", "aarch64"} else "x86_64-pc-windows"
+        if target_fragment:
+            for line in listing:
+                name = line.split()[0]
+                if target_fragment in name:
+                    return ["cargo", f"+{name}", *args]
+    return ["cargo", *args]
 
 _ZENPI_ENV_KEYS = {
     "CODEX_HOME",
@@ -1714,13 +1745,12 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="zenpi-user-smoke-") as directory:
         root = Path(directory)
         release = ROOT / "target" / "release" / "zenpi"
-        production_build = run(["cargo", "build", "--release", "--locked"])
+        production_build = run(cargo_command("build", "--release", "--locked"))
         assert_success(production_build, "production release build")
         production_root = root / "production-install"
         production_root.mkdir()
         production_install = run(
-            [
-                "cargo",
+            cargo_command(
                 "install",
                 "--path",
                 ".",
@@ -1728,7 +1758,7 @@ def main() -> int:
                 "--root",
                 str(production_root),
                 "--force",
-            ]
+            )
         )
         assert_success(production_install, "isolated production cargo install")
         production_binary = production_root / "bin" / "zenpi"
@@ -1755,7 +1785,7 @@ def main() -> int:
 
         features = os.environ.get("ZENPI_SMOKE_FEATURES", "dev-fixtures")
         feature_args = ["--features", features] if features else []
-        build = run(["cargo", "build", "--release", "--locked", *feature_args])
+        build = run(cargo_command("build", "--release", "--locked", *feature_args))
         assert_success(build, "release build")
         if not release.is_file() or not os.access(release, os.X_OK):
             raise AssertionError(f"release binary missing: {release}")
@@ -1763,8 +1793,7 @@ def main() -> int:
         install_root = root / "install"
         install_root.mkdir()
         install = run(
-            [
-                "cargo",
+            cargo_command(
                 "install",
                 "--path",
                 ".",
@@ -1773,7 +1802,7 @@ def main() -> int:
                 str(install_root),
                 "--force",
                 *feature_args,
-            ]
+            )
         )
         assert_success(install, "isolated cargo install")
         binary = install_root / "bin" / "zenpi"

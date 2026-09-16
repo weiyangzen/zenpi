@@ -1,0 +1,323 @@
+{
+  "schema_version": "zenpi-source-evidence/v1",
+  "item": "ZS1-027",
+  "status": "[_] master review pending",
+  "authority": {
+    "version": "3.1.16",
+    "requirement_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f"
+  },
+  "source_head": "bbb61e34aaf231639fdaaad1adbd757947034eac",
+  "subject": {
+    "path": "packages/coding-agent/src/core/tools/find.ts",
+    "bytes": 11178,
+    "lines": 318,
+    "sha256": "b06bcae6821a0e9fda1b63be613a7ce28eb0e66e1d01d16564e59e83f9ce10ea",
+    "role": "source/test runtime"
+  },
+  "node": {
+    "path": "/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "version": "24.19.0",
+    "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "platform": "Darwin",
+    "machine": "arm64"
+  },
+  "execution": {
+    "passed": 25,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "original_cases": 17,
+    "supplemental_cases": 8,
+    "renderer_injection": true,
+    "real_native_fd_FS": true,
+    "explicit_custom_operations_and_executable_fault_injection": true,
+    "Windows_native": false,
+    "product_test_run": false
+  },
+  "native_fd": {
+    "path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/agent-home/bin/fd",
+    "statuses": [
+      {
+        "type": "info",
+        "message": "fd not found. Downloading..."
+      },
+      {
+        "type": "info",
+        "message": "fd installed to /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/agent-home/bin/fd"
+      }
+    ],
+    "version": "fd 10.5.0",
+    "versionExit": 0,
+    "bytes": 2970480,
+    "sha256": "cf3bde435da174f41cf9589a2efeaf03804df7c250fc15e8b8a1e9bfc66ebc9a",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5983,
+      "sha256": "dd6de68463e094fdb53333dc88fd175688f0e5e1b8a6af6b4e3734fd45d10f6c"
+    },
+    {
+      "path": "case-review.json",
+      "bytes": 7589,
+      "sha256": "e3f536da195df1430ab4119d8a3639fe3310456d4aab7d366e0bf514b273151f"
+    },
+    {
+      "path": "dependency-tree.json",
+      "bytes": 14660,
+      "sha256": "5e17e4220e016c52f9a6cd29c8388facecc4121a524f8a15582beb8152b6578c"
+    },
+    {
+      "path": "fd-fault-fixture.mjs",
+      "bytes": 979,
+      "sha256": "39a903c6fab07a435276b17b3646c7354bbdf68102f811959f249bf8e0b1a273"
+    },
+    {
+      "path": "fd-licenses/LICENSE-APACHE",
+      "bytes": 10838,
+      "sha256": "73c83c60d817e7df1943cb3f0af81e4939a8352c9a96c2fd00451b1116fa635c"
+    },
+    {
+      "path": "fd-licenses/LICENSE-MIT",
+      "bytes": 1082,
+      "sha256": "322cfc7aa0c774d0eca3b2610f1d414de3ddbd7d8dd4b9dea941a13a6eb07455"
+    },
+    {
+      "path": "fd-provision.json",
+      "bytes": 566,
+      "sha256": "6fb19185a8f2d26f8800ce19acbae929be09eb0e7134dea94f58c04413c2e5f8"
+    },
+    {
+      "path": "fixture-inventory.json",
+      "bytes": 375250,
+      "sha256": "388dfa36d329e496a7d38ebe41b5765726c81268a500dc3cde1e06dc40982681"
+    },
+    {
+      "path": "fixtures/082e527304c72ceb8c0aad706bef590081d1674d35d80c4bf9f87a75fccd95ba.gz",
+      "bytes": 25,
+      "sha256": "291c47da755eb128ff8acc2d6bef0fd36ce1234f2f8c50a4ec8e7908832df305"
+    },
+    {
+      "path": "fixtures/73ee8eef1ec244417e53b88d03a65932d5c550e31862d2be2b065111630b59b1.gz",
+      "bytes": 229,
+      "sha256": "a894c71b175202b1974c620cac57ab9006a1f0235eee60c22f10a9fe10caa4fa"
+    },
+    {
+      "path": "fixtures/7d8bf54db0e090506421e6057a4020f598538b9ecc134a87376e4596309634b8.gz",
+      "bytes": 32,
+      "sha256": "c35b7133e8e6799fef5d085224ba89f09cc64a64b0ca213fe234418b74719436"
+    },
+    {
+      "path": "fixtures/a68180ef4899960e571a781d35bcb01ead246dec0bc9ac8a505d47256a51db38.gz",
+      "bytes": 36,
+      "sha256": "c3119af6336d9e06829c441de432035885f70df1fec9d0c2c4e413420c7dfbe6"
+    },
+    {
+      "path": "fixtures/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.gz",
+      "bytes": 20,
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "path": "install.log",
+      "bytes": 25,
+      "sha256": "b147a58e95015395ebf79d9b5bcc728e7f0cea67c14af56c16767982218cee5e"
+    },
+    {
+      "path": "installed-dependency-files.json",
+      "bytes": 341283,
+      "sha256": "8de67f1fc6c6b42142da1c87c6944d3a79c1adc53c45171c0a06bd117a03f1bc"
+    },
+    {
+      "path": "learn-report.md",
+      "bytes": 10757,
+      "sha256": "5fd6502bbf44f8654818ab02cb59ccf0a5bdda9697973bd9718b56022b3e11da"
+    },
+    {
+      "path": "original-test-results.json",
+      "bytes": 7935,
+      "sha256": "47d04cc3eec0c4294110d55b470e76620a0697ae4f7197c8583382e876c7ed83"
+    },
+    {
+      "path": "original.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "original.stdout.log",
+      "bytes": 4261,
+      "sha256": "3fe29eb25395c2c7b2decd55d318fa84563a8a614440281bf91b365aabd32c1e"
+    },
+    {
+      "path": "prepare-fd.mjs",
+      "bytes": 938,
+      "sha256": "0ca8cb768ba8c846ec2cf32581fe10ebf54238f257c4ef702aca4550b77f4def"
+    },
+    {
+      "path": "prior-worker-report.md",
+      "bytes": 2546,
+      "sha256": "7dd288473d855dc4fa434042c345a6341129824a7e21a2f35b335b0a467946b8"
+    },
+    {
+      "path": "probe-observations.json",
+      "bytes": 55114,
+      "sha256": "8c7fe475d07e299bf31098ffa9982b40b9f8e71369944b6e2c09c68d49b80b77"
+    },
+    {
+      "path": "probe.test.ts",
+      "bytes": 12294,
+      "sha256": "88ea5ade5d28dee824e8005f4e9e3473fd5dae716ea6b40c2aa433d4065107e7"
+    },
+    {
+      "path": "provision-fd.mjs",
+      "bytes": 854,
+      "sha256": "57572b743a5b904462f7390bfbaa57a443efa9449398d6f77c6aabd262a3be05"
+    },
+    {
+      "path": "provision.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "provision.stdout.log",
+      "bytes": 673,
+      "sha256": "9e9d379c59bab6879d84b73217a89019c643a437ef1312b58ae46b14807a3020"
+    },
+    {
+      "path": "renderer-bridge.mjs",
+      "bytes": 81,
+      "sha256": "5d0933a3ac1047ea1152819a6f440d59a92b35847b4fd50c11e7f2438bc0aa4f"
+    },
+    {
+      "path": "run.sh",
+      "bytes": 1262,
+      "sha256": "20b27f610870e24165a815db88c27dce76d1c8da1646836a26d61c76715befe4"
+    },
+    {
+      "path": "runtime/native/fd-darwin-arm64.gz",
+      "bytes": 1285064,
+      "sha256": "3d26c3a81a826e9b20e3dd208fe0b6f9e5a0b2268cb8e60400cb1231a213a72f"
+    },
+    {
+      "path": "runtime/package-lock.json",
+      "bytes": 40105,
+      "sha256": "32e1b119eaf151493e6051c960ce1c311f1807500d29e08e0f55286a812fe62b"
+    },
+    {
+      "path": "runtime/package.json",
+      "bytes": 123,
+      "sha256": "f1724db13b7f3a55c3cc6c3a3337073ff054a9a8fdbf26d74960c4882eb7cfc8"
+    },
+    {
+      "path": "source/packages/coding-agent/package.json",
+      "bytes": 4041,
+      "sha256": "552b6f87a540add2f6117e7584357730cceee798c2f5d7c69ac00c709d3e8750"
+    },
+    {
+      "path": "source/packages/coding-agent/src/config.ts",
+      "bytes": 19600,
+      "sha256": "7874d7f63a62778f4281a324f99ba4faee8dc9a5c7ae80e2c531552d199257f9"
+    },
+    {
+      "path": "source/packages/coding-agent/src/core/tools/find.ts",
+      "bytes": 11178,
+      "sha256": "b06bcae6821a0e9fda1b63be613a7ce28eb0e66e1d01d16564e59e83f9ce10ea"
+    },
+    {
+      "path": "source/packages/coding-agent/src/core/tools/path-utils.ts",
+      "bytes": 3626,
+      "sha256": "ab6f420d2388a41366113c17a25e356867820b87b02a169d044cfcf83e1997d3"
+    },
+    {
+      "path": "source/packages/coding-agent/src/core/tools/renderers/find.ts",
+      "bytes": 3180,
+      "sha256": "a33591e8193eb2a5591596019676899587f783149434f857eaf331edb8fabe70"
+    },
+    {
+      "path": "source/packages/coding-agent/src/core/tools/tool-definition-wrapper.ts",
+      "bytes": 1870,
+      "sha256": "98c04e593457dfefdc4160fa84c4e16f1a693adad21672bdf1fbfa4912ef2f8b"
+    },
+    {
+      "path": "source/packages/coding-agent/src/core/tools/truncate.ts",
+      "bytes": 7693,
+      "sha256": "104e61ea602c7f7894097b2771dad8c68de75c5a10ea6222e615c4ad144451c7"
+    },
+    {
+      "path": "source/packages/coding-agent/src/utils/child-process.ts",
+      "bytes": 4146,
+      "sha256": "cd324f5b9a1abadd85ab5a331750d475c8bd51ec65cae091ad9b416245ec85d4"
+    },
+    {
+      "path": "source/packages/coding-agent/src/utils/management-http.ts",
+      "bytes": 3004,
+      "sha256": "2195b345fdd5c607f87a55b93e7d00c6d70d7dcfe2989b08bbd9f39b529a756a"
+    },
+    {
+      "path": "source/packages/coding-agent/src/utils/paths.ts",
+      "bytes": 4880,
+      "sha256": "a687cdb54b82216673fea5be1210c48e64ffa8398d64cfabf2bd7dba5c9d4210"
+    },
+    {
+      "path": "source/packages/coding-agent/src/utils/text.ts",
+      "bytes": 404,
+      "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+    },
+    {
+      "path": "source/packages/coding-agent/src/utils/tools-manager.ts",
+      "bytes": 13294,
+      "sha256": "cfd082080d10a6209d7994ac7829c29dbb39694bdf3fe549e907c28cfc506a17"
+    },
+    {
+      "path": "source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "bytes": 3127,
+      "sha256": "d9bb34b773d7865109e41ac09146fa3c2c670cc594bb5a350e2d8e30230939db"
+    },
+    {
+      "path": "source/packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts",
+      "bytes": 3587,
+      "sha256": "40748b486bf64c9feaacb3e0f411ffec5fdc145cca3dad0f62c680e0673b959f"
+    },
+    {
+      "path": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "bytes": 3593,
+      "sha256": "5868521c64a301d49b018b82749f74b69bbe26c35a68122816398fbf7d33ea63"
+    },
+    {
+      "path": "source-inventory.json",
+      "bytes": 3455,
+      "sha256": "a9caf69e2083b26b4d6a831f0de50f190c413d73fba469a40c31a948855d1a2d"
+    },
+    {
+      "path": "source-verification.json",
+      "bytes": 4290,
+      "sha256": "2cf21002e9960e080924bf65ca3da3e4fda1ad01fbf6a4c8823cef457dbd7857"
+    },
+    {
+      "path": "test-results.json",
+      "bytes": 10780,
+      "sha256": "0a10b09c83caf8bc0b1bbff1c8c56ecad96788165101e33b633e5c081e99cec1"
+    },
+    {
+      "path": "test.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "test.stdout.log",
+      "bytes": 5252,
+      "sha256": "65f1d61b95b4fc86eebd5c9800b8dfee8dbd149e51c1a96e3c2e0006a66f753b"
+    },
+    {
+      "path": "verify-source.mjs",
+      "bytes": 541,
+      "sha256": "7405aba5a1ca2b00630369dc5a23cc2ce42d69f3515d52c2878c7d3c4dc586f1"
+    },
+    {
+      "path": "vitest.config.mjs",
+      "bytes": 492,
+      "sha256": "59090bf7b706f76502e351f917e3db316d483cc5b37631e341a266a6564c3c64"
+    }
+  ]
+}

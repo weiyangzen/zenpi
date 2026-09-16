@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "key": "package-msrv",
+    "capability": "包身份、2024 edition、Rust 1.88 声明",
+    "minimum_experiment": "隔离的 Rust 1.88 与 stable、锁定同一输入构建；记录 toolchain/target/feature/exit",
+    "evidence_limit": "声明与 CI stable 已读；最低支持图尚无本轮运行",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 2,
+    "key": "root-features",
+    "capability": "default=[] 与 dev-fixtures=[]",
+    "minimum_experiment": "默认/显式 fixture/--all-features 三组，分别检查显式 echo 与普通 backend 入口",
+    "evidence_limit": "core cfg! 准入片段；CI 的 all-features 不代替默认生产",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 3,
+    "key": "dependency-defaults",
+    "capability": "依赖默认 features 与图合并",
+    "minimum_experiment": "同一 lock 的 feature tree，特别关注 ureq TLS、crossterm events/event-stream、ratatui 后端",
+    "evidence_limit": "声明/选定 lock 边；未求出完整激活图",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 4,
+    "key": "dependency-count",
+    "capability": "14 无条件 + Unix libc + dev tempfile",
+    "minimum_experiment": "固定预算脚本，比较 metadata normal 集合与各 target 实际树；不得把 dev 算 normal",
+    "evidence_limit": "当前声明与历史预算 normal_count=15；不是每平台编译数",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 5,
+    "key": "patch-provenance",
+    "capability": "本地 crossterm0.29.0 patch 身份",
+    "minimum_experiment": "独立原包与固定 vendor 全库存差异检查，绑定 lock/source/API caller 版本",
+    "evidence_limit": "只复用历史库存和片段；本轮未全文复核 vendor",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 6,
+    "key": "reset-availability",
+    "capability": "Unix 且非 event-stream API 条件",
+    "minimum_experiment": "有/无 event-stream 及非 Unix 构建矩阵；并发 reader WouldBlock 和 OS queue 边界",
+    "evidence_limit": "条件直接可见；历史 Darwin helper；Linux/Windows 本轮0",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 7,
+    "key": "ignore-yaml",
+    "capability": "新解析/忽略依赖连接",
+    "minimum_experiment": "合法/畸形 YAML、严格字符串、ignore 否定/继承/失败、取消；保持调用owner独立",
+    "evidence_limit": "skills 片段只确认使用；113/078不由此接收",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 8,
+    "key": "grapheme",
+    "capability": "精确 Unicode 依赖与字节边界",
+    "minimum_experiment": "组合音符/ZWJ/emoji/宽字符编辑，检查光标/折叠/删除一致",
+    "evidence_limit": "after_edit 使用边界；122/085完整行为仍独立",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 9,
+    "key": "release-profile",
+    "capability": "z/thin/strip/codegen1/abort",
+    "minimum_experiment": "同一输入 production release 体积、首次启动最大值、RSS和队列/渲染预算",
+    "evidence_limit": "历史1d7二进制通过；本轮未重新构建或归因",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 10,
+    "key": "example-dev",
+    "capability": "runtime_budget_probe example 与 dev 范围",
+    "minimum_experiment": "构建/运行指定 example，独立绑定探针与产品二进制，不混淆 runtime/编译器RSS",
+    "evidence_limit": "仅声明与脚本调用片段；117仍独立",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 11,
+    "key": "release-matrix",
+    "capability": "CI fixture smoke 与生产打包边界",
+    "minimum_experiment": "每一目标打包后记录真实 features/二进制/hash/冷启动/最小help和fixture拒绝",
+    "evidence_limit": "五目标只是 workflow 定义；无本轮平台通过数",
+    "product_executed_this_round": false
+  },
+  {
+    "id": 12,
+    "key": "rollback-evidence",
+    "capability": "报告接收、补丁正逆与历史完整性",
+    "minimum_experiment": "absent 基线隔离 git init，forward/reverse check/apply，逐字节/hash/sentinel，再离线验证",
+    "evidence_limit": "本轮只执行证据机械检查；产品回退由131/130协调",
+    "product_executed_this_round": false
+  }
+]

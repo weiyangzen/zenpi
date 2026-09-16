@@ -1,0 +1,35 @@
+{
+  "path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/provider-kill-integration/bin/zenpi",
+  "bytes": 50052056,
+  "sha256": "df701fe2cfba2ec0696b89e3969a7941e254ef7c4f2a176ff8650d8149787114",
+  "build": {
+    "name": "build-cli",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "build",
+      "--locked",
+      "--offline"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T05:20:26.614001+00:00",
+    "ended_at": "2026-09-12T05:20:43.836288+00:00",
+    "elapsed_seconds": 17.221922291,
+    "exit_code": 0,
+    "environment_overrides": {
+      "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+    },
+    "HOME_preserved": true,
+    "CODEX_HOME_preserved": true,
+    "maxrss_command_tree_observed": 2178662400,
+    "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+    "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/provider-kill-integration/build-cli.log",
+    "bytes": 969,
+    "sha256": "1d2a22b632b607863da9d6f83423cc23ec43da28d80ea8939df0a1531dfb9d3a"
+  },
+  "source_inputs_sha256": "478737da94b06771b6fdecda7516b92928393764a85e7cce6186ab62e45792ec",
+  "harness_original_sha256": "5601ddbc5ad0689e593617ca41b570e51032e6a2022afdd613db354b41c22442",
+  "harness_relocated_sha256": "c33bf35c7b4b98059af656c386c048eda8af3f4361e171ced542b12901e0c16f",
+  "harness_only_changes": "Private evidence root and exact freshly compiled main CLI path",
+  "release_build": false
+}

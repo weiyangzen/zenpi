@@ -1,0 +1,75 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-402",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "directory402-current-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-DIR；G-STAGE --item ZS1-402",
+  "scope": "target",
+  "folder_path": "vendor/crossterm/src/event",
+  "children": [
+    "ZS1-401"
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/vendor/crossterm/src/event/current_folder_learn.md",
+      "bytes": 31940,
+      "sha256": "162561dc2c006a5af8de938965c97b68bd9e3793410a61904f61a6908ed449cc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/review.md",
+      "bytes": 6548,
+      "sha256": "ff4526a37fac24fa93e2b6e1ae1f8ca12159e7134124b174f51cf8d876c63e9d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/worker-report.md",
+      "bytes": 25390,
+      "sha256": "ea27c7edfca7ed007bddd25a9712d1315f5f898f6433b9dbd55ee80ea0d5045e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/worker-manifest.json",
+      "bytes": 87463,
+      "sha256": "c401bb83e60305fb3439b109d8cf2a12200791bc8305365295c196f094b93fe2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 51495560,
+      "sha256": "5a51e2d75b173e958a12e2541b1f710be835daf9deb99784b71c31ec98de4610"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/offline.stdout.json",
+      "bytes": 477,
+      "sha256": "89b42093069da48f586375f4dddd967a0c7351df7f46461ddf5952855cb61d19"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/offline.run.json",
+      "bytes": 270,
+      "sha256": "1a9d61fc1db75e0c588902801071ad7dbef93639d9f5457e49038ff6e751a2f9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/current-context.json",
+      "bytes": 3958,
+      "sha256": "fd48df4c2339dc9cace7e7c3b40df7a50513ad6fbbbe11c939108b2f2cb10377"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/accept.py",
+      "bytes": 13048,
+      "sha256": "25a299dfa4cec0d0f02ef90dd43cbeb4320974b8b95ee8134ae0a504dbda94c6"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-402/master-review-3.1.21/review.md",
+      "bytes": 6548,
+      "sha256": "ff4526a37fac24fa93e2b6e1ae1f8ca12159e7134124b174f51cf8d876c63e9d"
+    },
+    "findings": "Full402 report/verifier plus3928 new context lines read.20 exact previously read contexts and099 chain reused.401/400 actual receipts verified.438 offline payloads pass.6files/2dirs, only401 formal child.Only402 understood; parser/query limitations explicitly open."
+  }
+}

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.9 /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027
+
+ ✓ probe.test.ts > actual fd honors nonrepo hierarchical ignore, hidden matches and nested repository boundaries 22ms
+ ✓ probe.test.ts > actual fd applies relative/absolute path globs, context cwd and explicit sibling search root 30ms
+ ✓ probe.test.ts > actual fd filename whitespace/newline and symlink output reveal line-protocol limitations 9ms
+ ✓ probe.test.ts > actual fd limit flag is conservative at exact equality, zero is not a positive cap, byte truncation has no full path 73ms
+ ✓ probe.test.ts > custom glob passes ignore/limit but trusts returned count and paths including escapes 1ms
+ ✓ probe.test.ts > custom async glob abort settles before operation completes and does not cancel underlying work 6ms
+ ✓ probe.test.ts > default spawn fault fixtures expose exact argv, partial-error success, blank-error success and pre-reap cancellation 870ms
+ ✓ probe.test.ts > default actual spawn rejects non-executable fd and offline missing-tool path without network 2ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts > issue #3302 find returns no results for path-based glob patterns > basename pattern still matches (regression-safe) 49ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts > issue #3302 find returns no results for path-based glob patterns > directory-prefixed pattern with ** tail matches subtree 10ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts > issue #3302 find returns no results for path-based glob patterns > leading ** wildcard with path segments matches 10ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts > issue #3302 find returns no results for path-based glob patterns > src/**/*.spec.ts matches nested spec file 10ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts > issue #3303 nested .gitignore rules leak into sibling directories > flat sibling case > applies a/.gitignore only inside a/ and leaves b/ untouched 13ms
+ ✓ source/packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts > issue #3303 nested .gitignore rules leak into sibling directories > deeply nested case > scopes each .gitignore to its own subtree 12ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > Windows drive root > preserves the first segment and emits one trailing slash for fd directory output 1ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > Windows drive root > handles fd output that uses forward slashes under a drive root 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > Windows drive root > keeps deeper search paths unchanged 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > Windows drive root > does not relativize a sibling directory that shares a name prefix 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > Windows drive root > normalizes relative custom-glob results without corrupting them 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > POSIX root > preserves the first segment for files under / 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > POSIX root > preserves the first segment and one trailing slash for directories under / 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > POSIX root > preserves backslashes in POSIX filenames 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > absolute results outside the search path > falls back to path.relative when the absolute paths do not share a prefix 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > absolute results outside the search path > keeps a trailing slash on directories resolved through path.relative 0ms
+ ✓ source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts > issue #6104 find relativizes root search paths > through the find tool > relativizes custom glob results against a root search path 1ms
+
+ Test Files  4 passed (4)
+      Tests  25 passed (25)
+   Start at  06:16:21
+   Duration  1.70s (transform 60ms, setup 0ms, import 307ms, tests 1.12s, environment 0ms)
+
+JSON report written to /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/test-results.json

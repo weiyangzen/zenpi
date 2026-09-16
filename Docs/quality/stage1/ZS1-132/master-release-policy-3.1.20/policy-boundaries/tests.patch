@@ -1,0 +1,246 @@
+--- a/tests/session_new.rs
++++ b/tests/session_new.rs
+@@ -646,3 +646,243 @@
+         wire.finish();
+     }
+ }
++
++// The provider is deterministic here; the JSONL owner, session checkpoint,
++// approval policy, immutable worker gate and filesystem tool are real.
++fn new_policy_agent(root: &Path) -> Agent {
++    use std::sync::atomic::{AtomicUsize, Ordering};
++    use zenpi::backend::{Backend, BackendError, Completion, CompletionRequest};
++    struct Writes(AtomicUsize);
++    impl Backend for Writes {
++        fn complete(&self, _: CompletionRequest<'_>) -> Result<Completion, BackendError> {
++            let call = self.0.fetch_add(1, Ordering::SeqCst);
++            let mut response = Completion::text("policy fixture reply");
++            if call.is_multiple_of(2) {
++                response.content.clear();
++                response.tool_calls.push(zenpi::tools::ToolCall {
++                    id: format!("write-{}", call / 2),
++                    name: "write_file".into(),
++                    arguments: json!({
++                        "path": format!("note-{}.txt", call / 2),
++                        "content": "policy fixture write"
++                    }),
++                });
++            }
++            Ok(response)
++        }
++        fn name(&self) -> &str {
++            "new-policy-fixture"
++        }
++    }
++    let mut agent = Agent::new(
++        SessionStore::open_in_workspace(root.join("initial.jsonl"), root).unwrap(),
++        Box::new(Writes(AtomicUsize::new(0))),
++    );
++    agent.set_tools(
++        ToolRegistry::with_all_builtins().unwrap(),
++        ToolContext::new(root).unwrap(),
++        SideEffectPolicy::all_builtins(),
++    );
++    agent
++}
++
++#[test]
++fn configured_tool_deny_survives_jsonl_new_even_with_process_never() {
++    let root = tempdir().unwrap();
++    let mut agent = new_policy_agent(root.path());
++    agent.set_approval_policy(ApprovalPolicy {
++        mode: ApprovalMode::Never,
++        per_tool: [("write_file".into(), zenpi::approval::ApprovalDecision::Deny)].into(),
++        ..Default::default()
++    });
++    let mut wire = Wire::new(agent);
++    let old = wire.prompt("old-policy", "write in old session");
++    assert_eq!(old["success"], true, "{old}");
++    assert!(!root.path().join("note-0.txt").exists());
++    let prior = fs::read(root.path().join("initial.jsonl")).unwrap();
++    let new = wire.command("new-policy", "/new");
++    assert_eq!(new["success"], true, "{new}");
++    assert_ne!(new["project"]["session_id"], old["project"]["session_id"]);
++    let response = wire.prompt("next-policy", "write in new session");
++    assert_eq!(response["success"], true, "{response}");
++    assert!(!root.path().join("note-1.txt").exists());
++    let new_journal =
++        fs::read_to_string(new["data"]["new_session_path"].as_str().unwrap()).unwrap();
++    assert!(
++        new_journal.contains("tool approval denied"),
++        "{new_journal}"
++    );
++    assert!(!new_journal.contains("tool_execution_started"));
++    assert!(
++        fs::read(root.path().join("initial.jsonl"))
++            .unwrap()
++            .starts_with(&prior)
++    );
++    let rows = wire.finish();
++    assert!(
++        !rows
++            .iter()
++            .any(|row| row["event"]["type"] == "approval_request")
++    );
++}
++
++#[test]
++fn worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_new() {
++    use zenpi::{
++        core::WorkerExecutionBinding,
++        tools::{BlueprintGate, BlueprintLease, BlueprintPolicySpec},
++    };
++    for scenario in [
++        "allowed",
++        "denied_path",
++        "revoked",
++        "explicit_deny",
++        "missing_gate",
++        "spent_budget",
++    ] {
++        let root = tempdir().unwrap();
++        let mut agent = new_policy_agent(root.path());
++        let context = ToolContext::new(root.path()).unwrap();
++        let now = zenpi::session::unix_time_ms();
++        let (gate, revoke) = BlueprintGate::compile(
++            &context,
++            BlueprintPolicySpec {
++                blueprint_digest: "a".repeat(64),
++                goal_digest: "b".repeat(64),
++                item_id: "ZS1-132".into(),
++                allowed_tools: ["write_file".into()].into(),
++                readable_paths: [".".into()].into(),
++                writable_paths: [".".into()].into(),
++                denied_paths: if scenario == "denied_path" {
++                    ["note-0.txt".into(), "note-1.txt".into()].into()
++                } else {
++                    Default::default()
++                },
++                protected_paths: Default::default(),
++                allowed_commands: Default::default(),
++                denied_commands: Default::default(),
++                network_hosts: Default::default(),
++                max_actions: if scenario == "spent_budget" { 1 } else { 10 },
++                max_command_timeout_ms: 1000,
++                max_command_output_bytes: 1024,
++            },
++            BlueprintLease {
++                lease_id: "session-new-policy".into(),
++                issued_at_ms: now,
++                expires_at_ms: now + 60_000,
++            },
++            now,
++        )
++        .unwrap();
++        let evidence = gate.evidence();
++        if scenario != "missing_gate" {
++            agent.set_tools(
++                ToolRegistry::with_all_builtins().unwrap(),
++                context.with_blueprint_gate(gate).unwrap(),
++                SideEffectPolicy::all_builtins(),
++            );
++        }
++        agent
++            .set_worker_execution_binding(Some(WorkerExecutionBinding {
++                blueprint_id: "new-policy".into(),
++                blueprint_sha256: evidence.blueprint_digest.clone(),
++                goal_id: "new-policy-goal".into(),
++                item_id: evidence.item_id.clone(),
++                lease_id: evidence.lease_id.clone(),
++                policy_digest: evidence.policy_digest.clone(),
++                expires_at_ms: evidence.expires_at_ms,
++            }))
++            .unwrap();
++        agent.set_approval_policy(ApprovalPolicy {
++            mode: ApprovalMode::WorkerAllowAfterPreflight,
++            per_tool: if scenario == "explicit_deny" {
++                [("write_file".into(), zenpi::approval::ApprovalDecision::Deny)].into()
++            } else {
++                Default::default()
++            },
++            ..Default::default()
++        });
++        let mut wire = Wire::new(agent);
++        let old = wire.prompt("before-new", "write before session switch");
++        assert_eq!(old["success"], true, "{scenario}: {old}");
++        assert_eq!(
++            root.path().join("note-0.txt").exists(),
++            matches!(scenario, "allowed" | "revoked" | "spent_budget"),
++            "{scenario}"
++        );
++        let prefix = fs::read(root.path().join("initial.jsonl")).unwrap();
++        let new = wire.command("switch", "/new");
++        assert_eq!(new["success"], true, "{scenario}: {new}");
++        assert_ne!(new["project"]["session_id"], old["project"]["session_id"]);
++        if scenario == "revoked" {
++            revoke.revoke();
++        }
++        let response = wire.prompt("after-new", "write after session switch");
++        assert_eq!(response["success"], true, "{scenario}: {response}");
++        assert_eq!(
++            root.path().join("note-1.txt").exists(),
++            scenario == "allowed",
++            "{scenario}"
++        );
++        let raw = fs::read_to_string(new["data"]["new_session_path"].as_str().unwrap()).unwrap();
++        let records: Vec<Value> = raw
++            .lines()
++            .map(|line| serde_json::from_str::<Value>(line).unwrap())
++            .collect();
++        let events: Vec<&Value> = records.iter().map(|row| &row["event"]).collect();
++        let tool = records
++            .iter()
++            .find(|row| {
++                row["turn"]["role"] == "tool"
++                    && row["turn"]["metadata"]["tool_call_id"] == "write-1"
++            })
++            .expect("the second write must have a real tool result, including when denied");
++        if scenario == "allowed" {
++            let resolved = events
++                .iter()
++                .find(|e| e["type"] == "approval_resolved")
++                .expect("worker approval audit");
++            assert_eq!(resolved["source"], "worker_allow_after_preflight");
++            assert_eq!(resolved["remember"], false);
++            assert_eq!(resolved["policy_digest"], evidence.policy_digest);
++            assert_eq!(
++                resolved["execution"]["worker_binding"]["lease_id"],
++                evidence.lease_id
++            );
++            assert_eq!(resolved["execution"]["prohibition_gate_enforced"], true);
++        } else {
++            assert_eq!(
++                tool["turn"]["metadata"]["outcome"], "denied",
++                "{scenario}: {raw}"
++            );
++            if scenario == "spent_budget" {
++                // Action admission occurs at invocation, after the durable
++                // start record. A denied result and no file are authoritative;
++                // the start record alone does not prove a side effect.
++                assert!(
++                    tool["turn"]["content"]
++                        .as_str()
++                        .unwrap()
++                        .contains("action_budget_exhausted")
++                );
++            } else {
++                assert!(
++                    !events.iter().any(|e| e["type"] == "tool_execution_started"),
++                    "{scenario}: {raw}"
++                );
++            }
++        }
++        assert!(
++            fs::read(root.path().join("initial.jsonl"))
++                .unwrap()
++                .starts_with(&prefix)
++        );
++        let rows = wire.finish();
++        assert!(
++            !rows
++                .iter()
++                .any(|row| row["event"]["type"] == "approval_request"),
++            "{scenario}"
++        );
++    }
++}

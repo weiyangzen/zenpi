@@ -1,0 +1,66 @@
+{
+  "captured_at": "2026-09-12T12:30:53.721519+00:00",
+  "frozen_full_master_copy": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/checkout",
+  "frozen_input_files": 4096,
+  "product_paths": [
+    "src/tui.rs",
+    "tests/tui_transcript_ux.rs"
+  ],
+  "actual_private_copy_changes": {
+    "src/render.rs": {
+      "before": {
+        "bytes": 30217,
+        "sha256": "6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7"
+      },
+      "after": {
+        "bytes": 60098,
+        "sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d"
+      }
+    },
+    "src/tui.rs": {
+      "before": {
+        "bytes": 591434,
+        "sha256": "e0e509e507c7c28e4e4ca24709a088c9cedf167c692cf62c3d9bc0ac3658f336"
+      },
+      "after": {
+        "bytes": 591971,
+        "sha256": "2d3373d72fc5ad68b9e266824fe4c31c37db7b1c732927b4e38f4daecf8e53bd"
+      }
+    },
+    "tests/tui_transcript_ux.rs": {
+      "before": {
+        "bytes": 12405,
+        "sha256": "9a5d9c2784ccb1ba5f43e5092ade33e370a259781c4709c059ab3a071d71c13c"
+      },
+      "after": {
+        "bytes": 16949,
+        "sha256": "26562ab62ebf73a8eae1fd951ac0a247eb4adb9fc8711e87a3fc55d0b5ebd5d7"
+      }
+    }
+  },
+  "prerequisite_render_excluded_from_patch": true,
+  "source_lines_read": 14461,
+  "external_test_file_lines_read": 372,
+  "new_tests": 3,
+  "existing_transcript_tests": 13,
+  "transcript_tests_passed": 16,
+  "tui_unit_tests_passed": 23,
+  "render_unit_tests_passed": 23,
+  "render_integration_tests_passed": 4,
+  "cargo_invocations": 8,
+  "rustfmt_invocations": 3,
+  "rustc_version_invocations": 1,
+  "failed_cargo_invocations": [
+    "cargo-test-01",
+    "cargo-clippy-06"
+  ],
+  "full_product_context": true,
+  "whole_test_suite_claimed": false,
+  "substitute_harnesses": 0,
+  "pty_runs": 0,
+  "http_runs": 0,
+  "master_writes": 0,
+  "other_worker_writes": 0,
+  "status_writes": 0,
+  "complete": false
+}

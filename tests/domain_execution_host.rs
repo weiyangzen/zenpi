@@ -223,3 +223,62 @@ fn tui_blueprint_run_uses_the_same_owner_and_reports_errors_without_model_turns(
         message.role == MessageRole::Error && message.text.contains("blueprint run failed")
     }));
 }
+
+#[test]
+fn headless_handoff_queue_round_trips_immutable_claims_without_receipts() {
+    let dir = tempdir().unwrap();
+    let session = dir.path().join("handoff-session.jsonl");
+    let blueprint = Blueprint::new(
+        "handoff-plan",
+        "1",
+        vec![
+            BlueprintItem::new("build", 10).with_task(zenpi::domains::BlueprintTask {
+                instruction: "implement the bounded task".into(),
+                acceptance_commands: vec!["self-test".into()],
+            }),
+        ],
+    )
+    .unwrap();
+    let goal = Goal::new(
+        "handoff-goal",
+        &blueprint,
+        ResourceBudget {
+            tokens: 100,
+            wall_clock_ms: 10,
+            attempts: 2,
+            disk_bytes: 2_000,
+        },
+        None,
+    )
+    .unwrap();
+    let mut domains = DomainStore::open(path_for_session(&session)).unwrap();
+    domains.put_blueprint(blueprint).unwrap();
+    domains.put_goal(goal).unwrap();
+    let mut agent = Agent::with_echo(SessionStore::open(&session).unwrap());
+    let input = concat!(
+        "{\"type\":\"command\",\"id\":\"queue\",\"text\":\"/blueprint handoff handoff-plan@1\"}\n",
+        "{\"type\":\"command\",\"id\":\"list\",\"text\":\"/blueprint handoffs\"}\n",
+        "{\"type\":\"shutdown\",\"id\":\"shutdown\"}\n",
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let values = records(&output);
+    let queued = values.iter().find(|value| value["id"] == "queue").unwrap();
+    assert_eq!(queued["success"], true);
+    let claim = queued["data"]["handoff"].clone();
+    let listed = values.iter().find(|value| value["id"] == "list").unwrap();
+    assert_eq!(listed["success"], true);
+    assert_eq!(listed["data"]["handoffs"][0]["claim"], claim);
+    assert_eq!(listed["data"]["handoffs"][0]["receipt_status"], "running");
+    assert_eq!(listed["data"]["handoffs"][0]["manifest_imported"], false);
+    assert_eq!(listed["data"]["delivery"], "read_only_claims");
+    let execution =
+        ExecutionStore::open(zenpi::domain_execution::path_for_session(&session)).unwrap();
+    assert_eq!(execution.receipts().len(), 1);
+    assert_eq!(execution.receipts()[0].status, ExecutionStatus::Running);
+    assert!(!execution.receipts()[0].external_work_executed);
+    assert!(agent.session().events().iter().any(|event| {
+        event["type"] == "blueprint_handoff_claimed"
+            && event["claim_digest"] == claim["claim_digest"]
+    }));
+}

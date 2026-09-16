@@ -1,0 +1,26 @@
+{
+  "cancel": {
+    "http_requests": 1,
+    "durable_enqueue": 1,
+    "applied": 0,
+    "semantic_checkpoints": 0,
+    "queue_receipt_success": true,
+    "artifacts": {
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/cancel/responses.json": "9480aef8a72ccc440325ea2e68f38663dfac97d2c63707411e8d5fbe4fcf5e07",
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/cancel/journal.jsonl": "2c2be3211afb5791685449b17be0df5bf6bd614e45149cbfcca62e44e53d1c19",
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/cancel/requests.json": "48905b39d911ab49b89c39f56b65583d981b3c7131ca711948f3a0167c7ed9fe"
+    }
+  },
+  "success": {
+    "http_requests": 1,
+    "durable_enqueue": 1,
+    "applied": 0,
+    "semantic_checkpoints": 1,
+    "queue_receipt_success": true,
+    "artifacts": {
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/success/responses.json": "1d498d5a17d90caff9e30400d5e7b60e7b5679a0b936693ab5aa5666799df431",
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/success/journal.jsonl": "45a0defa426b7d69bdabbd09b7e54fda9c8c494a95ed31b4488f3c6bd9a433d4",
+      ".ops/stage1_execution/manual-compact-input-integration/actual-after/success/requests.json": "48905b39d911ab49b89c39f56b65583d981b3c7131ca711948f3a0167c7ed9fe"
+    }
+  }
+}

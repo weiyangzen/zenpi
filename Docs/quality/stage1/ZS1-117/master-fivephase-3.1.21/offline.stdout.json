@@ -1,0 +1,43 @@
+{
+  "passed": true,
+  "scope": "Offline artifact verification only; no product execution, official gate, root-cause proof or owner acceptance",
+  "artifacts": 348,
+  "checks": {
+    "manifest_exact_file_set": true,
+    "all_manifest_hashes": true,
+    "prior_manifest_identity": true,
+    "prior_artifacts_exact": true,
+    "frozen_input_counts": true,
+    "frozen_diagnostic_hashes": true,
+    "only_authorized_private_changes": true,
+    "three_before_source_hashes": true,
+    "full_diagnostic_patch_exact": true,
+    "single_launch_recorded": true,
+    "build_and_observer_success": true,
+    "bounded_capture_completed": true,
+    "binary_identity": true,
+    "all_command_stream_hashes": true,
+    "trace_raw_matches_validation": true,
+    "five_markers_single_process": true,
+    "same_clock_interval_arithmetic": true,
+    "payload_matches_record": true,
+    "one_matching_shutdown_reply": true,
+    "fixture_hashes": true,
+    "journal_terminal_matches_wire": true,
+    "system_separate_interval": true,
+    "contrary_system_qualification_preserved": true,
+    "offline_failure_preserved": true,
+    "frozen_and_old_ready_integrity_receipt": true,
+    "master_drift_explicit": true,
+    "python_evidence_syntax": true,
+    "no_gate_or_owner_acceptance_claim": true
+  },
+  "manifest": {
+    "bytes": 58914,
+    "sha256": "77c1a00a10025cc1cd6c31fa169f04d7d66f2770da08c59eee08d21e368f2aba"
+  },
+  "report": {
+    "bytes": 10970,
+    "sha256": "29b3ecf044498ff085b003ee737efc79f58c05a1436f58d3ed77eaab908efb6f"
+  }
+}

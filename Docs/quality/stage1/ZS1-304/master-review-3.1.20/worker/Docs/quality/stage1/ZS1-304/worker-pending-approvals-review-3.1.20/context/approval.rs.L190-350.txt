@@ -1,0 +1,161 @@
+    fn request_inner(
+        &self,
+        request: ApprovalRequest,
+        policy: &mut ApprovalPolicy,
+        cancelled: &dyn Fn() -> bool,
+        retain_accepted: bool,
+    ) -> Result<ApprovalResponse, ApprovalError> {
+        request.validate()?;
+        let id = request.request_id.clone();
+        let tool = request.tool.clone();
+        let (lock, wake) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        if state.pending.contains_key(&id) || state.decisions.contains_key(&id) {
+            return Err(ApprovalError::Invalid(
+                "request_id is already pending".into(),
+            ));
+        }
+        state.visible.remove(&id);
+        state.pending.insert(id.clone(), request);
+        loop {
+            if cancelled() {
+                state.pending.remove(&id);
+                state.visible.remove(&id);
+                state.decisions.remove(&id);
+                state
+                    .accepted
+                    .retain(|accepted| accepted.response.request_id != id);
+                return Err(ApprovalError::Cancelled);
+            }
+            if let Some(response) = state.decisions.get(&id).cloned() {
+                if !retain_accepted {
+                    state
+                        .accepted
+                        .retain(|accepted| accepted.response.request_id != id);
+                }
+                state.decisions.remove(&id);
+                state.pending.remove(&id);
+                state.visible.remove(&id);
+                if response.remember && !retain_accepted {
+                    // The caller owns the policy, so remembering a decision
+                    // never persists credentials or mutates global state.
+                    policy.remember(tool.clone(), response.decision);
+                }
+                return Ok(response);
+            }
+            let (next, _) = wake
+                .wait_timeout(state, Duration::from_millis(50))
+                .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+            state = next;
+        }
+    }
+
+    /// Return each newly pending request once. Calling this is what marks a
+    /// request as visible to a host, preventing a slow renderer from emitting
+    /// duplicate approval prompts.
+    pub fn drain_pending(&self) -> Vec<ApprovalRequest> {
+        let (lock, _) = &*self.inner;
+        let Ok(mut state) = lock.lock() else {
+            return Vec::new();
+        };
+        let fresh = state
+            .pending
+            .iter()
+            .filter(|(id, _)| !state.visible.contains_key(*id))
+            .map(|(id, request)| (id.clone(), request.clone()))
+            .collect::<Vec<_>>();
+        let mut result = Vec::with_capacity(fresh.len());
+        for (id, request) in fresh {
+            state.visible.insert(id, request.clone());
+            result.push(request);
+        }
+        result
+    }
+
+    /// Mark one request as visible and return it without consuming unrelated
+    /// pending prompts.  Slash owners use this before responding so their
+    /// behavior matches hosts that first emitted the request to a client.
+    pub fn reveal(&self, request_id: &str) -> Result<ApprovalRequest, ApprovalError> {
+        if request_id.trim().is_empty()
+            || request_id.len() > MAX_APPROVAL_ID_BYTES
+            || request_id.chars().any(char::is_control)
+        {
+            return Err(ApprovalError::Invalid("request_id is invalid".into()));
+        }
+        let (lock, _) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        let request = state
+            .pending
+            .get(request_id)
+            .cloned()
+            .ok_or(ApprovalError::UnknownRequest)?;
+        state.visible.insert(request_id.to_owned(), request.clone());
+        Ok(request)
+    }
+
+    /// Answer one visible request. A response for an unknown request is
+    /// rejected instead of being buffered for a future tool call.
+    pub fn respond(&self, response: ApprovalResponse) -> Result<(), ApprovalError> {
+        self.respond_with_request(response).map(|_| ())
+    }
+
+    /// Return the exact request atomically claimed by this response. Hosts
+    /// echo its digest rather than accepting a client-supplied policy grant.
+    pub fn respond_with_request(
+        &self,
+        response: ApprovalResponse,
+    ) -> Result<ApprovalRequest, ApprovalError> {
+        if response.request_id.trim().is_empty()
+            || response.request_id.len() > MAX_APPROVAL_ID_BYTES
+            || response.request_id.chars().any(char::is_control)
+        {
+            return Err(ApprovalError::Invalid("request_id is invalid".into()));
+        }
+        let (lock, wake) = &*self.inner;
+        let mut state = lock
+            .lock()
+            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+        if !state.pending.contains_key(&response.request_id)
+            || state.decisions.contains_key(&response.request_id)
+        {
+            return Err(ApprovalError::UnknownRequest);
+        }
+        if response.remember
+            && state.pending[&response.request_id].origin
+                == crate::tools::ToolOrigin::BlueprintWorker
+        {
+            return Err(ApprovalError::Invalid(
+                "worker decisions cannot become remembered tool grants".into(),
+            ));
+        }
+        // An answered request is no longer host-actionable even if the worker
+        // has not woken up yet.  Removing it here makes duplicate responses
+        // fail closed instead of allowing a later command to overwrite the
+        // first decision.
+        let request = state
+            .pending
+            .remove(&response.request_id)
+            .ok_or(ApprovalError::UnknownRequest)?;
+        state.accepted.push(AcceptedApproval {
+            request: request.clone(),
+            response: response.clone(),
+        });
+        state
+            .decisions
+            .insert(response.request_id.clone(), response);
+        wake.notify_all();
+        Ok(request)
+    }
+
+    /// Whether a request still needs a host decision.  This is intentionally
+    /// narrower than worker completion: once a response is accepted, another
+    /// `/approve` must not be able to replace it.
+    pub fn is_pending(&self, request_id: &str) -> bool {
+        let (lock, _) = &*self.inner;
+        lock.lock()
+            .is_ok_and(|state| state.pending.contains_key(request_id))
+    }

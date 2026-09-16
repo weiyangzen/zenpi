@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "complete": false,
+  "item": "ZS1-123",
+  "rust_tests": 33,
+  "entry_checks": 26,
+  "http_calls": 4,
+  "tui_processes": 1,
+  "headless_processes": 1,
+  "binary_sha256": "d150d6ef355e15bbb32b5176a15e984f2a252d396a2c7c1625cd029dab50bb52",
+  "product_sha256": "5912f71faa07e7f529b1c9bef875a977873c6a5e152d103e837d0fbac001cd32",
+  "release_verified": false,
+  "full_library_passed": false,
+  "generated_at": "2026-09-12T12:21:41.104576+00:00"
+}

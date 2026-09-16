@@ -1,0 +1,66 @@
+--- worker/headless.rs
++++ current/headless.rs
+@@ -4572,6 +4572,7 @@
+                     &mut replay,
+                     &mut pool,
+                     &mut pending_steers,
++                    &mut pending_inputs,
+                     &mut pending_shutdown,
+                     stopping,
+                     shutdown_sent,
+@@ -4630,6 +4631,7 @@
+                             &mut replay,
+                             &mut pool,
+                             &mut pending_steers,
++                            &mut pending_inputs,
+                             &mut pending_shutdown,
+                             true,
+                             shutdown_sent,
+@@ -4822,6 +4824,7 @@
+     replay: &mut ReplayState,
+     pool: &mut ProjectOwnerPool,
+     pending_steers: &mut VecDeque<PendingSteer>,
++    pending_inputs: &mut Vec<PendingInputResponse>,
+     pending_shutdown: &mut Option<(Option<String>, String, u16)>,
+     stopping: bool,
+     shutdown_sent: bool,
+@@ -5060,6 +5063,7 @@
+             Ok(false)
+         }
+         RuntimeEvent::Closed => {
++            close_input_responses(pending_inputs, output, replay)?;
+             if let Some((id, command, version)) = pending_shutdown.take() {
+                 write_cached_versioned_response(
+                     output,
+@@ -5152,6 +5156,31 @@
+             item.version,
+             replay,
+         )?;
++    }
++    Ok(())
++}
++
++fn close_input_responses<W: Write>(
++    pending: &mut Vec<PendingInputResponse>,
++    output: &mut W,
++    replay: &mut ReplayState,
++) -> Result<(), HeadlessError> {
++    for item in pending.drain(..) {
++        // This cancels only tickets not yet serviced. A detached owner may
++        // already be applying one, so an unavailable receipt is not proof
++        // that its durable queue mutation was cancelled.
++        item.ticket.cancel();
++        let response = match item.ticket.try_recv() {
++            Ok(result) => input_response(item.id, result),
++            Err(_) => StdioResponse::error_with_code(
++                item.id,
++                "input_queue",
++                "input_queue_result_unknown",
++                "runtime closed before the input receipt; the input may have been applied; inspect the input queue before retrying",
++            ),
++        };
++        replay.emission_project = Some(item.project);
++        write_cached_versioned_response(output, response, item.version, replay)?;
+     }
+     Ok(())
+ }

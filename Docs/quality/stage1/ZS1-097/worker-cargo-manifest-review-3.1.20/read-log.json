@@ -1,0 +1,32 @@
+{
+  "formal_files": 1,
+  "baseline": {
+    "bytes": 1001,
+    "lines": 42,
+    "sha256": "94c25405859cbec9d1a02e7c1a0a4e0dbbfd96e5c6bc476c23b9dc8be7229a65",
+    "range": [
+      1,
+      42
+    ],
+    "continuous_full_read": true,
+    "git_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c"
+  },
+  "current": {
+    "bytes": 1228,
+    "lines": 50,
+    "sha256": "d5fafd029ef77454e178222c2b62530d28859374f72a2ce6bd972a465bed5884",
+    "range": [
+      1,
+      50
+    ],
+    "continuous_full_read": true
+  },
+  "source_functions": 0,
+  "source_tests": 0,
+  "other_formal_files": 0,
+  "context_scope": "only captured spans interpreted; inventories/hashes are not full semantic review",
+  "product_behavior_runs": 0,
+  "cargo_runs": 0,
+  "pty_runs": 0,
+  "http_runs": 0
+}

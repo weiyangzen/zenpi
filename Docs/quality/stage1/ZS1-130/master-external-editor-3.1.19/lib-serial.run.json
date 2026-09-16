@@ -1,0 +1,28 @@
+{
+  "name": "lib-serial",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:49:19.673379+00:00",
+  "ended_at": "2026-09-12T05:49:37.277932+00:00",
+  "elapsed_seconds": 17.603988083,
+  "exit_code": 101,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 62865408,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/lib-serial.log",
+  "bytes": 14426,
+  "sha256": "1895169daf4c8e77ee441b6360eb7f4af37684fa4a3c6da8dc7de4566dc53ab4"
+}

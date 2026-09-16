@@ -1,0 +1,33 @@
+    pub fn open_directory_picker(&mut self) {
+        if let Some(view) = self
+            .approval_views
+            .get_mut(&self.project_tabs[self.active_project])
+        {
+            view.focused = false;
+        }
+        self.cancel_history_preview();
+        let base = self
+            .project_metadata(self.active_project())
+            .map(|m| std::path::PathBuf::from(&m.cwd))
+            .filter(|p| p.is_absolute() && p.is_dir())
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_else(|| "/".into());
+        self.directory_picker = Some(crate::directory_picker::DirectoryPicker::new(&base));
+        self.dirty = true;
+    }
+    fn picker_result(&mut self, result: Option<Option<std::path::PathBuf>>) {
+        if let Some(path) = result {
+            self.directory_picker = None;
+            self.pending_project = path.map(ProjectIntent::Open);
+        }
+        self.dirty = true;
+    }
+    fn request_project_select(&mut self, index: usize) {
+        if index < self.project_tabs.len() && index != self.active_project {
+            self.touch_editor_draft();
+        }
+        if self.project_workspace.is_some() {
+            self.pending_project = Some(ProjectIntent::Select(index));
+        } else {
+            self.select_project_tab(index);
+        }

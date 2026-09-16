@@ -1,0 +1,2905 @@
+{
+  "item": "ZS1-123",
+  "candidate": "file-completion-status",
+  "packet_ok": true,
+  "checks_count": 723,
+  "passed": 723,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "exact payload",
+      "ok": true
+    },
+    {
+      "name": "payload totals",
+      "ok": true
+    },
+    {
+      "name": "payload:README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/execution/active_requirement.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/learn/stage1_pi_mono/claims.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/execution/active_requirement.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/learn/stage1_pi_mono/claims.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:before/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:before/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:before/regression-tests.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:bin/zenpi",
+      "ok": true
+    },
+    {
+      "name": "payload:candidate.patch",
+      "ok": true
+    },
+    {
+      "name": "payload:chunk_manifest.tsv",
+      "ok": true
+    },
+    {
+      "name": "payload:initial-inputs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/before.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/before.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/before.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/clippy.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/clippy.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fix-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fix-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:project/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:project/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/clippy.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/rustfmt.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/approval.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend/chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend/transport.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/context.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/core.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/directory_picker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domain_execution.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/error.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/extension_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/external_editor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/headless.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/main.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/persona.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/prompt_templates.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/google.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/mod.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/registry.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/render.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/resource_loader.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/runtime_intent.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/search.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/security.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/session.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_output/redaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/approval_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/context.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/core_session.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_execution_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_execution_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_domain_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_event_budget.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_input_shutdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/layout_persistence.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/learn_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/mode_boundary.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/render_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/resume_compact_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/runtime_intent_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/security.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_cli.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_maintenance_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_new.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_recovery.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_branch_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_context_checkpoint.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_extension_hooks.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_external_evidence.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_gemini.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_input_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_model_registry.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_project_config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_prompt_resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_reasoning_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_resource_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_search.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_semantic_compaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_skill_md.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_tool_batch.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_transport.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_approval_focus.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_bentobox.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_busy_diff.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_goal_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_interaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_logs.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_resize.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tools/runtime_budget_probe.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.cargo_vcs_info.json",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/CODEOWNERS",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/ISSUE_TEMPLATE/bug_report.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/ISSUE_TEMPLATE/feature_request.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/workflows/crossterm_test.yml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.travis.yml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/CHANGELOG.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.toml.orig",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/LICENSE",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/CONTRIBUTING.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_c.png",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_full.png",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_full.svg",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/know-problems.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/copy-to-clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-match-modifiers.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-poll-read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-read-char-line.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-stream-async-std.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-stream-tokio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/is_tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/key-display.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/stderr.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/ansi_support.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/command.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/filter.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/poll.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/timeout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/macros.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/attributes.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/content_style.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/styled_content.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/stylize.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/attribute.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/color.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/colored.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/colors.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/file_descriptor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/complete-empty.screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/dismissed.screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/config/auth.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/config/config.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-000.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-001.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-002.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-003.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-004.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-005.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-006.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-007.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-008.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-009.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-010.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-011.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-012.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-013.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-014.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-015.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-016.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-017.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-018.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-019.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-020.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-021.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-022.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-023.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-024.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-025.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-026.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-027.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-028.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-029.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-030.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-031.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-032.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-033.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-034.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-035.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-036.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-037.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-038.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-039.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-040.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-041.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-042.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-043.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-044.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-045.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-046.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-047.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-048.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-049.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-050.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-051.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-052.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-053.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-054.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-055.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-056.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-057.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-058.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-059.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-060.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-061.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-062.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-063.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-064.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-065.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-066.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-067.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-068.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-069.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-070.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-071.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-072.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-073.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-074.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-075.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-076.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-077.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-078.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-079.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-080.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-081.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-082.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-083.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-084.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-085.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-086.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-087.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-088.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-089.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-090.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-091.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-092.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-093.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-094.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-095.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-096.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-097.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-098.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-099.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-100.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-101.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-102.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-103.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-104.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-105.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-106.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-107.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-108.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-109.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-110.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-111.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-112.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-113.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-114.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-115.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-116.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-117.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-118.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-119.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-120.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-121.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-122.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-123.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-124.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-125.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-126.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-127.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-128.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-129.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-130.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-131.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-132.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-133.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-134.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-135.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-136.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-137.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-138.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-139.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-140.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-141.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-142.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-143.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-144.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-145.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-146.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-147.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-148.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-149.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-150.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-151.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-152.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-153.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-154.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-155.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-156.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-157.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-158.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-159.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-160.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-161.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-162.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-163.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-164.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-165.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-166.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-167.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-168.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-169.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-170.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-171.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-172.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-173.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-174.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-175.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-176.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-177.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-178.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-179.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-180.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-181.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-182.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-183.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-184.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-185.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-186.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-187.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-188.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-189.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-190.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-191.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-192.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-193.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-194.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-195.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-196.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-197.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-198.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/project/candidate-199.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/sessions/initial.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/sessions/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/fixture/sessions/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/narrowed.screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/partial.screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/result.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/terminal.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty_completion_probe.py",
+      "ok": true
+    },
+    {
+      "name": "payload:reading-ranges.json",
+      "ok": true
+    },
+    {
+      "name": "payload:run-receipts.json",
+      "ok": true
+    },
+    {
+      "name": "payload:scope-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:src__tui.rs.diff",
+      "ok": true
+    },
+    {
+      "name": "payload:tests__tui_command_palette.rs.diff",
+      "ok": true
+    },
+    {
+      "name": "payload:verify_packet.py",
+      "ok": true
+    },
+    {
+      "name": "only authorized files",
+      "ok": true
+    },
+    {
+      "name": "project input path set",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:clippy.toml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:rustfmt.toml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/approval.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/backend/chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/backend/transport.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/config.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/context.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/core.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/directory_picker.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/domain_execution.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/error.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/extension_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/external_editor.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/headless.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/main.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/persona.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/prompt_templates.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/providers/anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/providers/google.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/providers/mod.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/providers/registry.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/render.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/resource_loader.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/runtime_intent.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/search.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/security.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/session.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/tool_output/redaction.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/tool_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:src/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/approval_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/config.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/context.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/core_session.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/domain_execution_host.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/domain_execution_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/headless_domain_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/headless_event_budget.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/headless_input_shutdown.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/headless_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/headless_protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/layout_persistence.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/learn_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/mode_boundary.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/render_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/resume_compact_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/runtime_intent_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/security.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/session_cli.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/session_maintenance_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/session_new.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/session_recovery.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_branch_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_context_checkpoint.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_extension_hooks.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_external_evidence.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_gemini.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_input_host.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_model_registry.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_project_config.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_prompt_resources.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_reasoning_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_resource_host.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_search.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_semantic_compaction.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_skill_md.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_tool_batch.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/stage1_transport.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_approval_focus.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_bentobox.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_busy_diff.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_goal_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_interaction.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_logs.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_resize.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tests/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:tools/runtime_budget_probe.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.cargo_vcs_info.json",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.github/CODEOWNERS",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.github/ISSUE_TEMPLATE/bug_report.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.github/ISSUE_TEMPLATE/feature_request.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.github/workflows/crossterm_test.yml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/.travis.yml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/CHANGELOG.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/Cargo.toml.orig",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/LICENSE",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/README.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/CONTRIBUTING.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/crossterm_c.png",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/crossterm_full.png",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/crossterm_full.svg",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/docs/know-problems.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/README.md",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/copy-to-clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-match-modifiers.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-poll-read.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-read-char-line.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-read.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-stream-async-std.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/event-stream-tokio.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/is_tty.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/key-display.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/examples/stderr.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/ansi_support.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/command.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/cursor/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/cursor/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/cursor/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/cursor.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/filter.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/read.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/source/unix/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/source/unix/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/source/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/source/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/source.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/stream.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/unix/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/unix/waker/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/unix/waker/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/unix/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/windows/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/windows/poll.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/windows/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event/timeout.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/event.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/macros.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/attributes.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/content_style.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/styled_content.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/stylize.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/types/attribute.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/types/color.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/types/colored.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/types/colors.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style/types.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/style.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/terminal/sys/file_descriptor.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/terminal/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/terminal/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/terminal/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/terminal.rs",
+      "ok": true
+    },
+    {
+      "name": "captured or protected input:vendor/crossterm/src/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "master122 composer exact",
+      "ok": true
+    },
+    {
+      "name": "master122 tui exact baseline",
+      "ok": true
+    },
+    {
+      "name": "exact two-file patch",
+      "ok": true
+    },
+    {
+      "name": "no initial main drift",
+      "ok": true
+    },
+    {
+      "name": "four actual Cargo records",
+      "ok": true
+    },
+    {
+      "name": "native locked offline:before",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/before.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/before.stderr",
+      "ok": true
+    },
+    {
+      "name": "native locked offline:fix-targeted",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/fix-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/fix-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "native locked offline:regression",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "native locked offline:clippy",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/clippy.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/clippy.stderr",
+      "ok": true
+    },
+    {
+      "name": "real failing assertions preserved",
+      "ok": true
+    },
+    {
+      "name": "regression:16",
+      "ok": true
+    },
+    {
+      "name": "regression:21",
+      "ok": true
+    },
+    {
+      "name": "regression:51",
+      "ok": true
+    },
+    {
+      "name": "regression:11",
+      "ok": true
+    },
+    {
+      "name": "targeted results",
+      "ok": true
+    },
+    {
+      "name": "PTY actual11 all pass",
+      "ok": true
+    },
+    {
+      "name": "PTY zero requests",
+      "ok": true
+    },
+    {
+      "name": "PTY byte-identical executable",
+      "ok": true
+    },
+    {
+      "name": "ARM64 Mach-O",
+      "ok": true
+    },
+    {
+      "name": "terminal restoration",
+      "ok": true
+    },
+    {
+      "name": "PTY screen:partial",
+      "ok": true
+    },
+    {
+      "name": "PTY screen:narrowed",
+      "ok": true
+    },
+    {
+      "name": "PTY screen:complete-empty",
+      "ok": true
+    },
+    {
+      "name": "PTY screen:dismissed",
+      "ok": true
+    },
+    {
+      "name": "actual empty display",
+      "ok": true
+    },
+    {
+      "name": "reading range:R01",
+      "ok": true
+    },
+    {
+      "name": "reading range:R02",
+      "ok": true
+    },
+    {
+      "name": "reading range:R03",
+      "ok": true
+    },
+    {
+      "name": "reading range:R04",
+      "ok": true
+    },
+    {
+      "name": "reading range:R05",
+      "ok": true
+    },
+    {
+      "name": "reading range:R06",
+      "ok": true
+    },
+    {
+      "name": "reading range:R07",
+      "ok": true
+    },
+    {
+      "name": "reading range:R08",
+      "ok": true
+    },
+    {
+      "name": "reading range:R09",
+      "ok": true
+    },
+    {
+      "name": "reading range:R10",
+      "ok": true
+    },
+    {
+      "name": "reading range:R11",
+      "ok": true
+    },
+    {
+      "name": "reading range:R12",
+      "ok": true
+    },
+    {
+      "name": "reading range:R13",
+      "ok": true
+    },
+    {
+      "name": "reading range:R14",
+      "ok": true
+    },
+    {
+      "name": "reading range:R15",
+      "ok": true
+    },
+    {
+      "name": "reading range:R16",
+      "ok": true
+    },
+    {
+      "name": "reading range:R17",
+      "ok": true
+    },
+    {
+      "name": "reading range:R18",
+      "ok": true
+    },
+    {
+      "name": "input chunk:before/src/tui.rs:0",
+      "ok": true
+    },
+    {
+      "name": "input chunk:before/src/tui.rs:262144",
+      "ok": true
+    },
+    {
+      "name": "input chunk:before/src/tui.rs:524288",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/core.rs:0",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/core.rs:262144",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/headless.rs:0",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/headless.rs:262144",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/tui.rs:0",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/tui.rs:262144",
+      "ok": true
+    },
+    {
+      "name": "input chunk:project/src/tui.rs:524288",
+      "ok": true
+    },
+    {
+      "name": "input chunk union:before/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "input chunk union:project/src/core.rs",
+      "ok": true
+    },
+    {
+      "name": "input chunk union:project/src/headless.rs",
+      "ok": true
+    },
+    {
+      "name": "input chunk union:project/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "authority3.1.21",
+      "ok": true
+    },
+    {
+      "name": "whole item remains unaccepted",
+      "ok": true
+    }
+  ],
+  "new_runtime_executions_by_verifier": 0,
+  "whole_123_accepted": false,
+  "cwd": "/private/tmp"
+}

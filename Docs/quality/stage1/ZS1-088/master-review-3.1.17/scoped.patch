@@ -1,0 +1,869 @@
+diff --git a/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/lib.rs_learn.md b/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/lib.rs_learn.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/learn/stage1_pi_mono/targets/zenpi/files/src/lib.rs_learn.md
+@@ -0,0 +1,74 @@
++# ZS1-088 — src/lib.rs
++
++Worker candidate: [_]. learn_mode: understand. Master semantic review required. Authority3.1.16, requirement digest `c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f`.
++
++Original blueprint baseline: source_path `src/lib.rs`,592bytes/31lines, SHA256 `2b429ff43bfba672fea949a9fb51ee6eda41a2975589dbc852a50bef2e13d575`. Retrieved read-only via git show6f252a20c628e9b1ede14e2887acc04657c71d7c:src/lib.rs and exact hash checked. Current main snapshot:844bytes/42lines, SHA256 `3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8`. Both files were read completely, baseline1–31 and current1–42; no section was skipped because the file is small. Exact byte ranges/capture time are in worker-owner-review/input-manifest.json. No prior local or main report exists, so this is a new report preserving both source baselines explicitly.
++
++Temporal boundary: main reports116 implemented/integrated and eight production checks passed;122 remains scratch-only and unintegrated. Those checks are main's status, not088 executions. Module presence does not independently establish116 acceptance or imply122 has integrated.
++
++## Every line and module declaration
++
++Line1 is the crate-level documentation comment describing a shared library and TUI/headless binary modes; line2 is blank. Lines3–42 are exactly40 unconditional public module declarations. The table below covers every declaration, its resolved source and whether it was in the original29-module baseline. Each declaration resolved to exactly one existing module entry file in the read-only main tree; full resolved-source hashes/bytes are recorded only as lookup context, not a full review of those sibling files.
++
++| Current line | Public module | Resolved entry | Original baseline |
++| --- | --- | --- | --- |
++| 3 | `approval` | `src/approval.rs` | present |
++| 4 | `b3` | `src/b3.rs` | present |
++| 5 | `backend` | `src/backend.rs` | present |
++| 6 | `config` | `src/config.rs` | present |
++| 7 | `context` | `src/context.rs` | present |
++| 8 | `core` | `src/core.rs` | present |
++| 9 | `diagnostics` | `src/diagnostics.rs` | present |
++| 10 | `directory_picker` | `src/directory_picker.rs` | new |
++| 11 | `domain_execution` | `src/domain_execution.rs` | present |
++| 12 | `domain_store` | `src/domain_store.rs` | present |
++| 13 | `domains` | `src/domains.rs` | present |
++| 14 | `error` | `src/error.rs` | present |
++| 15 | `extension_runtime` | `src/extension_runtime.rs` | new |
++| 16 | `extensions` | `src/extensions.rs` | present |
++| 17 | `governance` | `src/governance.rs` | present |
++| 18 | `headless` | `src/headless.rs` | present |
++| 19 | `input_queue` | `src/input_queue.rs` | new |
++| 20 | `layout` | `src/layout.rs` | present |
++| 21 | `persona` | `src/persona.rs` | present |
++| 22 | `project_workspace` | `src/project_workspace.rs` | new |
++| 23 | `prompt_templates` | `src/prompt_templates.rs` | new |
++| 24 | `protocol` | `src/protocol.rs` | present |
++| 25 | `providers` | `src/providers/mod.rs` | new |
++| 26 | `render` | `src/render.rs` | present |
++| 27 | `resource_loader` | `src/resource_loader.rs` | new |
++| 28 | `resources` | `src/resources.rs` | present |
++| 29 | `runtime` | `src/runtime.rs` | present |
++| 30 | `runtime_intent` | `src/runtime_intent.rs` | present |
++| 31 | `search` | `src/search.rs` | new |
++| 32 | `security` | `src/security.rs` | present |
++| 33 | `session` | `src/session.rs` | present |
++| 34 | `session_tree` | `src/session_tree.rs` | new |
++| 35 | `skills` | `src/skills.rs` | present |
++| 36 | `slash` | `src/slash.rs` | present |
++| 37 | `slash_actions` | `src/slash_actions.rs` | present |
++| 38 | `tool_output` | `src/tool_output.rs` | new |
++| 39 | `tool_runtime` | `src/tool_runtime.rs` | new |
++| 40 | `tools` | `src/tools.rs` | present |
++| 41 | `tui` | `src/tui.rs` | present |
++| 42 | `view_model` | `src/view_model.rs` | present |
++
++The original29 declarations are all retained in their relative order. The11 additions are directory_picker, extension_runtime, input_queue, project_workspace, prompt_templates, providers, resource_loader, search, session_tree, tool_output and tool_runtime. providers resolves to src/providers/mod.rs; the other39 entries resolve to src/NAME.rs. This is an actual path-resolution inventory, not an assertion that all transitive files or conditional targets compile or have passed owner review. Original/current source snapshots remain separate immutable evidence.
++
++## Public boundary and call mapping
++
++Each `pub mod` exposes that module namespace through the zenpi crate. It does not make private or pub(crate) members externally public, re-export every item at the crate root, invoke an initializer or determine runtime callback order. Every declaration is unconditional at this file level: there are no cfg/feature gates, path overrides, inline module bodies, macros, use/re-export statements, root functions/types/constants, mutable state, unsafe blocks, tests or runtime error branches. Platform/feature behavior inside modules must be reviewed at their own boundaries, not inferred from this flat index.
++
++The inspected Cargo.toml names the package zenpi and does not override library/binary target paths with a custom lib/bin section. The fully read11-line src/main.rs imports ExitCode and calls zenpi::core::run, converting Ok to success and Err to a printed error/failure exit. Thus core is an actual public integration entry used by the binary, while integration tests use paths such as zenpi::extensions and zenpi::extension_runtime. The line1 description is a high-level mode summary; it does not enumerate auxiliary CLI commands handled by core (extension management was separately observed in080), and must not be interpreted as enforcing a two-command CLI restriction.
++
++Added module declarations make the corresponding implementations available to compile and reference: resource_loader/prompt_templates support resource admission; extension_runtime is the115 runtime entry; input_queue/session_tree/tool_output provide typed state/output owners; providers/tool_runtime support provider/tool surfaces; directory_picker/project_workspace/search are additional host/workspace surfaces. These names are navigation context only. Their actual admission, cancellation, ownership, persistence and policy behavior remains the responsibility of each file's independent report. No sibling or parent directory gets accepted because its module appears here. Changes inside116 domain/core modules can integrate without another lib.rs declaration, so an unchanged index is not evidence of an unchanged product.
++
++## Error, cancellation, recovery and validation scope
++
++There is no executable branch or side effect in this file: it does not open resources, spawn processes, route requests, create sessions, register tools, cancel work or recover journals. Missing/ambiguous declared entry paths or private/public API mismatches are compile-time integration issues; the path inventory checks only existence/uniqueness, not full type checking. Runtime failure/cancel/restart behavior lives in exported modules and must not be claimed as handled by the index. Declaration order is not a lifecycle ordering guarantee.
++
++The40-entry inventory and original-to-current11-addition comparison are newly executed structural/integrity checks, not behavior tests. Existing C115 native-fixture package records a real17-case production/library run and strict clippy on that task's local tree; main separately reports integrating it and passing17 in the current116 tree. Neither report is relabeled an088 full-feature/cross-platform compile. The exact current lib.rs is also identical to the earlier079 captured-main compile-context lib.rs; that actual snapshot probe compiled a real main library and ran two slash parser counterexamples, with its support-file identities retained. This supplies historical current-index compilation context, not a rerun or semantic coverage of40 modules. No new Cargo build/test is needed for this read-only declaration review and no runtime case is newly claimed.
++
++Source pi-mono's package exports/types/runner/AgentSession use different packaging and runtime ownership surfaces. There is no one-to-one claim that Rust's library index implements those source behaviors. Source022/023/028 reports remain separate; module connection is only the prerequisite for their mapped target owners. ZS1-090 parent integration depends on independent file acceptance and is not completed by088.
++
++G-FILE is main's semantic gate. G-STAGE runs against read-only main with Python bytecode writes disabled; structural validity or missing master receipt is not semantic acceptance. The verifier checks complete current/baseline byte ranges,40 unique declarations, original retention/11 additions, actual module entry resolution and immutable evidence hashes. Current dependency paths are recorded at capture; later changes to sibling contents do not change which lib.rs bytes were reviewed. Candidate changes only this new report and088 evidence. Rollback removes them, with no source/index/Cargo/CI modification or acceptance promotion.
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/README.md b/Docs/quality/stage1/ZS1-088/worker-owner-review/README.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/README.md
+@@ -0,0 +1,5 @@
++# ZS1-088 complete library index review [_]
++
++Current42lines844bytes and original31lines592bytes bothreadcompletely. Current3d6a3b... snapshot has40publicmod declarations;29oldretained11added, providersusesmod.rs and39useNAME.rs. Everyentry resolveduniquely; module-resolution records fullsourcehash as context only. No runtime code inthisfile; fullperlinetable andcompile/runtime/cancel/recovery/publicvisibility boundaries are innewreport. No priorreport existed.
++
++Authority3.1.16.116integrated/8productionchecks aremainreported;122scratchonly. Currentindexmatcheslib.rs intheactual079main-snapshotcompile inputs; originalreceipt/log reused, not088testexecution. Currentmodulesiblingcontentmaydifferlaterandisnotaccepted throughthisindex. Main/Cargoentry context frozen. No newbehavior/cargorun. Structuralchecks/hash/range/reference verification distinctfromG-FILEsemantic acceptance. G-STAGEread-only missingmaster isnotpass. Rollback removesnewreport/evidence only;no product/CI/moduleindexchanges.
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/artifact-index.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/artifact-index.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/artifact-index.json
+@@ -0,0 +1,67 @@
++[
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/README.md",
++    "bytes": 1003,
++    "sha256": "75395782c450eeaf986e20f5667b674340c6426651eaa9c03faad99600a72cca"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/context-Cargo.toml",
++    "bytes": 1087,
++    "sha256": "3ea3fcf70b4b0140f8f123ae86604bf60e0202d3203dca07eaebf76bcdfb24e9"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/context-main.rs",
++    "bytes": 234,
++    "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs",
++    "bytes": 844,
++    "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.json",
++    "bytes": 1140,
++    "sha256": "b1e3aabc18bf2256d60d3e8babcab44bb5d5542e179aa6252a8f1ec4c0c4f629"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log",
++    "bytes": 408,
++    "sha256": "7cab2622f6a98bd26d911f67e3751b6405ee272835c81f3f001430f7f9bf90c3"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/input-manifest.json",
++    "bytes": 1309,
++    "sha256": "1a41effac20524fbe0d17ed110c04923df558cd6570af3ac461b28c67cc66b8f"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/module-resolution.json",
++    "bytes": 10486,
++    "sha256": "51d79730d8dc84037cf4ebba4fbb6e823f8c44346273ab42dc498146f559883d"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs",
++    "bytes": 592,
++    "sha256": "2b429ff43bfba672fea949a9fb51ee6eda41a2975589dbc852a50bef2e13d575"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.json",
++    "bytes": 860,
++    "sha256": "3be2c9f5ba90c3f6eebe0ca94742628aded3a7ee06bdac6873dad4a238776abb"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.log",
++    "bytes": 322,
++    "sha256": "f689c1f86d0e6f4ee0552d6a9f6b0fdb6fa3b85dace30de07647cc9fc94bec35"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/references.json",
++    "bytes": 2927,
++    "sha256": "af58aba24f8ee9033d2d025c9ea1c15a2a31ecdb7f3ccb14dcc736c627362658"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/verify_references.py",
++    "bytes": 2263,
++    "sha256": "fcfccc723401511a0120aca65b0deae3910f39507f685498f43050f2e4753b83"
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/context-Cargo.toml b/Docs/quality/stage1/ZS1-088/worker-owner-review/context-Cargo.toml
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/context-Cargo.toml
+@@ -0,0 +1,46 @@
++[package]
++name = "zenpi"
++version = "0.1.0"
++edition = "2024"
++rust-version = "1.88"
++description = "A lightweight Rust agent with TUI and headless JSONL modes"
++license = "MIT"
++repository = "https://github.com/weiyangzen/zenpi"
++readme = "README.md"
++keywords = ["agent", "tui", "headless", "jsonl", "rust"]
++
++[features]
++default = []
++dev-fixtures = []
++
++[dependencies]
++base64 = "0.23"
++crossterm = { version = "0.29", features = ["bracketed-paste"] }
++httpdate = "1.0"
++ignore = "0.4"
++ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
++serde = { version = "1.0", features = ["derive"] }
++serde_json = "1.0"
++sha2 = "0.10"
++thiserror = "2.0"
++toml = "0.9"
++unicode-width = "0.2"
++unicode-segmentation = "=1.13.3"
++ureq = { version = "3.4", default-features = true, features = ["json"] }
++yaml_serde = "0.10"
++[target.'cfg(unix)'.dependencies]
++libc = "0.2"
++
++[dev-dependencies]
++tempfile = "3.23"
++
++[[example]]
++name = "runtime_budget_probe"
++path = "tools/runtime_budget_probe.rs"
++
++[profile.release]
++opt-level = "z"
++lto = "thin"
++strip = "symbols"
++codegen-units = 1
++panic = "abort"
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/context-main.rs b/Docs/quality/stage1/ZS1-088/worker-owner-review/context-main.rs
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/context-main.rs
+@@ -0,0 +1,11 @@
++use std::process::ExitCode;
++
++fn main() -> ExitCode {
++    match zenpi::core::run() {
++        Ok(()) => ExitCode::SUCCESS,
++        Err(error) => {
++            eprintln!("zenpi: {error}");
++            ExitCode::FAILURE
++        }
++    }
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs b/Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs
+@@ -0,0 +1,42 @@
++//! Shared zenpi library. The binary exposes only TUI and headless modes.
++
++pub mod approval;
++pub mod b3;
++pub mod backend;
++pub mod config;
++pub mod context;
++pub mod core;
++pub mod diagnostics;
++pub mod directory_picker;
++pub mod domain_execution;
++pub mod domain_store;
++pub mod domains;
++pub mod error;
++pub mod extension_runtime;
++pub mod extensions;
++pub mod governance;
++pub mod headless;
++pub mod input_queue;
++pub mod layout;
++pub mod persona;
++pub mod project_workspace;
++pub mod prompt_templates;
++pub mod protocol;
++pub mod providers;
++pub mod render;
++pub mod resource_loader;
++pub mod resources;
++pub mod runtime;
++pub mod runtime_intent;
++pub mod search;
++pub mod security;
++pub mod session;
++pub mod session_tree;
++pub mod skills;
++pub mod slash;
++pub mod slash_actions;
++pub mod tool_output;
++pub mod tool_runtime;
++pub mod tools;
++pub mod tui;
++pub mod view_model;
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.json
+@@ -0,0 +1,33 @@
++{
++  "name": "g-stage-main-before-integration",
++  "argv": [
++    "env",
++    "PYTHONDONTWRITEBYTECODE=1",
++    "python3",
++    "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
++    "--root",
++    "/Users/wangweiyang/GitHub/zenpi",
++    "--blueprint",
++    "Docs/stage_1_v3_pi_mono_blueprint.md",
++    "--evidence-root",
++    "Docs/learn/stage1_pi_mono",
++    "--item",
++    "ZS1-088",
++    "--json"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-10T22:18:05.100990+00:00",
++  "ended_at": "2026-09-10T22:18:05.301343+00:00",
++  "elapsed_seconds": 0.20024170900000002,
++  "exit_code": 1,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 21872640,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log",
++  "bytes": 408,
++  "sha256": "7cab2622f6a98bd26d911f67e3751b6405ee272835c81f3f001430f7f9bf90c3"
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log b/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log
+@@ -0,0 +1,14 @@
++{
++  "ok": false,
++  "structural": {
++    "ok": true
++  },
++  "semantic_manual": {
++    "verified_by_checker": false,
++    "note": "Artifact structure is machine checked; semantic truth requires independent master review.",
++    "receipt_structure_ok": false
++  },
++  "errors": [
++    "[Errno 2] No such file or directory: '/Users/wangweiyang/GitHub/zenpi/Docs/learn/stage1_pi_mono/receipts/ZS1-088.master.json'"
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/input-manifest.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/input-manifest.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/input-manifest.json
+@@ -0,0 +1,36 @@
++{
++  "item": "ZS1-088",
++  "status": "[_]",
++  "authority_version": "3.1.16",
++  "authority_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f",
++  "current": {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/current-lib.rs",
++    "bytes": 844,
++    "lines": 42,
++    "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
++  },
++  "original_frozen": {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs",
++    "bytes": 592,
++    "lines": 31,
++    "sha256": "2b429ff43bfba672fea949a9fb51ee6eda41a2975589dbc852a50bef2e13d575"
++  },
++  "report": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/lib.rs_learn.md",
++  "prior_report": "ABSENT inlocal/main; newreport",
++  "captured_at": "2026-09-10T22:15:03.341378+00:00",
++  "ordered_read_chunks": [
++    {
++      "first_line": 1,
++      "last_line": 42,
++      "byte_start": 0,
++      "byte_end": 844,
++      "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
++    }
++  ],
++  "original_read": "all31lines/592bytes",
++  "temporal_boundary": "116integrated per main;122scratchonly",
++  "new_behavior_cases": 0,
++  "new_behavior_runs": 0,
++  "structural_checks": "40modulepathresolutions;29retained11added",
++  "main_source_at_capture": "/Users/wangweiyang/GitHub/zenpi/src/lib.rs"
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/module-resolution.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/module-resolution.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/module-resolution.json
+@@ -0,0 +1,322 @@
++[
++  {
++    "line": 3,
++    "module": "approval",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/approval.rs",
++    "bytes": 29396,
++    "sha256": "5488ad365670e515eba5e7d82a91dbf935be854b848c20fd99725f102e1f185f",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 4,
++    "module": "b3",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/b3.rs",
++    "bytes": 47958,
++    "sha256": "8c98d80c998b3d0dc3f52ae88ba73103c0d6e2c71c59d0caecf9f9ed3dcbc157",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 5,
++    "module": "backend",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/backend.rs",
++    "bytes": 98741,
++    "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 6,
++    "module": "config",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/config.rs",
++    "bytes": 70640,
++    "sha256": "521b6bdd8e7d2dc3f45096757f9a0afd89378c3a76175bbee3998eda69ffe92c",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 7,
++    "module": "context",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/context.rs",
++    "bytes": 30013,
++    "sha256": "256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 8,
++    "module": "core",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
++    "bytes": 262182,
++    "sha256": "0c809084ab5ab197722a33890770e579c4163e93c3de00af1002a23c0f038c24",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 9,
++    "module": "diagnostics",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/diagnostics.rs",
++    "bytes": 4459,
++    "sha256": "b538501715cd7d16f2da46b72961514f0718afb22c57144e4ef6b8558eb31d3b",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 10,
++    "module": "directory_picker",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/directory_picker.rs",
++    "bytes": 10550,
++    "sha256": "1104ae833bca842f74cbc1635234309e33f7af5aa8a3a0765b8d2c40632d092f",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 11,
++    "module": "domain_execution",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/domain_execution.rs",
++    "bytes": 112548,
++    "sha256": "2f5ee732fdf80b99af0ab973eb4594b2369786ae4acc6a86768fc3ba49be890f",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 12,
++    "module": "domain_store",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/domain_store.rs",
++    "bytes": 34183,
++    "sha256": "55258b05dadbb61c2060ac094c562ede0b656fbf31eb6119197510ac44e5a1c7",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 13,
++    "module": "domains",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/domains.rs",
++    "bytes": 24622,
++    "sha256": "c11e10d02a21ed3412e731acd269080053b18f649935bb1f9486b128ee7c79ac",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 14,
++    "module": "error",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/error.rs",
++    "bytes": 919,
++    "sha256": "333c7e9d1e3efe71672ee1fcf2d1d3d5e16c569e88ba9dbd9de1aceba815f32c",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 15,
++    "module": "extension_runtime",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
++    "bytes": 35676,
++    "sha256": "aee2484dc19a8f3064c3813d2b2890a72690cd9aa42ab956702a11aa6671843f",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 16,
++    "module": "extensions",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/extensions.rs",
++    "bytes": 20742,
++    "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 17,
++    "module": "governance",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/governance.rs",
++    "bytes": 44516,
++    "sha256": "4d80ffb9f29bb987e488bad93bc35546a6994065e793bd645fc3d73802930552",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 18,
++    "module": "headless",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/headless.rs",
++    "bytes": 353377,
++    "sha256": "a6ffd18fb706255d18e9ead1a88c668499514a15d2adbb97929aa79f126bc73a",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 19,
++    "module": "input_queue",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/input_queue.rs",
++    "bytes": 29652,
++    "sha256": "ff1ab18e485d1145803e3e10ce1d974658a882f703de5bdfdd94daa767155533",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 20,
++    "module": "layout",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/layout.rs",
++    "bytes": 54632,
++    "sha256": "218c1b1cb7853da8f5c03b51e09d552f0634efb82284e029cbcfaeb434dac05a",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 21,
++    "module": "persona",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/persona.rs",
++    "bytes": 2975,
++    "sha256": "a7dc0ea2080c2e2ef944ba5042209c0aa40453ad8aa7feded603a161392399e2",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 22,
++    "module": "project_workspace",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/project_workspace.rs",
++    "bytes": 25373,
++    "sha256": "645614426113ba7516c17de47446b33cb6845b2b7bf64e187ac0493ca490813b",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 23,
++    "module": "prompt_templates",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/prompt_templates.rs",
++    "bytes": 17406,
++    "sha256": "1b3f2531d6f292a0d1ab24b9b4c69f3780cefb528437102bea316ec5e8197a06",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 24,
++    "module": "protocol",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/protocol.rs",
++    "bytes": 45394,
++    "sha256": "b092559d0ad56fc3d0eff6875914be755e2801bb991b07a88bda21f941bfefea",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 25,
++    "module": "providers",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/providers/mod.rs",
++    "bytes": 129,
++    "sha256": "0c723015cd66bb637cd7d9d25a04200aa3af5708c4bb9c7747bc3f7f34027cdd",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 26,
++    "module": "render",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/render.rs",
++    "bytes": 30217,
++    "sha256": "6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 27,
++    "module": "resource_loader",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/resource_loader.rs",
++    "bytes": 9204,
++    "sha256": "121d3b6ea7760d137e0e074e7d9b269023ddc6ca2ecca199f23072890bd06858",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 28,
++    "module": "resources",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/resources.rs",
++    "bytes": 15263,
++    "sha256": "c6e8dcf6385ccbbf3cbbd9e1f3c6ec5318664c0afc9a3740c4c3588fe0f57c65",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 29,
++    "module": "runtime",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/runtime.rs",
++    "bytes": 33333,
++    "sha256": "7a42c428083f8f3edb0019311296b479004ff562b548d7cdc504729f7cbd1f21",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 30,
++    "module": "runtime_intent",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/runtime_intent.rs",
++    "bytes": 18942,
++    "sha256": "b6d06cb79ec0827875738f8120d3d075abc43d35a6de2d518c99336f5ea42ca6",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 31,
++    "module": "search",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/search.rs",
++    "bytes": 21220,
++    "sha256": "556db8458cce78326c2b8a191b39975ae1ff209e5f5d2a9f917a92efe4fae2b4",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 32,
++    "module": "security",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/security.rs",
++    "bytes": 16606,
++    "sha256": "b733d0e4fe890be481acc82de39e23f01e689c9121b3343a1863bae56ceb5cc5",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 33,
++    "module": "session",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/session.rs",
++    "bytes": 136997,
++    "sha256": "49c638663b8cd9bfb97558cba648fcd4ecc053601dde6b8d890c621b2e529b12",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 34,
++    "module": "session_tree",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/session_tree.rs",
++    "bytes": 20618,
++    "sha256": "43c95903866e4aa24cc2c20d0f0fcc1d25cd4d206a2e6ec8ec877304563a35fc",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 35,
++    "module": "skills",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
++    "bytes": 40533,
++    "sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 36,
++    "module": "slash",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/slash.rs",
++    "bytes": 81239,
++    "sha256": "449b1250c55ca9a3de9952c365ddb18c4f0d3522bb21d2bfd71b216a6fd155e7",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 37,
++    "module": "slash_actions",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/slash_actions.rs",
++    "bytes": 32985,
++    "sha256": "826536a1a7296b292be759610db1140dc8081821b22f7c488e17ae072e7d2f47",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 38,
++    "module": "tool_output",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/tool_output.rs",
++    "bytes": 53663,
++    "sha256": "5a77edb5371fcda1da2c29beb331c349dde9efa5389c44ddd87b5a9b1d735dcd",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 39,
++    "module": "tool_runtime",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/tool_runtime.rs",
++    "bytes": 13977,
++    "sha256": "95a30b514109fe8585aa7abb39727b4a4cf89075c007d272298ac3885134217b",
++    "new_since_blueprint": true
++  },
++  {
++    "line": 40,
++    "module": "tools",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/tools.rs",
++    "bytes": 118647,
++    "sha256": "af444116cd072268cfed5baabb0e7f6844976589db4dc68a67106fbbb6ecf82a",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 41,
++    "module": "tui",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
++    "bytes": 528820,
++    "sha256": "0e233da03e69f168c62cb0ceb05aa42e9824dbbf2aa175a5471ae4740e6690cd",
++    "new_since_blueprint": false
++  },
++  {
++    "line": 42,
++    "module": "view_model",
++    "resolved_source": "/Users/wangweiyang/GitHub/zenpi/src/view_model.rs",
++    "bytes": 42009,
++    "sha256": "094833f051ab66d30ce3f6cc74fcc0334ed938e79f5fd8e9269341b62bed08fe",
++    "new_since_blueprint": false
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs b/Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/original-lib.rs
+@@ -0,0 +1,31 @@
++//! Shared zenpi library. The binary exposes only TUI and headless modes.
++
++pub mod approval;
++pub mod b3;
++pub mod backend;
++pub mod config;
++pub mod context;
++pub mod core;
++pub mod diagnostics;
++pub mod domain_execution;
++pub mod domain_store;
++pub mod domains;
++pub mod error;
++pub mod extensions;
++pub mod governance;
++pub mod headless;
++pub mod layout;
++pub mod persona;
++pub mod protocol;
++pub mod render;
++pub mod resources;
++pub mod runtime;
++pub mod runtime_intent;
++pub mod security;
++pub mod session;
++pub mod skills;
++pub mod slash;
++pub mod slash_actions;
++pub mod tools;
++pub mod tui;
++pub mod view_model;
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.json
+@@ -0,0 +1,22 @@
++{
++  "name": "references-verified",
++  "argv": [
++    "python3",
++    "Docs/quality/stage1/ZS1-088/worker-owner-review/verify_references.py"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-10T22:18:04.980749+00:00",
++  "ended_at": "2026-09-10T22:18:05.012626+00:00",
++  "elapsed_seconds": 0.031756875000000004,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 11304960,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.log",
++  "bytes": 322,
++  "sha256": "f689c1f86d0e6f4ee0552d6a9f6b0fdb6fa3b85dace30de07647cc9fc94bec35"
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.log b/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/references-verified.log
+@@ -0,0 +1,13 @@
++{
++  "status": "pass",
++  "source_bytes": 844,
++  "source_lines": 42,
++  "baseline_lines": 31,
++  "public_modules": 40,
++  "retained": 29,
++  "added": 11,
++  "references": 10,
++  "module_lookup": "40uniquepaths; siblingsnotsemanticallyreviewed",
++  "new_behavior_cases": 0,
++  "meaning": "index/range/hash/referenceintegrity only"
++}
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/references.json b/Docs/quality/stage1/ZS1-088/worker-owner-review/references.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/references.json
+@@ -0,0 +1,62 @@
++[
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target079-owner-ready/manifest.json",
++    "bytes": 13452,
++    "sha256": "8cf8c7a8162fc0da3ca763cff3188d20c5ab43ec652d17259f1634f2ac400b57",
++    "scope": "Frozen compilecontext/sourceboundaries"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target079-owner-ready/files/Docs/quality/stage1/ZS1-079/worker-owner-review/compile-context.json",
++    "bytes": 8142,
++    "sha256": "272a1c8de909b63fe19ac7d4a5282ccffb9ba931a6d6e461ac5a3dbfd6fdebd8",
++    "scope": "Actual historicalmain library compilation inputmanifest"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target079-owner-ready/files/Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples-main-snapshot.json",
++    "bytes": 1007,
++    "sha256": "bd52822ac61a4af1af5148f2dd7c7541ac104c8c628e7966143b276432760785",
++    "scope": "Actual successfulcompile/run receipt;2parsercases not088cases"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target079-owner-ready/files/Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples-main-snapshot.log",
++    "bytes": 392,
++    "sha256": "c2c5b150d68f51a5f5737b2eebf481133dbc47256556747c0e2a53c149de4480",
++    "scope": "Actualprobe output"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/extension115-native-fixture-ready/manifest.json",
++    "bytes": 12679,
++    "sha256": "5310564998d526a927cba97d6e4853edf4319043bf61978896ac0f2682977a78",
++    "scope": "Earlierlocal115test/lint context; notcurrent088compile"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source022-behavior-ready/manifest.json",
++    "bytes": 5208,
++    "sha256": "1cc797078a4a8b3befb773d7299b8f7e7443143d50e14e4447315b539b96dba0",
++    "scope": "Sourceexport/runtimecontext only"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source023-behavior-ready/manifest.json",
++    "bytes": 5792,
++    "sha256": "df5693ad7a3d4c1b1a7cc8a86a4b6afbebb1e639d3591fc1656fbda11bc923a1",
++    "scope": "Sourceextensionrunnercontext only"
++  },
++  {
++    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source028-behavior-ready/manifest.json",
++    "bytes": 19205,
++    "sha256": "d8413bf703aa197e88004e3a0bc8efbefe6bf573708de021aaa9ebf5f9156f23",
++    "scope": "SourceAgentSessioncontext only"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/context-main.rs",
++    "bytes": 234,
++    "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b",
++    "scope": "Actualreadonlymaincontext snapshot, notsiblingacceptance"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-088/worker-owner-review/context-Cargo.toml",
++    "bytes": 1087,
++    "sha256": "3ea3fcf70b4b0140f8f123ae86604bf60e0202d3203dca07eaebf76bcdfb24e9",
++    "scope": "Actualreadonlymaincontext snapshot, notsiblingacceptance"
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-088/worker-owner-review/verify_references.py b/Docs/quality/stage1/ZS1-088/worker-owner-review/verify_references.py
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-088/worker-owner-review/verify_references.py
+@@ -0,0 +1,16 @@
++from pathlib import Path
++import hashlib,json,re
++R=Path(__file__).resolve().parents[5];E=Path(__file__).resolve().parent;sha=lambda b:hashlib.sha256(b).hexdigest();m=json.loads((E/'input-manifest.json').read_text());refs=json.loads((E/'references.json').read_text())
++for r in refs:
++ p=Path(r['path']);p=p if p.is_absolute() else R/p;b=p.read_bytes();assert sha(b)==r['sha256'] and len(b)==r['bytes']
++for k in ['original_frozen','current']:
++ r=m[k];b=(R/r['path']).read_bytes();assert len(b)==r['bytes'] and len(b.splitlines())==r['lines'] and sha(b)==r['sha256']
++current=(R/m['current']['path']).read_bytes();assert current==Path(m['main_source_at_capture']).read_bytes();c=m['ordered_read_chunks'][0];assert c['byte_start']==0 and c['byte_end']==len(current) and c['sha256']==sha(current)
++old=(R/m['original_frozen']['path']).read_text();new=current.decode();names=re.findall(r'^pub mod (\w+);$',new,re.M);oldnames=re.findall(r'^pub mod (\w+);$',old,re.M);assert len(names)==len(set(names))==40 and len(oldnames)==29 and [n for n in names if n in oldnames]==oldnames
++rows=json.loads((E/'module-resolution.json').read_text());assert [r['module'] for r in rows]==names and sum(r['new_since_blueprint'] for r in rows)==11
++for r in rows:
++ p=Path(r['resolved_source']);candidates=[p.parent/(r['module']+'.rs'),p.parent/r['module']/'mod.rs'] if p.name!='mod.rs' else [p.parent.parent/(r['module']+'.rs'),p.parent/'mod.rs'];assert sum(p.is_file() for p in candidates)==1 and p.is_file();assert new.splitlines()[r['line']-1]==f'pub mod {r["module"]};'
++context=json.loads((R/'.ops/target079-owner-ready/files/Docs/quality/stage1/ZS1-079/worker-owner-review/compile-context.json').read_text());entry=next(r for r in context['files'] if r['path']=='src/lib.rs');assert entry['sha256']==sha(current)
++report=(R/m['report']).read_text();assert all(r['module'] in report for r in rows)
++for k in ['original_frozen','current']:assert m[k]['sha256'] in report
++print(json.dumps({'status':'pass','source_bytes':len(current),'source_lines':42,'baseline_lines':31,'public_modules':40,'retained':29,'added':11,'references':len(refs),'module_lookup':'40uniquepaths; siblingsnotsemanticallyreviewed','new_behavior_cases':0,'meaning':'index/range/hash/referenceintegrity only'},indent=2))

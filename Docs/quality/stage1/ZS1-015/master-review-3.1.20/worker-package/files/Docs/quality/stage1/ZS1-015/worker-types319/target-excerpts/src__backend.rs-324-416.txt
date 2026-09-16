@@ -1,0 +1,93 @@
+/// Errors at the provider boundary.  They are surfaced as typed headless
+/// responses rather than panics or silent fallback to another model.
+#[derive(Debug, Error)]
+pub enum BackendError {
+    #[error("backend configuration: {0}")]
+    Configuration(String),
+    #[error("backend transport: {0}")]
+    Transport(String),
+    #[error("backend HTTP status: {status}")]
+    HttpStatus {
+        status: u16,
+        /// Provider-directed retry delay. The value is bounded while parsing
+        /// so an endpoint cannot stall the runtime indefinitely.
+        retry_after_ms: Option<u64>,
+    },
+    #[error("backend circuit is open for another {retry_after_ms} ms")]
+    CircuitOpen { retry_after_ms: u64 },
+    #[error("backend returned an invalid response: {0}")]
+    InvalidResponse(String),
+    #[error("backend returned an empty completion")]
+    EmptyResponse,
+    #[error("backend request was cancelled")]
+    Cancelled,
+    #[error("backend request was superseded by a steer")]
+    Steered,
+}
+
+impl BackendError {
+    /// Stable classification for hosts that need to decide whether a failed
+    /// turn may be retried without parsing display text.
+    pub const fn is_retryable(&self) -> bool {
+        match self {
+            Self::Transport(_) => true,
+            Self::HttpStatus { status, .. } => {
+                *status == 408
+                    || *status == 409
+                    || *status == 425
+                    || *status == 429
+                    || (*status >= 500 && *status <= 599)
+            }
+            Self::Configuration(_)
+            | Self::CircuitOpen { .. }
+            | Self::InvalidResponse(_)
+            | Self::EmptyResponse
+            | Self::Cancelled
+            | Self::Steered => false,
+        }
+    }
+
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Configuration(_) => "backend_configuration",
+            Self::Transport(_) => "backend_transport",
+            Self::HttpStatus { .. } => "backend_http_status",
+            Self::CircuitOpen { .. } => "backend_circuit_open",
+            Self::InvalidResponse(_) => "backend_invalid_response",
+            Self::EmptyResponse => "backend_empty_response",
+            Self::Cancelled => "backend_cancelled",
+            Self::Steered => "backend_steered",
+        }
+    }
+}
+
+/// Synchronous provider contract.  A synchronous boundary is intentional:
+/// the default binary stays tiny and callers that need concurrency can run
+/// independent agents in their own processes.
+pub trait Backend: Send + Sync {
+    fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError>;
+
+    fn complete_with_control(
+        &self,
+        request: CompletionRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
+    ) -> Result<Completion, BackendError> {
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        let completion = self.complete(request)?;
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        if !completion.content.is_empty() {
+            sink(ProviderEvent::TextDelta {
+                delta: completion.content.clone(),
+            })?;
+        }
+        sink(ProviderEvent::Completed {
+            response_id: completion.response_id.clone(),
+            model: completion.model.clone(),
+        })?;
+        Ok(completion)
+    }

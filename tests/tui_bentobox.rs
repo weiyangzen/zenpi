@@ -27,6 +27,31 @@ fn rendered(terminal: &Terminal<TestBackend>) -> String {
         .collect()
 }
 
+#[test]
+fn active_layout_edits_after_restore_replace_cached_project_layout() {
+    let mut state = TuiState::new(32);
+    state.focus_next_workspace_pane();
+    assert!(state.adjust_workspace_split(FocusDirection::Right));
+    let first = state.workspace_layout().clone();
+    assert!(state.open_project_tab("second"));
+    state.reset_workspace_layout();
+    let second = state.workspace_layout().clone();
+    assert!(state.select_project_tab(0));
+    assert_eq!(state.workspace_layout(), &first);
+    let mut restored = TuiState::new(32);
+    assert!(restored.restore_project_checkpoint(&state.project_checkpoint()));
+    assert_eq!(restored.workspace_layout(), &first);
+    restored.reset_workspace_layout();
+    restored.focus_next_workspace_pane();
+    let edited = restored.workspace_layout().clone();
+    assert_ne!(edited, first);
+    let mut reopened = TuiState::new(32);
+    assert!(reopened.restore_project_checkpoint(&restored.project_checkpoint()));
+    assert_eq!(reopened.workspace_layout(), &edited);
+    assert!(reopened.select_project_tab(1));
+    assert_eq!(reopened.workspace_layout(), &second);
+}
+
 fn resource_snapshot() -> ResourceSnapshot {
     ResourceSnapshot {
         collected_at_ms: 42,
@@ -259,7 +284,10 @@ fn gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt
 
     let snapshot = collect_gantt_snapshot(&session_path).unwrap();
     let content = snapshot.content();
-    assert!(content.contains("build  ready  12 LOC  status cancelled attempt 2"));
+    assert!(
+        content
+            .contains("build  ready  12 LOC  status cancelled attempt 2 error operator cancelled")
+    );
     assert!(content.contains("verify  after 1  34 LOC  status running attempt 3"));
 }
 
@@ -477,4 +505,80 @@ fn restoring_tab_models_preserves_each_tab_and_clears_dirty_state() {
     assert_eq!(state.workspace_layout().ratios, goal.ratios);
     state.set_workspace_tab(TabId::Project);
     assert_eq!(state.workspace_layout().ratios, project.ratios);
+}
+
+#[test]
+fn short_workspace_tab_cycle_skips_panes_that_have_no_screen_rows() {
+    let mut terminal = Terminal::new(TestBackend::new(180, 7)).unwrap();
+    let mut state = TuiState::default();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    let output = rendered(&terminal);
+    assert!(output.contains("Gantt"));
+    assert!(!output.contains("Resources"));
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)),
+        TuiAction::Redraw
+    );
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+    state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
+    assert!(state.input().is_empty());
+}
+
+#[test]
+fn short_workspace_direction_follows_the_panes_actually_drawn() {
+    let mut terminal = Terminal::new(TestBackend::new(180, 7)).unwrap();
+    let mut state = TuiState::default();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    assert!(rendered(&terminal).contains("Gantt"));
+    assert!(state.focus_workspace_pane(PaneId::Gantt));
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
+        TuiAction::Redraw
+    );
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+    state.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
+}
+
+#[test]
+fn short_workspace_narrow_cycle_reveals_each_selected_pane() {
+    let mut terminal = Terminal::new(TestBackend::new(60, 7)).unwrap();
+    let mut state = TuiState::default();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
+    assert!(rendered(&terminal).contains("Resources"));
+    state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    assert_eq!(
+        state.focused_workspace_pane(),
+        Some(PaneId::ProjectConversation)
+    );
+    assert!(rendered(&terminal).contains("Conversation"));
 }

@@ -1,0 +1,125 @@
+{
+  "all_matched": true,
+  "files": [
+    {
+      "path": "packages/coding-agent/src/core/tools/find.ts",
+      "bytes": 11178,
+      "lines": 318,
+      "sha256": "b06bcae6821a0e9fda1b63be613a7ce28eb0e66e1d01d16564e59e83f9ce10ea",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/path-utils.ts",
+      "bytes": 3626,
+      "lines": 118,
+      "sha256": "ab6f420d2388a41366113c17a25e356867820b87b02a169d044cfcf83e1997d3",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/truncate.ts",
+      "bytes": 7693,
+      "lines": 276,
+      "sha256": "104e61ea602c7f7894097b2771dad8c68de75c5a10ea6222e615c4ad144451c7",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts",
+      "bytes": 1870,
+      "lines": 47,
+      "sha256": "98c04e593457dfefdc4160fa84c4e16f1a693adad21672bdf1fbfa4912ef2f8b",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/renderers/find.ts",
+      "bytes": 3180,
+      "lines": 77,
+      "sha256": "a33591e8193eb2a5591596019676899587f783149434f857eaf331edb8fabe70",
+      "role": "context-only renderer",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/utils/tools-manager.ts",
+      "bytes": 13294,
+      "lines": 400,
+      "sha256": "cfd082080d10a6209d7994ac7829c29dbb39694bdf3fe549e907c28cfc506a17",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/utils/management-http.ts",
+      "bytes": 3004,
+      "lines": 78,
+      "sha256": "2195b345fdd5c607f87a55b93e7d00c6d70d7dcfe2989b08bbd9f39b529a756a",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/utils/child-process.ts",
+      "bytes": 4146,
+      "lines": 137,
+      "sha256": "cd324f5b9a1abadd85ab5a331750d475c8bd51ec65cae091ad9b416245ec85d4",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/utils/paths.ts",
+      "bytes": 4880,
+      "lines": 139,
+      "sha256": "a687cdb54b82216673fea5be1210c48e64ffa8398d64cfabf2bd7dba5c9d4210",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/utils/text.ts",
+      "bytes": 404,
+      "lines": 9,
+      "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/src/config.ts",
+      "bytes": 19600,
+      "lines": 579,
+      "sha256": "7874d7f63a62778f4281a324f99ba4faee8dc9a5c7ae80e2c531552d199257f9",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/package.json",
+      "bytes": 4041,
+      "lines": 107,
+      "sha256": "552b6f87a540add2f6117e7584357730cceee798c2f5d7c69ac00c709d3e8750",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "bytes": 3127,
+      "lines": 72,
+      "sha256": "d9bb34b773d7865109e41ac09146fa3c2c670cc594bb5a350e2d8e30230939db",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts",
+      "bytes": 3587,
+      "lines": 83,
+      "sha256": "40748b486bf64c9feaacb3e0f411ffec5fdc145cca3dad0f62c680e0673b959f",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "bytes": 3593,
+      "lines": 91,
+      "sha256": "5868521c64a301d49b018b82749f74b69bbe26c35a68122816398fbf7d33ea63",
+      "role": "source/test runtime",
+      "original_and_copy_match": true
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "model-registry-master-tests.log": {
+    "path": ".ops/stage1_execution/model-registry-master-tests.log",
+    "bytes": 8824,
+    "sha256": "ab64ee84121bc6ad9622fff34fe65cf2ecdcb90f2e3694a92dbbebae81c77c4b",
+    "passed": 89,
+    "failed": 2,
+    "ignored": 0
+  },
+  "model-registry-fixture-diagnostic.log": {
+    "path": ".ops/stage1_execution/model-registry-fixture-diagnostic.log",
+    "bytes": 965,
+    "sha256": "6423e66f53631b976d68182d63eccdea9eb8eae6d73c4ef235280b255dc52cd5",
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0
+  },
+  "model-registry-master-tests-fixed.log": {
+    "path": ".ops/stage1_execution/model-registry-master-tests-fixed.log",
+    "bytes": 11177,
+    "sha256": "c417e2b5002f9d22c9daa8d5d6eaffa94c45b83a7bf60e4d7e0f1a3baed9d858",
+    "passed": 121,
+    "failed": 0,
+    "ignored": 1
+  },
+  "model-registry-tool-cap-tests.log": {
+    "path": ".ops/stage1_execution/model-registry-tool-cap-tests.log",
+    "bytes": 4203,
+    "sha256": "1b2596a61253e65ff3b89c085c3210a57563efae6da08f75d302c1fb16bbcd98",
+    "passed": 39,
+    "failed": 0,
+    "ignored": 1
+  },
+  "model-owner-full-tests.log": {
+    "path": ".ops/stage1_execution/model-owner-full-tests.log",
+    "bytes": 57973,
+    "sha256": "f9fff5969fa26dd96f7df25f67faeccf19c861a8e8757391f698c59b19361cf2",
+    "passed": 625,
+    "failed": 0,
+    "ignored": 4
+  },
+  "model-owner-installed-skills.log": {
+    "path": ".ops/stage1_execution/model-owner-installed-skills.log",
+    "bytes": 670,
+    "sha256": "9eb6602f8dabbeeff97a5f55cf9bb9dc7c1d78a530acada01189684ba68f28fb",
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0
+  },
+  "model-owner-environment-tests.log": {
+    "path": ".ops/stage1_execution/model-owner-environment-tests.log",
+    "bytes": 2787,
+    "sha256": "0f41ba1c88cc446ff0dff28322553fc904bb193ee17d21896172b206e2879db1",
+    "passed": 26,
+    "failed": 0,
+    "ignored": 0
+  }
+}

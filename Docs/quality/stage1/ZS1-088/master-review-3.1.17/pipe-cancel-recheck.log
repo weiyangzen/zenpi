@@ -1,0 +1,55 @@
+
+running 1 test
+test extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded ... api=1 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=481 fixture_pids=["74977", "74981"] status=exit status: 0 stdout=
+running 1 test
+inner_elapsed_ms=477 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.48s
+
+ stderr=
+api=1 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=209 fixture_pids=["74983", "74984"] status=exit status: 0 stdout=
+running 1 test
+inner_elapsed_ms=201 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.20s
+
+ stderr=
+api=2 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=1012 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 75 filtered out; finished in 1.00s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (27720419) panicked at src/extension_runtime.rs:972:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+api=2 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=872 fixture_pids=["74999", "75001"] status=exit status: 0 stdout=
+running 1 test
+inner_elapsed_ms=860 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.86s
+
+ stderr=
+
+thread 'extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded' (27720354) panicked at src/extension_runtime.rs:865:9:
+escaped pipe cancel failures: [(2, "stdout")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 75 filtered out; finished in 2.61s
+

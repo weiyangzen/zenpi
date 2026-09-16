@@ -1,0 +1,234 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/added-tests.rs b/Docs/quality/stage1/ZS1-111/worker-io319/added-tests.rs
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/added-tests.rs
+@@ -0,0 +1,229 @@
++
++#[test]
++fn actual_kernel_file_size_limit_preserves_partial_write_identity_on_restart() {
++    let root = tempdir().unwrap();
++    let status = std::process::Command::new(std::env::current_exe().unwrap())
++        .args(["--exact", "kernel_file_size_limit_helper", "--nocapture"])
++        .env("ZENPI_OUTPUT_FSIZE_ROOT", root.path())
++        .status()
++        .unwrap();
++    assert!(status.success());
++    let reference: ArtifactRef =
++        serde_json::from_slice(&fs::read(root.path().join("reference.json")).unwrap()).unwrap();
++    assert!(reference.finalized && !reference.complete && reference.truncated);
++    assert_eq!(
++        (reference.bytes_stored, reference.bytes_observed),
++        (8192, 20480)
++    );
++    assert!(
++        reference
++            .failure
++            .as_deref()
++            .unwrap()
++            .contains("File too large")
++    );
++    let store = OutputArtifactStore::open(root.path().join("raw"), limits()).unwrap();
++    assert_eq!(store.inspect(&reference, 101).unwrap(), reference);
++    let mut expected = vec![b'A'; 4096];
++    expected.extend(vec![b'B'; 4096]);
++    assert_eq!(
++        store.read_range(&reference, 0, 8192, 101).unwrap(),
++        expected
++    );
++    assert_eq!(reference.sha256, Some(digest(&expected)));
++    println!(
++        "actual EFBIG: observed=20480 stored=8192 complete=false restart prefix/hash/identity verified"
++    );
++}
++
++#[test]
++fn kernel_file_size_limit_helper() {
++    let Some(root) = std::env::var_os("ZENPI_OUTPUT_FSIZE_ROOT") else {
++        return;
++    };
++    let root = std::path::PathBuf::from(root);
++    let store = OutputArtifactStore::open(root.join("raw"), limits()).unwrap();
++    let mut writer = store
++        .begin(
++            "kernel-session",
++            "kernel-call",
++            OutputStream::Stdout,
++            100,
++            store.progress_queue(),
++        )
++        .unwrap();
++    writer.append(&vec![b'A'; 4096]).unwrap();
++    // Process-local OS limit: force a partial successful write followed by the
++    // real kernel EFBIG path, without exhausting the user's filesystem.
++    struct Restore(libc::rlimit, libc::sighandler_t);
++    impl Drop for Restore {
++        fn drop(&mut self) {
++            unsafe {
++                libc::setrlimit(libc::RLIMIT_FSIZE, &self.0);
++                libc::signal(libc::SIGXFSZ, self.1);
++            }
++        }
++    }
++    let old = unsafe {
++        let mut old: libc::rlimit = std::mem::zeroed();
++        assert_eq!(libc::getrlimit(libc::RLIMIT_FSIZE, &mut old), 0);
++        let handler = libc::signal(libc::SIGXFSZ, libc::SIG_IGN);
++        assert_ne!(handler, libc::SIG_ERR);
++        assert_eq!(
++            libc::setrlimit(
++                libc::RLIMIT_FSIZE,
++                &libc::rlimit {
++                    rlim_cur: 8192,
++                    rlim_max: old.rlim_max
++                }
++            ),
++            0
++        );
++        Restore(old, handler)
++    };
++    let failed = writer.append(&vec![b'B'; 16384]);
++    drop(old);
++    assert!(
++        matches!(failed, Err(OutputError::Io(ref e)) if e.raw_os_error()==Some(libc::EFBIG)),
++        "{failed:?}"
++    );
++    let reference = writer.finish(true).unwrap();
++    fs::write(
++        root.join("reference.json"),
++        serde_json::to_vec(&reference).unwrap(),
++    )
++    .unwrap();
++}
++
++#[test]
++fn actual_metadata_permission_denial_remains_interrupted_after_restart() {
++    use std::os::unix::fs::PermissionsExt;
++    assert_ne!(
++        unsafe { libc::geteuid() },
++        0,
++        "EACCES fixture requires an unprivileged process"
++    );
++    let root = tempdir().unwrap();
++    let path = root.path().join("raw");
++    let store = OutputArtifactStore::open(&path, limits()).unwrap();
++    let mut writer = store
++        .begin(
++            "permission-session",
++            "permission-call",
++            OutputStream::Stdout,
++            100,
++            store.progress_queue(),
++        )
++        .unwrap();
++    writer.append(b"known-written-prefix").unwrap();
++    struct Restore(std::path::PathBuf);
++    impl Drop for Restore {
++        fn drop(&mut self) {
++            fs::set_permissions(&self.0, fs::Permissions::from_mode(0o700)).unwrap();
++        }
++    }
++    let restore = Restore(path.clone());
++    fs::set_permissions(&path, fs::Permissions::from_mode(0o500)).unwrap();
++    let failed = writer.finish(true);
++    drop(restore);
++    assert!(
++        matches!(failed, Err(OutputError::Io(ref e)) if e.raw_os_error()==Some(libc::EACCES)),
++        "{failed:?}"
++    );
++    let reference = writer.reference().clone();
++    assert!(reference.finalized && !reference.complete && reference.failure.is_some());
++    assert_eq!(reference.bytes_stored, 20);
++    assert!(matches!(
++        store.begin(
++            "permission-session",
++            "later-call",
++            OutputStream::Stderr,
++            100,
++            store.progress_queue()
++        ),
++        Err(OutputError::Interrupted)
++    ));
++    drop(writer);
++    drop(store);
++    let reopened = OutputArtifactStore::open(&path, limits()).unwrap();
++    assert!(matches!(
++        reopened.inspect(&reference, 101),
++        Err(OutputError::Interrupted)
++    ));
++    assert_eq!(
++        fs::read(path.join(format!("{}.raw", reference.artifact_id))).unwrap(),
++        b"known-written-prefix"
++    );
++    println!(
++        "actual EACCES: final metadata publication failed; complete=false; same owner blocked; reopened artifact interrupted with exact raw prefix"
++    );
++}
++
++#[test]
++fn actual_default_max_artifact_read_measures_in_scan_cancellation() {
++    let root = tempdir().unwrap();
++    let mut agent = output_host(root.path(), root.path());
++    let result = agent
++        .run_user_shell_with_cancel("!/usr/bin/yes x | /usr/bin/head -c 8388608", || false)
++        .unwrap();
++    let reference: ArtifactRef =
++        serde_json::from_value::<Vec<ArtifactRef>>(result["output_artifacts"].clone())
++            .unwrap()
++            .into_iter()
++            .find(|r| r.stream == OutputStream::Stdout)
++            .unwrap();
++    assert_eq!(
++        reference.bytes_stored,
++        OutputLimits::default().max_file_bytes
++    );
++    assert!(reference.complete);
++    let request = OutputReadRequest {
++        artifact_id: reference.artifact_id.clone(),
++        call_id: reference.call_id.clone(),
++        offset: 0,
++        length: 8,
++    };
++    let cancelled = AtomicBool::new(false);
++    let calls = std::sync::atomic::AtomicUsize::new(0);
++    let (tx, rx) = std::sync::mpsc::channel();
++    std::thread::scope(|scope| {
++        let cancel_flag = &cancelled;
++        let cancel = scope.spawn(move || {
++            rx.recv_timeout(Duration::from_secs(5)).unwrap();
++            std::thread::sleep(Duration::from_millis(1));
++            cancel_flag.store(true, Ordering::SeqCst);
++            Instant::now()
++        });
++        let started = Instant::now();
++        let result = agent.read_tool_output(request, &|| {
++            if calls.fetch_add(1, Ordering::SeqCst) == 1 {
++                tx.send(()).unwrap();
++            }
++            cancelled.load(Ordering::SeqCst)
++        });
++        let ended = Instant::now();
++        let cancelled_at = cancel.join().unwrap();
++        assert!(matches!(result, Err(OutputError::Cancelled)), "{result:?}");
++        println!(
++            "default 8MiB artifact, requested 8B: read_ms={} cancellation_to_return_ms={} callback_checks={}",
++            ended.duration_since(started).as_millis(),
++            ended.saturating_duration_since(cancelled_at).as_millis(),
++            calls.load(Ordering::SeqCst)
++        );
++        // Generous regression ceiling: a cancelled eight-byte request must
++        // not keep scanning/redacting the entire default 8MiB artifact.
++        assert!(
++            ended.saturating_duration_since(cancelled_at) < Duration::from_secs(1),
++            "cancel waited for full artifact scan"
++        );
++    });
++    assert_eq!(
++        agent
++            .session()
++            .events()
++            .iter()
++            .filter(|e| e["type"] == "tool_execution_started")
++            .count(),
++        1
++    );
++}

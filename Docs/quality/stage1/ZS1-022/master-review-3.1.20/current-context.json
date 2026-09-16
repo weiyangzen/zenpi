@@ -1,0 +1,138 @@
+[
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extensions.rs",
+    "captured_sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed",
+    "current_sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/extensions.rs.18-160.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/extensions.rs.269-307.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+    "captured_sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+    "current_sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/extension_runtime.rs.26-432.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/extension_runtime.rs.432-641.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
+    "captured_sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
+    "current_sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/skills.rs.24-59.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/skills.rs.343-402.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/skills.rs.65-88.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+    "captured_sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869",
+    "current_sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/core.rs.2104-2227.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/core.rs.3348-3390.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/core.rs.4490-4595.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/core.rs.4680-4732.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
+    "captured_sha256": "d04fa4e6fcf1b768adc26d82944468a568a8477d739f34290a42f429110cb185",
+    "current_sha256": "d04fa4e6fcf1b768adc26d82944468a568a8477d739f34290a42f429110cb185",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/validate_stage1_blueprint.py.605-658.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "captured_sha256": "20e38b23c6550422c993cc241f9ffa9daeb4443e6d4f050fdd370ba6d54268f9",
+    "current_sha256": "3bd9001e3d5ec2ef6037d7aa269c26fa419aa8ce1c3b76888d955940e55e5b7c",
+    "same_file": false,
+    "fragments": [
+      {
+        "path": "context/stage_1_v3_pi_mono_blueprint.md.127-154.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/runner.ts",
+    "captured_sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084",
+    "current_sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/runner.ts.723-780.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/runner.ts.927-1062.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/runner.ts.1246-1286.txt",
+        "matches_current": true
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/agent-session.ts",
+    "captured_sha256": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237",
+    "current_sha256": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237",
+    "same_file": true,
+    "fragments": [
+      {
+        "path": "context/agent-session.ts.875-901.txt",
+        "matches_current": true
+      },
+      {
+        "path": "context/agent-session.ts.2835-2870.txt",
+        "matches_current": true
+      }
+    ]
+  }
+]

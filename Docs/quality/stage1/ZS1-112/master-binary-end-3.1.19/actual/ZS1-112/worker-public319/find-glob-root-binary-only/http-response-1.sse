@@ -1,0 +1,6 @@
+data: {"choices": [{"index": 0, "delta": {"content": "SEARCH_FINISHED_319"}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+
+data: [DONE]
+

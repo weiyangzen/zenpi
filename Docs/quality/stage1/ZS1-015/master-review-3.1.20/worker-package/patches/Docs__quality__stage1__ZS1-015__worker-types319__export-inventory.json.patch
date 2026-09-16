@@ -1,0 +1,367 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json b/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json
+@@ -0,0 +1,362 @@
++[
++  {
++    "line": 17,
++    "kind": "type",
++    "name": "KnownApi"
++  },
++  {
++    "line": 29,
++    "kind": "type",
++    "name": "Api"
++  },
++  {
++    "line": 31,
++    "kind": "type",
++    "name": "KnownImagesApi"
++  },
++  {
++    "line": 33,
++    "kind": "type",
++    "name": "ImagesApi"
++  },
++  {
++    "line": 35,
++    "kind": "type",
++    "name": "KnownProvider"
++  },
++  {
++    "line": 76,
++    "kind": "type",
++    "name": "ProviderId"
++  },
++  {
++    "line": 78,
++    "kind": "type",
++    "name": "KnownImagesProvider"
++  },
++  {
++    "line": 80,
++    "kind": "type",
++    "name": "ImagesProviderId"
++  },
++  {
++    "line": 82,
++    "kind": "type",
++    "name": "ToolChoice"
++  },
++  {
++    "line": 83,
++    "kind": "type",
++    "name": "ThinkingLevel"
++  },
++  {
++    "line": 84,
++    "kind": "type",
++    "name": "ModelThinkingLevel"
++  },
++  {
++    "line": 85,
++    "kind": "type",
++    "name": "ThinkingLevelMap"
++  },
++  {
++    "line": 86,
++    "kind": "type",
++    "name": "ChatTemplateKwargValue"
++  },
++  {
++    "line": 97,
++    "kind": "type",
++    "name": "ThinkingTokenBudgetField"
++  },
++  {
++    "line": 100,
++    "kind": "interface",
++    "name": "ThinkingBudgets"
++  },
++  {
++    "line": 108,
++    "kind": "type",
++    "name": "CacheRetention"
++  },
++  {
++    "line": 110,
++    "kind": "type",
++    "name": "Transport"
++  },
++  {
++    "line": 113,
++    "kind": "type",
++    "name": "ProviderEnv"
++  },
++  {
++    "line": 114,
++    "kind": "type",
++    "name": "ProviderHeaders"
++  },
++  {
++    "line": 115,
++    "kind": "type",
++    "name": "FetchFunction"
++  },
++  {
++    "line": 116,
++    "kind": "type",
++    "name": "SessionAffinityFormat"
++  },
++  {
++    "line": 118,
++    "kind": "interface",
++    "name": "ProviderResponse"
++  },
++  {
++    "line": 124,
++    "kind": "interface",
++    "name": "ProviderRequestOptions"
++  },
++  {
++    "line": 179,
++    "kind": "interface",
++    "name": "StreamOptions"
++  },
++  {
++    "line": 225,
++    "kind": "type",
++    "name": "ProviderStreamOptions"
++  },
++  {
++    "line": 227,
++    "kind": "interface",
++    "name": "DeferredFetchOptions"
++  },
++  {
++    "line": 236,
++    "kind": "type",
++    "name": "DeferredCancelOptions"
++  },
++  {
++    "line": 243,
++    "kind": "interface",
++    "name": "ApiOptionsMap"
++  },
++  {
++    "line": 260,
++    "kind": "type",
++    "name": "ApiStreamOptions"
++  },
++  {
++    "line": 272,
++    "kind": "interface",
++    "name": "ProviderStreams"
++  },
++  {
++    "line": 289,
++    "kind": "interface",
++    "name": "ProviderImages"
++  },
++  {
++    "line": 297,
++    "kind": "interface",
++    "name": "ImagesOptions"
++  },
++  {
++    "line": 305,
++    "kind": "type",
++    "name": "ProviderImagesOptions"
++  },
++  {
++    "line": 307,
++    "kind": "interface",
++    "name": "AnthropicAllowedFallbackModel"
++  },
++  {
++    "line": 314,
++    "kind": "interface",
++    "name": "SimpleStreamOptions"
++  },
++  {
++    "line": 333,
++    "kind": "type",
++    "name": "StreamFunction"
++  },
++  {
++    "line": 339,
++    "kind": "type",
++    "name": "ImagesFunction"
++  },
++  {
++    "line": 345,
++    "kind": "interface",
++    "name": "TextSignatureV1"
++  },
++  {
++    "line": 351,
++    "kind": "interface",
++    "name": "TextContent"
++  },
++  {
++    "line": 357,
++    "kind": "interface",
++    "name": "ThinkingContent"
++  },
++  {
++    "line": 367,
++    "kind": "interface",
++    "name": "ImageContent"
++  },
++  {
++    "line": 373,
++    "kind": "interface",
++    "name": "ToolCall"
++  },
++  {
++    "line": 383,
++    "kind": "interface",
++    "name": "Usage"
++  },
++  {
++    "line": 406,
++    "kind": "type",
++    "name": "StopReason"
++  },
++  {
++    "line": 408,
++    "kind": "type",
++    "name": "JsonValue"
++  },
++  {
++    "line": 410,
++    "kind": "interface",
++    "name": "DeferredHandle"
++  },
++  {
++    "line": 422,
++    "kind": "interface",
++    "name": "UserMessage"
++  },
++  {
++    "line": 428,
++    "kind": "interface",
++    "name": "AssistantMessage"
++  },
++  {
++    "line": 452,
++    "kind": "interface",
++    "name": "ToolResultMessage"
++  },
++  {
++    "line": 470,
++    "kind": "type",
++    "name": "Message"
++  },
++  {
++    "line": 472,
++    "kind": "type",
++    "name": "ImagesInputContent"
++  },
++  {
++    "line": 473,
++    "kind": "type",
++    "name": "ImagesOutputContent"
++  },
++  {
++    "line": 475,
++    "kind": "interface",
++    "name": "ImagesContext"
++  },
++  {
++    "line": 479,
++    "kind": "type",
++    "name": "ImagesStopReason"
++  },
++  {
++    "line": 481,
++    "kind": "interface",
++    "name": "AssistantImages"
++  },
++  {
++    "line": 496,
++    "kind": "type",
++    "name": "GrammarFormat"
++  },
++  {
++    "line": 498,
++    "kind": "type",
++    "name": "GrammarVariants"
++  },
++  {
++    "line": 507,
++    "kind": "type",
++    "name": "ConstrainedSamplingConfig"
++  },
++  {
++    "line": 517,
++    "kind": "interface",
++    "name": "Tool"
++  },
++  {
++    "line": 524,
++    "kind": "interface",
++    "name": "Context"
++  },
++  {
++    "line": 546,
++    "kind": "type",
++    "name": "AssistantMessageEvent"
++  },
++  {
++    "line": 568,
++    "kind": "interface",
++    "name": "OpenAICompletionsCompat"
++  },
++  {
++    "line": 646,
++    "kind": "interface",
++    "name": "OpenAIResponsesCompat"
++  },
++  {
++    "line": 668,
++    "kind": "interface",
++    "name": "AnthropicMessagesCompat"
++  },
++  {
++    "line": 735,
++    "kind": "interface",
++    "name": "BedrockCompat"
++  },
++  {
++    "line": 746,
++    "kind": "interface",
++    "name": "OpenRouterRouting"
++  },
++  {
++    "line": 820,
++    "kind": "interface",
++    "name": "VercelGatewayRouting"
++  },
++  {
++    "line": 827,
++    "kind": "interface",
++    "name": "ModelCostRates"
++  },
++  {
++    "line": 834,
++    "kind": "interface",
++    "name": "ModelCostTier"
++  },
++  {
++    "line": 839,
++    "kind": "interface",
++    "name": "ModelCost"
++  },
++  {
++    "line": 845,
++    "kind": "interface",
++    "name": "Model"
++  },
++  {
++    "line": 876,
++    "kind": "interface",
++    "name": "ImagesModel"
++  }
++]

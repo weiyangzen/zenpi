@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/unborn-diff-integration/probe_hosts.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/untracked-directories-integration/zenpi",
+    "--out",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/unborn-diff-integration/hosts-before-sha1",
+    "--object-format",
+    "sha1"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T15:02:50.855875+00:00",
+  "ended_at": "2026-09-12T15:02:55.810727+00:00",
+  "exit_code": 1,
+  "log_sha256": "46b8c91ed1840da9d72cb416c05f8021aa6c580c4e40d9a43bd767fb409b04e8"
+}

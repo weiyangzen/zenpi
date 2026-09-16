@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "rustfmt",
+    "+stable-aarch64-apple-darwin",
+    "--edition",
+    "2024",
+    "--check",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-3.1.20/build/src/tui.rs"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-3.1.20/build",
+  "started_at": "2026-09-12T12:31:01.422168+00:00",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "network": "Cargo offline; no HTTP/PTY",
+  "source_sha256": "79b486ef11cccfe5b4fd017c6682e30f23ffcfb1fb6b191165e8befcb674c05c",
+  "status": "finished",
+  "exit_code": 0,
+  "elapsed_seconds": 0.20707470800000002,
+  "ended_at": "2026-09-12T12:31:01.629991+00:00",
+  "log": "final-format-check.log",
+  "bytes": 0,
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

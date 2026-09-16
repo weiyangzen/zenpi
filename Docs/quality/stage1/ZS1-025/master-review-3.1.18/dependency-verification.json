@@ -1,0 +1,16 @@
+{
+  "inventory_rows": 2100,
+  "verified_runtime_files": 2099,
+  "source": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/runtime/node_modules",
+  "inventory_sha256": "444af7b461b4fb861e42b401624e09762a1ef34ff8212dbdcb444f2a077c913c",
+  "all_runtime_before_and_copy_hashes_match": true,
+  "excluded_mutable_non_runtime_cache": [
+    {
+      "path": ".vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json",
+      "expected_sha256": "1467e33920384a16ec2b16d8a24d8326993b31bbe0e8cd56cb5da560cd6564e3",
+      "actual_sha256": "869e741edc5c525a5b109c1d46d7975d0e9a96ae28185963337b36595dba7b91",
+      "actual_bytes": 426
+    }
+  ],
+  "initial_attempt": "strict full inventory check failed before any copy; difference recorded, only generated .vite cache excluded from private replay"
+}

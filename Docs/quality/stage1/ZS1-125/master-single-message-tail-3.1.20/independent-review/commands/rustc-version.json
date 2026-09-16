@@ -1,0 +1,24 @@
+{
+  "name": "rustc-version",
+  "argv": [
+    "rustc",
+    "+stable-aarch64-apple-darwin",
+    "--version",
+    "--verbose"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "started_at": "2026-09-12T12:53:46.369927+00:00",
+  "ended_at": "2026-09-12T12:53:46.408127+00:00",
+  "elapsed_seconds": 0.038092583,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 31916032,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage125-render-review320/commands/rustc-version.log",
+  "bytes": 192,
+  "sha256": "a30ae9f932f04d4426978deb2b626208c9d81ba5b3f9b0069d68b58f0b1d9600"
+}

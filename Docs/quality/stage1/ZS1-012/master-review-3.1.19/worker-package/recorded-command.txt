@@ -1,0 +1,5 @@
+Working directory: /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source012
+Node binary: /Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node
+Command: node runtime/node_modules/vitest/vitest.mjs run --config vitest.config.mjs > test.stdout.log 2> test.stderr.log
+Final exit: 0. Three test files; 37 passed; 0 failed/skipped/todo.
+Initial startup failed before test collection due to missing isolated node_modules symlink; actual stderr retained. Original-only run after setup repair passed 24/24. Later supplemental runs remain 13 scenarios, not added together; final adds a prefix-only previous-summary omission assertion.

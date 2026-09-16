@@ -1,0 +1,14 @@
+{
+  "review": "Controller full worker script read, all new keeper and root delta read; supported CSI-u dispatch/modifier source read. One new main-binary PTY only, no legacy replay/retry. Keeper holds controlling terminal until post-child-exit flags observation then reaps; early failure preserved.",
+  "files": {
+    "root_pty_history_super.py": {
+      "bytes": 12876,
+      "sha256": "84f5ce0df484b4f78c1c2a3daf70b614e0a7b2683f5e3f0456732e1a57048553"
+    },
+    "pty_keeper.py": {
+      "bytes": 713,
+      "sha256": "3a195d36594c7560deadde6aee0e33f23a8f0d99852025e6978e14c391531e46"
+    }
+  },
+  "runtime_executions_at_review": 0
+}

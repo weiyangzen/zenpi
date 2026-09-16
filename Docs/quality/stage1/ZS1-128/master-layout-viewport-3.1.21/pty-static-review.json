@@ -1,0 +1,12 @@
+{
+  "root_pty_layout_viewport.py": {
+    "bytes": 12189,
+    "sha256": "b24c46351bb198ec70772536c0ed1a491188c58eccdd51c5db0dc49e6ba2302d",
+    "full_static_read": true
+  },
+  "pty_keeper.py": {
+    "bytes": 713,
+    "sha256": "3a195d36594c7560deadde6aee0e33f23a8f0d99852025e6978e14c391531e46",
+    "full_static_read": true
+  }
+}

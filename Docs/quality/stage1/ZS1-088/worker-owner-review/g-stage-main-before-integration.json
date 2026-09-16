@@ -1,0 +1,33 @@
+{
+  "name": "g-stage-main-before-integration",
+  "argv": [
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
+    "--root",
+    "/Users/wangweiyang/GitHub/zenpi",
+    "--blueprint",
+    "Docs/stage_1_v3_pi_mono_blueprint.md",
+    "--evidence-root",
+    "Docs/learn/stage1_pi_mono",
+    "--item",
+    "ZS1-088",
+    "--json"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "started_at": "2026-09-10T22:18:05.100990+00:00",
+  "ended_at": "2026-09-10T22:18:05.301343+00:00",
+  "elapsed_seconds": 0.20024170900000002,
+  "exit_code": 1,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 21872640,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-088/worker-owner-review/g-stage-main-before-integration.log",
+  "bytes": 408,
+  "sha256": "7cab2622f6a98bd26d911f67e3751b6405ee272835c81f3f001430f7f9bf90c3"
+}

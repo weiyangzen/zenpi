@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "kind": "static integrity and private exact-apply only",
+  "manifest_verified": true,
+  "prior_artifacts_verified": 18,
+  "source_bytes": 63623,
+  "source_lines": 1797,
+  "declaration_entries": 157,
+  "subscription_events": 36,
+  "context_fragments": 18,
+  "exact_prefix_preserved": true,
+  "report_sha256": "7cd970348d2e482b22301193e2ab933e38d12529755805c7438a0cb6ee1ae70b",
+  "patch_checks": [
+    {
+      "patch": "create-report.patch",
+      "sha256": "cfe99822ef302038c2bd89f51504a478659ed09819cd9ef82a14115c52f7ddc9",
+      "apply_and_reverse": "passed",
+      "only_path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/extensions/types.ts_learn.md"
+    },
+    {
+      "patch": "append-report.patch",
+      "sha256": "0f21d17e689401aa0f50338a39994017cb3cf0030641a8fcee31ba059a3d65c2",
+      "apply_and_reverse": "passed",
+      "only_path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/extensions/types.ts_learn.md"
+    }
+  ],
+  "runtime_tests_executed": 0,
+  "G_STAGE_executed": false,
+  "semantic_gate": "pending independent master review"
+}

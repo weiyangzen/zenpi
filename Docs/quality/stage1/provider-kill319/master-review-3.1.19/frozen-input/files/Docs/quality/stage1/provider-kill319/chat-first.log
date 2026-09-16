@@ -1,0 +1,9 @@
+chat partial PASS
+Traceback (most recent call last):
+  File "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/kill_probe.py", line 192, in <module>
+    for scenario in (['partial','tool'] if a.scenario=='both' else [a.scenario]): run(a.provider,scenario,a.label)
+  File "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/kill_probe.py", line 151, in run
+    require(CALL in json.dumps(started) and CALL in json.dumps(finished),'durable tool identity lost')
+  File "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/kill_probe.py", line 15, in require
+    if not condition: raise AssertionError(message)
+AssertionError: durable tool identity lost

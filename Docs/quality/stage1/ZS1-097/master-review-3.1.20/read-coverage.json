@@ -1,0 +1,39 @@
+{
+  "source": "Cargo.toml",
+  "baseline_sha256": "94c25405859cbec9d1a02e7c1a0a4e0dbbfd96e5c6bc476c23b9dc8be7229a65",
+  "baseline_bytes": 1001,
+  "baseline_lines": 42,
+  "baseline_read_ranges": [
+    [
+      0,
+      1001
+    ]
+  ],
+  "current_sha256": "d5fafd029ef77454e178222c2b62530d28859374f72a2ce6bd972a465bed5884",
+  "current_bytes": 1228,
+  "current_lines": 50,
+  "current_read_ranges": [
+    [
+      0,
+      1228
+    ]
+  ],
+  "report_sha256": "c0b431b5c1894608a59b10139037c3004a85b81a29eed0e9b8ef44d619ead536",
+  "report_read_lines": [
+    [
+      1,
+      47
+    ],
+    [
+      48,
+      91
+    ],
+    [
+      92,
+      150
+    ]
+  ],
+  "source_functions": 0,
+  "source_tests": 0,
+  "context_only": true
+}

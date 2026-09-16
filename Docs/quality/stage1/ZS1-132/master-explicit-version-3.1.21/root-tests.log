@@ -1,0 +1,126 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.11s
+     Running tests/domain_execution_owner.rs (target/debug/deps/domain_execution_owner-97a562157016bb66)
+
+running 14 tests
+test deterministic_cost_is_bounded_by_item_estimate ... ok
+test budget_and_tamper_fail_closed_without_mutating_receipts ... ok
+test store_rejects_duplicate_goal_blueprint_item_attempt_even_with_new_execution_id ... ok
+test external_manifest_checksum_is_strict_lowercase_sha256 ... ok
+test external_manifest_cannot_promote_failed_local_receipt ... ok
+test running_receipt_is_resumed_in_place_without_duplicate_attempt ... ok
+test cancellation_before_admission_is_idempotent_and_does_not_consume_budget ... ok
+test goal_cancellation_marks_running_external_attempt_terminal ... ok
+test external_manifest_import_binds_identity_and_acceptance_digest ... ok
+test external_handoff_is_bounded_idempotent_and_never_marks_work_done ... ok
+test handoff_store_rejects_tampering_and_does_not_execute_acceptance_commands ... ok
+test owner_selects_dependencies_and_persists_running_then_terminal_receipts ... ok
+test control_plane_success_does_not_unblock_a_dependent_external_handoff ... ok
+test cancellation_after_running_is_durable_and_restart_safe ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+     Running tests/domain_store.rs (target/debug/deps/domain_store-71949a43c8dbf84a)
+
+running 10 tests
+test read_only_open_does_not_create_missing_store ... ok
+test custom_session_paths_share_a_sibling_domain_store ... ok
+test symlinked_store_path_is_rejected_before_read_or_replace ... ok
+test missing_store_is_created_as_a_private_valid_jsonl_snapshot ... ok
+test oversized_or_duplicate_jsonl_is_rejected_before_state_use ... ok
+test stale_digest_and_invalid_status_transition_are_rejected_without_mutating_disk ... ok
+test tampered_snapshot_digest_and_cross_record_links_fail_closed ... ok
+test blueprint_goal_and_learn_round_trip_with_idempotent_writes ... ok
+test canonical_digest_does_not_depend_on_mutation_order ... ok
+test versioned_blueprints_are_kept_and_old_goal_links_remain_valid ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/headless_domain_owner.rs (target/debug/deps/headless_domain_owner-f8575d96a256f2dc)
+
+running 7 tests
+test missing_or_malformed_goal_status_fails_without_creating_a_store ... ok
+test headless_layout_and_pane_owner_persist_project_state_and_fail_closed ... ok
+test headless_plan_creates_bounded_sequential_blueprint_without_provider_work ... ok
+test headless_goal_create_links_one_persisted_blueprint_without_provider_work ... ok
+test headless_goal_status_is_a_durable_typed_owner_operation ... ok
+test headless_goal_run_resume_and_cancel_aliases_are_durable ... ok
+test goal_create_respects_explicit_version_and_does_not_mutate_on_rejection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+
+     Running tests/headless_protocol.rs (target/debug/deps/headless_protocol-4970f6db765b37c2)
+
+running 43 tests
+test approval_command_is_typed_and_bounded ... ok
+test checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence ... ok
+test async_reader_bounds_overlong_and_invalid_frames_without_stopping ... ok
+test cross_process_owner_lock_survives_contention_and_releases_after_kill ... ok
+test headless_common_model_and_doctor_commands_are_redacted_and_local ... ok
+test async_shutdown_acknowledges_only_after_prior_turn_terminal_response ... ok
+test async_recovery_event_does_not_overtake_turn_admission ... ok
+test protocol_v2_accepts_resume_sequence_and_v1_remains_supported ... ok
+test reconnect_process_fixture ... ok
+test in_flight_duplicate_request_id_is_suppressed_before_side_effects ... ok
+test async_runtime_lifecycle_events_are_correlated_ordered_and_replayable ... ok
+test inspection_responses_redact_paths_and_reject_domain_escape ... ok
+test async_eof_denies_unanswerable_side_effect_approval_without_hanging ... ok
+test session_control_requests_roundtrip_into_typed_commands ... ok
+test async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it ... ok
+test session_control_validation_is_bounded_and_rejects_origin_confusion ... ok
+test headless_session_lifecycle_and_queue_slash_commands_use_typed_owner ... ok
+test disconnected_wire_preserves_unknown_or_completed_outcome_without_retry ... ok
+test mailbox_retirement_is_confirmed_and_owned_in_both_hosts ... ok
+test headless_slash_commands_are_control_plane_only ... ok
+test checkpoint_pages_and_mailbox_are_local_durable_and_addressed ... ok
+test stale_session_writers_are_rejected_without_duplicate_sequences ... ok
+test malformed_frame_isolated_from_all_commands ... ok
+test live_steer_cancels_and_reissues_without_losing_or_duplicating_input ... ok
+test sequential_steer_and_eof_are_safe_terminal_paths ... ok
+test steer_shell_guard_keeps_expected_turn_rejection_before_side_effects ... ok
+test reconnect_restores_terminal_events_ack_and_monotonic_sequence ... ok
+test unsupported_version_and_missing_id_are_rejected ... ok
+test steer_shell_guard_rejects_attachments_before_side_effects ... ok
+test async_user_shell_runs_through_bounded_runtime_and_shutdown ... ok
+test steer_shell_guard_rejects_mode_before_side_effects ... ok
+test headless_domain_put_commands_persist_and_round_trip ... ok
+test session_slash_list_and_open_use_real_session_owner_paths ... ok
+test status_snapshots_redact_session_paths_in_sync_and_async_hosts ... ok
+test session_controls_remain_readable_while_provider_is_in_flight ... ok
+test unowned_session_controls_are_fail_closed_without_session_or_provider_effects ... ok
+test recovery_slash_is_durable_confirmed_and_never_dispatches_retry ... ok
+test shutdown_promotes_a_steer_admitted_before_the_shutdown_frame ... ok
+test resume_path_rejects_missing_journals_without_creating_them ... ok
+test resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history ... ok
+test synchronous_replay_and_control_idempotency_are_explicit ... ok
+test steer_shell_guard_preserves_valid_owned_shell_execution ... ok
+test user_shell_echo_is_explicit_and_does_not_call_provider ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.97s
+
+     Running tests/tui_goal_owner.rs (target/debug/deps/tui_goal_owner-e05d51060dee05a9)
+
+running 6 tests
+test tui_recovery_uses_the_shared_owner_without_retrying_work ... ok
+test tui_plan_creates_sequential_blueprint_without_provider_turn ... ok
+test tui_goal_owner_rejects_unknown_status_and_preserves_natural_language_refusal ... ok
+test tui_goal_create_uses_shared_owner_and_persists_queued_goal ... ok
+test tui_goal_owner_actions_match_headless_and_persist_status ... ok
+test tui_goal_run_resume_and_cancel_aliases_persist ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+

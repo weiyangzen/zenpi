@@ -1,0 +1,6 @@
+from pathlib import Path
+import os,sys,json,subprocess,datetime,hashlib,time
+W=Path('.ops/zs1-125-render-tail-work').resolve();label=sys.argv[1];argv=sys.argv[2:];log=W/(label+'.log');receipt=W/(label+'.json');assert not log.exists() and not receipt.exists()
+env=dict(os.environ);env['CARGO_TARGET_DIR']=str(W/'target');start=datetime.datetime.now(datetime.timezone.utc).isoformat();stamp=time.monotonic();before=Path('src/render.rs').read_bytes()
+with log.open('wb') as f:p=subprocess.run(argv,stdout=f,stderr=subprocess.STDOUT,env=env)
+after=Path('src/render.rs').read_bytes();b=log.read_bytes();r=dict(argv=argv,cwd=str(Path.cwd()),started_at=start,ended_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),elapsed_seconds=time.monotonic()-stamp,exit_code=p.returncode,environment_overrides={'CARGO_TARGET_DIR':env['CARGO_TARGET_DIR']},HOME_preserved=True,CODEX_HOME_preserved=True,source_before_sha256=hashlib.sha256(before).hexdigest(),source_after_sha256=hashlib.sha256(after).hexdigest(),log=log.name,log_bytes=len(b),log_sha256=hashlib.sha256(b).hexdigest());receipt.write_text(json.dumps(r,indent=2)+'\n');print(json.dumps(r,indent=2));print(b.decode(errors='replace')[-9000:]);sys.exit(p.returncode)

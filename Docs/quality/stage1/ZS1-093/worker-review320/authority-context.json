@@ -1,0 +1,24 @@
+{
+  "path": "/Users/wangweiyang/GitHub/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+  "sha256": "b3b623125d1ebbed1c6df1414b0d687ec48629fd6e0e7dbcdd3ce3cc05f96ab2",
+  "captured_at": "2026-09-12T11:44:46.809411+00:00",
+  "excerpts": [
+    {
+      "line": 139,
+      "text": "`G-DIR`：直属文件与直接子目录均已 `[x]` 后，单独写本目录在冻结子集中的调用关系、数据所有权、错误/取消/持久化路径、跨文件不变量及目标映射。记录 in-scope / context-only 清单，检查根到叶的闭包，无跳目录、重复接受或遗漏。目录报告不得宣称本目录未纳入文件已验收。"
+    },
+    {
+      "line": 206,
+      "text": "- [ ] **ZS1-089** — 逐文件复核 zenpi .github/workflows/ci.yml；layer `L1` | Depends: ZS1-001 | Owner scope: 仅该owner完整现状与源差距 | Owned paths: `Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md` | Validators: G-FILE；G-STAGE --item ZS1-089 | Rollback: 撤回该目标文件报告和本项状态，不覆盖源码 | Estimate: 2480 B；逐文件审核完整owner/模块接线/CI行为 | Estimated LOC: 0"
+    },
+    {
+      "line": 238,
+      "text": "- [ ] **ZS1-092** — 逐目录整合 zenpi .github/workflows；layer `L2` | Depends: ZS1-089 | Owner scope: 直属文件与直接子目录集成 | Owned paths: `Docs/learn/stage1_pi_mono/targets/zenpi/.github/workflows/current_folder_learn.md` | Validators: G-DIR；G-STAGE --item ZS1-092 | Rollback: 仅撤回本目录报告 | Estimate: 逐个核对CI边界与目录依赖 | Estimated LOC: 0"
+    },
+    {
+      "line": 239,
+      "text": "- [ ] **ZS1-093** — 逐目录整合 zenpi .github；layer `L2` | Depends: ZS1-092 | Owner scope: 直属文件与直接子目录集成 | Owned paths: `Docs/learn/stage1_pi_mono/targets/zenpi/.github/current_folder_learn.md` | Validators: G-DIR；G-STAGE --item ZS1-093 | Rollback: 仅撤回本目录报告 | Estimate: 逐个核对CI边界与目录依赖 | Estimated LOC: 0"
+    }
+  ],
+  "scope": "Formal selected dependency and G-DIR contract lines only"
+}

@@ -1,0 +1,161 @@
+{
+  "cases": [
+    {
+      "file": "probe.test.ts",
+      "title": "actual fd honors nonrepo hierarchical ignore, hidden matches and nested repository boundaries",
+      "status": "passed",
+      "boundary": "native fd / actual filesystem"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "actual fd applies relative/absolute path globs, context cwd and explicit sibling search root",
+      "status": "passed",
+      "boundary": "native fd / actual filesystem"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "actual fd filename whitespace/newline and symlink output reveal line-protocol limitations",
+      "status": "passed",
+      "boundary": "native fd / actual filesystem"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "actual fd limit flag is conservative at exact equality, zero is not a positive cap, byte truncation has no full path",
+      "status": "passed",
+      "boundary": "native fd / actual filesystem"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "custom glob passes ignore/limit but trusts returned count and paths including escapes",
+      "status": "passed",
+      "boundary": "explicit FindOperations injection"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "custom async glob abort settles before operation completes and does not cancel underlying work",
+      "status": "passed",
+      "boundary": "explicit FindOperations injection"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "default spawn fault fixtures expose exact argv, partial-error success, blank-error success and pre-reap cancellation",
+      "status": "passed",
+      "boundary": "controlled executable driving actual spawn/readline/abort"
+    },
+    {
+      "file": "probe.test.ts",
+      "title": "default actual spawn rejects non-executable fd and offline missing-tool path without network",
+      "status": "passed",
+      "boundary": "actual spawn EACCES and offline missing-tool"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "title": "basename pattern still matches (regression-safe)",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "title": "directory-prefixed pattern with ** tail matches subtree",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "title": "leading ** wildcard with path segments matches",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "title": "src/**/*.spec.ts matches nested spec file",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts",
+      "title": "applies a/.gitignore only inside a/ and leaves b/ untouched",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts",
+      "title": "scopes each .gitignore to its own subtree",
+      "status": "passed",
+      "boundary": "original test with native fd / actual filesystem"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "preserves the first segment and emits one trailing slash for fd directory output",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "handles fd output that uses forward slashes under a drive root",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "keeps deeper search paths unchanged",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "does not relativize a sibling directory that shares a name prefix",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "normalizes relative custom-glob results without corrupting them",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "preserves the first segment for files under /",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "preserves the first segment and one trailing slash for directories under /",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "preserves backslashes in POSIX filenames",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "falls back to path.relative when the absolute paths do not share a prefix",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "keeps a trailing slash on directories resolved through path.relative",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    },
+    {
+      "file": "source/packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "title": "relativizes custom glob results against a root search path",
+      "status": "passed",
+      "boundary": "original path pure function (POSIX/Windows) or explicit custom glob; no Windows native execution"
+    }
+  ],
+  "passed": 25,
+  "failed": 0,
+  "skipped": 0,
+  "todo": 0,
+  "original_cases": 17,
+  "supplemental_cases": 8,
+  "unexecuted": "UI renderer, AgentSession, full upstream suite, Linux/Windows native fd, product code"
+}

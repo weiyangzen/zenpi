@@ -1,0 +1,66 @@
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -228,6 +228,63 @@
+             Line::from(spans)
+         })
+         .collect()
++}
++
++/// A bounded visible window over all visual rows of accepted plain text.
++/// `offset` is clamped to the final full viewport; no head or tail row cap
++/// prevents scrolling through the middle. Only visible spans are retained.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct RenderedPlainWindow {
++    pub lines: Vec<Line<'static>>,
++    pub offset: usize,
++    pub total_lines: usize,
++    pub input_truncated: bool,
++}
++
++pub fn render_plain_window(
++    input: &str,
++    width: usize,
++    offset: usize,
++    height: usize,
++) -> RenderedPlainWindow {
++    let width = width.clamp(1, MAX_MARKDOWN_WIDTH);
++    let height = height.min(bounded_line_limit(width, MAX_MARKDOWN_LINES));
++    let bounded = truncate_bytes(input, MAX_MARKDOWN_BYTES);
++    let segments = [StyledSegment {
++        // Delayed tab expansion cannot consume the last accepted source bytes.
++        text: sanitize_compact(bounded),
++        style: Style::default(),
++    }];
++    let total_lines = walk_wrapped_segments(&segments, width, |_| {});
++    let offset = offset.min(total_lines.saturating_sub(height));
++    let end = offset.saturating_add(height);
++    let mut row = 0usize;
++    let mut lines = Vec::new();
++    let mut spans: Vec<Span<'static>> = Vec::new();
++    walk_wrapped_segments(&segments, width, |event| {
++        if let Some((text, style)) = event {
++            if row >= offset && row < end {
++                if let Some(last) = spans.last_mut()
++                    && last.style == style
++                {
++                    last.content.to_mut().push_str(text);
++                } else {
++                    spans.push(Span::styled(text.to_owned(), style));
++                }
++            }
++        } else {
++            if row >= offset && row < end {
++                lines.push(Line::from(std::mem::take(&mut spans)));
++            }
++            row += 1;
++        }
++    });
++    RenderedPlainWindow {
++        lines,
++        offset,
++        total_lines,
++        input_truncated: bounded.len() != input.len(),
++    }
+ }
+ 
+ /// Render the latest visual rows of a bounded Markdown message.

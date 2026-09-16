@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-072",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-072",
+  "source_path": "src/protocol.rs",
+  "source_hash": "90a5644d5a818a8051172b42b302614fb3263ebac737ce9dbf4a842791370d27",
+  "read_ranges": [
+    [
+      0,
+      45517
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/protocol.rs_learn.md",
+      "bytes": 2844,
+      "sha256": "3bb99d9851a325b0dde8b9dd16ed243e81d6f2283523b4507cbbeb6bbc879a25"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-072/master-review-current/review.md",
+      "bytes": 448,
+      "sha256": "2102b53aa7a838ed630c4618f68541b1bcac1e2eb066410d7af979bd189741cd"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-072/master-review-current/review.md",
+      "bytes": 448,
+      "sha256": "2102b53aa7a838ed630c4618f68541b1bcac1e2eb066410d7af979bd189741cd"
+    },
+    "findings": "完整读取 protocol.rs，覆盖 JSONL framing、command/request、validation、project/mailbox/queue/tree/output contracts 与 response/event envelope，并明确跨文件边界。"
+  }
+}

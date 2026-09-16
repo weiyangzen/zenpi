@@ -1,0 +1,47 @@
+    pub fn project_tab_count(&self) -> usize {
+        self.project_tabs.len()
+    }
+
+    pub fn active_project_index(&self) -> usize {
+        self.active_project
+    }
+
+    /// Return a project tab and its metadata without exposing mutable state.
+    pub fn project_tab_context(&self, index: usize) -> Option<(&str, Option<&ProjectTabMetadata>)> {
+        let name = self.project_tabs.get(index)?;
+        Some((name.as_str(), self.project_metadata.get(name)))
+    }
+
+    pub fn next_project_tab(&mut self, backwards: bool) -> bool {
+        if self.project_tabs.len() < 2 {
+            return false;
+        }
+        let next = if backwards {
+            (self.active_project + self.project_tabs.len() - 1) % self.project_tabs.len()
+        } else {
+            (self.active_project + 1) % self.project_tabs.len()
+        };
+        self.touch_editor_draft();
+        self.select_project_tab(next)
+    }
+
+    /// Expose the project strip in display order for renderers/hosts.
+    pub fn project_tab_labels(&self) -> Vec<String> {
+        self.project_tabs.clone()
+    }
+
+    /// Switch project and return the metadata the host must bind next.
+    pub fn project_switch_context(&mut self, index: usize) -> Option<ProjectTabMetadata> {
+        if index < self.project_tabs.len() && index != self.active_project {
+            self.touch_editor_draft();
+        }
+        if !self.select_project_tab(index) {
+            return None;
+        }
+        Some(
+            self.project_metadata(self.active_project())
+                .cloned()
+                .unwrap_or_default(),
+        )
+    }
+

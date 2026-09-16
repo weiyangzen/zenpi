@@ -1,0 +1,35 @@
+{
+  "item": "ZS1-125",
+  "complete": false,
+  "local_repair_passed": true,
+  "created_at": "2026-09-12T12:58:49.239946+00:00",
+  "product_paths": [
+    "src/render.rs",
+    "src/tui.rs",
+    "tests/tui_transcript_ux.rs",
+    "tools/tui_transcript_ux_smoke.py"
+  ],
+  "source_hashes": {
+    "src/render.rs": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d",
+    "src/tui.rs": "2d3373d72fc5ad68b9e266824fe4c31c37db7b1c732927b4e38f4daecf8e53bd",
+    "tests/tui_transcript_ux.rs": "26562ab62ebf73a8eae1fd951ac0a247eb4adb9fc8711e87a3fc55d0b5ebd5d7",
+    "tools/tui_transcript_ux_smoke.py": "da5f91b5ae1c49808d62fff2f5402bd70790c51122819a382d6353a7bb0c41a8"
+  },
+  "rust_tests_passed": 59,
+  "independent_harness_new_tests": 8,
+  "before_pty": {
+    "passed": 10,
+    "total": 14
+  },
+  "after_pty": {
+    "passed": 14,
+    "total": 14
+  },
+  "existing_pty_checks": 16,
+  "binary_sha256": "bdf901227bb2b20ae422f0802c3b361381952ba861b040320c401e6625f2cfa0",
+  "full_library_run": false,
+  "new_release_run": false,
+  "final_entrypoint_passed": true,
+  "final_entrypoint_checks": 14,
+  "initial_review": "Docs/quality/stage1/ZS1-125/master-single-message-tail-3.1.20/review.md"
+}

@@ -1,0 +1,39 @@
+{
+  "binary_sha256": "bb82450f8de71a0a7a91d828e42f659566cae3c7e4e574dd68706bfa10b94172",
+  "checks": {
+    "new_b_committed_before_queued_a_terminal": true,
+    "inflight_retry_stays_reserved_after_other_project_new": true,
+    "changed_inflight_retry_does_not_replace_fingerprint": true,
+    "only_origin_project_can_cancel_after_new": true,
+    "terminal_has_original_project_cwd_session": true,
+    "same_process_replay_and_conflict_keep_original_payload": true,
+    "independent_restart_replays_original_outcome_without_http": true
+  },
+  "initial_project": {
+    "project_id": "192a316ce152a17edb8cca86b59595c8461e2193db124e49689ac8cc065fc19b",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-cancel.fixture/initial",
+    "session_id": "session-1789211086851-7689-0"
+  },
+  "new_project": {
+    "project_id": "b19a8076058727d02ea776d7d33aebf3d65ab050d678efee8ee6bfa8a5a50e81",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-cancel.fixture/other",
+    "session_id": "session-1789211087087-7689-2"
+  },
+  "request_count": 2,
+  "terminal": {
+    "project": {
+      "project_id": "192a316ce152a17edb8cca86b59595c8461e2193db124e49689ac8cc065fc19b",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-cancel.fixture/initial",
+      "session_id": "session-1789211086851-7689-0"
+    },
+    "schema_version": 2,
+    "id": "pending-a",
+    "type": "response",
+    "command": "prompt",
+    "success": false,
+    "error": "request was cancelled",
+    "code": "backend_cancelled"
+  },
+  "jsonl_processes": 2,
+  "status": "passed"
+}

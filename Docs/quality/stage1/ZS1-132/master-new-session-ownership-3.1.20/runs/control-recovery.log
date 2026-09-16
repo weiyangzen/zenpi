@@ -1,0 +1,14 @@
+{
+  "binary_sha256": "9e76676bc87d7a859409954ae5d19ebc0560070a4685096f2dff87ea15e918dc",
+  "checks": {
+    "actual_precommit_sigkill_restores_old_owner_and_next_http": true,
+    "actual_postcommit_sigkill_restores_new_owner_and_replays_once": true,
+    "actual_replay_open_failure_reports_commit_and_recovers_same_receipt": true
+  },
+  "scope": "macOS/Unix actual CLI process recovery; not full ZS1-132 acceptance",
+  "fixture_executable_setup_ms": 1614.274083,
+  "uncommitted_crash_candidate": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/control-recovery.fixture/\u6062\u590d project/sessions/new-77b8efb93d913f8956d421d9ace53fb77e09d92ebc834ef20fe2fcb3265ef232-0.jsonl",
+  "status": "passed",
+  "jsonl_processes": 4,
+  "request_count": 4
+}

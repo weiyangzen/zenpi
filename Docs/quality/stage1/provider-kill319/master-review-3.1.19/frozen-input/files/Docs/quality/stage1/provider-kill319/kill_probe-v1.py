@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Actual production CLI SIGKILL during provider-native HTTP SSE. No mock Agent."""
+import argparse, base64, hashlib, json, os, pathlib, queue, shutil, socket, subprocess, threading, time, traceback
+ROOT = pathlib.Path(__file__).resolve().parent
+BINARY = ROOT.parents[3] / '.ops/provider-kill319-current/bin/zenpi'
+MODELS = {'chat': 'gpt-4.1', 'anthropic': 'claude-sonnet-4-6', 'google': 'gemini-2.5-flash'}
+PARTIAL = 'INTERRUPTED_PARTIAL_319'
+FINAL = 'FRESH_FINAL_319'
+BODY = 'DURABLE_READ_RESULT_319'
+CALL = 'durable_read_319'
+def save(path, value):
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False)+'\n')
+def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+def require(condition, message):
+    if not condition: raise AssertionError(message)
+def sse(v, event=None): return ((('event: '+event+'\n') if event else '')+'data: '+json.dumps(v)+'\n\n').encode()
+def frames(provider, kind):
+    """kind: partial (unclosed), tool (complete), final (complete), second (unclosed text)."""
+    model=MODELS[provider]; text=FINAL if kind=='final' else PARTIAL if kind in ('partial','second') else 'BEFORE_TOOL_319'
+    tool=kind in ('partial','tool'); name='write_file' if kind=='partial' else 'read_file'; args={'path':'NEVER.txt','content':'must not execute'} if kind=='partial' else {'path':'input.txt'}
+    call='incomplete_write_319' if kind=='partial' else CALL
+    if provider=='chat':
+        def chunk(delta, finish=None): return sse({'id':'chat319','object':'chat.completion.chunk','model':model,'choices':[{'index':0,'delta':delta,'finish_reason':finish}]})
+        out=chunk({'role':'assistant','content':text})
+        if tool: out+=chunk({'tool_calls':[{'index':0,'id':call,'type':'function','function':{'name':name,'arguments':'{"path":"NEVER' if kind=='partial' else json.dumps(args)}}]})
+        if kind in ('tool','final'): out+=chunk({},'tool_calls' if tool else 'stop')+b'data: [DONE]\n\n'
+        return out
+    if provider=='anthropic':
+        events=[{'type':'message_start','message':{'type':'message','id':'msg319','role':'assistant','model':model,'content':[],'stop_reason':None,'usage':{'input_tokens':7,'output_tokens':0}}}]
+        if kind=='tool':
+            events += [{'type':'content_block_start','index':0,'content_block':{'type':'thinking','thinking':'SIGNED_THOUGHT_319','signature':'opaque-signature-319'}},{'type':'content_block_stop','index':0}]
+        ix=1 if kind=='tool' else 0
+        events += [{'type':'content_block_start','index':ix,'content_block':{'type':'text','text':text}}]
+        if tool or kind=='final': events += [{'type':'content_block_stop','index':ix}]
+        if tool:
+            events += [{'type':'content_block_start','index':ix+1,'content_block':{'type':'tool_use','id':call,'name':name,'input':{} if kind=='partial' else args}}]
+            if kind=='partial': events += [{'type':'content_block_delta','index':ix+1,'delta':{'type':'input_json_delta','partial_json':'{"path":"NEVER'}}]
+            else: events += [{'type':'content_block_stop','index':ix+1}]
+        if kind in ('tool','final'): events += [{'type':'message_delta','delta':{'stop_reason':'tool_use' if tool else 'end_turn'},'usage':{'output_tokens':4}},{'type':'message_stop'}]
+        return b''.join(sse(v,v['type']) for v in events)
+    def chunk(parts, end=False):
+        candidate={'index':0,'content':{'role':'model','parts':parts}}
+        if end: candidate['finishReason']='STOP'
+        return sse({'responseId':'google319','modelVersion':model,'candidates':[candidate]})
+    parts=[]
+    if kind=='tool': parts.append({'text':'SIGNED_THOUGHT_319','thought':True,'thoughtSignature':'c2lnbmF0dXJlLTMxOQ=='})
+    parts.append({'text':text,'thoughtSignature':'dGV4dC0zMTk='})
+    if tool: parts.append({'functionCall':{'id':call,'name':name,'args':args},'thoughtSignature':'dG9vbC0zMTk='})
+    return chunk(parts, kind in ('tool','final'))
+class Server:
+    def __init__(self, provider, scenario, root):
+        self.provider=provider;self.scenario=scenario;self.root=root;self.requests=[];self.errors=[];self.closed=threading.Event();self.stop=threading.Event()
+        self.sock=socket.socket();self.sock.bind(('127.0.0.1',0));self.sock.listen();self.sock.settimeout(.1)
+        self.url='http://127.0.0.1:'+str(self.sock.getsockname()[1]);self.thread=threading.Thread(target=self.run,daemon=True);self.thread.start()
+    def run(self):
+        try:
+            while not self.stop.is_set():
+                try: conn,_=self.sock.accept()
+                except socket.timeout: continue
+                with conn:
+                    conn.settimeout(15);raw=b''
+                    while b'\r\n\r\n' not in raw:
+                        got=conn.recv(65536);require(got,'EOF in HTTP header');raw+=got
+                    header,body=raw.split(b'\r\n\r\n',1)
+                    length=int(next(l.split(b':',1)[1].strip() for l in header.split(b'\r\n') if l.lower().startswith(b'content-length:')))
+                    while len(body)<length:
+                        got=conn.recv(65536);require(got,'EOF in HTTP body');body+=got
+                    index=len(self.requests);request={'index':index,'headers':header.decode(),'body':json.loads(body[:length])};self.requests.append(request);save(self.root/f'http-request-{index}.json',request)
+                    held=index==(0 if self.scenario=='partial' else 1)
+                    kind=('partial' if self.scenario=='partial' else 'second') if held else ('tool' if self.scenario=='tool' and index==0 else 'final')
+                    payload=frames(self.provider,kind);(self.root/f'http-response-{index}.sse').write_bytes(payload)
+                    conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n'+(b'' if held else f'Content-Length: {len(payload)}\r\n'.encode())+b'\r\n'+payload)
+                    if held:
+                        while not self.stop.is_set():
+                            try: got=conn.recv(1)
+                            except ConnectionResetError: got=b''
+                            if not got: self.closed.set();break
+        except Exception: self.errors.append(traceback.format_exc())
+        finally:
+            self.sock.close();save(self.root/'http-server-result.json',{'requests':len(self.requests),'held_connection_closed':self.closed.is_set(),'errors':self.errors})
+    def close(self): self.stop.set();self.thread.join(17)
+class Cli:
+    def __init__(self, root, name):
+        self.records=[];self.cv=threading.Condition();self.name=name;self.root=root
+        env=os.environ.copy()
+        for k in list(env):
+            if k in ('ZENPI_PROFILE','ZENPI_BACKEND','ZENPI_PROVIDER','ZENPI_BASE_URL','ZENPI_MODEL','ZENPI_WIRE_API','ZENPI_MODEL_REASONING_EFFORT','ZENPI_MODEL_VERBOSITY') or k.startswith(('OPENAI_','ANTHROPIC_','GEMINI_')): env.pop(k)
+        env['ZENPI_HOME']=str(root/'user');env['ZENPI_API_KEY']='local-fixture-key'
+        self.err=(root/f'{name}.stderr').open('wb');self.out=(root/f'{name}.stdout.jsonl').open('wb');self.ins=(root/f'{name}.stdin.jsonl').open('wb')
+        self.p=subprocess.Popen([str(BINARY),'--mode','headless','--session',str(root/'session.jsonl')],cwd=root,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err)
+        save(root/f'{name}.process.json',{'pid':self.p.pid,'argv':self.p.args,'cwd':str(root),'ZENPI_HOME':env['ZENPI_HOME'],'HOME_preserved':env.get('HOME')==os.environ.get('HOME'),'CODEX_HOME_preserved':env.get('CODEX_HOME')==os.environ.get('CODEX_HOME'),'binary_sha256':digest(BINARY)})
+        self.reader=threading.Thread(target=self.read,daemon=True);self.reader.start()
+    def read(self):
+        for raw in self.p.stdout:
+            self.out.write(raw);self.out.flush()
+            with self.cv:
+                try: self.records.append((raw,json.loads(raw)))
+                except ValueError: self.records.append((raw,{'parse_error':True}))
+                self.cv.notify_all()
+    def wait(self,predicate,start=0,timeout=20):
+        deadline=time.monotonic()+timeout
+        with self.cv:
+            while True:
+                for raw,value in self.records[start:]:
+                    if predicate(value): return raw,value
+                if self.p.poll() is not None: raise AssertionError(f'{self.name} exited {self.p.returncode}; stderr={self.root/self.name}.stderr')
+                remaining=deadline-time.monotonic()
+                if remaining<=0: raise AssertionError(f'{self.name} timed out; last records {self.records[-3:]}')
+                self.cv.wait(min(.1,remaining))
+    def send(self,v,wait=True):
+        start=len(self.records);v={'schema_version':2,**v};raw=(json.dumps(v)+'\n').encode();self.ins.write(raw);self.ins.flush();self.p.stdin.write(raw);self.p.stdin.flush()
+        return self.wait(lambda r:r.get('id')==v['id'] and 'success' in r,start) if wait else None
+    def command(self,id,text): return self.send({'type':'command','id':id,'text':text})[1]
+    def close(self,kill=False):
+        if self.p.poll() is None:
+            if kill: self.p.kill()
+            else: self.p.stdin.close()
+            try: self.p.wait(timeout=5)
+            except subprocess.TimeoutExpired: self.p.kill();self.p.wait(timeout=5)
+        self.reader.join(2);self.err.close();self.out.close();self.ins.close()
+        save(self.root/f'{self.name}.exit.json',{'pid':self.p.pid,'returncode':self.p.returncode,'requested_SIGKILL':kill})
+        return self.p.returncode
+
+def journal(root): return [json.loads(l) for l in (root/'session.jsonl').read_text().splitlines()]
+def evt(v): return v.get('event',{}).get('type')
+def req(id,text): return {'type':'prompt','id':id,'text':text}
+def check_error(r,code): require(r.get('success') is False and r.get('code')==code,f'expected {code}: {r}')
+def run(provider,scenario,label):
+    root=ROOT/provider/(scenario+'-'+label);root.mkdir(parents=True,exist_ok=False);(root/'user').mkdir();(root/'input.txt').write_text(BODY)
+    server=Server(provider,scenario,root);config=f"backend='{ 'openai' if provider=='chat' else provider}'\nbase_url='{server.url}'\nmodel='{MODELS[provider]}'\n"
+    if provider=='chat': config+="wire_api='chat_completions'\n"
+    else: config+="model_reasoning_effort='high'\n"
+    (root/'user/config.toml').write_text(config);clients=[];checks=[]
+    def passed(s): checks.append(s)
+    try:
+        old=req('killed','read input then answer' if scenario=='tool' else 'begin interrupted response')
+        one=Cli(root,'owner-one');clients.append(one);one.send(old,False)
+        one.wait(lambda r:evt(r)=='text_delta' and PARTIAL in json.dumps(r))
+        if scenario=='partial': one.wait(lambda r:evt(r)=='tool_call_delta')
+        before=[(raw,v) for raw,v in one.records if v.get('type')=='event']
+        require(one.close(True)==-9,'first owner did not exit SIGKILL');require(server.closed.wait(5),'server did not observe killed connection close')
+        for suffix in ('','.reconnect'): shutil.copyfile(root/('session.jsonl'+suffix),root/('after-kill.session.jsonl'+suffix))
+        require(not (root/'NEVER.txt').exists(),'incomplete tool was dispatched')
+        require(not any(evt(v)=='completed' and PARTIAL in json.dumps(v) for _,v in before),'partial completed')
+        held_count=1 if scenario=='partial' else 2;require(len(server.requests)==held_count,'unexpected HTTP before restart')
+        j=journal(root);save(root/'after-kill.parsed-journal.json',j)
+        started=[r for r in j if r.get('event',{}).get('type')=='tool_execution_started']
+        finished=[r for r in j if r.get('event',{}).get('type')=='tool_execution_finished']
+        require(len(started)==len(finished)==(1 if scenario=='tool' else 0),f'tool durable counts {len(started)}/{len(finished)}')
+        if scenario=='tool':
+            require(CALL in json.dumps(started) and CALL in json.dumps(finished),'durable tool identity lost')
+            require(BODY in json.dumps(server.requests[1]['body']),'second HTTP lacks completed tool result')
+        passed('SIGKILL -9 during open native SSE; observed public delta durable; expected tool execution count')
+        two=Cli(root,'owner-two');clients.append(two)
+        status=two.send({'type':'status','id':'status'})[1];require(status['success'],'restart status failed')
+        inspect=two.command('inspect','/recovery inspect');require(inspect['success'],str(inspect));data=inspect['data'];save(root/'recovery-inspect.json',inspect)
+        require(len(data['operations'])==1 and data['tools']==[],str(data));op=data['operations'][0];opid=op['operation_id'];require(op['state']=='unknown_outcome' and op['retry_requires_confirmation'] and op.get('idempotency_key'),str(op))
+        start=len(two.records);resume=two.send({'type':'resume','id':'resume','from_sequence':0})[1];require(resume['success'],str(resume))
+        replayed={v['sequence']:raw for raw,v in two.records[start:] if v.get('type')=='event'}
+        require(all(replayed.get(v['sequence'])==raw for raw,v in before),'public event replay changed bytes/sequence/turn identity')
+        passed('independent process reports unknown provider outcome and replays every observed event byte-for-byte')
+        check_error(two.send(old)[1],'unknown_outcome');check_error(two.send(req('killed','conflicting payload'))[1],'request_id_conflict')
+        check_error(two.send(req('blocked','fresh before decision'))[1],'operation_recovery')
+        require(len(server.requests)==held_count,'restart/replay/blocked prompt automatically submitted HTTP')
+        retry=two.command('retry',f'/recovery retry {opid} --yes');require(retry['success'] and retry['data']['pending_count']==0 and retry['data']['execution_started'] is False and retry['data']['new_attempt_required'],str(retry))
+        repeat=two.command('retry-again',f'/recovery retry {opid} --yes');require(repeat['success'],str(repeat))
+        oppose=two.command('abandon-conflict',f'/recovery abandon {opid} --yes');require(not oppose['success'] and 'conflict' in str(oppose),str(oppose))
+        check_error(two.send(old)[1],'unknown_outcome');require(len(server.requests)==held_count,'recovery decision submitted HTTP')
+        passed('unknown/conflict/gated fresh IDs do not resubmit; retry is durable idempotent decision only')
+        fresh=req('fresh','continue after explicit recovery');raw,answer=two.send(fresh);require(answer['success'] and FINAL in json.dumps(answer) and PARTIAL not in json.dumps(answer),str(answer));require(len(server.requests)==held_count+1,'fresh request HTTP count wrong')
+        body=server.requests[-1]['body'];require(PARTIAL not in json.dumps(body),'partial text leaked into new provider history');require('incomplete_write_319' not in json.dumps(body),'incomplete tool leaked')
+        if scenario=='tool':
+            require(BODY in json.dumps(body) and CALL in json.dumps(body),'durable completed tool history missing')
+            if provider=='anthropic': require('opaque-signature-319' in json.dumps(body),'native signed block lost')
+            if provider=='google': require('dG9vbC0zMTk=' in json.dumps(body),'native signed part lost')
+        duplicate_raw,duplicate=two.send(fresh);require(duplicate_raw==raw,'terminal replay not byte exact');check_error(two.send(req('fresh','different'))[1],'request_id_conflict');require(len(server.requests)==held_count+1,'terminal duplicate resubmitted')
+        two.close();three=Cli(root,'owner-three');clients.append(three);raw3,_=three.send(fresh);require(raw3==raw,'restart terminal replay changed');check_error(three.send(old)[1],'unknown_outcome');require(len(server.requests)==held_count+1,'third owner resubmitted');three.close()
+        j=journal(root);require(sum(r.get('event',{}).get('type')=='tool_execution_started' for r in j)==(scenario=='tool'),'tool redispatched after recovery')
+        require(not (root/'NEVER.txt').exists(),'uncompleted write happened')
+        passed('fresh explicit new attempt succeeds with clean partial history; known tool identity preserved; terminal replay survives third process without execution')
+        save(root/'result.json',{'provider':provider,'scenario':scenario,'passed':True,'checks':checks,'http_requests':len(server.requests),'binary_sha256':digest(BINARY),'harness_sha256':digest(pathlib.Path(__file__))})
+        print(provider,scenario,'PASS',flush=True)
+    except Exception:
+        save(root/'result.json',{'provider':provider,'scenario':scenario,'passed':False,'checks':checks,'failure':traceback.format_exc(),'http_requests':len(server.requests),'binary_sha256':digest(BINARY),'harness_sha256':digest(pathlib.Path(__file__))});raise
+    finally:
+        for c in clients:
+            if c.p.poll() is None: c.close(True)
+        server.close()
+        save(root/'artifact-index.json',[{'path':str(p.relative_to(root)),'bytes':p.stat().st_size,'sha256':digest(p)} for p in sorted(root.rglob('*')) if p.is_file() and p.name!='artifact-index.json'])
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('provider',choices=MODELS);p.add_argument('--scenario',choices=['partial','tool','both'],default='both');p.add_argument('--label',required=True);a=p.parse_args()
+    for scenario in (['partial','tool'] if a.scenario=='both' else [a.scenario]): run(a.provider,scenario,a.label)

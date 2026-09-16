@@ -1,0 +1,370 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/cargo-target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 5 tests
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ignored, subprocess helper with parent-owned deadline and fixture cleanup
+native_fixture_setup elapsed_ms=80 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpB9j2MR/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpB9j2MR/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+native_fixture_setup elapsed_ms=80 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpWNHRPr/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpWNHRPr/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+native_fixture_setup elapsed_ms=80 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpIVZY7n/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpIVZY7n/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+native_fixture_setup elapsed_ms=85 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpx0sTQn/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpx0sTQn/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdout stop=revoke outer_timeout=false elapsed_ms=388 fixture_pids=["19956", "19962"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Unsupported("stale extension generation"))) phases=1988533.176893000 pid=19950 helper-entry
+1988533.179442000 pid=19950 host-start
+1988533.548632000 pid=19956 native-parent-entry
+1988533.548828000 pid=19956 fork-start
+1988533.549226000 pid=19956 fork-return
+1988533.549287000 pid=19962 native-holder-entry
+1988533.549439000 pid=19962 escaped-ready
+1988533.554781000 pid=19950 host-return
+
+inner_elapsed_ms=375 fd_count=5->5 escaped_still_alive=true outcome=Ok(Err(Unsupported("stale extension generation")))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.38s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpIVZY7n/fixture" bytes=337 truncated=false phases=1988533.176893000 pid=19950 helper-entry
+1988533.179442000 pid=19950 host-start
+1988533.548632000 pid=19956 native-parent-entry
+1988533.548828000 pid=19956 fork-start
+1988533.549226000 pid=19956 fork-return
+1988533.549287000 pid=19962 native-holder-entry
+1988533.549439000 pid=19962 escaped-ready
+1988533.554781000 pid=19950 host-return
+
+native_fixture_setup elapsed_ms=66 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmptbWiCF/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmptbWiCF/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdout stop=panic outer_timeout=false elapsed_ms=559 fixture_pids=["19955", "19980"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Err(Any { .. }) phases=1988533.176893000 pid=19951 helper-entry
+1988533.179436000 pid=19951 host-start
+1988533.720756000 pid=19955 native-parent-entry
+1988533.720996000 pid=19955 fork-start
+1988533.721559000 pid=19955 fork-return
+1988533.721636000 pid=19980 native-holder-entry
+1988533.721832000 pid=19980 escaped-ready
+1988533.726775000 pid=19951 host-return
+
+inner_elapsed_ms=547 fd_count=4->4 escaped_still_alive=true outcome=Err(Any { .. })
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.55s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28934544) panicked at src/extension_runtime.rs:1079:25:
+assertion `left != right` failed: fixture cancellation predicate unwind
+  left: "panic"
+ right: "panic"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpWNHRPr/fixture" bytes=337 truncated=false phases=1988533.176893000 pid=19951 helper-entry
+1988533.179436000 pid=19951 host-start
+1988533.720756000 pid=19955 native-parent-entry
+1988533.720996000 pid=19955 fork-start
+1988533.721559000 pid=19955 fork-return
+1988533.721636000 pid=19980 native-holder-entry
+1988533.721832000 pid=19980 escaped-ready
+1988533.726775000 pid=19951 host-return
+
+native_fixture_setup elapsed_ms=65 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZOldCz/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZOldCz/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=1 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=733 fixture_pids=["19954", "19999"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988533.176893000 pid=19952 helper-entry
+1988533.179438000 pid=19952 host-start
+1988533.896000000 pid=19954 native-parent-entry
+1988533.896246000 pid=19954 fork-start
+1988533.896722000 pid=19954 fork-return
+1988533.896801000 pid=19999 native-holder-entry
+1988533.896949000 pid=19999 escaped-ready
+1988533.901617000 pid=19952 host-return
+
+inner_elapsed_ms=722 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.73s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpB9j2MR/fixture" bytes=337 truncated=false phases=1988533.176893000 pid=19952 helper-entry
+1988533.179438000 pid=19952 host-start
+1988533.896000000 pid=19954 native-parent-entry
+1988533.896246000 pid=19954 fork-start
+1988533.896722000 pid=19954 fork-return
+1988533.896801000 pid=19999 native-holder-entry
+1988533.896949000 pid=19999 escaped-ready
+1988533.901617000 pid=19952 host-return
+
+native_fixture_setup elapsed_ms=66 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpiQdYO8/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpiQdYO8/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=1 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=809 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988533.181002000 pid=19953 helper-entry
+1988533.181636000 pid=19953 host-start
+1988533.982515000 pid=19953 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.80s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28934550) panicked at src/extension_runtime.rs:1091:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpx0sTQn/fixture" bytes=120 truncated=false phases=1988533.181002000 pid=19953 helper-entry
+1988533.181636000 pid=19953 host-start
+1988533.982515000 pid=19953 host-return
+
+native_fixture_setup elapsed_ms=65 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpuRnk5G/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpuRnk5G/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdin stop=revoke outer_timeout=false elapsed_ms=638 fixture_pids=["19979", "20034"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Unsupported("stale extension generation"))) phases=1988533.633874000 pid=19978 helper-entry
+1988533.634587000 pid=19978 host-start
+1988534.263037000 pid=19979 native-parent-entry
+1988534.263274000 pid=19979 fork-start
+1988534.263649000 pid=19979 fork-return
+1988534.263724000 pid=20034 native-holder-entry
+1988534.263883000 pid=20034 escaped-ready
+1988534.264415000 pid=19978 host-return
+
+inner_elapsed_ms=629 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Unsupported("stale extension generation")))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.63s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmptbWiCF/fixture" bytes=337 truncated=false phases=1988533.633874000 pid=19978 helper-entry
+1988533.634587000 pid=19978 host-start
+1988534.263037000 pid=19979 native-parent-entry
+1988534.263274000 pid=19979 fork-start
+1988534.263649000 pid=19979 fork-return
+1988534.263724000 pid=20034 native-holder-entry
+1988534.263883000 pid=20034 escaped-ready
+1988534.264415000 pid=19978 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_revoke_is_bounded ... ok
+api=2 pipe=stdin stop=panic outer_timeout=false elapsed_ms=650 fixture_pids=["19998", "20036"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Err(Any { .. }) phases=1988533.804666000 pid=19997 helper-entry
+1988533.805387000 pid=19997 host-start
+1988534.438302000 pid=19998 native-parent-entry
+1988534.438522000 pid=19998 fork-start
+1988534.438984000 pid=19998 fork-return
+1988534.439056000 pid=20036 native-holder-entry
+1988534.439222000 pid=20036 escaped-ready
+1988534.446614000 pid=19997 host-return
+
+inner_elapsed_ms=641 fd_count=4->4 escaped_still_alive=true outcome=Err(Any { .. })
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.64s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28934639) panicked at src/extension_runtime.rs:1079:25:
+assertion `left != right` failed: fixture cancellation predicate unwind
+  left: "panic"
+ right: "panic"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZOldCz/fixture" bytes=337 truncated=false phases=1988533.804666000 pid=19997 helper-entry
+1988533.805387000 pid=19997 host-start
+1988534.438302000 pid=19998 native-parent-entry
+1988534.438522000 pid=19998 fork-start
+1988534.438984000 pid=19998 fork-return
+1988534.439056000 pid=20036 native-holder-entry
+1988534.439222000 pid=20036 escaped-ready
+1988534.446614000 pid=19997 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_unwind_closes_owned_endpoints ... ok
+api=1 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=652 fixture_pids=["20029", "20037"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988533.979151000 pid=20015 helper-entry
+1988533.979888000 pid=20015 host-start
+1988534.620040000 pid=20029 native-parent-entry
+1988534.620285000 pid=20029 fork-start
+1988534.620660000 pid=20029 fork-return
+1988534.620735000 pid=20037 native-holder-entry
+1988534.620885000 pid=20037 escaped-ready
+1988534.622379000 pid=20015 host-return
+
+inner_elapsed_ms=642 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.64s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpiQdYO8/fixture" bytes=337 truncated=false phases=1988533.979151000 pid=20015 helper-entry
+1988533.979888000 pid=20015 host-start
+1988534.620040000 pid=20029 native-parent-entry
+1988534.620285000 pid=20029 fork-start
+1988534.620660000 pid=20029 fork-return
+1988534.620735000 pid=20037 native-holder-entry
+1988534.620885000 pid=20037 escaped-ready
+1988534.622379000 pid=20015 host-return
+
+native_fixture_setup elapsed_ms=69 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpFLqQwZ/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpFLqQwZ/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=1 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=828 fixture_pids=["20033", "20055"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988534.057846000 pid=20032 helper-entry
+1988534.058730000 pid=20032 host-start
+1988534.797966000 pid=20033 native-parent-entry
+1988534.798211000 pid=20033 fork-start
+1988534.798621000 pid=20033 fork-return
+1988534.798691000 pid=20055 native-holder-entry
+1988534.798840000 pid=20055 escaped-ready
+1988534.878905000 pid=20032 host-return
+
+inner_elapsed_ms=820 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.82s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpuRnk5G/fixture" bytes=337 truncated=false phases=1988534.057846000 pid=20032 helper-entry
+1988534.058730000 pid=20032 host-start
+1988534.797966000 pid=20033 native-parent-entry
+1988534.798211000 pid=20033 fork-start
+1988534.798621000 pid=20033 fork-return
+1988534.798691000 pid=20055 native-holder-entry
+1988534.798840000 pid=20055 escaped-ready
+1988534.878905000 pid=20032 host-return
+
+native_fixture_setup elapsed_ms=69 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZGObu6/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZGObu6/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=281 fixture_pids=["20054", "20073"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988534.703651000 pid=20053 helper-entry
+1988534.704381000 pid=20053 host-start
+1988534.970848000 pid=20054 native-parent-entry
+1988534.971079000 pid=20054 fork-start
+1988534.971509000 pid=20054 fork-return
+1988534.971577000 pid=20073 native-holder-entry
+1988534.971738000 pid=20073 escaped-ready
+1988534.977683000 pid=20053 host-return
+
+inner_elapsed_ms=273 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.27s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpFLqQwZ/fixture" bytes=337 truncated=false phases=1988534.703651000 pid=20053 helper-entry
+1988534.704381000 pid=20053 host-start
+1988534.970848000 pid=20054 native-parent-entry
+1988534.971079000 pid=20054 fork-start
+1988534.971509000 pid=20054 fork-return
+1988534.971577000 pid=20073 native-holder-entry
+1988534.971738000 pid=20073 escaped-ready
+1988534.977683000 pid=20053 host-return
+
+native_fixture_setup elapsed_ms=70 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpeBJNNt/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpeBJNNt/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=284 fixture_pids=["20090", "20093"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988535.058405000 pid=20089 helper-entry
+1988535.059125000 pid=20089 host-start
+1988535.326240000 pid=20090 native-parent-entry
+1988535.326455000 pid=20090 fork-start
+1988535.326790000 pid=20090 fork-return
+1988535.326854000 pid=20093 native-holder-entry
+1988535.326995000 pid=20093 escaped-ready
+1988535.333257000 pid=20089 host-return
+
+inner_elapsed_ms=274 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.28s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpeBJNNt/fixture" bytes=337 truncated=false phases=1988535.058405000 pid=20089 helper-entry
+1988535.059125000 pid=20089 host-start
+1988535.326240000 pid=20090 native-parent-entry
+1988535.326455000 pid=20090 fork-start
+1988535.326790000 pid=20090 fork-return
+1988535.326854000 pid=20093 native-holder-entry
+1988535.326995000 pid=20093 escaped-ready
+1988535.333257000 pid=20089 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded ... ok
+api=2 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=811 fixture_pids=["20072", "20091"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988534.958952000 pid=20071 helper-entry
+1988534.959677000 pid=20071 host-start
+1988535.148484000 pid=20072 native-parent-entry
+1988535.148728000 pid=20072 fork-start
+1988535.149146000 pid=20072 fork-return
+1988535.149212000 pid=20091 native-holder-entry
+1988535.149368000 pid=20091 escaped-ready
+1988535.759951000 pid=20071 host-return
+
+inner_elapsed_ms=800 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.80s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZGObu6/fixture" bytes=337 truncated=false phases=1988534.958952000 pid=20071 helper-entry
+1988534.959677000 pid=20071 host-start
+1988535.148484000 pid=20072 native-parent-entry
+1988535.148728000 pid=20072 fork-start
+1988535.149146000 pid=20072 fork-return
+1988535.149212000 pid=20091 native-holder-entry
+1988535.149368000 pid=20091 escaped-ready
+1988535.759951000 pid=20071 host-return
+
+native_fixture_setup elapsed_ms=68 compiler=cc argv=["-O2", "-Wall", "-Wextra", "-Werror", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmp96mT0w/fixture/endpoint.c", "-o", "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmp96mT0w/fixture/plugin"] source_bytes=1472 source_sha256=3109d4e05682e6c15f44f0c329609406d106a25789a8019f84a7444d9753d9f5 binary_bytes=34136 binary_sha256=82a7211a2c8e7753f9549ccd93706af584ef40bf591966cd79a6e1c595daa6ff
+api=2 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=831 fixture_pids=["20110", "20111"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988535.841652000 pid=20109 helper-entry
+1988535.842280000 pid=20109 host-start
+1988536.055579000 pid=20110 native-parent-entry
+1988536.055816000 pid=20110 fork-start
+1988536.056377000 pid=20110 fork-return
+1988536.056448000 pid=20111 native-holder-entry
+1988536.056626000 pid=20111 escaped-ready
+1988536.663385000 pid=20109 host-return
+
+inner_elapsed_ms=821 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.82s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmp96mT0w/fixture" bytes=337 truncated=false phases=1988535.841652000 pid=20109 helper-entry
+1988535.842280000 pid=20109 host-start
+1988536.055579000 pid=20110 native-parent-entry
+1988536.055816000 pid=20110 fork-start
+1988536.056377000 pid=20110 fork-return
+1988536.056448000 pid=20111 native-holder-entry
+1988536.056626000 pid=20111 escaped-ready
+1988536.663385000 pid=20109 host-return
+
+
+thread 'extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded' (28934406) panicked at src/extension_runtime.rs:1010:9:
+escaped pipe timeout failures: [(1, "stdout")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded
+
+test result: FAILED. 3 passed; 1 failed; 1 ignored; 0 measured; 91 filtered out; finished in 3.58s
+
+error: test failed, to rerun pass `--lib`

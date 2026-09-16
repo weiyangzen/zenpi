@@ -1,0 +1,1 @@
+{"schema_version":1,"id":"bench-stop","type":"response","command":"shutdown","success":true,"data":{"closing":true,"drained":true},"code":"ok"}

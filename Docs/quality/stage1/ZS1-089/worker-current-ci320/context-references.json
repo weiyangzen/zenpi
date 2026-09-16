@@ -1,0 +1,92 @@
+[
+  {
+    "source": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+    "bytes": 15327,
+    "sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c",
+    "captured_at": "2026-09-12T13:00:32.809183+00:00",
+    "scope": "context only; no sibling acceptance",
+    "excerpts": [
+      {
+        "artifact": "context/bench_runtime-1-58.txt",
+        "lines": [
+          1,
+          58
+        ],
+        "bytes": 1861,
+        "sha256": "b82c0e78a078c6bd06c44d94c9b96a6e4af30f6fa1e3c93daffff5813456665c"
+      },
+      {
+        "artifact": "context/bench_runtime-142-201.txt",
+        "lines": [
+          142,
+          201
+        ],
+        "bytes": 3127,
+        "sha256": "ced601d5a0524e58ebcc18d1e960992c456aa1fcf93159f7002eeda59c44f4f9"
+      },
+      {
+        "artifact": "context/bench_runtime-276-338.txt",
+        "lines": [
+          276,
+          338
+        ],
+        "bytes": 3595,
+        "sha256": "c0c8a31a5455adc73eb73dcd1dd145b310e23d3c15924a510db3a6a38fd569c6"
+      }
+    ]
+  },
+  {
+    "source": "/Users/wangweiyang/GitHub/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "bytes": 146422,
+    "sha256": "20e38b23c6550422c993cc241f9ffa9daeb4443e6d4f050fdd370ba6d54268f9",
+    "captured_at": "2026-09-12T13:00:32.809765+00:00",
+    "scope": "context only; no sibling acceptance",
+    "excerpts": [
+      {
+        "artifact": "context/stage_1_v3_pi_mono_blueprint-121-154.txt",
+        "lines": [
+          121,
+          154
+        ],
+        "bytes": 6584,
+        "sha256": "a9e931ed212412dcbfa64033f08a893b7f05dcb0b0b3d56e5b5876a28e0642f0"
+      },
+      {
+        "artifact": "context/stage_1_v3_pi_mono_blueprint-206-206.txt",
+        "lines": [
+          206,
+          206
+        ],
+        "bytes": 457,
+        "sha256": "44dbc66527f98babc6f8b66e4e836eb5fa7aac1a03096daed8e6b3fd0bca9aa3"
+      }
+    ]
+  },
+  {
+    "source": "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
+    "bytes": 44597,
+    "sha256": "d04fa4e6fcf1b768adc26d82944468a568a8477d739f34290a42f429110cb185",
+    "captured_at": "2026-09-12T13:00:32.810372+00:00",
+    "scope": "context only; no sibling acceptance",
+    "excerpts": [
+      {
+        "artifact": "context/validate_stage1_blueprint-1-45.txt",
+        "lines": [
+          1,
+          45
+        ],
+        "bytes": 1798,
+        "sha256": "2d45d340e554ca9cd84460b137eda2e7f6bdef3e5c1cfb119245e90c4886176a"
+      },
+      {
+        "artifact": "context/validate_stage1_blueprint-762-796.txt",
+        "lines": [
+          762,
+          796
+        ],
+        "bytes": 2035,
+        "sha256": "d43bbf7a344ef73b0394a58a5e609bc36914065b3cae88793e2dc800d59c8ebb"
+      }
+    ]
+  }
+]

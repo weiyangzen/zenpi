@@ -140,11 +140,24 @@ pub struct CheckpointInspection {
     pub acknowledgement_supported: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProjectControl {
+    Open { cwd: Option<String> },
+    Select { id: String },
+    List {},
+    Close { id: String },
+}
+
 /// A decoded request from stdin.  Optional fields are kept here so malformed
 /// requests can receive a correlated, typed error instead of terminating the
 /// process.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StdioRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectControl>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
     /// Missing versions are treated as v1 for compatibility with early
     /// clients; an explicitly unsupported version is rejected before dispatch.
     #[serde(default = "default_protocol_version", alias = "version")]
@@ -185,12 +198,21 @@ pub struct StdioRequest {
     pub checkpoint: Option<CheckpointRequest>,
     #[serde(default)]
     pub mailbox: Option<MailboxRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_queue: Option<InputQueueAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree: Option<TreeAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<OutputAction>,
 }
 
 /// A validated command.  The command owns its payload so admission can move
 /// it into the core without cloning potentially large prompt text.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
+    Project(ProjectControl),
     /// A typed local slash command carried over the headless transport.  The
     /// command text is parsed by the shared slash grammar and is never
     /// submitted as a provider prompt.
@@ -228,6 +250,9 @@ pub enum Command {
     },
     Checkpoint(CheckpointRequest),
     Mailbox(MailboxRequest),
+    InputQueue(InputQueueRequest),
+    Tree(TreeRequest),
+    ToolOutput(OutputRequest),
     UserShell(UserShellRequest),
     Approve {
         approval_id: String,
@@ -250,9 +275,85 @@ impl StdioRequest {
             });
         }
         validate_id(self.id.as_deref())?;
+        if let Some(id) = self.project_id.as_deref() {
+            validate_identifier(id, "project_id")?;
+        }
         validate_optional_field(self.expected_turn_id.as_deref(), "expected_turn_id", 256)?;
         validate_optional_field(self.path.as_deref(), "path", 4096)?;
         match self.kind.as_str() {
+            "tool_output" => {
+                let request = OutputRequest {
+                    schema_version: self.schema_version,
+                    id: self.id.ok_or(ProtocolError::EmptyField { field: "id" })?,
+                    kind: self.kind,
+                    session_id: self.session_id.ok_or(ProtocolError::EmptyField {
+                        field: "session_id",
+                    })?,
+                    output: self
+                        .output
+                        .ok_or(ProtocolError::EmptyField { field: "output" })?,
+                };
+                request.validate()?;
+                Ok(Command::ToolOutput(request))
+            }
+            "tree" => {
+                let request = TreeRequest {
+                    schema_version: self.schema_version,
+                    id: self.id.ok_or(ProtocolError::EmptyField { field: "id" })?,
+                    kind: self.kind,
+                    session_id: self.session_id.ok_or(ProtocolError::EmptyField {
+                        field: "session_id",
+                    })?,
+                    tree: self
+                        .tree
+                        .ok_or(ProtocolError::EmptyField { field: "tree" })?,
+                };
+                request.validate()?;
+                Ok(Command::Tree(request))
+            }
+            "project" => {
+                if self.schema_version != PROTOCOL_VERSION {
+                    return Err(ProtocolError::UnsupportedVersion {
+                        found: self.schema_version,
+                        expected: PROTOCOL_VERSION,
+                    });
+                }
+                if self.id.is_none() {
+                    return Err(ProtocolError::MissingField { field: "id" });
+                }
+                let control = self
+                    .project
+                    .ok_or(ProtocolError::MissingField { field: "project" })?;
+                match &control {
+                    ProjectControl::Open { cwd: Some(cwd) } => {
+                        validate_optional_field(Some(cwd), "cwd", 4096)?;
+                        if cwd.is_empty() || cwd.chars().any(char::is_control) {
+                            return Err(ProtocolError::InvalidField { field: "cwd" });
+                        }
+                    }
+                    ProjectControl::Select { id } | ProjectControl::Close { id } => {
+                        validate_identifier(id, "project_id")?
+                    }
+                    _ => {}
+                }
+                Ok(Command::Project(control))
+            }
+
+            "input_queue" => {
+                let request = InputQueueRequest {
+                    schema_version: self.schema_version,
+                    id: self.id.ok_or(ProtocolError::EmptyField { field: "id" })?,
+                    kind: self.kind,
+                    session_id: self.session_id.ok_or(ProtocolError::EmptyField {
+                        field: "session_id",
+                    })?,
+                    input_queue: self.input_queue.ok_or(ProtocolError::EmptyField {
+                        field: "input_queue",
+                    })?,
+                };
+                request.validate()?;
+                Ok(Command::InputQueue(request))
+            }
             "command" | "slash" => {
                 let input = bounded_text(self.text.or(self.message), "command")?;
                 if input.trim_start().starts_with('!') {
@@ -296,7 +397,10 @@ impl StdioRequest {
             "steer" => {
                 let text = bounded_text(self.text.or(self.message), "steer")?;
                 if text.trim_start().starts_with('!') {
-                    if self.expected_turn_id.is_some() {
+                    if !self.attachments.is_empty()
+                        || self.mode.is_some()
+                        || self.expected_turn_id.is_some()
+                    {
                         return Err(ProtocolError::InvalidField {
                             field: "user_shell",
                         });
@@ -699,13 +803,60 @@ pub fn parse_line(line: &str) -> Result<StdioRequest, ProtocolError> {
     if !value.is_object() {
         return Err(ProtocolError::NotObject);
     }
-    Ok(serde_json::from_value(value)?)
+    // Decode the original frame as well as inspecting its envelope: converting
+    // through Value first would silently collapse duplicate request/action IDs.
+    let parsed: StdioRequest = serde_json::from_str(line)?;
+    if value["type"] == "tool_output" {
+        let mut output = value.clone();
+        output
+            .as_object_mut()
+            .expect("validated object")
+            .remove("project_id");
+        serde_json::from_value::<OutputRequest>(output)?.validate()?;
+    }
+    if value["type"] == "tree" {
+        let mut tree = value.clone();
+        tree.as_object_mut()
+            .expect("validated object")
+            .remove("project_id");
+        serde_json::from_value::<TreeRequest>(tree)?.validate()?;
+    }
+    if value["type"] == "project"
+        && value
+            .as_object()
+            .expect("validated object")
+            .keys()
+            .any(|key| {
+                !matches!(
+                    key.as_str(),
+                    "schema_version" | "version" | "id" | "type" | "project" | "project_id"
+                )
+            })
+    {
+        return Err(ProtocolError::InvalidField {
+            field: "project_envelope",
+        });
+    }
+    if value["type"] == "input_queue" {
+        // Project selection is a host envelope guard; the queue owner still
+        // validates its independent session identity and strict action body.
+        let mut queue = value.clone();
+        queue
+            .as_object_mut()
+            .expect("validated object")
+            .remove("project_id");
+        let request: InputQueueRequest = serde_json::from_value(queue)?;
+        request.validate()?;
+    }
+    Ok(parsed)
 }
 
 /// A correlated JSONL response.  `data` and `error` are mutually exclusive;
 /// constructors below enforce that invariant.
 #[derive(Debug, Serialize)]
 pub struct StdioResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<crate::project_workspace::ProjectContext>,
     #[serde(default = "default_protocol_version")]
     pub schema_version: u16,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -733,6 +884,8 @@ pub struct StdioResponse {
 /// treating progress as a second command result.
 #[derive(Debug, Clone, Serialize)]
 pub struct StdioEvent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<crate::project_workspace::ProjectContext>,
     pub schema_version: u16,
     pub sequence: u64,
     /// Every stdout record has a discriminator so a client can safely mix
@@ -754,6 +907,7 @@ impl StdioEvent {
         event: Value,
     ) -> Self {
         Self {
+            project: None,
             schema_version: ASYNC_PROTOCOL_VERSION,
             sequence,
             kind: "event",
@@ -767,6 +921,7 @@ impl StdioEvent {
 impl StdioResponse {
     pub fn success(id: Option<String>, command: impl Into<String>, data: Option<Value>) -> Self {
         Self {
+            project: None,
             schema_version: LEGACY_PROTOCOL_VERSION,
             id,
             kind: "response",
@@ -782,6 +937,7 @@ impl StdioResponse {
 
     pub fn error(id: Option<String>, command: impl Into<String>, error: impl Into<String>) -> Self {
         Self {
+            project: None,
             schema_version: LEGACY_PROTOCOL_VERSION,
             id,
             kind: "response",
@@ -846,6 +1002,7 @@ pub fn encode_line<T: Serialize>(value: &T) -> Result<String, serde_json::Error>
 /// name without matching every enum variant.
 pub fn command_name(command: &Command) -> &'static str {
     match command {
+        Command::Project(_) => "project",
         Command::Slash { .. } => "command",
         Command::Prompt { .. } => "prompt",
         Command::Steer { .. } => "steer",
@@ -856,6 +1013,9 @@ pub fn command_name(command: &Command) -> &'static str {
         Command::Resume { .. } => "resume",
         Command::Checkpoint(_) => "checkpoint",
         Command::Mailbox(_) => "mailbox",
+        Command::InputQueue(_) => "input_queue",
+        Command::Tree(_) => "tree",
+        Command::ToolOutput(_) => "tool_output",
         Command::UserShell(_) => "user_shell",
         Command::Approve { .. } => "approve",
         Command::Shutdown => "shutdown",
@@ -869,5 +1029,281 @@ impl fmt::Display for TurnMode {
             Self::StartIfIdle => "start_if_idle",
             Self::Steer => "steer",
         })
+    }
+}
+
+/// Shared input-queue actions for slash, TUI and JSONL owners. Parsing does not
+/// imply durable receipt; the host calls InputQueue::execute with its writer.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum InputQueueAction {
+    Enqueue {
+        input_id: String,
+        kind: crate::input_queue::InputKind,
+        text: String,
+    },
+    Edit {
+        input_id: String,
+        expected_revision: u64,
+        text: String,
+    },
+    Cancel {
+        input_id: String,
+    },
+    List {
+        after_sequence: Option<u64>,
+        limit: u16,
+    },
+    Configure {
+        kind: crate::input_queue::InputKind,
+        mode: crate::input_queue::QueueMode,
+    },
+}
+
+impl InputQueueAction {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        match self {
+            Self::Enqueue { input_id, text, .. } | Self::Edit { input_id, text, .. } => {
+                validate_queue_id(input_id)?;
+                if text.trim().is_empty() {
+                    return Err(ProtocolError::EmptyField { field: "text" });
+                }
+                if text.len() > MAX_TEXT_BYTES {
+                    return Err(ProtocolError::FieldTooLong {
+                        field: "text",
+                        max: MAX_TEXT_BYTES,
+                    });
+                }
+                if text.contains('\0') || text.trim_start().starts_with('!') {
+                    return Err(ProtocolError::InvalidField { field: "text" });
+                }
+                if matches!(
+                    self,
+                    Self::Edit {
+                        expected_revision: u64::MAX,
+                        ..
+                    }
+                ) {
+                    return Err(ProtocolError::InvalidField {
+                        field: "expected_revision",
+                    });
+                }
+            }
+            Self::Cancel { input_id } => validate_queue_id(input_id)?,
+            Self::List {
+                after_sequence,
+                limit,
+            } => {
+                if *limit == 0 || *limit > 32 || *after_sequence == Some(u64::MAX) {
+                    return Err(ProtocolError::InvalidField {
+                        field: "input_queue_page",
+                    });
+                }
+            }
+            Self::Configure { .. } => {}
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn validate_queue_id(value: &str) -> Result<(), ProtocolError> {
+    validate_identifier(value, "input_queue_id")?;
+    if value.trim() != value {
+        return Err(ProtocolError::InvalidField {
+            field: "input_queue_id",
+        });
+    }
+    Ok(())
+}
+
+/// A separate strict envelope avoids silently treating queue fields as an old
+/// prompt. The host must route type=input_queue to this parser and then to the
+/// session owner. Existing StdioRequest/Command handling remains compatible.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct InputQueueRequest {
+    pub schema_version: u16,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub session_id: String,
+    pub input_queue: InputQueueAction,
+}
+
+impl InputQueueRequest {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if self.schema_version != PROTOCOL_VERSION {
+            return Err(ProtocolError::UnsupportedVersion {
+                found: self.schema_version,
+                expected: PROTOCOL_VERSION,
+            });
+        }
+        if self.kind != "input_queue" {
+            return Err(ProtocolError::InvalidField { field: "type" });
+        }
+        validate_queue_id(&self.id)?;
+        validate_queue_id(&self.session_id)?;
+        self.input_queue.validate()
+    }
+}
+
+pub fn parse_input_queue_line(line: &str) -> Result<InputQueueRequest, ProtocolError> {
+    if line.len() > MAX_LINE_BYTES {
+        return Err(ProtocolError::LineTooLong {
+            max: MAX_LINE_BYTES,
+        });
+    }
+    let request: InputQueueRequest = serde_json::from_str(line.strip_suffix('\r').unwrap_or(line))?;
+    request.validate()?;
+    Ok(request)
+}
+
+/// Strict session-scoped tree control shared by terminal and JSONL hosts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum TreeAction {
+    List {
+        cursor: usize,
+        limit: usize,
+    },
+    Enable {},
+    Select {
+        leaf: Option<String>,
+    },
+    Fork {
+        leaf: Option<String>,
+        destination: String,
+    },
+    Annotate {
+        entry_id: String,
+        annotation: crate::session_tree::TreeAnnotation,
+    },
+}
+impl TreeAction {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        match self {
+            Self::List { limit, .. }
+                if *limit == 0 || *limit > crate::session_tree::MAX_TREE_PAGE =>
+            {
+                return Err(ProtocolError::InvalidField { field: "limit" });
+            }
+            Self::Select { leaf } | Self::Fork { leaf, .. } => {
+                if let Some(leaf) = leaf {
+                    validate_queue_id(leaf)?;
+                }
+            }
+            Self::Annotate { entry_id, .. } => validate_queue_id(entry_id)?,
+            _ => {}
+        }
+        if let Self::Fork { destination, .. } = self
+            && (destination.is_empty()
+                || destination.len() > 4096
+                || destination.chars().any(char::is_control))
+        {
+            return Err(ProtocolError::InvalidField {
+                field: "destination",
+            });
+        }
+        Ok(())
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TreeRequest {
+    pub schema_version: u16,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub session_id: String,
+    pub tree: TreeAction,
+}
+impl TreeRequest {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if self.schema_version != PROTOCOL_VERSION {
+            return Err(ProtocolError::UnsupportedVersion {
+                found: self.schema_version,
+                expected: PROTOCOL_VERSION,
+            });
+        }
+        if self.kind != "tree" {
+            return Err(ProtocolError::InvalidField { field: "type" });
+        }
+        validate_queue_id(&self.id)?;
+        validate_queue_id(&self.session_id)?;
+        self.tree.validate()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum OutputAction {
+    Read {
+        artifact_id: String,
+        call_id: String,
+        offset: u64,
+        length: usize,
+    },
+    Cleanup {
+        call_id: Option<String>,
+        confirm: bool,
+    },
+}
+impl OutputAction {
+    pub fn read_request(&self) -> Option<crate::tool_output::OutputReadRequest> {
+        match self {
+            Self::Read {
+                artifact_id,
+                call_id,
+                offset,
+                length,
+            } => Some(crate::tool_output::OutputReadRequest {
+                artifact_id: artifact_id.clone(),
+                call_id: call_id.clone(),
+                offset: *offset,
+                length: *length,
+            }),
+            _ => None,
+        }
+    }
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if let Some(request) = self.read_request() {
+            request
+                .validate()
+                .map_err(|_| ProtocolError::InvalidField { field: "output" })?;
+        }
+        if let Self::Cleanup {
+            call_id: Some(call),
+            ..
+        } = self
+        {
+            validate_queue_id(call)?;
+        }
+        Ok(())
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OutputRequest {
+    pub schema_version: u16,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub session_id: String,
+    pub output: OutputAction,
+}
+impl OutputRequest {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if self.schema_version != PROTOCOL_VERSION {
+            return Err(ProtocolError::UnsupportedVersion {
+                found: self.schema_version,
+                expected: PROTOCOL_VERSION,
+            });
+        }
+        if self.kind != "tool_output" {
+            return Err(ProtocolError::InvalidField { field: "type" });
+        }
+        validate_queue_id(&self.id)?;
+        validate_queue_id(&self.session_id)?;
+        self.output.validate()
     }
 }

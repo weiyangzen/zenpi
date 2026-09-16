@@ -132,6 +132,57 @@ fn tui_goal_owner_actions_match_headless_and_persist_status() {
 }
 
 #[test]
+fn tui_goal_create_uses_shared_owner_and_persists_queued_goal() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    let blueprint = Blueprint::new(
+        "tui-create-plan",
+        "1",
+        vec![BlueprintItem::new("build", 100)],
+    )
+    .unwrap();
+    let mut store = DomainStore::open(path_for_session(&session_path)).unwrap();
+    store.put_blueprint(blueprint).unwrap();
+    drop(store);
+    let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let mut state = TuiState::default();
+    dispatch_slash_command(
+        SlashCommand::Goal {
+            instruction: "create tui-created-goal tui-create-plan@1".into(),
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(last_system_text(&state).contains("goal create:"));
+    let persisted = DomainStore::open(path_for_session(&session_path)).unwrap();
+    assert_eq!(
+        persisted.goal("tui-created-goal").unwrap().status,
+        GoalStatus::Queued
+    );
+}
+
+#[test]
+fn tui_plan_creates_sequential_blueprint_without_provider_turn() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("plan-session.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let mut state = TuiState::default();
+    dispatch_slash_command(
+        SlashCommand::Plan {
+            instruction: Some("tui-plan :: inspect; test; publish".into()),
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(last_system_text(&state).contains("plan created:"));
+    assert!(agent.history().is_empty());
+    let store = DomainStore::open(path_for_session(&session_path)).unwrap();
+    let blueprint = store.blueprint("tui-plan", "1").unwrap();
+    assert_eq!(blueprint.items.len(), 3);
+    assert_eq!(blueprint.items[2].depends_on, vec!["step-2"]);
+}
+
+#[test]
 fn tui_goal_owner_rejects_unknown_status_and_preserves_natural_language_refusal() {
     let dir = tempdir().unwrap();
     let session_path = dir.path().join("session.jsonl");
@@ -163,5 +214,37 @@ fn tui_goal_owner_rejects_unknown_status_and_preserves_natural_language_refusal(
                 .text
                 .contains("goal creation/execution requires an external b3ehive owner")
     }));
+    assert!(agent.history().is_empty());
+}
+
+#[test]
+fn tui_goal_run_resume_and_cancel_aliases_persist() {
+    let dir = tempdir().unwrap();
+    let session_path = dir.path().join("session.jsonl");
+    seed_goal(&session_path);
+    let mut agent = Agent::with_echo(SessionStore::open(&session_path).unwrap());
+    let mut state = TuiState::default();
+    for instruction in [
+        "run tui-owner-goal",
+        "status tui-owner-goal paused",
+        "resume tui-owner-goal",
+        "cancel tui-owner-goal",
+    ] {
+        dispatch_slash_command(
+            SlashCommand::Goal {
+                instruction: instruction.into(),
+            },
+            &mut state,
+            Some(&mut agent),
+        );
+    }
+    assert_eq!(
+        DomainStore::open(path_for_session(&session_path))
+            .unwrap()
+            .goal("tui-owner-goal")
+            .unwrap()
+            .status,
+        GoalStatus::Cancelled
+    );
     assert!(agent.history().is_empty());
 }

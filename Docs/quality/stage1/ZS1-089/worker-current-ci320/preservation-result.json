@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "ready_packages": 76,
+  "ready_regular_files": 10748,
+  "tracked_regular_files": 145,
+  "method": "regular-file set and SHA-256 equality; no FIFO opened",
+  "main_CI_unchanged": true,
+  "old_report_unchanged": true,
+  "main_report_still_absent": true
+}

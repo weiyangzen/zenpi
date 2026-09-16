@@ -1,0 +1,11 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/result.json b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/result.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/result.json
+@@ -0,0 +1,6 @@
++{
++  "passed": false,
++  "failure": "Traceback (most recent call last):\n  File \"/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command_kill_probe.py\", line 22, in <module>\n    approval=one.wait(lambda r:h.evt(r)=='approval_request')[1]['event']['approval'];a=one.send({'type':'approve','id':'approve','approval_id':approval['request_id'],'decision':'allow','remember':True})[1];h.require(a['success'],str(a))\n  File \"/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/kill_probe.py\", line 106, in wait\n    if self.p.poll() is not None: raise AssertionError(f'{self.name} exited {self.p.returncode}; stderr={self.root/self.name}.stderr')\nAssertionError: owner-one exited 1; stderr=/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr\n",
++  "binary_sha256": "c1f4f0e9478665ade1b3c69709ce7939a6d461330d863ed3085d19ee3014f18e",
++  "harness_sha256": "316d109eeef558b049c5142cc537d2b349d392f15a72a9b8cf8909ac266b79aa"
++}

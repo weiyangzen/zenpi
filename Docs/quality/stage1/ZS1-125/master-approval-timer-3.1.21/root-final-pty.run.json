@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-approval-timer-integration-3.1.21/root_final_approval_timer_pty.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started": "2026-09-13T00:51:38.475578+00:00",
+  "ended": "2026-09-13T00:51:44.129778+00:00",
+  "exit_code": 0,
+  "log": {
+    "bytes": 2341,
+    "sha256": "b6364dc0e8f063dafa0585cb50f20c9ae12404379e5c7b2e7d3fe6cd92ae017b"
+  }
+}

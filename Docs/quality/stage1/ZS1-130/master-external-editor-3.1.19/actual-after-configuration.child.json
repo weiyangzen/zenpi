@@ -1,0 +1,452 @@
+[
+  {
+    "event": "started",
+    "pid": 527,
+    "pgid": 527,
+    "foreground": 527,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-524-18d47cf4542f0690-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-524-18d47cf4542f0690-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "",
+    "seed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 532,
+    "pgid": 532,
+    "foreground": 532,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-529-18d47cf481f2f000-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-529-18d47cf481f2f000-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "",
+    "seed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 537,
+    "pgid": 537,
+    "foreground": 537,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-534-18d47cf4afb147a8-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-534-18d47cf4afb147a8-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "",
+    "seed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 540,
+    "pgid": 540,
+    "foreground": 540,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-538-18d47cf4df9c33b0-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-538-18d47cf4df9c33b0-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "",
+    "seed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 543,
+    "pgid": 543,
+    "foreground": 543,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf5276a30c0-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf5276a30c0-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "2f6d6f",
+    "seed_sha256": "dcc954337afd7f3ca4e163604a9ee0181144c62a1d8e9525a3db2c65ea89a3b5"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 546,
+    "pgid": 546,
+    "foreground": 546,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf563a91290-2/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf563a91290-2/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "2f6d6f64656c",
+    "seed_sha256": "9515fc13f4667937010c957ee75825f53e89879be37fbf559bbfb44cafe56b40"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 561,
+    "pgid": 561,
+    "foreground": 561,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf5b3fa4a70-3/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf5b3fa4a70-3/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "2f6174746163682066",
+    "seed_sha256": "bf9537e14560aaaf9540df11d44570a68165184d48d9a38a378ed4ce54545f2c"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "a565dadbf1cd9d029e1241abbf7f1179def328e98381bb25b81b2bfd0b6e0345",
+    "output_bytes": 18
+  },
+  {
+    "event": "started",
+    "pid": 570,
+    "pgid": 570,
+    "foreground": 570,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf6150a8ac8-4/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-541-18d47cf6150a8ac8-4/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "",
+    "seed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "event": "input",
+    "text": "\u0007save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "77994ab067669ef5f75a7f8463eec76c05fd5bd4917d8a1a57cc2e9228385a12",
+    "output_bytes": 14
+  },
+  {
+    "event": "started",
+    "pid": 575,
+    "pgid": 575,
+    "foreground": 575,
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/initial",
+    "argv": [
+      "--editor-child",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/children.jsonl",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/plan.json",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-574-18d47cf68420f910-1/draft.md"
+    ],
+    "tty": [
+      true,
+      true,
+      true
+    ],
+    "canonical": true,
+    "echo": true,
+    "blocking": true,
+    "environment_keys": [
+      "COLORTERM",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "LC_CTYPE",
+      "LOGNAME",
+      "PATH",
+      "SHELL",
+      "TERM",
+      "TMPDIR",
+      "USER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "path": "/Users/wangweiyang/GitHub/zenpi/.ops/editor-configuration-q_q18u80/temp/zenpi-editor-574-18d47cf68420f910-1/draft.md",
+    "directory_mode": 448,
+    "mode": 384,
+    "seed_hex": "4e4541525f425544474554",
+    "seed_sha256": "0fab3ecf761ee3512b12336c1b6c5d1bd73d680be9a0feaf9170b871654030f9"
+  },
+  {
+    "event": "input",
+    "text": "save\n"
+  },
+  {
+    "event": "exit",
+    "code": 0,
+    "output_sha256": "d509bff642a353f88582e8a846ecae041c333b79c57a7a24ff310fbdb7e914e9",
+    "output_bytes": 262144
+  }
+]

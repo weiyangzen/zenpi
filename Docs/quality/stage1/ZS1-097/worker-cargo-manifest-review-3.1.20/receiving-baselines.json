@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-09-12T11:38:48.476681+00:00",
+  "report": "Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.toml_learn.md",
+  "master": {
+    "exists": false,
+    "path": "/Users/wangweiyang/GitHub/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.toml_learn.md"
+  },
+  "worker": {
+    "exists": false,
+    "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.toml_learn.md"
+  },
+  "absence_is_not_an_empty_existing_file": true
+}

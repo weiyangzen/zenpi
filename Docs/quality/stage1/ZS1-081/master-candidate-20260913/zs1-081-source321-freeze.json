@@ -1,0 +1,18 @@
+{
+  "task": "ZS1-081",
+  "frozen_at": "2026-09-13T02:59:17.517366+00:00",
+  "ready_path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-ready",
+  "payload_count": 61,
+  "physical_file_count": 62,
+  "physical_bytes": 2449465,
+  "manifest_bytes": 10138,
+  "manifest_sha256": "3831b3071a6faccc4477aff5801e6037b0815cd9fef154051b45f5c4d3b77ccb",
+  "report_bytes": 46735,
+  "report_sha256": "585366422964dd3ecbed65c9389d56a9182725b2b648b9c68ac7b89664311259",
+  "master_patch_bytes": 47346,
+  "master_patch_sha256": "32271835eee4204880b68855ad7de9fa499a78462046329601a748b81ecb5d5f",
+  "verifier_bytes": 8367,
+  "verifier_sha256": "86192674f48a1ce295b3676b55ec001f8d8c61b883c3566db7b21f32b875e50b",
+  "audit_allowance": 1,
+  "audit_executed_before_freeze": 0
+}

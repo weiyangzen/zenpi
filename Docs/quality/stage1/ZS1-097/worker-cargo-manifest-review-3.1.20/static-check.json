@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "inputs": 60,
+  "formal_files": 1,
+  "baseline_lines": 42,
+  "current_lines": 50,
+  "current_normal_declarations": 15,
+  "context_files": 10,
+  "lock_blocks": 17,
+  "capability_groups": 12,
+  "source_functions": 0,
+  "source_tests": 0,
+  "product_behavior_runs": 0,
+  "cargo_runs": 0,
+  "pty_runs": 0,
+  "http_runs": 0,
+  "method": "byte integrity and narrow text/receipt validation only"
+}

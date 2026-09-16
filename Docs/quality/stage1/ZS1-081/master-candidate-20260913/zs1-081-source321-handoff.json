@@ -1,0 +1,28 @@
+{
+  "task": "ZS1-081",
+  "ready": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-ready",
+  "state": "candidate only; awaiting master independent review",
+  "result": "360 PASS 0 FAIL; one frozen offline audit; zero product/tests",
+  "outside_files": [
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-freeze.json",
+      "bytes": 779,
+      "sha256": "f57872565d8a9f1fa4b91b77eb0d32e848069678ff00ca0f256810d625dcc4f5"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-audit.stdout",
+      "bytes": 13140,
+      "sha256": "377c7f6ef6a98fde73dfd193c655bcf7449af63ab2eba1abccd66a01d07ec67e"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-audit.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-081-source321-audit-receipt.json",
+      "bytes": 451,
+      "sha256": "d273fc4db0661f253f801c794fd6f543c8d444173198fb13cba0a0b41f94c078"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "source_sha256": "20217e87ca2427fcdf6a5ed6fffaf6c481ed5c12d5d485752bbcae6f89d358cf",
+  "binary_end_fix_retained": true,
+  "depth_fix_rejected_for_fifo_blocking": true,
+  "depth_requirement_open": true
+}

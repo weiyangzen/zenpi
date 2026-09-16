@@ -234,7 +234,7 @@ impl ResourceCollector {
             workspace: self.workspace_summary()?,
             cpu: cpu_signal(),
             memory: memory_signal(),
-            disk: disk_signal(),
+            disk: disk_signal(&self.root),
             process: process_signal(),
         })
     }
@@ -352,13 +352,59 @@ fn memory_signal() -> MemorySignal {
     }
 }
 
-fn disk_signal() -> DiskSignal {
-    // Portable std APIs expose file metadata but not filesystem capacity. A
-    // missing disk signal is preferable to spawning `df` or linking libc.
+fn disk_signal(root: &Path) -> DiskSignal {
+    #[cfg(unix)]
+    {
+        unix_disk_signal(root)
+    }
+    #[cfg(not(unix))]
+    {
+        // Windows and other targets retain an explicit typed fallback rather
+        // than spawning a platform command or claiming zero capacity.
+        DiskSignal {
+            total_bytes: None,
+            available_bytes: None,
+            status: SignalStatus::Unavailable,
+        }
+    }
+}
+
+#[cfg(unix)]
+fn unix_disk_signal(root: &Path) -> DiskSignal {
+    let Some(path) = root
+        .to_str()
+        .and_then(|value| std::ffi::CString::new(value).ok())
+    else {
+        return DiskSignal {
+            total_bytes: None,
+            available_bytes: None,
+            status: SignalStatus::Unavailable,
+        };
+    };
+    let mut stats = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: `path` is a valid NUL-terminated path and `stats` points to
+    // writable storage for the OS-provided structure.
+    let result = unsafe { libc::statvfs(path.as_ptr(), stats.as_mut_ptr()) };
+    if result != 0 {
+        return DiskSignal {
+            total_bytes: None,
+            available_bytes: None,
+            status: SignalStatus::Unavailable,
+        };
+    }
+    // SAFETY: statvfs initialized the structure when it returned success.
+    let stats = unsafe { stats.assume_init() };
+    let block_size = stats.f_frsize;
+    let total_bytes = u64::from(stats.f_blocks).checked_mul(block_size);
+    let available_bytes = u64::from(stats.f_bavail).checked_mul(block_size);
     DiskSignal {
-        total_bytes: None,
-        available_bytes: None,
-        status: SignalStatus::Unavailable,
+        status: if total_bytes.is_some() && available_bytes.is_some() {
+            SignalStatus::Available
+        } else {
+            SignalStatus::Unavailable
+        },
+        total_bytes,
+        available_bytes,
     }
 }
 

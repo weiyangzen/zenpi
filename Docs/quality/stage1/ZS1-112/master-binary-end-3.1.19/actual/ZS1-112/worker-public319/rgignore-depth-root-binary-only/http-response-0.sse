@@ -1,0 +1,6 @@
+data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "search-call-319", "type": "function", "function": {"name": "search_text", "arguments": "{\"query\": \"depth_only_needle\", \"regex\": true, \"path\": \"fixture\"}"}}]}, "finish_reason": null}]}
+
+data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]}
+
+data: [DONE]
+

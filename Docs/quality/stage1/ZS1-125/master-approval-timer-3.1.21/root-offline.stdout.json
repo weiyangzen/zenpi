@@ -1,0 +1,2691 @@
+{
+  "checks": [
+    {
+      "name": "exact payload paths",
+      "ok": true
+    },
+    {
+      "name": "payload count",
+      "ok": true
+    },
+    {
+      "name": "payload bytes",
+      "ok": true
+    },
+    {
+      "name": "payload:README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/execution/active_requirement.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/learn/stage1_pi_mono/claims.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/execution/active_requirement.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/learn/stage1_pi_mono/claims.json",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-final/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "ok": true
+    },
+    {
+      "name": "payload:authority-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:before/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:before/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:before/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:before/tui-with-regression-tests.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:bin/zenpi",
+      "ok": true
+    },
+    {
+      "name": "payload:candidate.patch",
+      "ok": true
+    },
+    {
+      "name": "payload:chunk_manifest.tsv",
+      "ok": true
+    },
+    {
+      "name": "payload:initial-inputs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/after-initial.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/after-initial.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/after-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/after-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/before.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/before.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/build.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/build.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/clippy.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/clippy.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/final-fmt.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/final-fmt.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/final-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/final-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fix-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fix-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fmt.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/fmt.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v2.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v2.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v2.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v3.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v3.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v3.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v4.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v4.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty-v4.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/pty.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/tui-regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "payload:logs/tui-regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/before-observation.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/before-observation.stderr.log",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/before-observation.stdout.log",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/binary.json",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/build.run.json",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/build.stderr.log",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/build.stdout.log",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/main-inputs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/run.py",
+      "ok": true
+    },
+    {
+      "name": "payload:master-observation/src/main.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:process-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:project/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:project/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/clippy.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/rustfmt.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/approval.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend/chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend/transport.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/context.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/core.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/directory_picker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domain_execution.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/error.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/extension_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/external_editor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/headless.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/main.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/persona.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/prompt_templates.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/google.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/mod.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/providers/registry.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/render.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/resource_loader.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/runtime_intent.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/search.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/security.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/session.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_output/redaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tool_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/src/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/approval_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/context.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/core_session.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_execution_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_execution_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_domain_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_event_budget.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_input_shutdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/headless_protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/layout_persistence.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/learn_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/mode_boundary.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/render_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/resume_compact_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/runtime_intent_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/security.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_cli.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_maintenance_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_new.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/session_recovery.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_branch_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_context_checkpoint.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_extension_hooks.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_external_evidence.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_gemini.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_input_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_model_registry.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_project_config.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_prompt_resources.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_reasoning_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_resource_host.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_search.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_semantic_compaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_skill_md.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_tool_batch.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/stage1_transport.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_approval_focus.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_bentobox.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_busy_diff.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_goal_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_interaction.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_logs.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_resize.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tests/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/tools/runtime_budget_probe.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.cargo_vcs_info.json",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/CODEOWNERS",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/ISSUE_TEMPLATE/bug_report.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/ISSUE_TEMPLATE/feature_request.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.github/workflows/crossterm_test.yml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/.travis.yml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/CHANGELOG.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/Cargo.toml.orig",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/LICENSE",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/CONTRIBUTING.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_c.png",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_full.png",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/crossterm_full.svg",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/docs/know-problems.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/README.md",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/copy-to-clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-match-modifiers.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-poll-read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-read-char-line.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-stream-async-std.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/event-stream-tokio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/is_tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/key-display.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/examples/stderr.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/ansi_support.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/command.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/cursor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/filter.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/read.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/source.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/stream.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/poll.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event/timeout.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/event.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/macros.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/attributes.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/content_style.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/styled_content.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/stylize.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/attribute.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/color.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/colored.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types/colors.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style/types.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/style.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/file_descriptor.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/terminal.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:project/vendor/crossterm/src/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/failure-note.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/pty-evidence/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/pty-evidence/workspace/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/pty-evidence/workspace/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/pty-evidence/workspace/session.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-attempt-1-failed/pty_approval_timer_probe.py",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/workspace/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/workspace/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence/workspace/session.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/checks-progress.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/final-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/latest-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/result.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/terminal.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/workspace/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/workspace/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v2/workspace/session.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/checks-progress.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/completed.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/final-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/latest-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/pending-end.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/pending-start.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/result.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/running-end.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/running-start.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/terminal.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/.zenpi-output-e3254fb7658e3cdb1f3ae3b31c1f280be3607808703434159a121496c1eb390d/56d20cd0e07928447c45988c33d22d1b61c0ff4e305b84b0603753630ee54f4f.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/.zenpi-output-e3254fb7658e3cdb1f3ae3b31c1f280be3607808703434159a121496c1eb390d/56d20cd0e07928447c45988c33d22d1b61c0ff4e305b84b0603753630ee54f4f.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/.zenpi-output-e3254fb7658e3cdb1f3ae3b31c1f280be3607808703434159a121496c1eb390d/6c190b4f81b2b04aa2a6bb2d54a975b2f29b68c4098d412b65165217a90220d0.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/.zenpi-output-e3254fb7658e3cdb1f3ae3b31c1f280be3607808703434159a121496c1eb390d/6c190b4f81b2b04aa2a6bb2d54a975b2f29b68c4098d412b65165217a90220d0.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v3/workspace/session.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/checks-progress.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/completed.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/config/project-tabs.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/final-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/latest-screen.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/pending-end.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/pending-start.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/result.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/running-end.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/running-start.txt",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/terminal.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/.zenpi-output-4cb8dd943f70858e2c8f7ea4d5ed207157467b164dd3789b63c300b7210e92c1/0d58b1e22400fe0f1dcca3c4f318079e471abf0d89bca12cef773f69fdeb2cd6.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/.zenpi-output-4cb8dd943f70858e2c8f7ea4d5ed207157467b164dd3789b63c300b7210e92c1/0d58b1e22400fe0f1dcca3c4f318079e471abf0d89bca12cef773f69fdeb2cd6.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/.zenpi-output-4cb8dd943f70858e2c8f7ea4d5ed207157467b164dd3789b63c300b7210e92c1/a8c914c6a75c259a0005d57c570a2e16e76aaeb926e2ffc71cf74b24ea2e60d2.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/.zenpi-output-4cb8dd943f70858e2c8f7ea4d5ed207157467b164dd3789b63c300b7210e92c1/a8c914c6a75c259a0005d57c570a2e16e76aaeb926e2ffc71cf74b24ea2e60d2.raw",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/project-workspace.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/project-workspace.lock",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-evidence-v4/workspace/session.jsonl",
+      "ok": true
+    },
+    {
+      "name": "payload:pty-journal-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:pty_approval_timer_probe.py",
+      "ok": true
+    },
+    {
+      "name": "payload:pty_approval_timer_probe_v2.py",
+      "ok": true
+    },
+    {
+      "name": "payload:pty_approval_timer_probe_v3.py",
+      "ok": true
+    },
+    {
+      "name": "payload:pty_approval_timer_probe_v4.py",
+      "ok": true
+    },
+    {
+      "name": "payload:reading-ranges.json",
+      "ok": true
+    },
+    {
+      "name": "payload:run-receipts.json",
+      "ok": true
+    },
+    {
+      "name": "payload:scope-observation.json",
+      "ok": true
+    },
+    {
+      "name": "payload:src__tui.rs.diff",
+      "ok": true
+    },
+    {
+      "name": "payload:tests__tui_transcript_ux.rs.diff",
+      "ok": true
+    },
+    {
+      "name": "payload:timer-tests.inc",
+      "ok": true
+    },
+    {
+      "name": "payload:verify_packet.py",
+      "ok": true
+    },
+    {
+      "name": "owned scope",
+      "ok": true
+    },
+    {
+      "name": "202 initial inputs",
+      "ok": true
+    },
+    {
+      "name": "project exact paths",
+      "ok": true
+    },
+    {
+      "name": "protected original:Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "protected original:Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "protected original:clippy.toml",
+      "ok": true
+    },
+    {
+      "name": "protected original:rustfmt.toml",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/approval.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/backend/chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/backend/transport.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/config.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/context.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/core.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/directory_picker.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/domain_execution.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/error.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/extension_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/external_editor.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/headless.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/main.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/persona.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/prompt_templates.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/providers/anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/providers/google.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/providers/mod.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/providers/registry.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/render.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/resource_loader.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/runtime_intent.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/search.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/security.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/session.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/tool_output/redaction.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/tool_runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:src/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/approval_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/b3.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/backend.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/config.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/context.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/core_session.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/diagnostics.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/domain_execution_host.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/domain_execution_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/domain_store.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/domains.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/extensions.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/governance.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/headless_domain_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/headless_event_budget.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/headless_input_shutdown.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/headless_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/headless_protocol.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/layout.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/layout_persistence.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/learn_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/mode_boundary.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/render_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/resources.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/resume_compact_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/runtime.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/runtime_intent_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/security.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/session_cli.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/session_maintenance_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/session_new.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/session_recovery.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/skills.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/slash.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/slash_actions.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_anthropic.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_branch_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_chat_stream.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_context_checkpoint.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_extension_hooks.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_external_evidence.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_gemini.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_input_host.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_input_queue.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_model_registry.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_project_config.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_prompt_resources.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_reasoning_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_resource_host.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_search.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_semantic_compaction.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_session_tree.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_skill_md.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_tool_batch.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_tool_output.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/stage1_transport.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tools.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_approval_focus.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_bentobox.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_busy_diff.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_command_palette.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_composer.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_goal_owner.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_interaction.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_logs.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_markdown.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_project_workspace.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_resize.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tests/view_model.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:tools/runtime_budget_probe.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.cargo_vcs_info.json",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.github/CODEOWNERS",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.github/ISSUE_TEMPLATE/bug_report.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.github/ISSUE_TEMPLATE/feature_request.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.github/workflows/crossterm_test.yml",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/.travis.yml",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/CHANGELOG.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/Cargo.lock",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/Cargo.toml",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/Cargo.toml.orig",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/LICENSE",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/README.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/.gitignore",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/CONTRIBUTING.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/crossterm_c.png",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/crossterm_full.png",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/crossterm_full.svg",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/docs/know-problems.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/README.md",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/copy-to-clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-match-modifiers.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-poll-read.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-read-char-line.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-read.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-stream-async-std.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/event-stream-tokio.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/is_tty.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/key-display.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/examples/stderr.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/ansi_support.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/clipboard.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/command.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/cursor/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/cursor/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/cursor/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/cursor.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/filter.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/read.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/source/unix/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/source/unix/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/source/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/source/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/source.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/stream.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/unix/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/unix/waker/mio.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/unix/waker/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/unix/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/windows/parse.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/windows/poll.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/windows/waker.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event/timeout.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/event.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/lib.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/macros.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/attributes.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/content_style.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/styled_content.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/stylize.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/types/attribute.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/types/color.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/types/colored.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/types/colors.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style/types.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/style.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/terminal/sys/file_descriptor.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/terminal/sys/unix.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/terminal/sys/windows.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/terminal/sys.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/terminal.rs",
+      "ok": true
+    },
+    {
+      "name": "protected original:vendor/crossterm/src/tty.rs",
+      "ok": true
+    },
+    {
+      "name": "fresh 125 tui baseline",
+      "ok": true
+    },
+    {
+      "name": "composer protected",
+      "ok": true
+    },
+    {
+      "name": "only two changed inputs",
+      "ok": true
+    },
+    {
+      "name": "main drift explicitly not gate",
+      "ok": true
+    },
+    {
+      "name": "per-file diff:src/tui.rs",
+      "ok": true
+    },
+    {
+      "name": "per-file diff:tests/tui_transcript_ux.rs",
+      "ok": true
+    },
+    {
+      "name": "complete exact patch",
+      "ok": true
+    },
+    {
+      "name": "real before 5 fail and 1 pass",
+      "ok": true
+    },
+    {
+      "name": "before added test source retained",
+      "ok": true
+    },
+    {
+      "name": "final targeted 14 pass",
+      "ok": true
+    },
+    {
+      "name": "integration count:12",
+      "ok": true
+    },
+    {
+      "name": "integration count:16",
+      "ok": true
+    },
+    {
+      "name": "integration count:17",
+      "ok": true
+    },
+    {
+      "name": "integration count:51",
+      "ok": true
+    },
+    {
+      "name": "integration count:11",
+      "ok": true
+    },
+    {
+      "name": "six integration binaries",
+      "ok": true
+    },
+    {
+      "name": "broad lib failure retained",
+      "ok": true
+    },
+    {
+      "name": "clippy completed with original vendor warning",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/before.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/before.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/after-initial.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/after-initial.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/after-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/after-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/fix-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/fix-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/final-targeted.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/final-targeted.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/tui-regression.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/tui-regression.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/clippy.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/clippy.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/build.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/build.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/final-fmt.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/final-fmt.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v2.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v2.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v3.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v3.stderr",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v4.stdout",
+      "ok": true
+    },
+    {
+      "name": "run log:logs/pty-v4.stderr",
+      "ok": true
+    },
+    {
+      "name": "fmt receipt",
+      "ok": true
+    },
+    {
+      "name": "clippy separate exit not invented",
+      "ok": true
+    },
+    {
+      "name": "first failed PTY provenance",
+      "ok": true
+    },
+    {
+      "name": "PTY failed attempt retained:2",
+      "ok": true
+    },
+    {
+      "name": "PTY failed attempt retained:3",
+      "ok": true
+    },
+    {
+      "name": "new successful PTY",
+      "ok": true
+    },
+    {
+      "name": "12 PTY checks",
+      "ok": true
+    },
+    {
+      "name": "zero model HTTP and one real shell gate",
+      "ok": true
+    },
+    {
+      "name": "PTY exact tested binary",
+      "ok": true
+    },
+    {
+      "name": "PTY raw alternate restore",
+      "ok": true
+    },
+    {
+      "name": "journal local shell turn distinguished",
+      "ok": true
+    },
+    {
+      "name": "no remaining owned child",
+      "ok": true
+    },
+    {
+      "name": "authority: authority",
+      "ok": true
+    },
+    {
+      "name": "authority: blueprint hash",
+      "ok": true
+    },
+    {
+      "name": "authority-final: authority",
+      "ok": true
+    },
+    {
+      "name": "authority-final: blueprint hash",
+      "ok": true
+    },
+    {
+      "name": "authority stable",
+      "ok": true
+    },
+    {
+      "name": "chunk:authority/Docs/stage_1_v3_pi_mono_blueprint.md:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:authority-final/Docs/stage_1_v3_pi_mono_blueprint.md:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:before/src/tui.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:before/tui-with-regression-tests.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:1048576",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:2097152",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:3145728",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:4194304",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:5242880",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:6291456",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:7340032",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:8388608",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:9437184",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:10485760",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:11534336",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:12582912",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:13631488",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:14680064",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:15728640",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:16777216",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:17825792",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:18874368",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:19922944",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:20971520",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:22020096",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:23068672",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:24117248",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:25165824",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:26214400",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:27262976",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:28311552",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:29360128",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:30408704",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:31457280",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:32505856",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:33554432",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:34603008",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:35651584",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:36700160",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:37748736",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:38797312",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:39845888",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:40894464",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:41943040",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:42991616",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:44040192",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:45088768",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:46137344",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:47185920",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:48234496",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:49283072",
+      "ok": true
+    },
+    {
+      "name": "chunk:bin/zenpi:50331648",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/backend.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/config.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/core.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/domain_execution.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/headless.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/session.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/slash.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/slash_actions.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/tools.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/src/tui.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/tests/headless_protocol.rs:0",
+      "ok": true
+    },
+    {
+      "name": "chunk:project/tests/stage1_tool_output.rs:0",
+      "ok": true
+    }
+  ],
+  "passed": 671,
+  "failed": 0,
+  "executes_product": false
+}

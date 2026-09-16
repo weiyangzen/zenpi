@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "artifact_count": 31,
+  "patch_sha256": "f84468a89294226b1d81c878ca29f2ecb1758130c2f28929ca33a43a1ab35ea0",
+  "before": "826536a1a7296b292be759610db1140dc8081821b22f7c488e17ae072e7d2f47",
+  "after": "5912f71faa07e7f529b1c9bef875a977873c6a5e152d103e837d0fbac001cd32",
+  "roundtrip": true,
+  "sentinel": true
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-085",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-085",
+  "source_path": "src/tui.rs",
+  "source_hash": "83f5aa5b91f83cdcde80cc43936baafe8c681eb3f885b4fe9b213affa0217681",
+  "read_ranges": [
+    [
+      0,
+      262144
+    ],
+    [
+      262144,
+      524288
+    ],
+    [
+      524288,
+      681440
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/tui.rs_learn.md",
+      "bytes": 3736,
+      "sha256": "c90cfb9ec3f828037ab155a14593622d23f96ab35c5f72bcc38d2e26da48a130"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-085/master-review-current/review.md",
+      "bytes": 516,
+      "sha256": "a64c0faf8f795b9bc89654bd37d1cf0c0ba6f5f5d2cb9c10ec260a55e8d24429"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-085/master-review-current/review.md",
+      "bytes": 516,
+      "sha256": "a64c0faf8f795b9bc89654bd37d1cf0c0ba6f5f5d2cb9c10ec260a55e8d24429"
+    },
+    "findings": "完整分块读取 tui.rs，覆盖 BentoBox、目录 picker 顶部加号项目分页、cwd/session owner 隔离、composer/approval/transcript UX 与共享控制面边界。"
+  }
+}

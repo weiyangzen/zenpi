@@ -1,0 +1,98 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-080",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "target080-current-independent-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-080",
+  "source_path": "src/extensions.rs",
+  "source_hash": "9b1879edcfb70e711960092e12060a9137e2aacda6bdc547318e5ccb7510fe39",
+  "read_ranges": [
+    [
+      0,
+      23071
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/extensions.rs_learn.md",
+      "bytes": 38812,
+      "sha256": "3e0d33464cc567790080611260f9b531da2b5b01af1c7a8261a4b940a2471d42"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/review.md",
+      "bytes": 7479,
+      "sha256": "7a82f2420d5a44474126ebab701b56a0dbc64c4becc116c4dd26b532899a95a4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/worker-report.md",
+      "bytes": 31331,
+      "sha256": "ca553c741238339f613e87fc6a13af9a513516c702f93e740d60a72768ddbb16"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/worker-manifest.json",
+      "bytes": 41970,
+      "sha256": "175d88faad7789422029f2a0b85c140f3a9248f260cff3aa115e2a26faef9dc1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/current-extensions.rs",
+      "bytes": 20742,
+      "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/baseline-extensions.rs",
+      "bytes": 23071,
+      "sha256": "9b1879edcfb70e711960092e12060a9137e2aacda6bdc547318e5ccb7510fe39"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/extensions-tests.rs",
+      "bytes": 6302,
+      "sha256": "00a3873257e010a9fdd337d8b913fda3f2efe101710c45ae225975ab59c2237d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/read-binding.json",
+      "bytes": 18090,
+      "sha256": "da12344c9c754cda82f730110150f40bdc103759e8e3929780773da7dd547ca1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/accept.py",
+      "bytes": 8406,
+      "sha256": "5cd0aef6870c43b32082c7e675fa6e0d63ac80bef7e2f91a6667e3fad2e970c3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 2267554,
+      "sha256": "4e8691e470f3bd5d5b95cb730135d73a07894b1e2598259aa2f0f5f5e77192d8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/worker-external.tar.gz",
+      "bytes": 1937,
+      "sha256": "cef9ecaf39da8d93078e95bdb99bd290a984afbb9d8168db86cdd65166dd2c2c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/offline-stdout.log",
+      "bytes": 4407,
+      "sha256": "4cb5c4fb4aa94efa629dd0d3a790bf8f20ab96d137513da0bc2556d5813b6f81"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/offline-run.json",
+      "bytes": 355,
+      "sha256": "609194ab6a8ec679e5f54062bd0efc11d8b8fda0695944e3a73503cd1e57149e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/baseline-to-current.diff",
+      "bytes": 12866,
+      "sha256": "999cb38bfacbebb46d6c55e0f158b889f2fc2ff504db374b0f70be5063ed1bcd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/root-audit.py",
+      "bytes": 12854,
+      "sha256": "877252d3e3ece2a67f7a1e7d5caa0b8512113c98ee7d0fbc0ca0e66eeceaa2cd"
+    }
+  ],
+  "role": "worker",
+  "reviewer": "worker A"
+}

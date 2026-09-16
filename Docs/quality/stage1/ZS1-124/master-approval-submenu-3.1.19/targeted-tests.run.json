@@ -1,0 +1,29 @@
+{
+  "name": "targeted-tests",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--offline",
+    "--test",
+    "tui_command_palette",
+    "--test",
+    "tui_approval_focus"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T06:38:35.802006+00:00",
+  "ended_at": "2026-09-12T06:38:45.426020+00:00",
+  "elapsed_seconds": 9.623678250000001,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1618034688,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/approval-submenu-integration/targeted-tests.log",
+  "bytes": 2989,
+  "sha256": "429cbe664e9a23395846535ca8ecf73512f798d3e219b38ed4f4e39228681ddc"
+}

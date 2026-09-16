@@ -1,0 +1,38 @@
+    disable_model_invocation: bool,
+}
+
+fn yaml_string<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    match yaml_serde::Value::deserialize(deserializer)? {
+        yaml_serde::Value::String(value) => Ok(value),
+        _ => Err(serde::de::Error::custom("expected a YAML string")),
+    }
+}
+
+fn optional_yaml_string<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    yaml_string(deserializer).map(Some)
+}
+
+fn parse_markdown(text: &str) -> Result<(MarkdownFrontmatter, &str), SkillError> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let first_end = text
+        .find('\n')
+        .ok_or_else(|| SkillError::Invalid("missing frontmatter".into()))?;
+    if text[..first_end].trim_end_matches('\r') != "---" {
+        return Err(SkillError::Invalid("missing YAML frontmatter".into()));
+    }
+    let mut offset = first_end + 1;
+    for line in text[offset..].split_inclusive('\n') {
+        if offset > 16 * 1024 {
+            return Err(SkillError::Invalid("skill frontmatter is too large".into()));
+        }
+        if matches!(line.trim_end_matches(['\n', '\r']), "---" | "...") {
+            let frontmatter: MarkdownFrontmatter =
+                yaml_serde::from_str(&text[first_end + 1..offset]).map_err(|error| {
+                    SkillError::Invalid(format!("invalid YAML frontmatter: {error}"))
+                })?;
+            let body = &text[offset + line.len()..];
+            if frontmatter.description.trim().is_empty()
+                || frontmatter.description.chars().count() > 1024
+                || frontmatter

@@ -1,0 +1,70 @@
+{
+  "formal_source": {
+    "path": "Docs/quality/stage1/ZS1-094/master-review-3.1.21/current-layout.rs",
+    "bytes": 54632,
+    "sha256": "218c1b1cb7853da8f5c03b51e09d552f0634efb82284e029cbcfaeb434dac05a"
+  },
+  "current_line_ranges": [
+    [
+      1,
+      320
+    ],
+    [
+      321,
+      640
+    ],
+    [
+      641,
+      960
+    ],
+    [
+      961,
+      1260
+    ],
+    [
+      1261,
+      1567
+    ]
+  ],
+  "current_byte_ranges": [
+    [
+      0,
+      11787
+    ],
+    [
+      11787,
+      21346
+    ],
+    [
+      21346,
+      32624
+    ],
+    [
+      32624,
+      44546
+    ],
+    [
+      44546,
+      54632
+    ]
+  ],
+  "baseline": {
+    "path": "Docs/quality/stage1/ZS1-094/master-review-3.1.21/baseline-layout.rs",
+    "bytes": 54632,
+    "sha256": "218c1b1cb7853da8f5c03b51e09d552f0634efb82284e029cbcfaeb434dac05a"
+  },
+  "identical_to_current": true,
+  "source_read_tool_chunks": [
+    "dc6953",
+    "c35db6",
+    "5edf73",
+    "29249d",
+    "8ac48d"
+  ],
+  "report": {
+    "path": "Docs/quality/stage1/ZS1-094/master-review-3.1.21/worker-report.md",
+    "bytes": 34842,
+    "sha256": "4a12b4cf394ee52cdc00631dbc29bdade4f6e6cca484301e60476176f7cbda9a"
+  },
+  "product_executions": 0
+}

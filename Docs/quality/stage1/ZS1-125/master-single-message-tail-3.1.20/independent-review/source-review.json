@@ -1,0 +1,37 @@
+{
+  "source": {
+    "bytes": 60098,
+    "sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d"
+  },
+  "lines": 1706,
+  "continuous_read_ranges_from_prior_context": [
+    [
+      1,
+      300
+    ],
+    [
+      301,
+      600
+    ],
+    [
+      601,
+      900
+    ],
+    [
+      901,
+      1200
+    ],
+    [
+      1201,
+      1500
+    ],
+    [
+      1501,
+      1706
+    ]
+  ],
+  "scope": "single renderer module, unchanged B after; independent integration tests; pinned B lock and dependencies; no TUI wiring claim",
+  "ready_packages": 75,
+  "ready_files": 10607,
+  "tracked_regular_files": 145
+}

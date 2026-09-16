@@ -1,0 +1,332 @@
+{
+  "item": "ZS1-097",
+  "status": "candidate ready; master semantic G-FILE/G-STAGE pending",
+  "formal_source_files": 1,
+  "source_tests_read": 0,
+  "source_tests_executed": 0,
+  "capability_groups": 12,
+  "product_changes": false,
+  "root_writes": false,
+  "cargo_runs": 0,
+  "pty_runs": 0,
+  "http_runs": 0,
+  "product_behavior_runs": 0,
+  "learn_report": "Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.toml_learn.md",
+  "master_before": "absent",
+  "worker_before": "absent",
+  "patch_replay_passed": true,
+  "files": {
+    "Docs/learn/stage1_pi_mono/targets/zenpi/files/Cargo.toml_learn.md": {
+      "bytes": 24001,
+      "sha256": "c0b431b5c1894608a59b10139037c3004a85b81a29eed0e9b8ef44d619ead536"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/capability-matrix.json": {
+      "bytes": 4316,
+      "sha256": "2ebf7069da56f7d605066e2132726a2b85608d4267b93a215b3920d124486723"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/check_static.py": {
+      "bytes": 4936,
+      "sha256": "7dbd3e25f4d0869662337aa9ea779b4a4f930caec8dc001d7591377cf0f325d1"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/.github__workflows__ci.yml.L15-76.txt": {
+      "bytes": 2209,
+      "sha256": "8bddf9bdc46dcaf3ab75315319932aca85f9ced184c8432c9678771241394840"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/.github__workflows__release.yml.L13-57.txt": {
+      "bytes": 2227,
+      "sha256": "ebe358d09a352692c58982ea563966d3356e46b5a05d438eb9410b268fcabed9"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/authority-selector.json": {
+      "bytes": 9516,
+      "sha256": "e65740c7df5925f141461d786a076a4b775761392a5f7f8cbcc7b79fa086f837"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/blueprint-3.1.20.md": {
+      "bytes": 146422,
+      "sha256": "b3b623125d1ebbed1c6df1414b0d687ec48629fd6e0e7dbcdd3ce3cc05f96ab2"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/base64.txt": {
+      "bytes": 191,
+      "sha256": "c0133660504bec61a775f57ed3426db30d3f5521cba2b9b7510c4ac0982eeb16"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/crossterm.txt": {
+      "bytes": 224,
+      "sha256": "8cf3f37d0a935a4baf47818677197519914ac700a4af3347a76ca48f95972529"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/httpdate.txt": {
+      "bytes": 192,
+      "sha256": "f57c5491e0096bf044f2c35631017dc619e7880b28f59d348dd2d41fa3028129"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/ignore.txt": {
+      "bytes": 322,
+      "sha256": "6e6b86e5a4938d80d9d9f0f84da6dce5c0e5815dcb01d05c12e23310d723d832"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/libc.txt": {
+      "bytes": 190,
+      "sha256": "9fe2dc0b2f20d84237e611b8bc49056d86abd4c479ee35e6def0789a37813d14"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/ratatui.txt": {
+      "bytes": 296,
+      "sha256": "008abd18307627a1cb2690d1b79e0b6aa0441f224e63fa9ab8f530d855f608be"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/serde.txt": {
+      "bytes": 242,
+      "sha256": "4b56ac4f17c15c5aff87f5dd993f5d56d4fb2bc876237e9e425d69adb548aa08"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/serde_json.txt": {
+      "bytes": 269,
+      "sha256": "7ff0cd3925e88e10948d814caeb079b529bc7b81563bb23c7365f4c0b21d9499"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/sha2.txt": {
+      "bytes": 246,
+      "sha256": "562d355bd0049b5ca282f8d08054905a86133077e35f071665e56d35eebb7a93"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/tempfile.txt": {
+      "bytes": 293,
+      "sha256": "338a62279bee3c057ae2b48eb761a16e19b7d93e7334edbb6f876b3246285da0"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/thiserror.txt": {
+      "bytes": 232,
+      "sha256": "740af2c3e0a26ba52ba7a6fb9317fca83f3f89717f916b87e7fbab968dc9b7a5"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/toml.txt": {
+      "bytes": 333,
+      "sha256": "212366bbd6590453240dabe868b56a9ed32f47a32b5bd537afdddfb59136ce88"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/unicode-segmentation.txt": {
+      "bytes": 205,
+      "sha256": "e64f954bff1ddd98c2823aa3bb037a4ad93418e8fbe19f89110c8288048763ab"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/unicode-width.txt": {
+      "bytes": 197,
+      "sha256": "c181fc30f5b1a39885071b283ce8ac390d61c2072145e2a7db432d51f7a36f14"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/ureq.txt": {
+      "bytes": 378,
+      "sha256": "e55fc50a0ac6344ce13cfd17bda1eaf43dead7aa49890c9078501749bcbc2ffb"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/yaml_serde.txt": {
+      "bytes": 269,
+      "sha256": "1e3465b502b4030b188496fd2aa548e1a0a641e81676ad8940476fa13b9b27ec"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/lock/zenpi.txt": {
+      "bytes": 272,
+      "sha256": "1e340cbc47dc7f3eee2841218670155c090b93a0e60035aa599896cc54d57482"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__core.rs.L5727-5738.txt": {
+      "bytes": 617,
+      "sha256": "46c1259890fdcf9648f55c99d6bdeea465c414ea0a8c0398d94e0137fc74fed8"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__skills.rs.L601-638.txt": {
+      "bytes": 1640,
+      "sha256": "520d07319a927f3c07c2c2ddbade0c0ac64c98f0b11f3e24bbe609c0c18888ed"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__skills.rs.L710-730.txt": {
+      "bytes": 924,
+      "sha256": "97604db7cbefa651c04d61c58cbeaa00788451560c7ecf20b76c7997246b2e29"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__tui.rs.L12688-12748.txt": {
+      "bytes": 2507,
+      "sha256": "1a0336a20b0ca0875c928dfd322111dc2cb5455fbf3994f0f423f6f80005fea0"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__tui.rs.L12755-12772.txt": {
+      "bytes": 698,
+      "sha256": "69d7a5efe4963c1c31fea24fe7f1c45bd25bcedcd2e68e41d4ea56e157e33f02"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/src__tui.rs.L1284-1300.txt": {
+      "bytes": 596,
+      "sha256": "cb8016a88dd06854c72f8d0847da4189275e8e3cd3137b643d2ada4126b4bd5b"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/tools__bench_runtime.py.L130-139.txt": {
+      "bytes": 598,
+      "sha256": "e0303069b75d6e5fc1eb42b701cfc291d87408a8b8abe34ac0073b847c02161b"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/tools__bench_runtime.py.L24-40.txt": {
+      "bytes": 423,
+      "sha256": "af4c27a83329747513defa97d941dee6c13c73caab237a57988fbbfe1d2a35f8"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/tools__bench_runtime.py.L250-270.txt": {
+      "bytes": 594,
+      "sha256": "ba8569a7a4267d21789270795b11c27f6cad988397c20d4e095304fbc4624ffe"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/tools__release.sh.L1-49.txt": {
+      "bytes": 2222,
+      "sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/vendor__crossterm__Cargo.toml.L12-40.txt": {
+      "bytes": 562,
+      "sha256": "217b160defb1557ce19b1b609372d2ec768a9d31913a437d5493c9994e27f3bd"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/vendor__crossterm__Cargo.toml.L48-88.txt": {
+      "bytes": 638,
+      "sha256": "e453392297be3ba0ef4325f0e3ee0e76b5a3bb04167fd15022ad39f2dd8111a0"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context/vendor__crossterm__src__event.rs.L145-166.txt": {
+      "bytes": 1062,
+      "sha256": "b7e993f1c0242f52b11d582573063e0881a3330feb952a8b42dcbf72ebc89a3e"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/context-capture.json": {
+      "bytes": 15982,
+      "sha256": "bbce815e95117169f71ebb4ef9d7c482f40dd01f4c5014fa76ddbd1eb13b669d"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/declaration-inventory.json": {
+      "bytes": 13359,
+      "sha256": "cbb4cc4611c78f4d11b418dcfc523b3a22046247012e2c5ce0abc6dadb76896f"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/binary.json": {
+      "bytes": 103,
+      "sha256": "f6b576b7f6b8269dfd22134b7af04a4cf50723b705ce2121836bcdedd72c33de"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/budget.json": {
+      "bytes": 17297,
+      "sha256": "423695ea985aa557671cddd7b35ad5eac69ef90495d8ae51fee401260b638ffa"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/budget.run.json": {
+      "bytes": 936,
+      "sha256": "ecd1457eae959cd79279f70027eab672ebda8138c4128ffb263f3561fd7783e4"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/build-inputs.json": {
+      "bytes": 31944,
+      "sha256": "268f5b93248697a221e5e5b8329925a321c12cf67a9e65e768db7e5f3d1b8118"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/manifest.json": {
+      "bytes": 22044,
+      "sha256": "4a3e21c0fb5738b18abbda180fea89282c69932cbf7d916aa9aa87bd800ece7f"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/release/review.md": {
+      "bytes": 5393,
+      "sha256": "c56e46fa5a2f82bcad853cfd1be52fae62b287abff9353eb3af5fafa134c0031"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/README.md": {
+      "bytes": 2976,
+      "sha256": "1e3de01bfac89875bfee04bc27c9f8e6fc56351507d99d72d2c5737f96457d9b"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/dependency-experiment-manifest.json": {
+      "bytes": 12155,
+      "sha256": "2b2bb6e659eb54094c6d81818d3d9c950709ca54a23b5beb52372361baf3a8b9"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/manifest.json": {
+      "bytes": 45372,
+      "sha256": "6748f89eb33382e3e87c3c4f1636a5611ca399ddb749f5491fb2f75b737376c5"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/after-build.log": {
+      "bytes": 1810,
+      "sha256": "fa030c4d877ce03c8e23d7bacfa23c22f15a6020e27ed2e7653ba240d90e047d"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/after-csi.pty": {
+      "bytes": 251,
+      "sha256": "ee2687ceb50db0d2b7e1f878c2970addebdc0339c1100a8672b41d78137ced74"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/after-paste.pty": {
+      "bytes": 251,
+      "sha256": "ee2687ceb50db0d2b7e1f878c2970addebdc0339c1100a8672b41d78137ced74"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/after-queued.pty": {
+      "bytes": 348,
+      "sha256": "d78ecd9f8873984000fcf81318e90ff454579f1a4461ef1f39801259508fc4a5"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/after-utf8.pty": {
+      "bytes": 249,
+      "sha256": "95552d088233ec0e0445ad9825d21d6be3d5afac9b2b8ce3a69b28d82ddaf011"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/before-build.log": {
+      "bytes": 1941,
+      "sha256": "16408b3c2d0bdfad40d21e8cb893880517e583070fa440752036653a5a3ab9a6"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/before-csi.pty": {
+      "bytes": 242,
+      "sha256": "3ad947096de8470bf7c52a4036a6244a5f81cf929db2445a7192fe79cb361f82"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/before-paste.pty": {
+      "bytes": 166,
+      "sha256": "66d0917a6ad50102d569a6ec00a2ad83c0fc276a093c71f524a0c3ded91026d3"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/before-queued.pty": {
+      "bytes": 348,
+      "sha256": "d78ecd9f8873984000fcf81318e90ff454579f1a4461ef1f39801259508fc4a5"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/before-utf8.pty": {
+      "bytes": 251,
+      "sha256": "af88776c02809966fcc0594a32a3e85eebe024d65af3a8433239dd24faffe5d0"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/cycles.pty": {
+      "bytes": 121,
+      "sha256": "ea5b508947741ef318c10e835a3e251ee27520a52d6406715c74f3281ffb075a"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/inventory.json": {
+      "bytes": 15209,
+      "sha256": "344051770b5cba32a718a31a930a37eebd01684d84d0b3c396e4417af3788dfc"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/queue-reset.pty": {
+      "bytes": 238,
+      "sha256": "ede1a7b450f0026ff848ce7eb6535408edd1d3445cf8ef05d849238b4927c4df"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/result.json": {
+      "bytes": 8205,
+      "sha256": "233ae5312fa5fe230208f59d17536a37aa4e20492db10412be877f92283bd26d"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/history/ux131/validation/wouldblock.log": {
+      "bytes": 3679,
+      "sha256": "201da0301b3e01f859d7b9d10242dfe96b2b0a11a11b13b409f2c4d93e3fd8fb"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/inputs.json": {
+      "bytes": 23941,
+      "sha256": "e0a5a61abf93f11f3e5205e97c23e46706a45a9499f0dc9429b75a1c89240182"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/mechanical-attempts.json": {
+      "bytes": 684,
+      "sha256": "ef3ba4b20c37dc46c2bc3a5842dd3071e21c63bc68639e241297d9ffcd10843f"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/patch-replay.json": {
+      "bytes": 1749,
+      "sha256": "9b4564aa13ebb3352b2842b9df88e2e9d06f8222c81a3325031c1ff4e6a1995b"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/read-log.json": {
+      "bytes": 771,
+      "sha256": "e500ddef53664ed068a3b1ffe959648f8e4dd409c93edcb27e0879d54a90bfdb"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/receiving-baselines.json": {
+      "bytes": 505,
+      "sha256": "e3c1653db0b92373f2fdc8a9083b61c6bc8ea5a28924024e16ee5bb9fb2d1a9d"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/source/baseline-Cargo.toml": {
+      "bytes": 1001,
+      "sha256": "94c25405859cbec9d1a02e7c1a0a4e0dbbfd96e5c6bc476c23b9dc8be7229a65"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/source/baseline-to-current.diff": {
+      "bytes": 861,
+      "sha256": "379ad9c2656f1080e90d2891468e2f295ecea2421399641544aca12e643bcc8a"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/source/current-Cargo.toml": {
+      "bytes": 1228,
+      "sha256": "d5fafd029ef77454e178222c2b62530d28859374f72a2ce6bd972a465bed5884"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/source-drift.json": {
+      "bytes": 5218,
+      "sha256": "b00a73c6db525a9fb4d9cc030a692237c7c2728e93dc266637cdd99a47501761"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/static-check.json": {
+      "bytes": 413,
+      "sha256": "628d95c0cc2dc850f1e15d53562ee8274c40b9a47a1e3c6a1c8fb6ac3e81baa9"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/verify_package.py": {
+      "bytes": 2352,
+      "sha256": "e4e64e7ecf40bca7eaaadb6743df32f98696e74065e8d8e63d75f2deaae1c621"
+    },
+    "Docs/quality/stage1/ZS1-097/worker-cargo-manifest-review-3.1.20/worker-review-receipt.json": {
+      "bytes": 1034,
+      "sha256": "dcf14d2b4996c6c943e40d83a8415c63b2a138044d39f3a0d17bf338ff2b5cf8"
+    },
+    "README.md": {
+      "bytes": 2371,
+      "sha256": "324c558d90f7c7878c2e6aef63fc0e24b4cec0d227bd69d5bd8b89ba8a3dbcd1"
+    },
+    "master.patch": {
+      "bytes": 24247,
+      "sha256": "51ab1fe82291593d0ccbaac11a8b3949b6891405bdeb8699d75badf6ac507b83"
+    },
+    "worker.patch": {
+      "bytes": 24247,
+      "sha256": "51ab1fe82291593d0ccbaac11a8b3949b6891405bdeb8699d75badf6ac507b83"
+    }
+  }
+}

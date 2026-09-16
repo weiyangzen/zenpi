@@ -1,0 +1,92 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.18s
+     Running tests/session_new.rs (.ops/stage1_execution/new132-integration/target/debug/deps/session_new-960bff5bb994ad0a)
+
+running 13 tests
+test bare_new_is_the_only_public_syntax_and_is_registered ... ok
+test staged_attachment_is_not_dropped_or_moved_by_new ... ok
+test actual_directory_permission_failure_keeps_old_owner_usable ... ok
+test durable_pending_input_and_unknown_operation_are_not_erased ... ok
+test old_port_cannot_acquire_the_new_sessions_running_turn ... ok
+test failed_owner_checkpoint_preserves_old_session_and_removes_candidate ... ok
+test configured_tool_deny_survives_jsonl_new_even_with_process_never ... ok
+test new_keeps_project_and_preferences_but_has_empty_history_and_durable_replay ... ok
+test exclusive_names_skip_existing_files_links_directories_and_stop_at_limit ... ok
+test running_request_rejects_new_without_cancelling_old_work_then_allows_retry ... ok
+test actual_extension_preparation_jsonl_cancel_keeps_owner_and_old_port ... ok
+test worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_new ... ok
+test replaced_candidate_regular_link_and_directory_are_retained_without_switching ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.16s
+
+     Running tests/tui_approval_focus.rs (.ops/stage1_execution/new132-integration/target/debug/deps/tui_approval_focus-96779183d9d3d528)
+
+running 12 tests
+test replay_never_promotes_worker_or_malformed_records_or_overrides_configured_deny ... ok
+test escape_and_paste_never_grant_or_discard_draft ... ok
+test worker_never_offers_remember_and_release_cannot_confirm ... ok
+test deny_default_and_explicit_allow_keep_draft_cursor ... ok
+test actual_coordinator_rejects_cross_project_wrong_call_and_duplicate ... ok
+test cancelled_owner_rejects_stale_visible_request ... ok
+test multiple_requests_reset_selection_and_projects_do_not_share_focus ... ok
+test directory_picker_owns_keys_over_existing_or_new_approval_view ... ok
+test invalid_requests_and_view_capacity_are_bounded ... ok
+test remembered_policy_reopens_only_its_session_and_preserves_configured_deny ... ok
+test background_approvals_are_visible_even_when_the_source_tab_is_offscreen ... ok
+test full_diff_scroll_is_independent_from_folded_transcript_and_resize ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/tui_bentobox.rs (.ops/stage1_execution/new132-integration/target/debug/deps/tui_bentobox-0c7b7c0a8727a605)
+
+running 16 tests
+test adapter_translates_and_clips_model_rectangles ... ok
+test ctrl_number_switches_workspace_tab_without_submitting_prompt ... ok
+test disabled_optional_panes_are_not_rendered_or_allocated ... ok
+test restoring_tab_models_preserves_each_tab_and_clears_dirty_state ... ok
+test workspace_keyboard_controls_focus_and_split_without_touching_prompt ... ok
+test tab_switch_keeps_independent_layout_state_and_dirty_bit ... ok
+test terminal_backtab_moves_workspace_focus_backwards ... ok
+test active_layout_edits_after_restore_replace_cached_project_layout ... ok
+test production_workspace_is_resize_safe_at_tiny_viewports ... ok
+test production_workspace_renders_tabs_and_existing_transcript_prompt ... ok
+test production_resources_pane_renders_completed_snapshot ... ok
+test gantt_refresh_failure_retains_last_valid_projection ... ok
+test production_gantt_pane_renders_bounded_domain_projection ... ok
+test gantt_projection_does_not_create_a_missing_execution_store_and_stays_bounded ... ok
+test gantt_projection_truncates_maximal_valid_blueprint ... ok
+test gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/tui_project_workspace.rs (.ops/stage1_execution/new132-integration/target/debug/deps/tui_project_workspace-1eed673f1bf434ae)
+
+running 11 tests
+test display_only_ticks_do_not_schedule_project_writes_but_layout_changes_do ... ok
+test asynchronous_transcript_mutations_schedule_checkpoints_without_keyboard_input ... ok
+test canonical_project_checkpoint_restores_session_projection_without_feature_tabs ... ok
+test session_workspace_mismatch_does_not_rewrite_existing_journal ... ok
+test topmost_plus_opens_picker_and_cancel_never_creates_a_tab_or_changes_draft ... ok
+test invalid_project_config_is_rejected_before_creating_session_or_mutating_visible_owner ... ok
+test stale_resume_writer_and_busy_owner_leave_the_tui_checkpoint_unchanged ... ok
+test switching_while_original_owner_is_locked_preserves_drafts_layout_and_owner ... ok
+test restart_restores_selected_runtime_and_drafts_without_reusing_startup_owner ... ok
+test shared_resume_checkpoint_failure_preserves_actual_owner_draft_layout_and_metadata ... ok
+test picker_confirmation_and_real_tools_bind_two_equal_basename_directories ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+

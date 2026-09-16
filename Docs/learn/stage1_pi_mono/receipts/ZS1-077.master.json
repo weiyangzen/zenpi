@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-077",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-077",
+  "source_path": "src/tools.rs",
+  "source_hash": "c3149b926933e5800cd41a2e8d3fcf6f109f8a455f2ef6ed8e2d48d696dbe33c",
+  "read_ranges": [
+    [
+      0,
+      119778
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/tools.rs_learn.md",
+      "bytes": 3021,
+      "sha256": "7716737e7d5dbc1e93716d9071663fb3cbc6f7e55077a20915b0d99ad007a108"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-077/master-review-current/review.md",
+      "bytes": 445,
+      "sha256": "ee4ce06d77629aa453159fa796e112186a82f2241fad3fd1b1a5cbb5bde2093f"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-077/master-review-current/review.md",
+      "bytes": 445,
+      "sha256": "ee4ce06d77629aa453159fa796e112186a82f2241fad3fd1b1a5cbb5bde2093f"
+    },
+    "findings": "完整读取 tools.rs，覆盖 policy/gate、registry、read/search/write/edit/command、process budget、atomic write、diff/cancel 与 workspace safety。"
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "ok": true,
+  "structural": {
+    "ok": true
+  },
+  "semantic_manual": {
+    "verified_by_checker": false,
+    "note": "Artifact structure is machine checked; semantic truth requires independent master review.",
+    "receipt_structure_ok": true,
+    "master_review_receipts": [
+      "ZS1-001",
+      "ZS1-010",
+      "ZS1-011",
+      "ZS1-012",
+      "ZS1-013",
+      "ZS1-014",
+      "ZS1-015",
+      "ZS1-016",
+      "ZS1-017",
+      "ZS1-019",
+      "ZS1-020",
+      "ZS1-021",
+      "ZS1-022",
+      "ZS1-023",
+      "ZS1-024",
+      "ZS1-025",
+      "ZS1-026",
+      "ZS1-027",
+      "ZS1-029",
+      "ZS1-030",
+      "ZS1-071",
+      "ZS1-088",
+      "ZS1-089",
+      "ZS1-094",
+      "ZS1-095",
+      "ZS1-097",
+      "ZS1-099",
+      "ZS1-133",
+      "ZS1-050",
+      "ZS1-051",
+      "ZS1-052",
+      "ZS1-053",
+      "ZS1-054",
+      "ZS1-055",
+      "ZS1-057",
+      "ZS1-058",
+      "ZS1-059",
+      "ZS1-061",
+      "ZS1-400",
+      "ZS1-401",
+      "ZS1-402",
+      "ZS1-403",
+      "ZS1-404",
+      "ZS1-405",
+      "ZS1-406",
+      "ZS1-092",
+      "ZS1-093",
+      "ZS1-304",
+      "ZS1-307",
+      "ZS1-308",
+      "ZS1-309"
+    ]
+  },
+  "errors": [],
+  "requirement_digest": "3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d",
+  "snapshot_sha256": "f71ae4de445f7b964caba7ecbe7e8aeee1114f6ac97d856ee10baeaad1cc74a8",
+  "items": 121,
+  "files": 58,
+  "folders": 32,
+  "scope_counts": {
+    "source": {
+      "files": 21,
+      "folders": 16
+    },
+    "target": {
+      "files": 27,
+      "folders": 11
+    },
+    "reference:codex": {
+      "files": 10,
+      "folders": 5
+    }
+  },
+  "frontier": {
+    "worker_claim_frontier": [
+      "ZS1-018",
+      "ZS1-028"
+    ],
+    "integration_frontier": [],
+    "integration_blocked": [],
+    "live_workers": 1,
+    "capacity": 3,
+    "saturation": 3,
+    "claims": [
+      {
+        "item_id": "ZS1-073",
+        "model": "gpt-6-astra",
+        "owned_paths": [
+          "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/context.rs_learn.md"
+        ],
+        "reasoning_effort": "high",
+        "requirement_digest": "3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d",
+        "run_id": "zenpi-stage1-20260911",
+        "runtime_checked_at": "2026-09-13T01:49:15.699734+00:00",
+        "runtime_note": "073 context.rs 全文件候选已交付，任务终态已核对；070/072候选同待主控逐文件独立验收。整阶段50/121。",
+        "runtime_status": "finished",
+        "session": "01a08be3-4678-75a0-9369-fbf8dbddb1ed",
+        "workspace": "/Users/wangweiyang/.codex/worktrees/38de/zenpi"
+      },
+      {
+        "item_id": "ZS1-084",
+        "model": "gpt-6-astra",
+        "owned_paths": [
+          "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/headless.rs_learn.md"
+        ],
+        "reasoning_effort": "high",
+        "requirement_digest": "3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d",
+        "run_id": "zenpi-stage1-20260911",
+        "runtime_checked_at": "2026-09-13T01:49:15.699734+00:00",
+        "runtime_note": "094布局文件候选待主控独立复核；当前逐块完整审阅src/headless.rs。122历史搜索与126会话列表局部修复已合入，BentoBox保留。",
+        "runtime_status": "live",
+        "session": "01a08be3-4677-7463-832b-bdb571ea6b9a",
+        "workspace": "/Users/wangweiyang/.codex/worktrees/2267/zenpi"
+      },
+      {
+        "item_id": "ZS1-086",
+        "model": "gpt-6-astra",
+        "owned_paths": [
+          "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/view_model.rs_learn.md"
+        ],
+        "reasoning_effort": "high",
+        "requirement_digest": "3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d",
+        "run_id": "zenpi-stage1-20260911",
+        "runtime_checked_at": "2026-09-13T01:49:15.699734+00:00",
+        "runtime_note": "086 view_model.rs 全文件候选已交付，任务终态已核对；096渲染文件候选同待主控逐文件独立验收；095已正式验收。整阶段50/121。",
+        "runtime_status": "finished",
+        "session": "01a08be3-4677-7463-832b-bd94155eeba7",
+        "workspace": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi"
+      }
+    ],
+    "cycle_detected": false,
+    "provisional_claims": []
+  },
+  "bootstrap_required": false,
+  "master_receipts_checked": [
+    "ZS1-001",
+    "ZS1-010",
+    "ZS1-011",
+    "ZS1-012",
+    "ZS1-013",
+    "ZS1-014",
+    "ZS1-015",
+    "ZS1-016",
+    "ZS1-017",
+    "ZS1-019",
+    "ZS1-020",
+    "ZS1-021",
+    "ZS1-022",
+    "ZS1-023",
+    "ZS1-024",
+    "ZS1-025",
+    "ZS1-026",
+    "ZS1-027",
+    "ZS1-029",
+    "ZS1-030",
+    "ZS1-071",
+    "ZS1-088",
+    "ZS1-089",
+    "ZS1-094",
+    "ZS1-095",
+    "ZS1-097",
+    "ZS1-099",
+    "ZS1-133",
+    "ZS1-050",
+    "ZS1-051",
+    "ZS1-052",
+    "ZS1-053",
+    "ZS1-054",
+    "ZS1-055",
+    "ZS1-057",
+    "ZS1-058",
+    "ZS1-059",
+    "ZS1-061",
+    "ZS1-400",
+    "ZS1-401",
+    "ZS1-402",
+    "ZS1-403",
+    "ZS1-404",
+    "ZS1-405",
+    "ZS1-406",
+    "ZS1-092",
+    "ZS1-093",
+    "ZS1-304",
+    "ZS1-307",
+    "ZS1-308",
+    "ZS1-309"
+  ],
+  "counts": {
+    "not_done": 70,
+    "worker_self_tested": 0,
+    "master_accepted": 51
+  }
+}

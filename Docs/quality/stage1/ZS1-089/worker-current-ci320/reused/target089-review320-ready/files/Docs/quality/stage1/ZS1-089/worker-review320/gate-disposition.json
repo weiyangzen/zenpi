@@ -1,0 +1,19 @@
+{
+  "item": "ZS1-089",
+  "status": "[_]",
+  "integrity_exit": 0,
+  "offline_exit": 0,
+  "gstage_exit": 1,
+  "gstage_structural_ok": true,
+  "gstage_log_sha256": "fd4e98ca2d279a3a8f6df7fe7ca1b6f6e56a655d5976318aee2f2d673e90638f",
+  "reason": "Master receipt absent. Workflow static learning and historical archive cases do not grant hosted CI or semantic/directory acceptance.",
+  "new_behavior_runs": 0,
+  "preserved_ready_manifests": 65,
+  "prior_report_prefix_bytes": 12050,
+  "followups": [
+    "budget failure artifact retention and startup diagnostics",
+    "stage1 checker wiring distinct from v1/v2",
+    "archive negative regression persistent CI coverage",
+    "hosted Ubuntu execution and exact action/toolchain identity"
+  ]
+}

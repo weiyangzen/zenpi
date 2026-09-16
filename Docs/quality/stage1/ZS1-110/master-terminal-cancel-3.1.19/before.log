@@ -1,0 +1,40 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.62s
+     Running tests/stage1_gemini.rs (target/debug/deps/stage1_gemini-950cb90087f3dece)
+
+running 2 tests
+Gemini on_text=false, cancelled_result=false, ready=2, late=["ToolCallDone { call: ToolCall { id: \"native_second\", name: \"read_file\", arguments: Object {\"path\": String(\"second.txt\")} } }", "Usage { usage: Usage { input_tokens: 12, output_tokens: 6, total_tokens: 18 } }", "Completed { response_id: Some(\"response_fixture\"), model: Some(\"gemini-2.5-flash\") }"]
+Gemini on_text=true, cancelled_result=false, ready=
+thread 'native_terminal_cancel_on_first_tool_stops_remaining_tools_and_completion' (28147758) panicked at tests/stage1_gemini.rs:956:5:
+events published after cancellation: ["ToolCallDone { call: ToolCall { id: \"native_second\", name: \"read_file\", arguments: Object {\"path\": String(\"second.txt\")} } }", "Usage { usage: Usage { input_tokens: 12, output_tokens: 6, total_tokens: 18 } }", "Completed { response_id: Some(\"response_fixture\"), model: Some(\"gemini-2.5-flash\") }"]
+2, late=["ToolCallDone { call: ToolCall { id: \"native_first\", name: \"read_file\", arguments: Object {\"path\": String(\"first.txt\")} } }", "ToolCallDone { call: ToolCall { id: \"native_second\", name: \"read_file\", arguments: Object {\"path\": String(\"second.txt\")} } }", "Usage { usage: Usage { input_tokens: 12, output_tokens: 6, total_tokens: 18 } }", "Completed { response_id: Some(\"response_fixture\"), model: Some(note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+\"gemini-2.5-flash\") }"]
+
+thread 'native_terminal_cancel_on_text_done_stops_ready_tools_and_completion' (28147759) panicked at tests/stage1_gemini.rs:956:5:
+events published after cancellation: ["ToolCallDone { call: ToolCall { id: \"native_first\", name: \"read_file\", arguments: Object {\"path\": String(\"first.txt\")} } }", "ToolCallDone { call: ToolCall { id: \"native_second\", name: \"read_file\", arguments: Object {\"path\": String(\"second.txt\")} } }", "Usage { usage: Usage { input_tokens: 12, output_tokens: 6, total_tokens: 18 } }", "Completed { response_id: Some(\"response_fixture\"), model: Some(\"gemini-2.5-flash\") }"]
+test native_terminal_cancel_on_first_tool_stops_remaining_tools_and_completion ... FAILED
+test native_terminal_cancel_on_text_done_stops_ready_tools_and_completion ... FAILED
+
+failures:
+
+failures:
+    native_terminal_cancel_on_first_tool_stops_remaining_tools_and_completion
+    native_terminal_cancel_on_text_done_stops_ready_tools_and_completion
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `--test stage1_gemini`

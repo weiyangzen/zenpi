@@ -69,10 +69,23 @@ if [[ -z "$BIN" ]]; then
   if ((RELEASE_CHECK)); then
     BUILD_ARGS=(build --quiet --locked --release --features dev-fixtures --manifest-path "$ROOT_DIR/Cargo.toml" --bin zenpi)
   fi
-  cargo "${BUILD_ARGS[@]}" || {
-    ((ALLOW_SKIP)) && skip "cargo build failed"
-    fail "cargo build failed"
-  }
+  # On Apple Silicon hosts running an x86_64-emulated shell, rustup may have
+  # selected an x86 toolchain whose rustc binary cannot execute. Prefer the
+  # native installed toolchain when the default cargo invocation reports that
+  # host/toolchain mismatch, while preserving the normal command everywhere
+  # else.
+  if ! cargo "${BUILD_ARGS[@]}"; then
+    if command -v rustup >/dev/null 2>&1 \
+      && rustup toolchain list 2>/dev/null | grep -q '^stable-aarch64-apple-darwin'; then
+      RUSTUP_TOOLCHAIN=stable-aarch64-apple-darwin cargo "${BUILD_ARGS[@]}" || {
+        ((ALLOW_SKIP)) && skip "cargo build failed"
+        fail "cargo build failed"
+      }
+    else
+      ((ALLOW_SKIP)) && skip "cargo build failed"
+      fail "cargo build failed"
+    fi
+  fi
   if ((RELEASE_CHECK)); then
     BIN="$ROOT_DIR/target/release/zenpi"
   else

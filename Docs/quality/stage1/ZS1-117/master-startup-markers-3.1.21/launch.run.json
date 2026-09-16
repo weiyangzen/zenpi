@@ -1,0 +1,76 @@
+{
+  "launch_index": 0,
+  "launch_limit": 1,
+  "argv": [
+    "/usr/bin/time",
+    "-l",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-single-markers-3.1.21/source-diagnostic/target/release/zenpi",
+    "--mode",
+    "headless",
+    "--session",
+    "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-j54aa9yq/session-0.jsonl"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "fixture_root": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-j54aa9yq",
+  "session": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-j54aa9yq/session-0.jsonl",
+  "fresh_session": true,
+  "binary": {
+    "bytes": 6093552,
+    "sha256": "7ce01ad7cef17b8466c2fd2eacd37732ae3507633ac503bfcd7c9e654d95946d"
+  },
+  "parent_pid": 99637,
+  "parent_ppid": 17113,
+  "clock_id": 6,
+  "clock_domain": "CLOCK_MONOTONIC nanoseconds; Python explicit clock_gettime_ns; Rust libc explicit clock_gettime",
+  "python": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "environment_overrides": {
+    "ZENPI_HOME": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-j54aa9yq/zenpi",
+    "ZENPI_BACKEND": "openai",
+    "ZENPI_BASE_URL": "http://127.0.0.1:1",
+    "ZENPI_MODEL": "benchmark-no-network",
+    "ZENPI_API_KEY": "fixture placeholder present; value omitted"
+  },
+  "inherited_zenpi_key_names_only": [],
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "watchdog_seconds": 5,
+  "started_at": "2026-09-12T23:06:24.854000+00:00",
+  "anchors": {
+    "popen_before_ns": 2028733384626000,
+    "popen_return_ns": 2028733386261000,
+    "stdin_write_before_ns": 2028733386263000,
+    "stdin_closed_ns": 2028733386279000,
+    "stdout_first_read_ns": 2028734521189000,
+    "stdout_last_read_ns": 2028734521189000,
+    "stderr_first_read_ns": 2028734521933000,
+    "stderr_last_read_ns": 2028734521933000,
+    "stderr_eof_ns": 2028734522144000,
+    "stdout_eof_ns": 2028734522169000,
+    "wrapper_exit_observed_ns": 2028734522193000,
+    "wait_return_ns": 2028734522194000,
+    "parent_capture_end_ns": 2028734522245000
+  },
+  "timed_out": false,
+  "reaped": true,
+  "parent_io_note": "Same one-shot bytes and EOF, no handshake; selector observes output arrival instead of communicate; instrumentation is not a budget replay.",
+  "wrapper_pid": 99638,
+  "returncode": 0,
+  "finished_at": "2026-09-12T23:06:25.991752+00:00",
+  "stdout": {
+    "bytes": 144,
+    "sha256": "25ec3e42f157458bc2bef231093a547f8ca61277aea7a7400a24075c4f67a8af"
+  },
+  "stderr": {
+    "bytes": 777,
+    "sha256": "e79dd1f3b1b5947d19558c47659bc4e47b320388f6d24c9d43bca895d99c65dc"
+  },
+  "markers_present": true,
+  "markers": {
+    "bytes": 342,
+    "sha256": "bb40adbafd35d9927556fbadd400d68f667013972e4aa2d8d428791eaa57b3e2"
+  },
+  "diagnostic_binary_after": {
+    "bytes": 6093552,
+    "sha256": "7ce01ad7cef17b8466c2fd2eacd37732ae3507633ac503bfcd7c9e654d95946d"
+  }
+}

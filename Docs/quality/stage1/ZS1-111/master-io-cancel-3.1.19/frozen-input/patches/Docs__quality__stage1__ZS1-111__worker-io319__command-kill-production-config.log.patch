@@ -1,0 +1,6 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.log b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.log
+@@ -0,0 +1 @@
++production CLI command SIGKILL/recovery PASS

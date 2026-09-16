@@ -1,0 +1,160 @@
+#[derive(Debug, Clone, Default)]
+struct ApprovalView {
+    requests: Vec<crate::approval::ApprovalRequest>,
+    focused: bool,
+    index: usize,
+    scroll: u16,
+    allow: bool,
+    remember: bool,
+}
+
+impl TuiState {
+    pub fn present_approval(&mut self, request: crate::approval::ApprovalRequest) {
+        if let Err(error) = request.validate() {
+            self.push_message(MessageRole::Error, format!("Invalid approval: {error}"));
+            return;
+        }
+        let can_focus = self.directory_picker.is_none() && self.transcript_browser.is_none();
+        let project = self.active_project().to_owned();
+        let view = self.approval_views.entry(project).or_default();
+        if view.requests.len() < 128
+            && !view
+                .requests
+                .iter()
+                .any(|r| r.request_id == request.request_id)
+        {
+            let first = view.requests.is_empty();
+            view.requests.push(request);
+            if first {
+                view.focused = can_focus;
+                view.index = 0;
+                view.scroll = 0;
+                view.allow = false;
+                view.remember = false;
+            }
+            self.dirty = true;
+        }
+    }
+    pub fn approval_count(&self) -> usize {
+        self.approval_views
+            .get(self.active_project())
+            .map_or(0, |v| v.requests.len())
+    }
+    pub fn retire_approval(&mut self, id: &str) {
+        let project = self.active_project().to_owned();
+        if let Some(view) = self.approval_views.get_mut(&project) {
+            view.requests.retain(|r| r.request_id != id);
+            view.index = view.index.min(view.requests.len().saturating_sub(1));
+            view.allow = false;
+            view.remember = false;
+            view.scroll = 0;
+            if view.requests.is_empty() {
+                view.focused = false;
+            }
+            self.dirty = true;
+        }
+    }
+    fn approval_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        if self.directory_picker.is_some() {
+            return None;
+        }
+        let project = self.active_project().to_owned();
+        let view = self.approval_views.get_mut(&project)?;
+        if view.requests.is_empty() {
+            return None;
+        }
+        if key.modifiers == KeyModifiers::ALT && key.code == KeyCode::Char('a') {
+            view.focused = true;
+            self.dirty = true;
+            return Some(TuiAction::Redraw);
+        }
+        if !view.focused {
+            return None;
+        }
+        self.dirty = true;
+        if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+            return Some(TuiAction::Interrupt);
+        }
+        if key.modifiers != KeyModifiers::NONE {
+            return Some(TuiAction::None);
+        }
+        match key.code {
+            KeyCode::Esc => {
+                view.focused = false;
+                self.set_status("Approval pending · Alt-A opens review · draft kept");
+            }
+            KeyCode::Char('/') => {
+                view.focused = false;
+                return None;
+            }
+            KeyCode::Char('y') => {
+                view.allow = true;
+                view.remember = false;
+            }
+            KeyCode::Char('n') => {
+                view.allow = false;
+                view.remember = false;
+            }
+            KeyCode::Char('r')
+                if view.requests[view.index].origin
+                    != crate::tools::ToolOrigin::BlueprintWorker =>
+            {
+                view.remember = !view.remember;
+            }
+            KeyCode::Tab | KeyCode::Right => {
+                view.index = (view.index + 1) % view.requests.len();
+                view.scroll = 0;
+                view.allow = false;
+                view.remember = false;
+            }
+            KeyCode::BackTab | KeyCode::Left => {
+                view.index = (view.index + view.requests.len() - 1) % view.requests.len();
+                view.scroll = 0;
+                view.allow = false;
+                view.remember = false;
+            }
+            KeyCode::Up => view.scroll = view.scroll.saturating_sub(1),
+            KeyCode::Down => view.scroll = view.scroll.saturating_add(1),
+            KeyCode::PageUp => view.scroll = view.scroll.saturating_sub(10),
+            KeyCode::PageDown => view.scroll = view.scroll.saturating_add(10),
+            KeyCode::Home => view.scroll = 0,
+            KeyCode::End => view.scroll = u16::MAX,
+            KeyCode::Enter => {
+                let r = &view.requests[view.index];
+                return Some(TuiAction::RespondApproval {
+                    project,
+                    request_id: r.request_id.clone(),
+                    turn_id: r.turn_id.clone(),
+                    call_id: r.call_id.clone(),
+                    allow: view.allow,
+                    remember: view.remember,
+                });
+            }
+            _ => {}
+        }
+        Some(TuiAction::Redraw)
+    }
+    fn render_approval(&mut self, frame: &mut Frame<'_>) {
+        let project = self.active_project().to_owned();
+        let Some(view) = self.approval_views.get_mut(&project) else {
+            return;
+        };
+        if view.requests.is_empty() {
+            return;
+        }
+        let area = frame.area();
+        if !view.focused {
+            if area.height > 0 {
+                frame.render_widget(
+                    Paragraph::new(format!(
+                        " {} approvals pending · Alt-A review",
+                        view.requests.len()
+                    ))
+                    .style(Style::default().fg(Color::Yellow)),
+                    Rect::new(area.x, area.bottom() - 1, area.width, 1),
+                );
+            }
+            return;
+        }
+        if area.width < 4 || area.height < 5 {
+            return;

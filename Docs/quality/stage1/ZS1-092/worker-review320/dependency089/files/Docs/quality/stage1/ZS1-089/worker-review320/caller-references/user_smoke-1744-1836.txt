@@ -1,0 +1,93 @@
+def main() -> int:
+    with tempfile.TemporaryDirectory(prefix="zenpi-user-smoke-") as directory:
+        root = Path(directory)
+        release = ROOT / "target" / "release" / "zenpi"
+        production_build = run(cargo_command("build", "--release", "--locked"))
+        assert_success(production_build, "production release build")
+        production_root = root / "production-install"
+        production_root.mkdir()
+        production_install = run(
+            cargo_command(
+                "install",
+                "--path",
+                ".",
+                "--locked",
+                "--root",
+                str(production_root),
+                "--force",
+            )
+        )
+        assert_success(production_install, "isolated production cargo install")
+        production_binary = production_root / "bin" / "zenpi"
+        if not production_binary.is_file() or not os.access(production_binary, os.X_OK):
+            raise AssertionError(f"installed production binary missing: {production_binary}")
+        production_help = run([str(production_binary), "--help"])
+        assert_success(production_help, "installed production help")
+        assert_production_rejects_echo(production_binary, root)
+        assert_production_session_gc(production_binary, root)
+        assert_production_blueprint_execution(production_binary, root)
+        assert_openai_fixture(production_binary, root)
+        assert_headless_eof_drains_slow_provider(production_binary, root)
+        assert_headless_tool_approval(production_binary, root)
+        shell_smoke = run(
+            [
+                "python3",
+                str(ROOT / "tools" / "tui_user_shell_smoke.py"),
+                "--binary",
+                str(production_binary),
+            ],
+            timeout=90,
+        )
+        assert_success(shell_smoke, "installed local shell allow/deny and journal")
+
+        features = os.environ.get("ZENPI_SMOKE_FEATURES", "dev-fixtures")
+        feature_args = ["--features", features] if features else []
+        build = run(cargo_command("build", "--release", "--locked", *feature_args))
+        assert_success(build, "release build")
+        if not release.is_file() or not os.access(release, os.X_OK):
+            raise AssertionError(f"release binary missing: {release}")
+
+        install_root = root / "install"
+        install_root.mkdir()
+        install = run(
+            cargo_command(
+                "install",
+                "--path",
+                ".",
+                "--locked",
+                "--root",
+                str(install_root),
+                "--force",
+                *feature_args,
+            )
+        )
+        assert_success(install, "isolated cargo install")
+        binary = install_root / "bin" / "zenpi"
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise AssertionError(f"installed binary missing: {binary}")
+
+        help_result = run([str(binary), "--help"])
+        assert_success(help_result, "installed help")
+        if "tui|headless" not in help_result.stdout:
+            raise AssertionError(f"installed help does not expose both modes: {help_result.stdout!r}")
+
+        session = assert_headless_echo(binary, root)
+        assert_resume(binary, session, root)
+        assert_resume_reopens_process(binary, session, root)
+        assert_headless_slash_owners(binary, root)
+        assert_invalid_inputs(binary, root)
+        assert_tui(binary, root)
+        assert_tui_multiline_paste(binary, root)
+        assert_tui_slash_completion(binary, root)
+        assert_tui_signal_cleanup(binary, root)
+        assert_tui_interrupt_while_streaming(binary, root)
+    print(
+        "user smoke passed: production install/provider/tool approval/local shell allow/deny/EOF drain/session GC/Blueprint execution, echo fixture, "
+        "durable slash/runtime intents, resume, TUI resize/multiline paste/slash completion, streaming interrupt, "
+        "OS signal cleanup, and terminal restoration"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

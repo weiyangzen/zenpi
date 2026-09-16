@@ -1,0 +1,88 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-073",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "target073-current-independent-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-073",
+  "source_path": "src/context.rs",
+  "source_hash": "bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909",
+  "read_ranges": [
+    [
+      0,
+      8199
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/context.rs_learn.md",
+      "bytes": 40182,
+      "sha256": "9e029c376418316d0f4b040bb76f24af5312c9a9740af386c121fb1fdc5b4f47"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/review.md",
+      "bytes": 6106,
+      "sha256": "8676c1beda12a3e7a33f068888209db773faaf3174b516d61d9873dac58f5de2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/worker-report.md",
+      "bytes": 34074,
+      "sha256": "5f6325ffe2286403f5926605aef66cf16bdb9e104f4a7aa1be9b2bdd4c1c6e2b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/worker-manifest.json",
+      "bytes": 59754,
+      "sha256": "63f737ad072cd8454571c2306c79b540820d19751531cdaabb19bd019cedd5c1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/current-context.rs",
+      "bytes": 30013,
+      "sha256": "256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/baseline-context.rs",
+      "bytes": 8199,
+      "sha256": "bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/read-binding.json",
+      "bytes": 1078,
+      "sha256": "f00b3844271eed4faa8c87a8fabff48fbb2277d6e25d006d8773af4cb5f2c8bf"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/accept.py",
+      "bytes": 7447,
+      "sha256": "5d7ebdc65a565cdfa9bcaf9ac88d3f5d985014a9fa07bcd0850739e5c77dba44"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 5691726,
+      "sha256": "4f7f894344f1d0a2e53fe94b80817658e68d72535a9716e8de6cc9ab71267c49"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/offline-stdout.log",
+      "bytes": 3375,
+      "sha256": "b35db3f53cda72cc0ecd9f4089d23694bf6f2874c09d3c6cc4913b7a3bfae31a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/offline-run.json",
+      "bytes": 349,
+      "sha256": "2a39a71cc2cf85dbab156164e52d5646b24dada20de3d2300ba9e9b1c0e2438d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/receiver-base.md",
+      "bytes": 3036,
+      "sha256": "08f9dc2204499b1431e049bb6e42c5677a24eb4934f4c3672cf3f17063b5219b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-073/master-review-3.1.21/root-audit.py",
+      "bytes": 11347,
+      "sha256": "10830efb5faf51fc3a3d019ed24c956b6e458c668563c51f26d95288d464eeae"
+    }
+  ],
+  "role": "worker",
+  "reviewer": "worker A with controller current qualification"
+}

@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "operations": [
+    {
+      "phase": "forward-check",
+      "exit_code": 0,
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "phase": "forward",
+      "exit_code": 0,
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "phase": "reverse-check",
+      "exit_code": 0,
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "phase": "reverse",
+      "exit_code": 0,
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    }
+  ]
+}

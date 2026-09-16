@@ -1,0 +1,96 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-reuse319/reused-evidence.json b/Docs/quality/stage1/ZS1-016/worker-reuse319/reused-evidence.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-reuse319/reused-evidence.json
+@@ -0,0 +1,91 @@
++{
++  "package": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready",
++  "manifest_sha256": "f52b12aaea01cf39c2e9705f81cce2560d427064d9a269259379f07e409c2d8d",
++  "records": [
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md",
++      "original_path": "Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md",
++      "bytes": 7606,
++      "sha256": "fda441946508ad53585d69e269c7fba7d9ee205670773b9c154546905d052fbd"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/README.md",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/README.md",
++      "bytes": 860,
++      "sha256": "3e474841875db73443fe799257b6630457c5946abb11555dba611308a8b90ffe"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/artifact-index.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/artifact-index.json",
++      "bytes": 2262,
++      "sha256": "0b6c83449836bcb5b60ca3473e25c3bc4f3ec5236b0f256ba43f4a12fa8d6d2d"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/install.log",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/install.log",
++      "bytes": 24,
++      "sha256": "829dbc0cd1c03d78cfed218cea77e5e0d62991392cafd04d8bf260056a1d7abd"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/owner-hashes.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/owner-hashes.json",
++      "bytes": 734,
++      "sha256": "66ee4de0ca50636b6c61d2b32f4f3324959f6875264877f0526ca9d5356a29c0"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/package-lock.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/package-lock.json",
++      "bytes": 3263,
++      "sha256": "4f6588027ae4ef088ed8c73ab56f65ad05014316e44796425feb424533c5b7e4"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/package.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/package.json",
++      "bytes": 94,
++      "sha256": "8bbe65428ff29c0154c61d238fffa4e81abd74ec9895efef3dd31fe395c293d7"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts",
++      "bytes": 10076,
++      "sha256": "d248ecf11acec471c03d0856d2727d3b5841cf9c5a0100b3a20325779be13ae3"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.json",
++      "bytes": 954,
++      "sha256": "601376538c5673c3a0d58885f90dd93894fd09a869ceb0b81c1e002862ce3a02"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.log",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.log",
++      "bytes": 2833,
++      "sha256": "3b1afccacb15d8bd184bff8b8c8f2f13b83f5d26c8dff5592b1085f3efdf2fe2"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.json",
++      "bytes": 935,
++      "sha256": "94bf429c79a5265a06b4538b304c0f8524de49f2c07afd8087d3ffeddc7646e4"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.log",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.log",
++      "bytes": 3844,
++      "sha256": "2293c2c486a9c6c87fab2fde7a6f5432730a9642d2429ac1255ef9a466d59365"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.json",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.json",
++      "bytes": 899,
++      "sha256": "c18b126c2d1bed7d65dace0d6b518bb9c526ee0f7c07650b8e3f971aa8a371b6"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/source016-behavior-ready/files/Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log",
++      "original_path": "Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log",
++      "bytes": 1626,
++      "sha256": "1d17e3916926b3635b2ad4e8247c49468c3d3b09cf660bb25d90d36d491a318b"
++    }
++  ],
++  "reuse": "Integrity-checked historical 23 source cases and 17 target tests, not rerun."
++}

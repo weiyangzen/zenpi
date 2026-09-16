@@ -1,0 +1,113 @@
+{
+  "source_sha256": "1877e9535820cb8b45e5a84598ac8ae581058bb0fbee6f0c64ec672f8ab986dd",
+  "target": [
+    {
+      "path": "src/skills.rs",
+      "expected": {
+        "bytes": 40533,
+        "sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8"
+      },
+      "actual": {
+        "bytes": 40533,
+        "sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8"
+      },
+      "same": true
+    },
+    {
+      "path": "src/extensions.rs",
+      "expected": {
+        "bytes": 20742,
+        "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+      },
+      "actual": {
+        "bytes": 20742,
+        "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+      },
+      "same": true
+    },
+    {
+      "path": "src/resource_loader.rs",
+      "expected": {
+        "bytes": 9204,
+        "sha256": "121d3b6ea7760d137e0e074e7d9b269023ddc6ca2ecca199f23072890bd06858"
+      },
+      "actual": {
+        "bytes": 9204,
+        "sha256": "121d3b6ea7760d137e0e074e7d9b269023ddc6ca2ecca199f23072890bd06858"
+      },
+      "same": true
+    },
+    {
+      "path": "src/core.rs",
+      "expected": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "actual": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "same": true
+    },
+    {
+      "path": "src/slash_actions.rs",
+      "expected": {
+        "bytes": 76284,
+        "sha256": "f5dbc7862462d314bb8880ad6ee0f02d7c38aafa8b96196a08acb9773490b497"
+      },
+      "actual": {
+        "bytes": 76284,
+        "sha256": "f5dbc7862462d314bb8880ad6ee0f02d7c38aafa8b96196a08acb9773490b497"
+      },
+      "same": true
+    },
+    {
+      "path": "src/prompt_templates.rs",
+      "expected": {
+        "bytes": 17406,
+        "sha256": "1b3f2531d6f292a0d1ab24b9b4c69f3780cefb528437102bea316ec5e8197a06"
+      },
+      "actual": {
+        "bytes": 17406,
+        "sha256": "1b3f2531d6f292a0d1ab24b9b4c69f3780cefb528437102bea316ec5e8197a06"
+      },
+      "same": true
+    },
+    {
+      "path": "src/extension_runtime.rs",
+      "expected": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "actual": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "same": true
+    },
+    {
+      "path": "tests/stage1_prompt_resources.rs",
+      "expected": {
+        "bytes": 16193,
+        "sha256": "1bbdbff6927a996a06c08bb7afe84d9a94f25722b89c757d7bd1867a9c46a40f"
+      },
+      "actual": {
+        "bytes": 16193,
+        "sha256": "1bbdbff6927a996a06c08bb7afe84d9a94f25722b89c757d7bd1867a9c46a40f"
+      },
+      "same": true
+    },
+    {
+      "path": "tests/stage1_resource_host.rs",
+      "expected": {
+        "bytes": 23253,
+        "sha256": "6bfe5c0861bcd58c6dd42b8ca6a8ef4505ee8b030e20974cdc0024ba7695f4ae"
+      },
+      "actual": {
+        "bytes": 23253,
+        "sha256": "6bfe5c0861bcd58c6dd42b8ca6a8ef4505ee8b030e20974cdc0024ba7695f4ae"
+      },
+      "same": true
+    }
+  ]
+}

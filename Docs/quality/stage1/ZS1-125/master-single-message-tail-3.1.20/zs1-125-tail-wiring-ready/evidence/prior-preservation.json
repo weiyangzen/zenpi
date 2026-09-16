@@ -1,0 +1,267 @@
+{
+  "captured_at": "2026-09-12T12:29:39.315380+00:00",
+  "manifests": [
+    {
+      "manifest": ".ops/zs1-308-ready/manifest.json",
+      "sha256": "305bf26e6b67fd850851bb27a836a444aecaa9eb3bef2397eba523097052eb7c",
+      "dictionary_artifacts_verified": 64,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-307-ready/manifest.json",
+      "sha256": "e21c3e0d2176ecd29cb0d35b61ca701d5a5024d882680fa80789885f20b009a7",
+      "dictionary_artifacts_verified": 53,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-305-ready/manifest.json",
+      "sha256": "489b7d810f6d7b2b089b6d26242b089fb874d8e42385f47a3d1976dddb783424",
+      "dictionary_artifacts_verified": 82,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux123-provenance-ready/manifest.json",
+      "sha256": "3dff661338162c5e43eb108c7197fb48efb87b00c1f600ecf0f6acc0623e5a93",
+      "dictionary_artifacts_verified": 54,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux123-source-inspector-ready/manifest.json",
+      "sha256": "9b4ad570c19fefcfcde88b4eb7c5c9cc4b3cfa0275e416bfa6721bdd059a0db5",
+      "dictionary_artifacts_verified": 61,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-304-ready/manifest.json",
+      "sha256": "0f45c4db1bc94d7efa8be1ead4dfaf66102803ada90bf7e378cb8d28d011c579",
+      "dictionary_artifacts_verified": 63,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-303-ready/manifest.json",
+      "sha256": "5a89f95eaf0db8e42d40537ca6acb0afc4eb996b60ccdf0b3e036016cface7cb",
+      "dictionary_artifacts_verified": 59,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-301-ready/manifest.json",
+      "sha256": "7d556ca63b5def586e4a875fc566c64afb53c0a37377b69714de77c2aa077aa4",
+      "dictionary_artifacts_verified": 33,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-302-ready/manifest.json",
+      "sha256": "50b2453318f0183c2001700c2ae8411060cf195a1ff9452837eebbdc5ad01469",
+      "dictionary_artifacts_verified": 33,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-306-ready/manifest.json",
+      "sha256": "34c9b72c3fe1865085ab6847232c22ae752c7b9762761fca87fc876efce7a596",
+      "dictionary_artifacts_verified": 36,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux129-ready/manifest.json",
+      "sha256": "8eab5d250ce50e731c19cfb99677c594b3de7d5d8a751a68f5928df830778c22",
+      "dictionary_artifacts_verified": 131,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/compact-ui-followup-ready/manifest.json",
+      "sha256": "8e0cd794b297315beed644fb8f183784e0a6bf88a0ac9dbc174a1c0026ccc220",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 10
+    },
+    {
+      "manifest": ".ops/approval-ui-ready/manifest.json",
+      "sha256": "d53cf02dd9209306f3eaaf6082e22816cffd065e7b68dbc772577af7d271c07e",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 19
+    },
+    {
+      "manifest": ".ops/ux122-queued-shell-ready/manifest.json",
+      "sha256": "2b78debee9c27d4b548ba378d93f71b7c34088da4821279bd9de9c1772e7eaee",
+      "dictionary_artifacts_verified": 45,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/codex-reference-ready/manifest.json",
+      "sha256": "ddeedf88d21d8980c5e7de68f85f44e91519856dab2fcee1317969b53c8392cd",
+      "dictionary_artifacts_verified": 16,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/composer-paste-burst-followup-ready/manifest.json",
+      "sha256": "c640a75ca5cd9acb1f85bf124c06f9af519295ae1766d214fe9c0655d9d5a2c7",
+      "dictionary_artifacts_verified": 55,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux130-ready/manifest.json",
+      "sha256": "067fcead5c8c65df8c12814f25feafbf896ae6c633947799a1d6cbd9c4e0fa32",
+      "dictionary_artifacts_verified": 272,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/external-editor-contract-ready/manifest.json",
+      "sha256": "9af92ba5afa14f53229a2a49a2f9b3df85c21cddd4143fa8d36a8211dace9c86",
+      "dictionary_artifacts_verified": 24,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/project-tui-resume-followup-ready/manifest.json",
+      "sha256": "f4e692c2e437ec6c1481b69c36ff8c942f2559e62f0e671c7362aec712b1e488",
+      "dictionary_artifacts_verified": 78,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/codex-directories-ready/manifest.json",
+      "sha256": "7edccc0e13f7a06b873cad8ccf4e16baddfd3d1200a60b011e8f17fd1a0f1d96",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux130-postresize-ready/manifest.json",
+      "sha256": "db274d10a7e17c733c956f46949aca1c81a2d77343e982461914823a0e80e9f6",
+      "dictionary_artifacts_verified": 41,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux122-large-paste-ready/manifest.json",
+      "sha256": "ccbb9cb8356e7d294359b8e25f54220b8ca3f1c1f1a2c780148db1f1acd80915",
+      "dictionary_artifacts_verified": 107,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux131-ready/manifest.json",
+      "sha256": "6748f89eb33382e3e87c3c4f1636a5611ca399ddb749f5491fb2f75b737376c5",
+      "dictionary_artifacts_verified": 268,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux130-reader-reset-ready/manifest.json",
+      "sha256": "2b2bb6e659eb54094c6d81818d3d9c950709ca54a23b5beb52372361baf3a8b9",
+      "dictionary_artifacts_verified": 111,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux130-phase-observation-ready/manifest.json",
+      "sha256": "b7d6c2356173f70c93a98a1866d9a7a6b7b410473f022ddb0c69d01517c5a1c9",
+      "dictionary_artifacts_verified": 33,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/project-checkpoint-followup-ready/manifest.json",
+      "sha256": "8645bd5d1f7746977ed388c02e6e14439acad263924fb4ef935f3f49c2b9dc95",
+      "dictionary_artifacts_verified": 27,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/project-persistence-followup-ready/manifest.json",
+      "sha256": "2d1a6665d6f236481aa599172caabd54503a8ad01d9385cfea34f6adec6bec59",
+      "dictionary_artifacts_verified": 67,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/approval-submenu-ready/manifest.json",
+      "sha256": "ee7ef368c27ec81f3aebb39abb051d78aa32af24f08c5673c3b218c6acc4988d",
+      "dictionary_artifacts_verified": 111,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/composer-ui-ready/manifest.json",
+      "sha256": "cf83bf59ff84d236450f0b0a854ecc52d1a49c33a0043fcdd6733da18123cf5d",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 11
+    },
+    {
+      "manifest": ".ops/ux122-queue-identity-ready/manifest.json",
+      "sha256": "50372e2f39104fb3759508987c6e28513fcdef8f783681349f376e410144fdf2",
+      "dictionary_artifacts_verified": 81,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/approval-submenu-legacy-ready/manifest.json",
+      "sha256": "5287ea492c4b420e4093ab3153f67276e77be5fce10421c7eeb809c32961e940",
+      "dictionary_artifacts_verified": 9,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/transcript-ui-ready/manifest.json",
+      "sha256": "59b1c25b9cbf36c3ef5282b99c9565a21e6bf05cb4cc6db5f1a363c2ed33d789",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/approval-reference-ready/manifest.json",
+      "sha256": "edde64ff4fc1ee2b669ccf57c558ebf8e893e2f44b7fc94a6e933c15f6930829",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux122-kill-yank-contract-ready/manifest.json",
+      "sha256": "b97ca4bbb63e54551900c06759c24c83a72b1e120fca0026e48934e77f3a5061",
+      "dictionary_artifacts_verified": 30,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/ux128-integrated-failed-ready/manifest.json",
+      "sha256": "f4c554b7a897b318dc36ed110e8f7da85b71f241e5d4c41988449593b388729c",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 91
+    },
+    {
+      "manifest": ".ops/project-resume-atomic-followup-ready/manifest.json",
+      "sha256": "1ce2f36629da49065251a6f7339da689accdd4819e7868035b97d584eeb04a9f",
+      "dictionary_artifacts_verified": 24,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/project-ui-ready/manifest.json",
+      "sha256": "9f4747aa9a717610b85f3479def1875ab3946ceaa06edc66d558c2a599c0878f",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/command-ui-ready/manifest.json",
+      "sha256": "e9621ed01be38649288c5005b601930d0b3b4b8ad3172ae05e7e0fa4f163864d",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 10
+    },
+    {
+      "manifest": ".ops/shared-project-ready/manifest.json",
+      "sha256": "733cc7af479293a88e6cd3c1b637f7f1c564c6fc01e1c316b92cc48839c88e32",
+      "dictionary_artifacts_verified": 0,
+      "list_artifacts_verified": 27
+    },
+    {
+      "manifest": ".ops/zs1-309-ready/manifest.json",
+      "sha256": "6df39987202ba51f35d30baa6bf8dca4dcab43aa380d52b1e65aa05c08e90b81",
+      "dictionary_artifacts_verified": 87,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-094-ready/manifest.json",
+      "sha256": "013e06a06e650f9d17b606021b7c2f444eb43ee806ce5055443a949828375fc5",
+      "dictionary_artifacts_verified": 42,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-097-ready/manifest.json",
+      "sha256": "4c032718962a1f28681a42bfb54a17b381cba562e55dfb875ba5e6814732e192",
+      "dictionary_artifacts_verified": 78,
+      "list_artifacts_verified": 0
+    },
+    {
+      "manifest": ".ops/zs1-125-render-tail-ready/manifest.json",
+      "sha256": "822b201ac8e8f3f5bb4172599ac42c807addbba69c13362d24c26576d36f9581",
+      "dictionary_artifacts_verified": 38,
+      "list_artifacts_verified": 0
+    }
+  ],
+  "manifests_verified": 43,
+  "dictionary_artifacts_verified": 2313,
+  "all_exact": true,
+  "list_artifacts_verified": 168
+}

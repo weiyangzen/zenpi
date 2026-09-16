@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "tools/tui_approval_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/tui-idle-selection-integration/zenpi-final",
+    "--evidence",
+    ".ops/stage1_execution/tui-idle-selection-integration/approvals.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T11:33:52.057390+00:00",
+  "elapsed_seconds": 12.98534475,
+  "exit_code": 0,
+  "log_sha256": "73786fe6eda7d2e3398cf4522d760ead78dca6b2c44f1b9dc3c71d525df1dc21",
+  "log_bytes": 812
+}

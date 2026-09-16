@@ -1,0 +1,18 @@
+[
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-render-tail-work/target/debug/deps/zenpi-e6b326c116898da7",
+    "captured_at": "2026-09-12T12:07:03.326994+00:00",
+    "bytes": 1786456,
+    "sha256": "446baa816587b2e770f334c1bae2cb46cc6a4052f6a86c1ce38738e61e077a81",
+    "copied": false,
+    "scope": "test executable identity only; no product release"
+  },
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-render-tail-work/target/debug/deps/render_markdown-cbb1af9b3e65373a",
+    "captured_at": "2026-09-12T12:07:03.327808+00:00",
+    "bytes": 1380720,
+    "sha256": "db199dccec3d48a9ac130a5fa0bd7c9a7f4ece839c08f7c9b0a99982efaa0cb0",
+    "copied": false,
+    "scope": "test executable identity only; no product release"
+  }
+]

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/probe.py", line 50, in <module>
+    assert not errors,errors
+AssertionError: ["AssertionError('provider gate timed out')"]

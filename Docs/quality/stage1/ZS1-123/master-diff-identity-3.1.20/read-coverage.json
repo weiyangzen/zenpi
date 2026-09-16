@@ -1,0 +1,40 @@
+{
+  "before_complete": [
+    {
+      "lines": [
+        1,
+        280
+      ],
+      "bytes": 11195,
+      "sha256": "25f3532aef5d30a988447bb0fdcb53ada24fb54e278174292e68c8048328d53b"
+    },
+    {
+      "lines": [
+        281,
+        560
+      ],
+      "bytes": 10463,
+      "sha256": "efaccf2b50ad2e8ff431d7d403c4daed8a27a781ccfd2ba31f1d07614749c459"
+    },
+    {
+      "lines": [
+        561,
+        840
+      ],
+      "bytes": 9486,
+      "sha256": "c177b132637098ded2c22d53d6bef4b7574997e88612accac71cc85994bdab91"
+    },
+    {
+      "lines": [
+        841,
+        1078
+      ],
+      "bytes": 10199,
+      "sha256": "232e25ddc50999dd5ee37d8b82fa30916d1b9ab6d15400125535ceefbfc741d0"
+    }
+  ],
+  "after_review": "Full before plus complete C patch and A followup, exact reconstructed after; no claim of separate full after reading",
+  "C_patch_lines": 434,
+  "after_sha256": "811bde9af190b2e439542c0a89dd8e8a1f76bbcf8eb6aa3ad3b16143447ec30b",
+  "caller_scope": "bounded current TUI/headless diff branches only"
+}

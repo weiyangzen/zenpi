@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "manifest_sha256": "822b201ac8e8f3f5bb4172599ac42c807addbba69c13362d24c26576d36f9581",
+  "artifacts": 38,
+  "source_after_sha256": "b239971a91e3b9c05400e36b4ca9da3eebfb64a0566d36c26dd08340b33a3b5d",
+  "patch_sha256": "0b0a6a6956f7be5a3a5ff062f1236394b5b77886f4682eb48a43bef1f259e1a5",
+  "operations": [
+    {
+      "baseline": "master",
+      "phase": "forward_check",
+      "passed": true
+    },
+    {
+      "baseline": "master",
+      "phase": "forward",
+      "passed": true
+    },
+    {
+      "baseline": "master",
+      "phase": "reverse_check",
+      "passed": true
+    },
+    {
+      "baseline": "master",
+      "phase": "reverse",
+      "passed": true
+    },
+    {
+      "baseline": "worker",
+      "phase": "forward_check",
+      "passed": true
+    },
+    {
+      "baseline": "worker",
+      "phase": "forward",
+      "passed": true
+    },
+    {
+      "baseline": "worker",
+      "phase": "reverse_check",
+      "passed": true
+    },
+    {
+      "baseline": "worker",
+      "phase": "reverse",
+      "passed": true
+    }
+  ],
+  "exact_bytes": true,
+  "sentinel_preserved": true,
+  "cargo_executions_by_verifier": 0,
+  "pty_runs": 0,
+  "http_runs": 0,
+  "scope": "offline integrity only; integration and ZS1-125 acceptance pending"
+}

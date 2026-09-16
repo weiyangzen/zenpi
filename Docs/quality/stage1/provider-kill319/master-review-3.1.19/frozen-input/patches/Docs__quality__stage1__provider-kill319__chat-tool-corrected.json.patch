@@ -1,0 +1,32 @@
+diff --git a/Docs/quality/stage1/provider-kill319/chat-tool-corrected.json b/Docs/quality/stage1/provider-kill319/chat-tool-corrected.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/chat-tool-corrected.json
+@@ -0,0 +1,27 @@
++{
++  "name": "chat-tool-corrected",
++  "argv": [
++    "python3",
++    "Docs/quality/stage1/provider-kill319/kill_probe.py",
++    "chat",
++    "--scenario",
++    "tool",
++    "--label",
++    "corrected"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T05:09:57.011535+00:00",
++  "ended_at": "2026-09-12T05:09:57.662669+00:00",
++  "elapsed_seconds": 0.6510497909999999,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 67207168,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/chat-tool-corrected.log",
++  "bytes": 15,
++  "sha256": "5f81d1c90a3d6308d9c6ca3a590fce96de4e543e541b843e88107dcd043869c5"
++}

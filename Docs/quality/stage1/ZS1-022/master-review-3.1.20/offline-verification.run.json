@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source022-master/worker/verify.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T14:23:58.102615+00:00",
+  "ended_at": "2026-09-12T14:23:58.266642+00:00",
+  "exit_code": 0,
+  "log_sha256": "3c47cad21376a0d11356050de84b66764eb97ba297e4f7cd4645bcef27acb60e"
+}

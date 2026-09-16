@@ -1,0 +1,57 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/verify_review.py b/Docs/quality/stage1/ZS1-089/worker-review320/verify_review.py
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/verify_review.py
+@@ -0,0 +1,52 @@
++from pathlib import Path
++import json,hashlib,base64,difflib,sys,runpy
++E=Path(__file__).resolve().parent;R=E.parents[4];M=Path('/Users/wangweiyang/GitHub/zenpi');H=lambda b:hashlib.sha256(b).hexdigest();frozen='--frozen' in sys.argv
++def read(p):return json.loads((E/p).read_text())
++m=read('input-manifest.json');assert m['authority']=='3.1.20' and m['requirement_digest']=='8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645' and m['frozen']['path']=='.github/workflows/ci.yml';steps=read('step-index.json');texts={}
++for name,count in [('baseline',77),('current',94)]:
++ row=m[name];b=(R/row['artifact']).read_bytes();assert len(b)==row['bytes'] and H(b)==row['sha256'] and len(b.splitlines())==row['lines']==count and row['read_ranges']==[[0,len(b)]] and row['line_ranges']==[[1,count]]
++ texts[name]=b.decode();actual=[{'line':i,'name':line.split('- name: ',1)[1]} for i,line in enumerate(texts[name].splitlines(),1) if line.startswith('      - name: ')];assert actual==steps[name] and len(actual)==16
++ if not frozen:assert Path(row['path']).read_bytes()==b
++assert m['baseline']['sha256']==m['frozen']['sha256'] and m['baseline']['bytes']==m['frozen']['bytes']
++assert texts['baseline'].splitlines(True)[:76]==texts['current'].splitlines(True)[:76]
++expected=''.join(difflib.unified_diff(texts['baseline'].splitlines(True),texts['current'].splitlines(True),fromfile='frozen/.github/workflows/ci.yml',tofile='current/.github/workflows/ci.yml'));assert (E/'baseline-to-current.diff').read_text()==expected
++old=read('reused-packages.json');assert [v['members'] for v in old]==[18,22];roots=[]
++for row in old:
++ p=R/row['artifact'];raw=(p/'manifest.json').read_bytes();assert H(raw)==row['manifest_sha256'];manifest=json.loads(raw);assert len(manifest['files'])==row['members']
++ if not frozen:assert (Path(row['path'])/'manifest.json').read_bytes()==raw
++ for f in manifest['files']:
++  b=(p/'files'/f['path']).read_bytes();assert len(b)==f['bytes'] and H(b)==f['sha256']
++  if not frozen:assert (Path(row['path'])/'files'/f['path']).read_bytes()==b
++ roots.append(p/'files'/manifest['evidence_directory'])
++o,a=roots
++assert (o/'original-ci.yml').read_text()==texts['baseline'] and (o/'current-ci.yml').read_text()==texts['baseline'] and (a/'baseline-ci.yml').read_text()==texts['baseline'] and (a/'candidate-ci.yml').read_text()==texts['current']
++for p,stem,expected in [(o,'archive-gate-counterexample',0),(o,'g-stage-main-before-integration',1),(a,'three-case-replay',0),(a,'candidate-shell-syntax',0),(a,'g-stage-main-before-integration',1)]:
++ r=json.loads((p/(stem+'.json')).read_text());b=(p/(stem+'.log')).read_bytes();assert r['exit_code']==expected and r['bytes']==len(b) and r['sha256']==H(b)
++results=json.loads((a/'three-case-results.json').read_text());assert results['baseline_ci_sha256']==m['baseline']['sha256'] and results['candidate_ci_sha256']==m['current']['sha256']
++assert [r['runs']['baseline']['exit_code'] for r in results['cases']]==[0,1,0] and [r['runs']['candidate']['exit_code'] for r in results['cases']]==[0,1,1]
++for row in results['cases']:
++ b=base64.b64decode(row['archive_base64'],validate=True);assert len(b)==row['archive_bytes'] and H(b)==row['archive_sha256'] and row['HOME_preserved'] and row['CODEX_HOME_preserved']
++ for run in row['runs'].values():assert run['temporary_files_after_exit']==[] and 'probe.tar.gz: OK' in run['stdout']
++assert results['cases'][2]['independent_tar']['exit_code']!=0
++for name in ['baseline','candidate']:
++ t=texts['current' if name=='candidate' else 'baseline'];lines=t.split('      - name: Package and verify the production artifact\n',1)[1].split('        run: |\n',1)[1].splitlines();assert all(v.startswith('          ') for v in lines);commands=[v[10:] for v in lines];assert commands.pop(0)=='tools/release.sh';d=('\n'.join(commands)+'\n').encode();assert d==(a/(name+'-gate.sh')).read_bytes() and H(d)==results['extracted_script_sha256'][name]
++assert len((o/'probe_archive_gate.py').read_bytes().splitlines())==22 and len((a/'replay_archive_gate.py').read_bytes().splitlines())==55
++refs=read('caller-references.json');assert len(refs)==8;observations={}
++for row in refs:
++ b=Path(row['path']).read_bytes() if not frozen else None;matches=b is not None and H(b)==row['sha256']
++ if b is not None:observations[row['relative_path']]={'matches_capture':matches,'capture_sha256':row['sha256'],'current_sha256':H(b)}
++ for c in row['excerpts']:
++  d=(R/c['artifact']).read_bytes();assert H(d)==c['sha256'] and len(d.splitlines())==c['line_end']-c['line_start']+1
++  if matches:assert d==b''.join(b.splitlines(keepends=True)[c['line_start']-1:c['line_end']])
++ if row['scope'].startswith('full script'):assert row['excerpts'][0]['line_start']==1 and row['excerpts'][0]['line_end']==row['lines']
++inv=read('report-inventory.json');prior=(E/'prior-report.md').read_bytes();assert len(prior)==inv['prior_prefix_bytes']==12050 and H(prior)==inv['prior_prefix_sha256']=='60ecb71dd2898ae62ed20169442f4ec36a58894dfb380d50fea1ed2fd965f96e';b=(R/inv['owned_path']).read_bytes();final=read('report-final.json');assert b.startswith(prior) and H(b)==final['sha256'] and len(b)==final['bytes'];assert (R/old[0]['artifact']/'files'/inv['owned_path']).read_bytes()==prior
++preserved=read('preserved-ready-manifests.json');assert len(preserved)==65
++gate=read('gstage-main.log');receipt=read('gstage-main.json');assert receipt['exit_code']==1 and gate['structural']['ok'] and not gate['ok'] and any('ZS1-089.master.json' in v for v in gate['errors']) and receipt['sha256']==H((E/'gstage-main.log').read_bytes())
++if not frozen:
++ s=json.loads((M/'Docs/execution/active_requirement.json').read_text());assert s['blueprint_version']==m['authority'] and s['requirement_digest']==m['requirement_digest'] and s['baseline_files']['ZS1-089']==m['frozen'];assert not (M/inv['owned_path']).exists()
++ local=read('local-working-source.json');d=Path(local['path']).read_bytes();assert len(d)==local['bytes'] and H(d)==local['sha256']
++ for name,digest in preserved.items():assert H((R/'.ops'/name/'manifest.json').read_bytes())==digest,name
++ sys.path.insert(0,str(M/'tools'));g=runpy.run_path(str(M/'tools/validate_stage1_blueprint.py'));bp=g['parse']((M/'Docs/stage_1_v3_pi_mono_blueprint.md').read_text());f=bp.files['ZS1-089'];assert f.path==m['frozen']['path'] and f.sha256==m['baseline']['sha256'] and bp.requirement==m['requirement_digest']
++ for n in ['baseline','current']:g['check_ranges'](m[n]['read_ranges'],m[n]['bytes'])
++ g['artifact'](R,{'path':inv['owned_path'],'bytes':len(b),'sha256':H(b)})
++print(json.dumps({'ok':True,'item':'ZS1-089','mode':'frozen-offline' if frozen else 'live-readonly','baseline':m['baseline']['sha256'],'current':m['current']['sha256'],'complete_lines':[77,94],'steps_each':16,'prior_report_bytes':len(prior),'report_bytes':len(b),'report_sha256':H(b),'old_package_members':40,'historical_cases':3,'historical_baseline_exits':[0,1,0],'historical_current_exits':[0,1,1],'caller_live_observations':observations,'preserved_ready_manifests':65,'gstage_exit':1,'master_receipt_missing':True,'new_behavior_runs':0,'limits':'Pure integrity, full workflow reading, exact historical reuse; no product or hosted CI execution, no sibling/directory/master acceptance'},indent=2))

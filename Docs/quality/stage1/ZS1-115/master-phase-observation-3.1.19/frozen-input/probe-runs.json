@@ -1,0 +1,192 @@
+[
+  {
+    "name": "before-watchdog",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--before",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/before-watchdog",
+      "watchdog"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:51.231749+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 1,
+    "exit": 1,
+    "ended": "2026-09-12T06:02:54.480577+00:00",
+    "fixture_directory_removed": true,
+    "stdout_sha256": "a4e71befb7d94ff814d08ccb16398e45badcd5b2e59909b9ab0b1b441c9889fb",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "after-watchdog",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--after",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/after-watchdog",
+      "watchdog"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:54.481520+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 1,
+    "exit": 1,
+    "ended": "2026-09-12T06:02:56.989582+00:00",
+    "fixture_directory_removed": true,
+    "stdout_sha256": "e8319ec14684dc28808fcab237e0d7788ded7e74b3fff80a111e3b99cb636b63",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "normal",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--after",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/normal",
+      "normal"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:56.990755+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.001982+00:00",
+    "fixture_directory_removed": true,
+    "stdout_sha256": "8493302a966c4e4a12b89f422a318318d532cc164dcb02e9380dbbabbc4403ae",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "nonzero",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--after",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/nonzero",
+      "nonzero"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.002766+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 1,
+    "exit": 1,
+    "ended": "2026-09-12T06:02:57.013324+00:00",
+    "fixture_directory_removed": true,
+    "stdout_sha256": "3161da1979fdad7f327e921bef6daf6bd0816286720bd3867df6128ae59319b5",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "unwind",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--unwind",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/unwind",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.014142+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 1,
+    "exit": 1,
+    "ended": "2026-09-12T06:02:57.018327+00:00",
+    "fixture_directory_removed": true,
+    "stdout_sha256": "5fe4f5e7c332265bd526127a6faf26c58230a6c7e510da5994b5d8db8a005586",
+    "stderr_sha256": "e2980af7a5aa076b0e84a3e235c8668b0315fadd42d4a11b2883db4bd32ba828",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "boundary",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--snapshot",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/boundary",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.019309+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.022893+00:00",
+    "fixture_directory_removed": false,
+    "stdout_sha256": "b3e0459ae0005e90ff892ccd56013da201cbdb7b658804d2e1bc4ecdef78b882",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "oversize",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--snapshot",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/oversize",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.023831+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.029761+00:00",
+    "fixture_directory_removed": false,
+    "stdout_sha256": "520f9fc0995b77ecf35d4d8b005abc0012131a0b4a31545a9ab36d64c114e76b",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "missing",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--snapshot",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/missing",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.030830+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.034693+00:00",
+    "fixture_directory_removed": false,
+    "stdout_sha256": "76f57c731b091bd6ced9075d0a16cdc3329a561e50ba263e7642d36e529053d7",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "fifo",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--snapshot",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/fifo",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.035630+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.039426+00:00",
+    "fixture_directory_removed": false,
+    "stdout_sha256": "f7371a6b0bbaed2637bbd58d7707749e139736be4edb5a82aaf984510014f4b9",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  },
+  {
+    "name": "symlink",
+    "argv": [
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe",
+      "--snapshot",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase-observation-egw0xru2/symlink",
+      "unused"
+    ],
+    "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi",
+    "started": "2026-09-12T06:02:57.040409+00:00",
+    "binary_sha256": "5a766e4edce4aaf4c770537f502aab5060047b6829d101d92673594b33c6725a",
+    "expected_exit": 0,
+    "exit": 0,
+    "ended": "2026-09-12T06:02:57.044209+00:00",
+    "fixture_directory_removed": false,
+    "stdout_sha256": "af0f24cea98b546cecf82c07a14950503904749bf586ed4386d7683b004b6438",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observation_checks_passed": true
+  }
+]

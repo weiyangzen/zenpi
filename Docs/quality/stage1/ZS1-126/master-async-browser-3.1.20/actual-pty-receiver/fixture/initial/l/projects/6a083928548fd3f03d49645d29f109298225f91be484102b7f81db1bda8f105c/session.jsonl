@@ -1,0 +1,2 @@
+{"created_at_ms":1789219032270,"cwd":"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial/other","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789219032270-53096-0","timestamp":"2026-09-12T13:17:12Z","timestamp_ms":1789219032270,"version":1}
+{"event":{"generation":4,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789219032270-53096-0","timestamp":"2026-09-12T13:17:12Z","timestamp_ms":1789219032280}

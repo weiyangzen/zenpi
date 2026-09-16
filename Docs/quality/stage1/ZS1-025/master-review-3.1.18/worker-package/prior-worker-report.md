@@ -1,0 +1,19 @@
+# ZS1-025 — bash.ts
+
+状态：[_] worker 完整阅读候选，主控未接受。
+source_id: SRC-0945
+source_path: packages/coding-agent/src/core/tools/bash.ts
+source_hash: b76645f5d7b414957c7772eb8ec75d9dee71d27320ebcbf419881451576a6eee
+source_bytes: 13665
+read_ranges: [[0, 13665]]
+run_id: zenpi-stage1-20260911
+
+完整阅读 1–400 行，连续1–240和241–400。schema支持command与秒级可选timeout；resolveTimeoutMs拒绝非有限/非正/超32位毫秒范围，默认无超时。BashOperations允许替换真实exec，因此只看onData mock不能证明生产shell。createLocalShellOperations实际spawn shell，cwd存在性检查，按shell配置通过argv或stdin传命令；Unix detached，stdout/stderr都送同一个onData，原源码full output不区分两流。
+
+child PID登记、AbortSignal监听、timeout都调用killProcessTree；waitForChildProcess负责等待并避免继承stdio使close挂住（该依赖未在本独立文件中重新声称完整阅读）。返回后依据signal/timedOut抛aborted/timeout；finally撤销跟踪、timer和abort listener。env来自shell env或调用者覆盖；resolveSpawnContext先去除旧PI_SESSION_* / provider/model/reasoning字段，再按设置填当前ctx；spawnHook可改变command/cwd/env。zenpi不能照搬为绕过其immutable worker policy/审批的任意hook。
+
+createShellToolDefinition建立OutputAccumulator、acceptingOutput、dirty与throttle timer；收到data先append，再scheduleOutputUpdate。首次立即空update，其后按BASH_UPDATE_THROTTLE_MS节流，snapshot(persistIfTruncated)在执行未结束时产生tail与fullOutputPath。finishOutput先禁止late data，再finish decoder、清timer、发最后dirty update，取snapshot并await closeTempFile；因此raw写入完成要到异步close之后。formatOutput根据lines/bytes/单超长行给显示范围和完整路径文案。
+
+异常仍调用finishOutput保存片段；aborted和timeout错误包含当前tail及终止说明，非零退出也带tail抛错。其它exec异常重新抛原错误，可能不带artifact details；finally再次清timer。正常返回content+details，createBashTool通过wrapper生成AgentTool并附prompt信息。输出进度生命周期有明确acceptingOutput=false边界，但文件不带hash、complete/incomplete元数据，也无受限范围读取/TTL/会话清理。
+
+zenpi已有RunCommandTool具有限时、process group、reap、pipe reader join和环境脱敏，111应复用，不能替换为无默认timeout。候选在相同supervised路径上逐流tee到受控artifact、输出视图继续受原内存cap约束；owner在reap并join后flush和终态验证，取消时保留incomplete。CommandOutputCapture可在普通工具返回Cancelled error后仍由host读取terminal artifact refs；host仍须把引用、进度与canonical turn/call事件持久化/投影，并提供有界读取入口。此候选不冒称TUI/headless产品入口已接线或已通过完整重启验收。

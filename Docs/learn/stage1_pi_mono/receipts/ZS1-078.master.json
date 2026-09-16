@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-078",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-078",
+  "source_path": "src/skills.rs",
+  "source_hash": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
+  "read_ranges": [
+    [
+      0,
+      40533
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/skills.rs_learn.md",
+      "bytes": 2075,
+      "sha256": "61039d04530131171839cec1f94fd414523445422b0039a01d10551204285ea7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-078/master-review-current/review.md",
+      "bytes": 367,
+      "sha256": "ebdbfe76e031c5c165b344142b91d0ff34ac0d81a2205d7bfc0dc8dbbc1274dd"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-078/master-review-current/review.md",
+      "bytes": 367,
+      "sha256": "ebdbfe76e031c5c165b344142b91d0ff34ac0d81a2205d7bfc0dc8dbbc1274dd"
+    },
+    "findings": "完整读取 skills.rs，覆盖 manifest validation、provenance/precedence、bounded recursive discovery、cancel、collision、source hash 与 replacement。"
+  }
+}

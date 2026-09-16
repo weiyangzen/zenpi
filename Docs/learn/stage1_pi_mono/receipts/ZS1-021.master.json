@@ -1,0 +1,103 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-021",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "source021-current-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-021",
+  "source_path": "packages/coding-agent/src/core/resource-loader.ts",
+  "source_hash": "1877e9535820cb8b45e5a84598ac8ae581058bb0fbee6f0c64ec672f8ab986dd",
+  "read_ranges": [
+    [
+      0,
+      7471
+    ],
+    [
+      7471,
+      15291
+    ],
+    [
+      15291,
+      23941
+    ],
+    [
+      23941,
+      31274
+    ],
+    [
+      31274,
+      37251
+    ],
+    [
+      37251,
+      40180
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/resource-loader.ts_learn.md",
+      "bytes": 55652,
+      "sha256": "d22c14a1e82a623a4507ddde32d46a762bdee0213a9ba636706f08c036c56f7e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/review.md",
+      "bytes": 7823,
+      "sha256": "266ec0cefdbd3a4d0da3e634ebb41c7386d642f271f0b713c9134ace7b8f9d4c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/worker-report.md",
+      "bytes": 47827,
+      "sha256": "3b539b2388a6cb73e2d8b1275aa5529d6d0aa54720fa8fd2761e53df93738068"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/worker-manifest.json",
+      "bytes": 78491,
+      "sha256": "624213df1e2b5ad2d9f943440d55c11951c04e38b6d39f714c8cc687479d4ea4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 927079,
+      "sha256": "d99bae69891bc1a28a41e4554bdb221a3b61f64f3432822c98404c426240ad9f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/worker-offline.json",
+      "bytes": 171618,
+      "sha256": "3fe70f849775bc31c74b4c379b98a20461a86f5f6181b85223b8d1939c7d949a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/current-inputs.json",
+      "bytes": 11789,
+      "sha256": "add815d9dc4a642d50713b015275534ad6c8959ebf19738ffef5a74c32cf75c6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/current-input-audit.json",
+      "bytes": 3215,
+      "sha256": "61879d5c54d30ee398b52fff092021088c83319aea502e0c9c48614cf3dc8db8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/worker-offline.run.json",
+      "bytes": 465,
+      "sha256": "adc803bca6eb0d9dd0b929dd6c64e17bfae851a9c54bf51f3dfb5062c92f9c38"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/accept.py",
+      "bytes": 7915,
+      "sha256": "aee4c74757174eb2e16e0598446792eac2ed2e9f14f84d3426988bd0a8e481ac"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-021/master-review-3.1.21/review.md",
+      "bytes": 7823,
+      "sha256": "266ec0cefdbd3a4d0da3e634ebb41c7386d642f271f0b713c9134ace7b8f9d4c"
+    },
+    "findings": "Complete021 source, full candidate and historical23-case probe independently read; target loader and bounded host mappings reviewed. Preserve four doubles, original failure logs, partial source reload and limited target publication guarantees. Only021 accepted."
+  }
+}

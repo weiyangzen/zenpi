@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "python3",
+    "tools/bench_runtime.py",
+    "--samples",
+    "3",
+    "--output",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/shutdown-current-3.1.21/release-hosts/budget.json",
+    "--startup-evidence-dir",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/shutdown-current-3.1.21/release-hosts/startup"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T17:05:19.295386+00:00",
+  "ended_at": "2026-09-12T17:06:56.637055+00:00",
+  "exit_code": 0,
+  "pid": 28075,
+  "reaped": true,
+  "timed_out": false,
+  "removed_proxy_names": [],
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "log": {
+    "bytes": 12590,
+    "sha256": "ca58971cae1effa00e39ac5bee3e918225cccb952ae71832a7681e68920a260b"
+  }
+}

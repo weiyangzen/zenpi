@@ -1,0 +1,15 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdin.jsonl b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdin.jsonl
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdin.jsonl
+@@ -0,0 +1,10 @@
++{"schema_version": 2, "type": "command", "id": "inspect", "text": "/recovery inspect"}
++{"schema_version": 2, "type": "user_shell", "id": "killed-command", "text": "!exec /Applications/Xcode.app/Contents/Developer/usr/bin/python3 effect.py"}
++{"schema_version": 2, "type": "user_shell", "id": "killed-command", "text": "!printf conflict"}
++{"schema_version": 2, "type": "user_shell", "id": "blocked", "text": "!printf should-not-run"}
++{"schema_version": 2, "type": "resume", "id": "resume", "from_sequence": 0}
++{"schema_version": 2, "type": "tool_output", "id": "read-orphan", "session_id": "session-1789190554164-62056-0", "output": {"action": "read", "artifact_id": "d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb", "call_id": "user-shell-1789190554197-1", "offset": 0, "length": 32}}
++{"schema_version": 2, "type": "command", "id": "abandon", "text": "/recovery abandon user-shell-1789190554197-1 --yes"}
++{"schema_version": 2, "type": "command", "id": "abandon-again", "text": "/recovery abandon user-shell-1789190554197-1 --yes"}
++{"schema_version": 2, "type": "user_shell", "id": "killed-command", "text": "!exec /Applications/Xcode.app/Contents/Developer/usr/bin/python3 effect.py"}
++{"schema_version": 2, "type": "tool_output", "id": "cleanup", "session_id": "session-1789190554164-62056-0", "output": {"action": "cleanup", "confirm": true}}

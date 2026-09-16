@@ -1,0 +1,73 @@
+{
+  "before": {
+    "name": "before",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "test",
+      "--locked",
+      "--test",
+      "stage1_anthropic",
+      "native_terminal_cancel_",
+      "--",
+      "--nocapture"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T04:56:29.641658+00:00",
+    "ended_at": "2026-09-12T04:56:32.662443+00:00",
+    "elapsed_seconds": 3.020672041,
+    "exit_code": 101,
+    "environment_overrides": {
+      "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+    },
+    "HOME_preserved": true,
+    "CODEX_HOME_preserved": true,
+    "maxrss_command_tree_observed": 402931712,
+    "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+    "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/anthropic-terminal-cancel-integration/before.log",
+    "bytes": 3491,
+    "sha256": "7dc55c3bcb442531718fce8fe21c94aa998dde5101df273f24ac66b23d29b554"
+  },
+  "after": {
+    "name": "after",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "test",
+      "--locked",
+      "--test",
+      "stage1_anthropic",
+      "--test",
+      "backend",
+      "--test",
+      "config",
+      "--test",
+      "security"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T04:58:18.488763+00:00",
+    "ended_at": "2026-09-12T04:58:35.781015+00:00",
+    "elapsed_seconds": 17.292253291999998,
+    "exit_code": 0,
+    "environment_overrides": {
+      "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+    },
+    "HOME_preserved": true,
+    "CODEX_HOME_preserved": true,
+    "maxrss_command_tree_observed": 1536016384,
+    "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+    "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/anthropic-terminal-cancel-integration/after.log",
+    "bytes": 5265,
+    "sha256": "d760d9f48ccdc48a7d4075cb84023f79286cb5cccb9e8e7c443657d76e3615b9"
+  },
+  "after_counts": [
+    15,
+    10,
+    8,
+    19
+  ],
+  "after_total": 52,
+  "actual_native_before_two_fail": true,
+  "product_accepted": false,
+  "final_lint_pending": true
+}

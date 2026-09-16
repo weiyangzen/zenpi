@@ -1,0 +1,45 @@
+{
+  "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions",
+  "entries": [
+    {
+      "name": "index.ts",
+      "kind": "file",
+      "selected": false,
+      "bytes": 4204,
+      "lines": 193,
+      "sha256": "3502526cb694e66e79b729a72956dd8be4be4556c8c60c3a0b534ac3bf7ad1ce"
+    },
+    {
+      "name": "loader.ts",
+      "kind": "file",
+      "selected": false,
+      "bytes": 25877,
+      "lines": 809,
+      "sha256": "c96284a217cd4e2eee8d7335a7c25b106135968c716ce39834b4714f5ff8f771"
+    },
+    {
+      "name": "runner.ts",
+      "kind": "file",
+      "selected": true,
+      "bytes": 39774,
+      "lines": 1286,
+      "sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084"
+    },
+    {
+      "name": "types.ts",
+      "kind": "file",
+      "selected": true,
+      "bytes": 63623,
+      "lines": 1797,
+      "sha256": "96e20f8038027f0b0172f311b6b9d9ddf42123b2f5b2a018f533af026fd3371e"
+    },
+    {
+      "name": "wrapper.ts",
+      "kind": "file",
+      "selected": false,
+      "bytes": 1832,
+      "lines": 45,
+      "sha256": "c89397e268ccf27aa465fa1307fdbe324a3457966803e3fc6ec4d982ae2d379d"
+    }
+  ]
+}

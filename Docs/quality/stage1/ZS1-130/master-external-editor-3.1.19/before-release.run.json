@@ -1,0 +1,28 @@
+{
+  "name": "before-release",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--bin",
+    "zenpi"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:45:27.792473+00:00",
+  "ended_at": "2026-09-12T05:46:25.351901+00:00",
+  "elapsed_seconds": 57.55819075,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1941389312,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/before-release.log",
+  "bytes": 959,
+  "sha256": "b3b45ecb9874adb3333300f5b25f02e6460e1524c608713ea6ba7e32e9d91ab6"
+}

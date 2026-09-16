@@ -1,0 +1,87 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-055",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "directory055-current-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-DIR；G-STAGE --item ZS1-055",
+  "scope": "source",
+  "folder_path": "packages/ai/src/api",
+  "children": [
+    "ZS1-016",
+    "ZS1-017",
+    "ZS1-029"
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/packages/ai/src/api/current_folder_learn.md",
+      "bytes": 33597,
+      "sha256": "52ce9f3333c6c4ab728048e729f6bc896b014d092d8ce832ac151f6174810134"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/review.md",
+      "bytes": 6377,
+      "sha256": "ad1dc225cf6e670ffd6bb2888736348f8e2833fa861b9ad85323c0e1bb95b442"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/worker-report.md",
+      "bytes": 27218,
+      "sha256": "7d7d02a264f22b3364bae34ac726c19b09d4e6ad186c9ada13bfb82ac8e29cfe"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/worker-manifest.json",
+      "bytes": 285385,
+      "sha256": "466c784bf50cdb078b727085f66eae5fd8bdc15e955cf2437c00c89045a41492"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/worker-ready.tar.gz",
+      "bytes": 8086286,
+      "sha256": "4b9c580e475897c025079871dc45e382728fedbbee7b7c74be6ab70e2d476abb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/offline.stdout.json",
+      "bytes": 7224,
+      "sha256": "5f7f2eefc7eb0dd3b332caa790d673ff5fa05b8a1db2aa26ffdab32b6bce9da1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/offline.run.json",
+      "bytes": 526,
+      "sha256": "12e85096f5675498b5988f91ae205ecae1d2ff752c1964220751038e7fc579d6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/current-inputs.json",
+      "bytes": 19731,
+      "sha256": "b59fd56497e549e43f6eb3dee30a4978c59aa2292ec5bbeeaf2731ee0f5afb50"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/headless-delta.patch",
+      "bytes": 2439,
+      "sha256": "fdb9a11f1d8cc643a4b55e53d8141888f7654ba29b11c9ca20bfd7b2ef43b857"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/accept.py",
+      "bytes": 8775,
+      "sha256": "61e0ff4a857939bdec7c2d62b62c56cbc19888e1102169ae25741118273cb7e5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/current-child-receipts/ZS1-016.master.json",
+      "bytes": 28866,
+      "sha256": "3174455631e29d83e0aba7ab387d1a842c2c60e9e3de62af4b26098d58958155"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/current-child-receipts/ZS1-017.master.json",
+      "bytes": 3155,
+      "sha256": "064cb16fbaac94fc0885d5b5b60cf5350182669681c7a4325b5092312b0b3e74"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-055/master-review-3.1.21/current-child-receipts/ZS1-029.master.json",
+      "bytes": 2976,
+      "sha256": "70519e6239e576f6ab467d47f1cc6c91e0a2f8c2d5f45c2d7db0e6afc418d069"
+    }
+  ],
+  "role": "worker",
+  "reviewer": "worker B with historical C evidence and current controller dependency qualification"
+}

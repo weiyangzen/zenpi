@@ -1,0 +1,47 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-070",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-070",
+  "source_path": "src/core.rs",
+  "source_hash": "0d4d0d1aef706528fe1a91ec9846ab4ea365c61e08c67d23a6a794a26c49916e",
+  "read_ranges": [
+    [
+      0,
+      262144
+    ],
+    [
+      262144,
+      279620
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/core.rs_learn.md",
+      "bytes": 5058,
+      "sha256": "decc37da9651b5c694b4996ea3d5d9756a547eaac47eabc4afac70eada3973c5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-070/master-review-current/review.md",
+      "bytes": 729,
+      "sha256": "1b75d3bdb7276b8a61ab727dac230c17b6b860edaccf149410e71bc40cf00c67"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-070/master-review-current/review.md",
+      "bytes": 729,
+      "sha256": "1b75d3bdb7276b8a61ab727dac230c17b6b860edaccf149410e71bc40cf00c67"
+    },
+    "findings": "完整读取当前 src/core.rs；报告覆盖 admission、turn lifecycle、owner/recovery、tools/approval、resources/extensions 与 CLI boundary，并明确跨文件验证边界。"
+  }
+}

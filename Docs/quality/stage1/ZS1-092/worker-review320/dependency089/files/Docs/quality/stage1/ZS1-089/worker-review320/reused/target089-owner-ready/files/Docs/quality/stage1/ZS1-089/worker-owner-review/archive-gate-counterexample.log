@@ -1,0 +1,14 @@
+{"case": "clean", "gate_exit_code": 0, "gate_stdout": "probe.tar.gz: OK\n", "gate_stderr": "", "independent_tar_exit_code": 0, "independent_tar_stdout": "zenpi/README.md\n", "archive_sha256": "836704c6002f715c4d68ffab402b7903a1e25ded28f669fd2778261a2ea3b5b4"}
+{"case": "forbidden-name", "gate_exit_code": 1, "gate_stdout": "probe.tar.gz: OK\n", "gate_stderr": "", "independent_tar_exit_code": 0, "independent_tar_stdout": "zenpi/.env\n", "archive_sha256": "a85ff14c238264a7d08e080d3dbfa07ed9a1cafbff597cafade09ff8bf43fe53"}
+{"case": "checksum-consistent-invalid-archive", "gate_exit_code": 0, "gate_stdout": "probe.tar.gz: OK\n", "gate_stderr": "tar: Error opening archive: Unrecognized archive format\n", "independent_tar_exit_code": 1, "independent_tar_stdout": "", "archive_sha256": "ec9bd04b698bd732a96d65ce9bd4cd4b06fe0b817bd5cf84227d53a086cb95fc"}
+{
+  "status": "counterexample-confirmed",
+  "actual_shell_lines": "(cd dist && shasum -a 256 -c *.sha256)\n! tar -tzf dist/*.tar.gz | grep -Eiq '(auth\\.json|\\.codex|\\.zenpi|fixture|\\.env)'\n",
+  "cases": 3,
+  "defect": "checksum-valid malformed archive passes final gate because tar failure is masked by negating grep no-match",
+  "execution": "Local macOS bash/tar/grep/shasum actual subprocesses; no GitHub/Linux runner claimed; release.sh/build not executed",
+  "tools": {
+    "bash": "GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)",
+    "tar": "bsdtar 3.5.3 - libarchive 3.7.4 zlib/1.2.12 liblzma/5.4.3 bz2lib/1.0.8"
+  }
+}

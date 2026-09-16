@@ -1,0 +1,204 @@
+diff --git a/Docs/quality/stage1/provider-kill319/chat/tool-first/after-kill.parsed-journal.json b/Docs/quality/stage1/provider-kill319/chat/tool-first/after-kill.parsed-journal.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/chat/tool-first/after-kill.parsed-journal.json
+@@ -0,0 +1,199 @@
++[
++  {
++    "created_at_ms": 1789189735460,
++    "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/chat/tool-first",
++    "kind": "session",
++    "schema_version": 1,
++    "seq": 0,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735460,
++    "version": 1
++  },
++  {
++    "event": {
++      "generation": 1,
++      "tools": [],
++      "type": "extensions_selected"
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 1,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735469
++  },
++  {
++    "kind": "turn",
++    "schema_version": 1,
++    "seq": 2,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735494,
++    "turn": {
++      "content": "read input then answer",
++      "created_at_ms": 1789189735494,
++      "id": "turn-1789189735494-1",
++      "parent_id": null,
++      "role": "user"
++    }
++  },
++  {
++    "event": {
++      "idempotency_key": "provider-ae62edc5a64f9a1b212cc0104dce1bda727124615c4a5e804bc52a7a2557aba1",
++      "operation_id": "provider-turn-1789189735494-1",
++      "operation_kind": "provider",
++      "retry_requires_confirmation": false,
++      "turn_id": "turn-1789189735494-1",
++      "type": "operation_started"
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 3,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735504
++  },
++  {
++    "kind": "turn",
++    "schema_version": 1,
++    "seq": 4,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735522,
++    "turn": {
++      "content": "BEFORE_TOOL_319",
++      "created_at_ms": 1789189735522,
++      "id": "assistant-tool-call-1789189735522-3",
++      "metadata": {
++        "annotations": [
++          {
++            "finish_reason": "tool_calls",
++            "type": "chat_finish_reason"
++          }
++        ],
++        "model": "gpt-4.1",
++        "tool_calls": [
++          {
++            "arguments": {
++              "path": "input.txt"
++            },
++            "execution": {
++              "approval_policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++              "origin": "agent_tool",
++              "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++              "prohibition_gate_enforced": false,
++              "worker_binding": null
++            },
++            "id": "durable_read_319",
++            "name": "read_file",
++            "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++            "worker_binding": null
++          }
++        ]
++      },
++      "parent_id": "turn-1789189735494-1",
++      "role": "assistant"
++    }
++  },
++  {
++    "event": {
++      "idempotency_key": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++      "operation_id": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++      "operation_kind": "tool",
++      "retry_requires_confirmation": true,
++      "turn_id": "turn-1789189735494-1",
++      "type": "operation_started"
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 5,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735535
++  },
++  {
++    "event": {
++      "call_id": "durable_read_319",
++      "execution": {
++        "approval_policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++        "origin": "agent_tool",
++        "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++        "prohibition_gate_enforced": false,
++        "worker_binding": null
++      },
++      "operation_id": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++      "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++      "tool": "read_file",
++      "turn_id": "turn-1789189735494-1",
++      "type": "tool_execution_started",
++      "worker_binding": null
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 6,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735542
++  },
++  {
++    "kind": "turn",
++    "schema_version": 1,
++    "seq": 7,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735555,
++    "turn": {
++      "content": "{\"call_id\":\"durable_read_319\",\"output\":{\"content\":\"DURABLE_READ_RESULT_319\",\"path\":\"input.txt\",\"truncated\":false},\"status\":\"success\",\"tool\":\"read_file\"}",
++      "created_at_ms": 1789189735555,
++      "id": "tool-1789189735555-5",
++      "metadata": {
++        "execution": {
++          "approval_policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++          "origin": "agent_tool",
++          "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++          "prohibition_gate_enforced": false,
++          "worker_binding": null
++        },
++        "implementation_complete": false,
++        "operation_id": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++        "outcome": "succeeded",
++        "output_capture": null,
++        "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++        "tool_call_id": "durable_read_319",
++        "tool_name": "read_file",
++        "worker_binding": null
++      },
++      "parent_id": "turn-1789189735494-1",
++      "role": "tool"
++    }
++  },
++  {
++    "event": {
++      "operation_id": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++      "outcome": "succeeded",
++      "policy_digest": "4465cc47df55207f8ac46205b1041a0ea2322c0ee6ad02a830db0e4c5fbcc521",
++      "type": "tool_execution_finished",
++      "worker_binding": null
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 8,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735565
++  },
++  {
++    "event": {
++      "operation_id": "tool-b4c6d4adbd443b815b35405ff8cd7ce1d996b3d56d010ff41e92cedd10917e36",
++      "outcome": "succeeded",
++      "type": "operation_finished"
++    },
++    "kind": "event",
++    "schema_version": 1,
++    "seq": 9,
++    "session_id": "session-1789189735460-56001-0",
++    "timestamp": "2026-09-12T05:08:55Z",
++    "timestamp_ms": 1789189735576
++  }
++]

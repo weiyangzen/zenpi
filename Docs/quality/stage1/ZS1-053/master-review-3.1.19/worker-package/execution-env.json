@@ -1,0 +1,8 @@
+{
+  "DIR_RESULT": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/test-results.json",
+  "DIR_OBSERVATIONS": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/observations.json",
+  "TMPDIR": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-directory053-22qa7_ug",
+  "PI_CODING_AGENT_DIR": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/agent-home",
+  "PI_PACKAGE_DIR": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/source/packages/coding-agent",
+  "PI_OFFLINE": "1"
+}

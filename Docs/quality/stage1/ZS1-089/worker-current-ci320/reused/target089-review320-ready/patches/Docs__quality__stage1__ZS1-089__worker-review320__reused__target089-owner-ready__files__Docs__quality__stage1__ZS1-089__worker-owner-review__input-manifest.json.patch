@@ -1,0 +1,42 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/input-manifest.json b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/input-manifest.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/input-manifest.json
+@@ -0,0 +1,37 @@
++{
++  "item": "ZS1-089",
++  "status": "[_]",
++  "authority_version": "3.1.16",
++  "authority_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f",
++  "current": {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/current-ci.yml",
++    "bytes": 2480,
++    "lines": 77,
++    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
++  },
++  "original_frozen": {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/original-ci.yml",
++    "bytes": 2480,
++    "lines": 77,
++    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
++  },
++  "report": "Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md",
++  "prior_report": "ABSENTlocal/main",
++  "captured_at": "2026-09-10T22:18:23.117538+00:00",
++  "main_source_at_capture": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/ci.yml",
++  "ordered_read_chunks": [
++    {
++      "first_line": 1,
++      "last_line": 77,
++      "byte_start": 0,
++      "byte_end": 2480,
++      "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
++    }
++  ],
++  "steps": 16,
++  "new_behavior_cases": 3,
++  "new_behavior_runs": 1,
++  "execution_boundary": "Actual localmacOS shellcommands;notGitHub/Linux/releasebuild",
++  "temporal_boundary": "116integrated per main;122scratchonly",
++  "workflow_modified": false
++}

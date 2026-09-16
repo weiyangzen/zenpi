@@ -1,0 +1,492 @@
+[
+  {
+    "worker_read": "reads/001.txt",
+    "source": "capture/codex/codex-rs/tui/src/file_search.rs",
+    "old_lines": [
+      1,
+      133
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1,
+      133
+    ]
+  },
+  {
+    "worker_read": "reads/005.txt",
+    "source": "capture/codex/codex-rs/file-search/src/lib.rs",
+    "old_lines": [
+      60,
+      235
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      60,
+      235
+    ]
+  },
+  {
+    "worker_read": "reads/006.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      550,
+      735
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/007.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/file_search_popup.rs",
+    "old_lines": [
+      1,
+      154
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1,
+      154
+    ]
+  },
+  {
+    "worker_read": "reads/008.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      4657,
+      4738
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/009.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      1620,
+      1735
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1620,
+      1735
+    ]
+  },
+  {
+    "worker_read": "reads/010.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      3219,
+      3310
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      3219,
+      3310
+    ]
+  },
+  {
+    "worker_read": "reads/011.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      3509,
+      3553
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      3509,
+      3553
+    ]
+  },
+  {
+    "worker_read": "reads/012.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      1736,
+      1823
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1736,
+      1823
+    ]
+  },
+  {
+    "worker_read": "reads/013.txt",
+    "source": "capture/codex/codex-rs/file-search/src/lib.rs",
+    "old_lines": [
+      1,
+      59
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1,
+      59
+    ]
+  },
+  {
+    "worker_read": "reads/014.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      11735,
+      11795
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      11959,
+      12019
+    ]
+  },
+  {
+    "worker_read": "reads/015.txt",
+    "source": "capture/codex/codex-rs/tui/src/app_event.rs",
+    "old_lines": [
+      116,
+      131
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      116,
+      131
+    ]
+  },
+  {
+    "worker_read": "reads/016.txt",
+    "source": "capture/codex/codex-rs/tui/src/app.rs",
+    "old_lines": [
+      2190,
+      2200
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2190,
+      2200
+    ]
+  },
+  {
+    "worker_read": "reads/017.txt",
+    "source": "capture/codex/codex-rs/tui/src/app.rs",
+    "old_lines": [
+      2498,
+      2525
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2498,
+      2525
+    ]
+  },
+  {
+    "worker_read": "reads/018.txt",
+    "source": "capture/codex/codex-rs/tui/src/app.rs",
+    "old_lines": [
+      2748,
+      2758
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2748,
+      2758
+    ]
+  },
+  {
+    "worker_read": "reads/019.txt",
+    "source": "capture/codex/codex-rs/tui/src/chatwidget.rs",
+    "old_lines": [
+      8635,
+      8644
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      8635,
+      8644
+    ]
+  },
+  {
+    "worker_read": "reads/020.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/mod.rs",
+    "old_lines": [
+      1095,
+      1104
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1095,
+      1104
+    ]
+  },
+  {
+    "worker_read": "reads/021.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      1229,
+      1246
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1229,
+      1246
+    ]
+  },
+  {
+    "worker_read": "reads/022.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      2095,
+      2157
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2095,
+      2157
+    ]
+  },
+  {
+    "worker_read": "reads/023.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      2015,
+      2094
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2015,
+      2094
+    ]
+  },
+  {
+    "worker_read": "reads/024.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      2540,
+      2575
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2657,
+      2692
+    ]
+  },
+  {
+    "worker_read": "reads/025.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      2653,
+      2671
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      2770,
+      2788
+    ]
+  },
+  {
+    "worker_read": "reads/026.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      4874,
+      4894
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/027.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      5020,
+      5046
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/028.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      5135,
+      5164
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/029.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      11450,
+      11503
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      11674,
+      11727
+    ]
+  },
+  {
+    "worker_read": "reads/030.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      11543,
+      11560
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/031.txt",
+    "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "old_lines": [
+      1990,
+      2014
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1990,
+      2014
+    ]
+  },
+  {
+    "worker_read": "reads/032.txt",
+    "source": "capture/zenpi/tests/tui_command_palette.rs",
+    "old_lines": [
+      240,
+      290
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      362,
+      412
+    ]
+  },
+  {
+    "worker_read": "reads/033.txt",
+    "source": "capture/zenpi/tests/tui_command_palette.rs",
+    "old_lines": [
+      413,
+      431
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/034.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      14323,
+      14363
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/035.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      5766,
+      5823
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      5964,
+      6021
+    ]
+  },
+  {
+    "worker_read": "reads/036.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      5236,
+      5267
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      5434,
+      5465
+    ]
+  },
+  {
+    "worker_read": "reads/037.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      10208,
+      10242
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      10432,
+      10466
+    ]
+  },
+  {
+    "worker_read": "reads/038.txt",
+    "source": "capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "old_lines": [
+      1,
+      13
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      1,
+      13
+    ]
+  },
+  {
+    "worker_read": "reads/039.txt",
+    "source": "capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "old_lines": [
+      135,
+      143
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      135,
+      143
+    ]
+  },
+  {
+    "worker_read": "reads/040.txt",
+    "source": "capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "old_lines": [
+      481,
+      487
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      481,
+      487
+    ]
+  },
+  {
+    "worker_read": "reads/041.txt",
+    "source": "capture/zenpi/src/tui.rs",
+    "old_lines": [
+      5744,
+      5765
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/042.txt",
+    "source": "capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+    "old_lines": [
+      409,
+      429
+    ],
+    "unique_exact_current_match": false,
+    "current_lines": null
+  },
+  {
+    "worker_read": "reads/043.txt",
+    "source": "capture/zenpi/src/slash_actions.rs",
+    "old_lines": [
+      559,
+      710
+    ],
+    "unique_exact_current_match": true,
+    "current_lines": [
+      559,
+      710
+    ]
+  }
+]

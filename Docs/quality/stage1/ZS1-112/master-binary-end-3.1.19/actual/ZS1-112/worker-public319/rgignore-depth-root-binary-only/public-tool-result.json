@@ -1,0 +1,20 @@
+{
+  "call_id": "search-call-319",
+  "output": {
+    "context": [],
+    "engine": "ripgrep",
+    "file_limit": 256,
+    "files_visited": 3,
+    "hidden": false,
+    "ignore": true,
+    "matches": [],
+    "max_depth": 64,
+    "max_file_bytes": 1048576,
+    "query": "depth_only_needle",
+    "regex": true,
+    "truncated": false,
+    "truncation_reasons": []
+  },
+  "status": "success",
+  "tool": "search_text"
+}

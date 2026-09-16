@@ -1,0 +1,1 @@
+{"argv": ["/Applications/Xcode.app/Contents/Developer/usr/bin/python3", ".ops/stage1_execution/target080-current-3.1.21/root-offline/audit.py", ".ops/stage1_execution/target080-current-3.1.21/worker"], "auditor_sha256": "877252d3e3ece2a67f7a1e7d5caa0b8512113c98ee7d0fbc0ca0e66eeceaa2cd", "full_static_read": "43ff9d", "at": "2026-09-13T03:15:12.877278+00:00"}

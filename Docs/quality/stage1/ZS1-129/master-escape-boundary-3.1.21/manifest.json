@@ -1,0 +1,61 @@
+{
+  "complete": false,
+  "artifacts": {
+    "inputs-after.json": {
+      "bytes": 31648,
+      "sha256": "16be38c6daace4cef3844825efaf1c97f7ceec67a5f05ba488fea3630376bf5e"
+    },
+    "root-tests.log": {
+      "bytes": 12794,
+      "sha256": "d4722789b7fd7c10e4dcce69409a29a30595f4d52974d2649808b9c4b77e8fe6"
+    },
+    "vendor-libc-stream.log": {
+      "bytes": 2228,
+      "sha256": "2ccd5b5c96239217c4500716837be0640bdaaca0192e16ed5c8d0b243745004e"
+    },
+    "vendor-default.run.json": {
+      "bytes": 735,
+      "sha256": "70cf273a86d8c91f964297f8305f5fc7746bb25a307cfb8ad8a00ce29b535ffc"
+    },
+    "root-tests.run.json": {
+      "bytes": 695,
+      "sha256": "de25853b822e74bdb6a0fd219ad18c8086d85fbeed64ff0f25ec55cb3aff22b0"
+    },
+    "root-clippy.run.json": {
+      "bytes": 530,
+      "sha256": "adc36ceeba86bc982f1a6e8f9b41b10e50da696b5797914b8afc9114ea7cb06d"
+    },
+    "root-fmt.run.json": {
+      "bytes": 427,
+      "sha256": "5aa5bfbde2e018f957cccc9f8bfc8ac344b8b3103d2860b2d40c2d701ca6e72d"
+    },
+    "vendor-libc-stream.run.json": {
+      "bytes": 778,
+      "sha256": "9f554d22de19433abe4f906be1bc769d327fc730efefd9f6c6a2735a57fbd846"
+    },
+    "integrate.py": {
+      "bytes": 3613,
+      "sha256": "fa1d1e1c3b5c6f90a4dc675021e0e61ea2ecbc85fe298cbcee34f78381dde663"
+    },
+    "inputs-before.json": {
+      "bytes": 31648,
+      "sha256": "a0f1d6a15fc8e8851c5b5c3147526beb4d07a3f56382cac556a8d858da9961c7"
+    },
+    "master-verification.json": {
+      "bytes": 33807,
+      "sha256": "5e09d592be61045fd8d83064fa049cd8f8fdc00eda62bfeaa4a82710f878b552"
+    },
+    "vendor-default.log": {
+      "bytes": 4537,
+      "sha256": "7119ff61aaead0fa37b8ac69ddf10cdb431644adff9d72d96639c6b7687eb6a2"
+    },
+    "review.md": {
+      "bytes": 3223,
+      "sha256": "fbe02ffe9e665ba8fa6d65e3b398f961761f7ee0173b1e5f74a288e16ff2b08b"
+    },
+    "integration-evidence.tar.gz": {
+      "bytes": 3569852,
+      "sha256": "9875b4decc5e45344ca74f71e966ef810e46d600118df1581c4300d2673c4c17"
+    }
+  }
+}

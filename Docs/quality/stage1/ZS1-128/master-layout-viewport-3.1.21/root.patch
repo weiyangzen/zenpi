@@ -1,0 +1,117 @@
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -3635,7 +3635,9 @@
+             // before the first draw.  It is never used after a real frame.
+             (160, 40)
+         } else {
+-            (self.last_area.width, self.last_area.height)
++            // Navigation must use the same measured content area as the
++            // renderer, after the tabs, header, prompt and footer are laid out.
++            (self.workspace_area.width, self.workspace_area.height)
+         }
+     }
+ 
+--- a/src/layout.rs
++++ b/src/layout.rs
+@@ -965,7 +965,7 @@
+     /// At a narrow width the geometry intentionally exposes only one pane, but
+     /// all available, non-collapsed panes remain candidates so a user can use
+     /// the keyboard to move through the single-pane stack.  At wider widths,
+-    /// breakpoint-collapsed and unavailable panes are omitted.
++    /// breakpoint-collapsed, unavailable and zero-area panes are omitted.
+     pub fn focusable_panes(&self, width: u16, height: u16) -> Vec<PaneId> {
+         let viewport = Viewport::new(width, height);
+         let snapshot = self.compute_viewport(viewport);
+@@ -982,7 +982,9 @@
+                 } else {
+                     snapshot
+                         .pane(spec.id)
+-                        .filter(|pane| pane.visibility == Visibility::Visible)
++                        .filter(|pane| {
++                            pane.visibility == Visibility::Visible && !pane.rect.is_empty()
++                        })
+                         .map(|_| spec.id)
+                 }
+             })
+--- a/tests/tui_bentobox.rs
++++ b/tests/tui_bentobox.rs
+@@ -506,3 +506,79 @@
+     state.set_workspace_tab(TabId::Project);
+     assert_eq!(state.workspace_layout().ratios, project.ratios);
+ }
++
++#[test]
++fn short_workspace_tab_cycle_skips_panes_that_have_no_screen_rows() {
++    let mut terminal = Terminal::new(TestBackend::new(180, 7)).unwrap();
++    let mut state = TuiState::default();
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "zenpi"))
++        .unwrap();
++    let output = rendered(&terminal);
++    assert!(output.contains("Gantt"));
++    assert!(!output.contains("Resources"));
++    assert_eq!(
++        state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)),
++        TuiAction::Redraw
++    );
++    assert_eq!(
++        state.focused_workspace_pane(),
++        Some(PaneId::ProjectConversation)
++    );
++    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
++    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
++    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
++    assert_eq!(
++        state.focused_workspace_pane(),
++        Some(PaneId::ProjectConversation)
++    );
++    state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
++    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
++    assert!(state.input().is_empty());
++}
++
++#[test]
++fn short_workspace_direction_follows_the_panes_actually_drawn() {
++    let mut terminal = Terminal::new(TestBackend::new(180, 7)).unwrap();
++    let mut state = TuiState::default();
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "zenpi"))
++        .unwrap();
++    assert!(rendered(&terminal).contains("Gantt"));
++    assert!(state.focus_workspace_pane(PaneId::Gantt));
++    assert_eq!(
++        state.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL)),
++        TuiAction::Redraw
++    );
++    assert_eq!(
++        state.focused_workspace_pane(),
++        Some(PaneId::ProjectConversation)
++    );
++    state.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL));
++    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
++}
++
++#[test]
++fn short_workspace_narrow_cycle_reveals_each_selected_pane() {
++    let mut terminal = Terminal::new(TestBackend::new(60, 7)).unwrap();
++    let mut state = TuiState::default();
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "zenpi"))
++        .unwrap();
++    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
++    state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "zenpi"))
++        .unwrap();
++    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
++    assert!(rendered(&terminal).contains("Resources"));
++    state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "zenpi"))
++        .unwrap();
++    assert_eq!(
++        state.focused_workspace_pane(),
++        Some(PaneId::ProjectConversation)
++    );
++    assert!(rendered(&terminal).contains("Conversation"));
++}

@@ -1,0 +1,32 @@
+{
+  "item": "ZS1-092",
+  "authority": "3.1.20",
+  "requirement_digest": "8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645",
+  "scope": "target",
+  "folder_path": ".github/workflows",
+  "owned_report": "Docs/learn/stage1_pi_mono/targets/zenpi/.github/workflows/current_folder_learn.md",
+  "captured_at": "2026-09-12T11:37:59.185516+00:00",
+  "candidate_kind": "provisional-directory-integration",
+  "acceptance_eligible": false,
+  "children": [
+    "ZS1-089"
+  ],
+  "unaccepted_children": [
+    "ZS1-089"
+  ],
+  "child_blueprint_state": "[ ]",
+  "directory_blueprint_state": "[ ]",
+  "source_baseline": {
+    "bytes": 2480,
+    "path": ".github/workflows/ci.yml",
+    "scope": "target",
+    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
+  },
+  "formal_direct_files": [
+    {
+      "item": "ZS1-089",
+      "path": ".github/workflows/ci.yml"
+    }
+  ],
+  "formal_direct_subdirectories": []
+}

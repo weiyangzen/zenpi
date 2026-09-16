@@ -1,0 +1,18 @@
+        guard: &mut TerminalGuard,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        owner: Option<&Arc<Mutex<crate::core::Agent>>>,
+    ) -> Result<bool, TuiError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (state, guard, terminal, owner);
+        }
+        #[cfg(unix)]
+        {
+            let Some(result) = self.current.as_mut().and_then(|edit| edit.session.poll()) else {
+                return Ok(false);
+            };
+            let edit = self.current.take().unwrap();
+            guard.resume_editor(event::reset_event_reader, terminal)?;
+            if edit.session.fatal_failure() {
+                let message = result
+                    .err()

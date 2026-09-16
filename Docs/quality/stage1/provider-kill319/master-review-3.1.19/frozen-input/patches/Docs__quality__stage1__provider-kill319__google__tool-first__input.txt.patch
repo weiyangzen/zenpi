@@ -1,0 +1,7 @@
+diff --git a/Docs/quality/stage1/provider-kill319/google/tool-first/input.txt b/Docs/quality/stage1/provider-kill319/google/tool-first/input.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/google/tool-first/input.txt
+@@ -0,0 +1 @@
++DURABLE_READ_RESULT_319
+\ No newline at end of file

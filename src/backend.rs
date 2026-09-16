@@ -20,6 +20,9 @@ use crate::core::{Turn, TurnRole};
 use crate::security::{SecretError, SecretHandle};
 use crate::tools::{ToolCall, ToolDefinition};
 
+mod chat_stream;
+mod transport;
+
 /// Keep provider responses bounded even when an endpoint omits a content
 /// length.  The core applies the smaller per-turn text limit afterwards.
 pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
@@ -29,7 +32,6 @@ pub const MAX_TOTAL_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024;
 /// Maximum time a blocking Responses body read may hide a cancellation
 /// request. `ureq` has no external abort handle, so the synchronous adapter
 /// uses short receive-body slices and resumes after ordinary slice expiry.
-const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -118,7 +120,7 @@ pub struct RequestAttachment {
     pub sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProviderCapabilities {
     pub text: bool,
     pub images: bool,
@@ -132,6 +134,8 @@ pub struct ProviderCapabilities {
 impl ProviderCapabilities {
     pub const fn for_wire_api(wire_api: OpenAiWireApi) -> Self {
         match wire_api {
+            OpenAiWireApi::AnthropicMessages => crate::providers::anthropic::CAPABILITIES,
+            OpenAiWireApi::GoogleGenerativeAi => crate::providers::google::CAPABILITIES,
             OpenAiWireApi::Responses => Self {
                 text: true,
                 images: true,
@@ -147,7 +151,7 @@ impl ProviderCapabilities {
                 files: false,
                 tools: true,
                 structured_output: true,
-                streaming: false,
+                streaming: true,
                 reasoning: false,
             },
         }
@@ -172,6 +176,8 @@ pub struct CompletionRequest<'a> {
     pub instructions: Option<&'a str>,
     pub metadata: Option<&'a Value>,
     pub attachments: &'a [RequestAttachment],
+    pub response_format: Option<&'a Value>,
+    pub max_output_tokens: Option<u64>,
 }
 
 impl<'a> CompletionRequest<'a> {
@@ -189,11 +195,23 @@ impl<'a> CompletionRequest<'a> {
             instructions: None,
             metadata: None,
             attachments: &[],
+            response_format: None,
+            max_output_tokens: None,
         }
     }
 
     pub fn with_instructions(mut self, instructions: Option<&'a str>) -> Self {
         self.instructions = instructions;
+        self
+    }
+
+    pub fn with_max_output_tokens(mut self, tokens: u64) -> Self {
+        self.max_output_tokens = Some(tokens);
+        self
+    }
+
+    pub fn with_response_format(mut self, format: Option<&'a Value>) -> Self {
+        self.response_format = format;
         self
     }
 
@@ -216,6 +234,9 @@ pub enum ProviderEvent {
         model: Option<String>,
     },
     TextDelta {
+        delta: String,
+    },
+    ReasoningDelta {
         delta: String,
     },
     TextDone {
@@ -252,6 +273,7 @@ impl ProviderEvent {
         match self {
             Self::ResponseCreated { .. } => "response_created",
             Self::TextDelta { .. } => "text_delta",
+            Self::ReasoningDelta { .. } => "reasoning_delta",
             Self::TextDone { .. } => "text_done",
             Self::Refusal { .. } => "refusal",
             Self::ToolCallDelta { .. } => "tool_call_delta",
@@ -401,6 +423,63 @@ pub trait Backend: Send + Sync {
     fn model(&self) -> Option<&str> {
         None
     }
+
+    /// None explicitly means this low-level backend is not registry-bound.
+    fn model_descriptor(
+        &self,
+        _model: Option<&str>,
+    ) -> Result<Option<crate::providers::registry::ModelDescriptor>, BackendError> {
+        Ok(None)
+    }
+
+    fn model_catalog(&self) -> Vec<crate::providers::registry::ModelDescriptor> {
+        Vec::new()
+    }
+
+    fn model_capabilities(
+        &self,
+        _model: Option<&str>,
+    ) -> Result<Option<ProviderCapabilities>, BackendError> {
+        Ok(None)
+    }
+
+    fn reasoning_effort(&self) -> Option<&str> {
+        None
+    }
+
+    /// Validate without changing state. Hosts validate, persist the selection,
+    /// then call the infallible commit hook below; failed journal writes leave
+    /// the effective provider settings untouched.
+    fn validate_reasoning_effort(
+        &self,
+        _model: Option<&str>,
+        _effort: Option<&str>,
+    ) -> Result<(), BackendError> {
+        Err(BackendError::Configuration(
+            "runtime reasoning settings require a registry-bound provider".into(),
+        ))
+    }
+
+    /// Commit only a value accepted by validate_reasoning_effort. This must
+    /// perform no I/O and cannot fail after the owner's durable event append.
+    fn commit_reasoning_effort(&mut self, _effort: Option<String>) {}
+
+    /// Reject unrepresentable opaque history before a durable model selection.
+    fn validate_history_model(
+        &self,
+        _turns: &[Turn],
+        model: Option<&str>,
+    ) -> Result<(), BackendError> {
+        self.validate_model(model)
+    }
+
+    fn validate_model(&self, model: Option<&str>) -> Result<(), BackendError> {
+        if let Some(model) = model {
+            crate::providers::registry::validate_identity("backend", model)
+                .map_err(|error| BackendError::Configuration(error.to_string()))?;
+        }
+        Ok(())
+    }
 }
 
 /// Deterministic backend used by default.  It returns the latest user text
@@ -436,6 +515,8 @@ pub enum OpenAiWireApi {
     #[default]
     ChatCompletions,
     Responses,
+    AnthropicMessages,
+    GoogleGenerativeAi,
 }
 
 impl OpenAiWireApi {
@@ -443,6 +524,8 @@ impl OpenAiWireApi {
         match self {
             Self::ChatCompletions => "chat_completions",
             Self::Responses => "responses",
+            Self::AnthropicMessages => "anthropic_messages",
+            Self::GoogleGenerativeAi => "google_generative_ai",
         }
     }
 }
@@ -456,8 +539,10 @@ impl FromStr for OpenAiWireApi {
                 Ok(Self::ChatCompletions)
             }
             "responses" | "response" => Ok(Self::Responses),
+            "anthropic_messages" | "anthropic-messages" => Ok(Self::AnthropicMessages),
+            "google_generative_ai" | "google-generative-ai" => Ok(Self::GoogleGenerativeAi),
             other => Err(BackendError::Configuration(format!(
-                "unsupported OpenAI wire API {other:?}; use chat_completions or responses"
+                "unsupported provider wire API {other:?}; use chat_completions, responses, anthropic_messages or google_generative_ai"
             ))),
         }
     }
@@ -465,8 +550,8 @@ impl FromStr for OpenAiWireApi {
 
 /// A synchronous OpenAI-compatible HTTP backend.
 ///
-/// Chat Completions uses a bounded JSON response; Responses uses the
-/// provider's server-sent event stream and folds text deltas into the same
+/// Both wire APIs consume bounded server-sent event streams. Chat also accepts
+/// a JSON response from compatible gateways that ignore streaming. Deltas fold into the same
 /// normalized completion. `ureq` is blocking and connection pooling keeps
 /// the steady-state process smaller than an async runtime.
 pub struct OpenAiCompatibleBackend {
@@ -484,6 +569,7 @@ pub struct OpenAiCompatibleBackend {
     circuit_failure_threshold: u32,
     circuit_cooldown: Duration,
     circuit: Mutex<CircuitState>,
+    registry: Option<(String, crate::providers::registry::ModelRegistry)>,
 }
 
 impl std::fmt::Debug for OpenAiCompatibleBackend {
@@ -501,6 +587,7 @@ impl std::fmt::Debug for OpenAiCompatibleBackend {
             .field("max_retries", &self.max_retries)
             .field("circuit_failure_threshold", &self.circuit_failure_threshold)
             .field("circuit_cooldown", &self.circuit_cooldown)
+            .field("registry_bound", &self.registry.is_some())
             .field("capabilities", &self.capabilities())
             .finish()
     }
@@ -609,6 +696,7 @@ impl OpenAiCompatibleBackend {
             circuit_failure_threshold: 3,
             circuit_cooldown: Duration::from_secs(2),
             circuit: Mutex::new(CircuitState::default()),
+            registry: None,
         })
     }
 
@@ -743,8 +831,24 @@ impl OpenAiCompatibleBackend {
         self.wire_api
     }
 
-    pub const fn capabilities(&self) -> ProviderCapabilities {
-        ProviderCapabilities::for_wire_api(self.wire_api)
+    /// Legacy constructors are wire-only. Production factories must call
+    /// `with_model_registry`; their effective capabilities are model × wire.
+    pub fn capabilities(&self) -> ProviderCapabilities {
+        self.model_capabilities(None)
+            .expect("registry binding validates the immutable model identity")
+            .unwrap_or_else(|| ProviderCapabilities::for_wire_api(self.wire_api))
+    }
+
+    pub fn with_model_registry(
+        mut self,
+        provider: String,
+        registry: crate::providers::registry::ModelRegistry,
+    ) -> Result<Self, BackendError> {
+        crate::providers::registry::validate_identity(&provider, &self.model)
+            .map_err(|error| BackendError::Configuration(error.to_string()))?;
+        self.registry = Some((provider, registry));
+        self.validate_model(None)?;
+        Ok(self)
     }
 
     pub fn with_max_retries(mut self, max_retries: u32) -> Result<Self, BackendError> {
@@ -803,11 +907,31 @@ fn normalize_endpoint(
     while endpoint.ends_with('/') {
         endpoint.pop();
     }
+    if wire_api == OpenAiWireApi::GoogleGenerativeAi {
+        if endpoint.contains("/models/") {
+            return Err(BackendError::Configuration(
+                "Gemini base URL must precede /models, without a model operation".into(),
+            ));
+        }
+        if endpoint
+            .strip_prefix("http://")
+            .or_else(|| endpoint.strip_prefix("https://"))
+            .is_some_and(|rest| !rest.contains('/'))
+        {
+            endpoint.push_str("/v1beta");
+        }
+        return Ok(endpoint);
+    }
     let canonical_openai_host = is_openai_endpoint(&endpoint);
     let suffix = match wire_api {
         OpenAiWireApi::ChatCompletions => "/chat/completions",
         OpenAiWireApi::Responses => "/responses",
+        OpenAiWireApi::AnthropicMessages => "/messages",
+        OpenAiWireApi::GoogleGenerativeAi => unreachable!("handled above"),
     };
+    if wire_api == OpenAiWireApi::AnthropicMessages && endpoint.ends_with("/messages") {
+        return Ok(endpoint);
+    }
     if endpoint.ends_with("/chat/completions") {
         endpoint.truncate(endpoint.len() - "/chat/completions".len());
     } else if endpoint.ends_with("/responses") {
@@ -826,7 +950,9 @@ fn normalize_endpoint(
         // OpenAI's canonical Responses endpoint lives under `/v1`, while
         // preserving the historical Chat Completions behavior for generic
         // OpenAI-compatible hosts that supplied an origin-only URL.
-        if matches!(wire_api, OpenAiWireApi::Responses) && canonical_openai_host {
+        if (matches!(wire_api, OpenAiWireApi::Responses) && canonical_openai_host)
+            || wire_api == OpenAiWireApi::AnthropicMessages
+        {
             endpoint.push_str("/v1");
         }
         endpoint.push_str(suffix);
@@ -859,7 +985,76 @@ impl OpenAiCompatibleBackend {
                 "model must be non-empty and at most 256 bytes".into(),
             ));
         }
-        let body = match self.wire_api {
+        self.validate_model(Some(model))?;
+        let descriptor = self.model_descriptor(Some(model))?;
+        let capabilities = self
+            .model_capabilities(Some(model))?
+            .unwrap_or_else(|| ProviderCapabilities::for_wire_api(self.wire_api));
+        if !capabilities.text {
+            return Err(BackendError::Configuration(
+                "selected model does not support text".into(),
+            ));
+        }
+        if !capabilities.tools
+            && (!request.tools.is_empty()
+                || request.turns.iter().any(|turn| {
+                    turn.role == TurnRole::Tool
+                        || turn
+                            .metadata
+                            .as_ref()
+                            .is_some_and(|metadata| metadata.get("tool_calls").is_some())
+                }))
+        {
+            return Err(BackendError::Configuration(
+                "selected model does not support tools".into(),
+            ));
+        }
+        for attachment in request.attachments {
+            if (attachment.input.kind == AttachmentKind::Image && !capabilities.images)
+                || (attachment.input.kind == AttachmentKind::File && !capabilities.files)
+            {
+                return Err(BackendError::Configuration(
+                    "selected model or wire does not support attachment kind".into(),
+                ));
+            }
+        }
+        if let Some(format) = request.response_format {
+            if !capabilities.structured_output {
+                return Err(BackendError::Configuration(
+                    "selected model does not support structured output".into(),
+                ));
+            }
+            validate_response_format(format)?;
+        }
+        crate::providers::anthropic::validate_history_wire(request.turns, self.wire_api.as_str())?;
+        if matches!(
+            self.wire_api,
+            OpenAiWireApi::AnthropicMessages | OpenAiWireApi::GoogleGenerativeAi
+        ) && self.verbosity.is_some()
+        {
+            return Err(BackendError::Configuration(
+                "Native provider verbosity is unsupported".into(),
+            ));
+        }
+        let mut body = match self.wire_api {
+            OpenAiWireApi::GoogleGenerativeAi => crate::providers::google::request_body(
+                &request,
+                model,
+                self.reasoning_effort.as_deref(),
+                self.registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("google"),
+            )?,
+            OpenAiWireApi::AnthropicMessages => crate::providers::anthropic::request_body(
+                &request,
+                model,
+                self.reasoning_effort.as_deref(),
+                self.registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("anthropic"),
+            )?,
             OpenAiWireApi::ChatCompletions => {
                 if request
                     .attachments
@@ -870,14 +1065,24 @@ impl OpenAiCompatibleBackend {
                         "Chat Completions adapter does not support file attachments".into(),
                     ));
                 }
-                let mut messages: Vec<Value> = request.turns.iter().map(chat_message).collect();
+                let provider = self
+                    .registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("openai");
+                let mut messages: Vec<Value> = request
+                    .turns
+                    .iter()
+                    .map(|turn| chat_message(turn, provider, model))
+                    .collect::<Result<_, _>>()?;
                 let attachments = attachments_for_context(request.turns, request.attachments);
                 apply_chat_attachments(&mut messages, &attachments)?;
                 strip_internal_turn_ids(&mut messages);
                 let mut body = json!({
                     "model": model,
                     "messages": messages,
-                    "stream": false,
+                    "stream": true,
+                    "stream_options": { "include_usage": true },
                 });
                 if !request.tools.is_empty() {
                     body["tools"] = Value::Array(
@@ -954,39 +1159,125 @@ impl OpenAiCompatibleBackend {
                 body
             }
         };
-        let mut request_builder = self
-            .client
-            .post(&self.endpoint)
+        if self.wire_api != OpenAiWireApi::GoogleGenerativeAi {
+            body["stream"] = json!(capabilities.streaming);
+        }
+        if !capabilities.streaming {
+            body.as_object_mut()
+                .expect("request object")
+                .remove("stream_options");
+        }
+        if descriptor.is_some() || request.max_output_tokens.is_some() {
+            let limit = request
+                .max_output_tokens
+                .unwrap_or(crate::context::DEFAULT_RESERVED_OUTPUT_TOKENS)
+                .min(
+                    descriptor
+                        .as_ref()
+                        .map_or(u64::MAX, |model| model.max_output_tokens),
+                );
+            if limit == 0 {
+                return Err(BackendError::Configuration(
+                    "output token limit must be positive".into(),
+                ));
+            }
+            if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+                body["generationConfig"]["maxOutputTokens"] = json!(limit);
+            } else {
+                body[if self.wire_api == OpenAiWireApi::Responses {
+                    "max_output_tokens"
+                } else if self.wire_api == OpenAiWireApi::AnthropicMessages {
+                    "max_tokens"
+                } else {
+                    "max_completion_tokens"
+                }] = json!(limit);
+            }
+        }
+        if let Some(format) = request.response_format {
+            if self.wire_api == OpenAiWireApi::Responses {
+                let format = if format["type"] == "json_schema" {
+                    let mut schema = format["json_schema"].clone();
+                    schema["type"] = json!("json_schema");
+                    schema
+                } else {
+                    format.clone()
+                };
+                if body.get("text").is_none() {
+                    body["text"] = json!({});
+                }
+                body["text"]["format"] = format;
+            } else {
+                body["response_format"] = format.clone();
+            }
+        }
+        let endpoint = if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+            crate::providers::google::endpoint(&self.endpoint, model, capabilities.streaming)?
+        } else {
+            self.endpoint.clone()
+        };
+        let (request_client, cancellation) = transport::client(self.client.config().clone());
+        let mut request_builder = request_client
+            .post(&endpoint)
             .header("content-type", "application/json")
             .header(
                 "x-idempotency-key",
-                idempotency_key(&self.endpoint, request.turn_id, &body)?,
+                idempotency_key(&endpoint, request.turn_id, &body)?,
             );
+        if self.wire_api == OpenAiWireApi::AnthropicMessages {
+            request_builder = request_builder.header("anthropic-version", "2023-06-01");
+        }
         if let Some(secret) = &self.secret_handle {
             let digest = self.secret_policy_digest.as_deref().ok_or_else(|| {
                 BackendError::Configuration("secret policy binding missing".into())
             })?;
             let header = secret
-                .with_secret(digest, |key| format!("Bearer {key}"))
+                .with_secret(digest, |key| {
+                    if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+                        key.to_owned()
+                    } else {
+                        format!("Bearer {key}")
+                    }
+                })
                 .map_err(secret_error)?;
-            request_builder = request_builder.header("authorization", header);
+            request_builder = request_builder.header(
+                if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+                    "x-goog-api-key"
+                } else {
+                    "authorization"
+                },
+                header,
+            );
         } else if let Some(key) = &self.api_key {
-            request_builder = request_builder.header("authorization", format!("Bearer {key}"));
+            request_builder = if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+                request_builder.header("x-goog-api-key", key)
+            } else {
+                request_builder.header("authorization", format!("Bearer {key}"))
+            };
         }
-        // Only the streaming Responses adapter can safely treat a short body
-        // timeout as a cancellation poll. Chat JSON remains one bounded read
-        // under the caller's ordinary total timeout.
-        if self.wire_api == OpenAiWireApi::Responses {
+        // Both adapters use short receive slices so host cancellation can be
+        // observed while a provider is sending a slow body. The Chat JSON
+        // reader below resumes the same response after a slice timeout; it
+        // never opens a second request.
+        if self.wire_api == OpenAiWireApi::Responses
+            || self.wire_api == OpenAiWireApi::ChatCompletions
+            || self.wire_api == OpenAiWireApi::AnthropicMessages
+            || self.wire_api == OpenAiWireApi::GoogleGenerativeAi
+        {
             request_builder = request_builder
                 // A decompressor may not be resumable after an underlying
                 // timeout. SSE is already text and benefits little from
                 // compression, so keep cancellation polling on raw bytes.
                 .header("accept-encoding", "identity")
                 .config()
-                .timeout_recv_body(Some(CANCEL_POLL_INTERVAL.min(self.request_timeout)))
+                // Keep a generous receive slice: very short socket deadlines
+                // can make ureq tear down an otherwise healthy SSE stream at
+                // the same moment a provider flushes its next frame. The
+                // cancellation predicate is still checked between reads;
+                // transport robustness takes precedence over a 100ms poll.
+                .timeout_recv_body(Some(Duration::from_secs(2).min(self.request_timeout)))
                 .build();
         }
-        let mut response = request_builder.send_json(&body).map_err(map_ureq_error)?;
+        let mut response = transport::send_json(request_builder, &body, cancelled, cancellation)?;
         let status = response.status().as_u16();
         if status >= 400 {
             return Err(BackendError::HttpStatus {
@@ -1002,17 +1293,90 @@ impl OpenAiCompatibleBackend {
             return Err(BackendError::Cancelled);
         }
         match self.wire_api {
+            OpenAiWireApi::GoogleGenerativeAi => {
+                let provider = self
+                    .registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("google");
+                let sse = response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|v| {
+                        v.split(';')
+                            .next()
+                            .is_some_and(|m| m.trim().eq_ignore_ascii_case("text/event-stream"))
+                    });
+                crate::providers::google::read_response(
+                    response.body_mut(),
+                    sse,
+                    provider,
+                    model,
+                    capabilities,
+                    cancelled,
+                    sink,
+                )
+            }
+            OpenAiWireApi::AnthropicMessages => {
+                let provider = self
+                    .registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("anthropic");
+                let sse = response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|v| {
+                        v.split(';')
+                            .next()
+                            .is_some_and(|m| m.trim().eq_ignore_ascii_case("text/event-stream"))
+                    });
+                crate::providers::anthropic::read_response(
+                    response.body_mut(),
+                    sse,
+                    provider,
+                    model,
+                    capabilities,
+                    cancelled,
+                    sink,
+                )
+            }
             OpenAiWireApi::ChatCompletions => {
-                let payload: Value = response
-                    .body_mut()
-                    .with_config()
-                    .limit(MAX_RESPONSE_BYTES as u64)
-                    .read_json()
-                    .map_err(map_ureq_error)?;
-                let tool_calls = extract_chat_tool_calls(&payload)?;
+                if response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|value| value.to_str().ok())
+                    .is_some_and(|value| {
+                        value.split(';').next().is_some_and(|mime| {
+                            mime.trim().eq_ignore_ascii_case("text/event-stream")
+                        })
+                    })
+                {
+                    let provider = self
+                        .registry
+                        .as_ref()
+                        .map(|(p, _)| p.as_str())
+                        .unwrap_or("openai");
+                    return chat_stream::read(
+                        response.body_mut(),
+                        provider,
+                        model,
+                        cancelled,
+                        sink,
+                    );
+                }
+                let payload = read_bounded_json_body(response.body_mut(), cancelled)?;
+                let tool_calls = chat_stream::validate_json(&payload)?;
                 let content = match extract_content(&payload) {
                     Ok(content) => content,
-                    Err(BackendError::InvalidResponse(_)) if !tool_calls.is_empty() => {
+                    Err(BackendError::InvalidResponse(_))
+                        if !tool_calls.is_empty()
+                            && payload["choices"][0]["message"]
+                                .get("content")
+                                .is_none_or(Value::is_null) =>
+                    {
                         String::new()
                     }
                     Err(error) => return Err(error),
@@ -1020,7 +1384,7 @@ impl OpenAiCompatibleBackend {
                 if content.trim().is_empty() && tool_calls.is_empty() {
                     return Err(BackendError::EmptyResponse);
                 }
-                let completion = Completion {
+                let mut completion = Completion {
                     content,
                     usage: payload.get("usage").and_then(parse_usage),
                     model: payload
@@ -1032,15 +1396,194 @@ impl OpenAiCompatibleBackend {
                     refusal: extract_chat_refusal(&payload),
                     annotations: extract_annotations(&payload),
                 };
-                emit_completion_events(&completion, sink)?;
+                let mut reasoning = chat_stream::Reasoning::default();
+                let mut delta = reasoning.fold(&payload["choices"][0]["message"])?;
+                let provider = self
+                    .registry
+                    .as_ref()
+                    .map(|(p, _)| p.as_str())
+                    .unwrap_or("openai");
+                reasoning.annotate(provider, model, &mut completion.annotations)?;
+                if let Some(reason) = payload["choices"][0]["finish_reason"].as_str() {
+                    completion
+                        .annotations
+                        .push(json!({"type":"chat_finish_reason", "finish_reason":reason}));
+                }
+                emit_completion_events(&completion, &mut |event| {
+                    if cancelled() {
+                        return Err(BackendError::Cancelled);
+                    }
+                    if !matches!(event, ProviderEvent::ResponseCreated { .. })
+                        && let Some(delta) = delta.take()
+                    {
+                        sink(ProviderEvent::ReasoningDelta { delta })?;
+                        if cancelled() {
+                            return Err(BackendError::Cancelled);
+                        }
+                    }
+                    sink(event)
+                })?;
                 Ok(completion)
             }
-            OpenAiWireApi::Responses => read_responses_stream(response.body_mut(), cancelled, sink),
+            OpenAiWireApi::Responses => {
+                if !capabilities.streaming {
+                    let payload = read_bounded_json_body(response.body_mut(), cancelled)?;
+                    validate_responses_terminal(&payload, true)?;
+                    let completion = completion_from_responses_json(&payload)?;
+                    emit_completion_events(&completion, sink)?;
+                    Ok(completion)
+                } else {
+                    read_responses_stream(
+                        response.body_mut(),
+                        self.registry.is_some(),
+                        cancelled,
+                        sink,
+                    )
+                }
+            }
         }
     }
 }
 
 impl Backend for OpenAiCompatibleBackend {
+    fn model_descriptor(
+        &self,
+        model: Option<&str>,
+    ) -> Result<Option<crate::providers::registry::ModelDescriptor>, BackendError> {
+        self.registry
+            .as_ref()
+            .map(|(provider, registry)| registry.resolve(provider, model.unwrap_or(&self.model)))
+            .transpose()
+            .map_err(|error| BackendError::Configuration(error.to_string()))
+    }
+
+    fn model_catalog(&self) -> Vec<crate::providers::registry::ModelDescriptor> {
+        self.registry
+            .as_ref()
+            .map(|(provider, registry)| registry.list(provider))
+            .unwrap_or_default()
+    }
+
+    fn model_capabilities(
+        &self,
+        model: Option<&str>,
+    ) -> Result<Option<ProviderCapabilities>, BackendError> {
+        Ok(self.model_descriptor(model)?.map(|model| {
+            model.effective_capabilities(ProviderCapabilities::for_wire_api(self.wire_api))
+        }))
+    }
+
+    fn reasoning_effort(&self) -> Option<&str> {
+        self.reasoning_effort.as_deref()
+    }
+
+    fn validate_reasoning_effort(
+        &self,
+        model: Option<&str>,
+        effort: Option<&str>,
+    ) -> Result<(), BackendError> {
+        if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+            crate::providers::google::validate_effort(model.unwrap_or(&self.model), effort)?;
+        }
+        if self.wire_api == OpenAiWireApi::AnthropicMessages {
+            crate::providers::anthropic::validate_effort(model.unwrap_or(&self.model), effort)?;
+        }
+        let model = self.model_descriptor(model)?.ok_or_else(|| {
+            BackendError::Configuration(
+                "runtime reasoning settings require a registry-bound provider".into(),
+            )
+        })?;
+        model
+            .validate_reasoning(ProviderCapabilities::for_wire_api(self.wire_api), effort)
+            .map_err(|error| BackendError::Configuration(error.to_string()))
+    }
+
+    fn commit_reasoning_effort(&mut self, effort: Option<String>) {
+        self.reasoning_effort = effort;
+    }
+
+    fn validate_history_model(
+        &self,
+        turns: &[Turn],
+        model: Option<&str>,
+    ) -> Result<(), BackendError> {
+        let model = model.unwrap_or(&self.model);
+        let provider =
+            self.registry
+                .as_ref()
+                .map(|(p, _)| p.as_str())
+                .unwrap_or(match self.wire_api {
+                    OpenAiWireApi::AnthropicMessages => "anthropic",
+                    OpenAiWireApi::GoogleGenerativeAi => "google",
+                    _ => "openai",
+                });
+        for turn in turns {
+            chat_stream::validate_history(turn, provider, model, self.wire_api.as_str())?;
+            for a in turn
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get("annotations"))
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|a| a["type"] == "native_history")
+            {
+                if a["wire"] != self.wire_api.as_str() || a["provider"] != provider {
+                    return Err(BackendError::Configuration(
+                        "native history provider/wire cannot represent selected model".into(),
+                    ));
+                }
+                let opaque = a
+                    .get("blocks")
+                    .and_then(Value::as_array)
+                    .is_some_and(|blocks| {
+                        blocks.iter().any(|b| {
+                            matches!(b["type"].as_str(), Some("thinking" | "redacted_thinking"))
+                        })
+                    })
+                    || a.get("parts")
+                        .and_then(Value::as_array)
+                        .is_some_and(|parts| {
+                            parts.iter().any(|p| {
+                                p.get("thoughtSignature").is_some() || p["thought"] == true
+                            })
+                        });
+                if opaque && a["model"] != model {
+                    return Err(BackendError::Configuration(
+                        "opaque signed history cannot move to another model".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_model(&self, model: Option<&str>) -> Result<(), BackendError> {
+        crate::providers::registry::validate_identity("backend", model.unwrap_or(&self.model))
+            .map_err(|error| BackendError::Configuration(error.to_string()))?;
+        if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+            crate::providers::google::validate_effort(
+                model.unwrap_or(&self.model),
+                self.reasoning_effort.as_deref(),
+            )?;
+        }
+        if self.wire_api == OpenAiWireApi::AnthropicMessages {
+            crate::providers::anthropic::validate_effort(
+                model.unwrap_or(&self.model),
+                self.reasoning_effort.as_deref(),
+            )?;
+        }
+        if let Some(model) = self.model_descriptor(model)? {
+            model
+                .validate_reasoning(
+                    ProviderCapabilities::for_wire_api(self.wire_api),
+                    self.reasoning_effort.as_deref(),
+                )
+                .map_err(|error| BackendError::Configuration(error.to_string()))?;
+        }
+        Ok(())
+    }
+
     fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
         self.complete_openai(request, &|| false, &mut |_| Ok(()))
     }
@@ -1066,8 +1609,12 @@ impl Backend for OpenAiCompatibleBackend {
             }
             circuit.open_until = None;
         }
+        let model_tools = self
+            .model_capabilities(request.model)?
+            .map(|capabilities| capabilities.tools);
         let mut attempt = 0_u32;
         loop {
+            let mut emitted = false;
             let result = self.complete_openai(
                 CompletionRequest {
                     turn_id: request.turn_id,
@@ -1077,13 +1624,34 @@ impl Backend for OpenAiCompatibleBackend {
                     instructions: request.instructions,
                     metadata: request.metadata,
                     attachments: request.attachments,
+                    response_format: request.response_format,
+                    max_output_tokens: request.max_output_tokens,
                 },
                 cancelled,
-                sink,
+                &mut |event| {
+                    if model_tools == Some(false)
+                        && matches!(
+                            event,
+                            ProviderEvent::ToolCallDelta { .. }
+                                | ProviderEvent::ToolCallDone { .. }
+                        )
+                    {
+                        return Err(BackendError::InvalidResponse(
+                            "selected model returned an unsupported tool call".into(),
+                        ));
+                    }
+                    emitted = true;
+                    sink(event)
+                },
             );
-            let should_retry = result
-                .as_ref()
-                .is_err_and(|error| error.is_retryable() && attempt < self.max_retries);
+            let should_retry = result.as_ref().is_err_and(|error| {
+                !emitted
+                    && error.is_retryable()
+                    && attempt < self.max_retries
+                    && !request
+                        .metadata
+                        .is_some_and(|v| v["purpose"] == "semantic_compaction")
+            });
             if !should_retry {
                 let mut circuit = self.circuit.lock().map_err(|_| {
                     BackendError::Transport("provider circuit lock poisoned".into())
@@ -1132,6 +1700,12 @@ impl Backend for OpenAiCompatibleBackend {
     }
 
     fn name(&self) -> &str {
+        if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
+            return "google-generative-ai";
+        }
+        if self.wire_api == OpenAiWireApi::AnthropicMessages {
+            return "anthropic-messages";
+        }
         "openai-compatible"
     }
 
@@ -1177,7 +1751,7 @@ fn duration_ms_ceil(duration: Duration) -> u64 {
         .max(u64::from(!duration.is_zero()))
 }
 
-fn chat_message(turn: &Turn) -> Value {
+fn chat_message(turn: &Turn, provider: &str, model: &str) -> Result<Value, BackendError> {
     let role = match turn.role {
         TurnRole::System => "system",
         TurnRole::User => "user",
@@ -1221,7 +1795,8 @@ fn chat_message(turn: &Turn) -> Value {
                 .collect(),
         );
     }
-    message
+    chat_stream::replay(turn, provider, model, &mut message)?;
+    Ok(message)
 }
 
 fn apply_chat_attachments(
@@ -1557,6 +2132,7 @@ fn extract_responses_content(payload: &Value) -> Result<String, BackendError> {
 
 fn read_responses_stream(
     body: &mut ureq::Body,
+    strict_terminal: bool,
     cancelled: &dyn Fn() -> bool,
     sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
 ) -> Result<Completion, BackendError> {
@@ -1600,6 +2176,7 @@ fn read_responses_stream(
         while let Some(newline) = pending.iter().position(|byte| *byte == b'\n') {
             let line = pending.drain(..=newline).collect::<Vec<_>>();
             process_responses_line(
+                strict_terminal,
                 &line,
                 &mut content,
                 &mut usage,
@@ -1615,6 +2192,7 @@ fn read_responses_stream(
     }
     if !pending.is_empty() {
         process_responses_line(
+            strict_terminal,
             &pending,
             &mut content,
             &mut usage,
@@ -1660,8 +2238,35 @@ fn read_responses_stream(
     })
 }
 
+pub(crate) fn read_bounded_json_body(
+    body: &mut ureq::Body,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Value, BackendError> {
+    use std::io::Read;
+    let mut reader = body.with_config().limit(MAX_RESPONSE_BYTES as u64).reader();
+    let mut bytes = Vec::new();
+    let mut chunk = [0_u8; 16 * 1024];
+    loop {
+        if cancelled() {
+            return Err(BackendError::Cancelled);
+        }
+        match reader.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(read) => bytes.extend_from_slice(&chunk[..read]),
+            Err(error) if is_recv_body_poll_timeout(&error) => continue,
+            Err(error) => return Err(BackendError::Transport(error.to_string())),
+        }
+    }
+    if cancelled() {
+        return Err(BackendError::Cancelled);
+    }
+    serde_json::from_slice(&bytes)
+        .map_err(|error| BackendError::InvalidResponse(format!("invalid JSON response: {error}")))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_responses_line(
+    strict_terminal: bool,
     line: &[u8],
     content: &mut String,
     usage: &mut Option<Usage>,
@@ -1682,6 +2287,7 @@ fn process_responses_line(
         let payload: Value = serde_json::from_str(clean_line).map_err(|error| {
             BackendError::InvalidResponse(format!("invalid Responses JSON: {error}"))
         })?;
+        validate_responses_terminal(&payload, strict_terminal)?;
         let completion = completion_from_responses_json(&payload)?;
         emit_completion_events(&completion, sink)?;
         *content = completion.content;
@@ -1779,8 +2385,9 @@ fn process_responses_line(
             }
         }
         Some("response.completed") => {
-            *saw_completed = true;
             let response = event.get("response").unwrap_or(&event);
+            validate_responses_terminal(response, strict_terminal)?;
+            *saw_completed = true;
             *usage = response.get("usage").and_then(parse_usage);
             *model = response
                 .get("model")
@@ -1827,7 +2434,7 @@ fn process_responses_line(
     Ok(())
 }
 
-fn is_recv_body_poll_timeout(error: &std::io::Error) -> bool {
+pub(crate) fn is_recv_body_poll_timeout(error: &std::io::Error) -> bool {
     error
         .get_ref()
         .and_then(|source| source.downcast_ref::<ureq::Error>())
@@ -1835,8 +2442,15 @@ fn is_recv_body_poll_timeout(error: &std::io::Error) -> bool {
 }
 
 fn completion_from_responses_json(payload: &Value) -> Result<Completion, BackendError> {
-    let content = extract_responses_content(payload)?;
-    if content.trim().is_empty() {
+    let tool_calls = extract_responses_tool_calls(payload)?;
+    let content = extract_responses_content(payload).or_else(|error| {
+        if tool_calls.is_empty() {
+            Err(error)
+        } else {
+            Ok(String::new())
+        }
+    })?;
+    if content.trim().is_empty() && tool_calls.is_empty() {
         return Err(BackendError::EmptyResponse);
     }
     Ok(Completion {
@@ -1846,7 +2460,7 @@ fn completion_from_responses_json(payload: &Value) -> Result<Completion, Backend
             .get("model")
             .and_then(Value::as_str)
             .map(str::to_owned),
-        tool_calls: extract_responses_tool_calls(payload)?,
+        tool_calls,
         response_id: payload.get("id").and_then(Value::as_str).map(str::to_owned),
         refusal: extract_responses_refusal(payload),
         annotations: extract_annotations(payload),
@@ -1892,42 +2506,6 @@ fn push_unique_tool_call(calls: &mut Vec<ToolCall>, call: ToolCall) {
     }
 }
 
-fn extract_chat_tool_calls(payload: &Value) -> Result<Vec<ToolCall>, BackendError> {
-    let Some(calls) = payload
-        .get("choices")
-        .and_then(Value::as_array)
-        .and_then(|choices| choices.first())
-        .and_then(|choice| choice.get("message"))
-        .and_then(|message| message.get("tool_calls"))
-        .and_then(Value::as_array)
-    else {
-        return Ok(Vec::new());
-    };
-    calls
-        .iter()
-        .map(|call| {
-            let id = call
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| BackendError::InvalidResponse("tool call is missing id".into()))?;
-            let function = call.get("function").ok_or_else(|| {
-                BackendError::InvalidResponse("tool call is missing function".into())
-            })?;
-            let name = function
-                .get("name")
-                .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    BackendError::InvalidResponse("tool call is missing function name".into())
-                })?;
-            let arguments = function
-                .get("arguments")
-                .and_then(Value::as_str)
-                .unwrap_or("{}");
-            parse_tool_call(id, name, arguments)
-        })
-        .collect()
-}
-
 fn extract_responses_tool_calls(payload: &Value) -> Result<Vec<ToolCall>, BackendError> {
     let Some(output) = payload.get("output").and_then(Value::as_array) else {
         return Ok(Vec::new());
@@ -1941,6 +2519,12 @@ fn extract_responses_tool_calls(payload: &Value) -> Result<Vec<ToolCall>, Backen
 }
 
 fn parse_response_function_call(item: &Value) -> Option<ToolCall> {
+    if item
+        .get("status")
+        .is_some_and(|status| status != "completed")
+    {
+        return None;
+    }
     let id = item
         .get("call_id")
         .or_else(|| item.get("id"))
@@ -2002,6 +2586,40 @@ fn parse_usage(value: &Value) -> Option<Usage> {
         output_tokens: output,
         total_tokens: total,
     })
+}
+
+fn validate_response_format(format: &Value) -> Result<(), BackendError> {
+    if serde_json::to_vec(format).map_or(true, |bytes| bytes.len() > 64 * 1024)
+        || !format.is_object()
+        || !matches!(format["type"].as_str(), Some("json_object" | "json_schema"))
+        || (format["type"] == "json_schema"
+            && (!format["json_schema"].is_object()
+                || !format["json_schema"]["schema"].is_object()
+                || !format["json_schema"]["name"]
+                    .as_str()
+                    .is_some_and(|name| !name.is_empty() && name.len() <= 64)))
+    {
+        return Err(BackendError::Configuration(
+            "structured output format is invalid or too large".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_responses_terminal(payload: &Value, strict: bool) -> Result<(), BackendError> {
+    if payload
+        .get("status")
+        .is_some_and(|status| status != "completed")
+        || (strict && payload["status"] != "completed")
+        || payload
+            .get("incomplete_details")
+            .is_some_and(|details| !details.is_null())
+    {
+        return Err(BackendError::InvalidResponse(
+            "Responses missing or incomplete terminal status".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "src/tool_output.rs",
+    "bytes": 62012,
+    "sha256": "f18513b3b55754b34a21fa879f8405d1e59979b85274b7081f4d02e9eda379cd"
+  },
+  {
+    "path": "tests/stage1_tool_output.rs",
+    "bytes": 96655,
+    "sha256": "613f447e823baa5068fc107b72627e6ed4efdab486f3aa170234a288d39f29a4"
+  }
+]

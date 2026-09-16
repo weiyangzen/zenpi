@@ -1,0 +1,29 @@
+{
+  "manifest_sha256": "8e166f43f96c00745a15327290cbb0124e65fc2c11b2b61cf78a8c97d21fb2d4",
+  "files_verified": 30,
+  "full_patch_forward_reverse": true,
+  "product_paths": [
+    {
+      "path": "src/providers/google.rs",
+      "base_exists": true,
+      "base_sha256": "cfe567a41e3efb3cbba65f55eb11fd66618bb83310f0511c2728222cd375c071",
+      "base_bytes": 29036,
+      "sha256": "f0d56a364cda38b5a10bff74e68057ad76bf539000c883ee6e820c2105081890",
+      "bytes": 29333,
+      "lines": 759,
+      "patch_sha256": "9e0e9ce5bd063ad21f642145fd7443ee97f00fda72c35ace991fa3bc06a7792c",
+      "status": "[_]"
+    },
+    {
+      "path": "tests/stage1_gemini.rs",
+      "base_exists": true,
+      "base_sha256": "cda8ea43b41788ba3c15ef085d4d6310c8470c40c51bc4a79ff01575dbad931d",
+      "base_bytes": 31582,
+      "sha256": "0b89fa8b1587cfbd1ed36fb53b7280d79586acd3323da1e2b4280cb033d85367",
+      "bytes": 35033,
+      "lines": 971,
+      "patch_sha256": "84b9a115f3a4d8a5bd0ae467749973ba998c361274828674fb5e324e3236c25c",
+      "status": "[_]"
+    }
+  ]
+}

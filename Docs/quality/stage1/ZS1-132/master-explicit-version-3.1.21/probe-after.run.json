@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/version-release-3.1.21/probe.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/version-release-3.1.21/zenpi-release",
+    "--out",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/version-release-3.1.21/after"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T17:26:36.578858+00:00",
+  "ended_at": "2026-09-12T17:26:37.686828+00:00",
+  "exit_code": 0,
+  "pid": 32031,
+  "reaped": true,
+  "timed_out": false,
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "log": {
+    "bytes": 2202,
+    "sha256": "4f4d05f74fa073ce2192eba5f80eca37250367bd667fac0a17c4bdf00ea08762"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-300",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "target300-current-independent-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；hash/chunks/源测试/操作映射",
+  "source_path": "codex-rs/tui/src/bottom_pane/chat_composer.rs",
+  "source_hash": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+  "read_ranges": [
+    [
+      0,
+      262144
+    ],
+    [
+      262144,
+      374943
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/chat_composer.rs_learn.md",
+      "bytes": 8694,
+      "sha256": "f1328c01cfe2f78b0c5be88592c331ad25b1754d26eedc9eba70ac9ca8cc0998"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/review.md",
+      "bytes": 686,
+      "sha256": "7b34d0bf643803d3c4e013b9b7c3eea42cf93715a212a0dcdb68cfb7f7957195"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/worker-report.md",
+      "bytes": 8006,
+      "sha256": "2f1ebc30223d03130809251d4238ab04dae3e564e0057289ba1de45b8e4bc87f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/current-chat_composer.rs",
+      "bytes": 374943,
+      "sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/worker-manifest.json",
+      "bytes": 2789,
+      "sha256": "61c3a4c228df3fe64c45e82db0028745bd4c5f4f4c651ef8772c897d069dedf5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-binding.json",
+      "bytes": 2123,
+      "sha256": "90320318b9af53cb7981340b27ff0d08dd36829ba9abf60aef2dffe098c2e79e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/accept.py",
+      "bytes": 4476,
+      "sha256": "d7e6e67187ea27530ec82ab734e1af5ad0adff76ed462659053309896016815c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-001.txt",
+      "bytes": 81960,
+      "sha256": "443d6e5184154a9c3a3cb0ea83f5822d080c40045d8491e19ae344cf4802a152"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-002.txt",
+      "bytes": 79998,
+      "sha256": "40f9f534aa1d960d5c4d3156e3a6c92e4f386dca9e1d15d080d2cdc9fe590da2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-003.txt",
+      "bytes": 75517,
+      "sha256": "8331454a1ce0130fecc508896583021d838695d8d05559b0c153b930aee16adb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-004.txt",
+      "bytes": 74027,
+      "sha256": "e763b6fc0a624bb76c76aa4b7397ac9fdae0c39dca041386d7885f14da78f258"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/read-005.txt",
+      "bytes": 63441,
+      "sha256": "dda1d5d4dddeb66923046b371af665bac0b5c9b1d1e697977b077320a6e01f49"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-300/master-review-3.1.21-v4/review.md",
+      "bytes": 686,
+      "sha256": "7b34d0bf643803d3c4e013b9b7c3eea42cf93715a212a0dcdb68cfb7f7957195"
+    },
+    "findings": "Requirement-delta rebind reviewed: Codex source evidence and artifact chain are preserved; only receipt binding fields were synchronized, with no new semantic acceptance."
+  }
+}

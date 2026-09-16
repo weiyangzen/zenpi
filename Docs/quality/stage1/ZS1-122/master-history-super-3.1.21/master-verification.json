@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "binary": {
+    "bytes": 50751592,
+    "sha256": "f455ee073c57d9428149b42def234815028a7eb7e0f3d9bc971373b99c0c1a15"
+  },
+  "owned": {
+    "src/tui.rs": {
+      "bytes": 669057,
+      "sha256": "7c0d9e5c2cb5f351412aa6e98ac233f5c55580ee1885a431653d8c91b908ba4b"
+    },
+    "tests/tui_composer.rs": {
+      "bytes": 58353,
+      "sha256": "15ed997ca5e80f1cc0dfa372c463b43249e2acef58d02b7bcd1270f7943874db"
+    }
+  },
+  "scope": "local history Super guard",
+  "item": "ZS1-122",
+  "master_verified": true,
+  "whole_item_accepted": false,
+  "rust_tests": 128,
+  "new_tests": 3,
+  "before_failed_tests": 1,
+  "root_pty_checks": 18,
+  "root_pty_runs": 1,
+  "root_pty_pass": true,
+  "root_http_count": 0,
+  "worker_pty_harness_exit": 1,
+  "worker_final_http_count": null,
+  "offline_checks": 922
+}

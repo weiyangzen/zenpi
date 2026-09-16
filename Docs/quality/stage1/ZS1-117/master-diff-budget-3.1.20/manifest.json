@@ -1,0 +1,51 @@
+{
+  "item": "ZS1-117",
+  "complete": false,
+  "budget_passed": false,
+  "files": {
+    "budget.log": {
+      "bytes": 12438,
+      "sha256": "6083ceb4bac97b81e11cdcb4ccc28c89b2e18316b431051c04f2c6b78c6653fc"
+    },
+    "budget.run.json": {
+      "bytes": 653,
+      "sha256": "e7beef1b9354670d8ff9eecb7916a8208b1c869ca9db45dde7dffec0ebce3c34"
+    },
+    "current-build-inputs.tar.gz": {
+      "bytes": 1189069,
+      "sha256": "3e57582a811ae2b54be83bc113def35b010c8f868e80a33cbdcf37b41e958a0c"
+    },
+    "host-processes-after.log": {
+      "bytes": 130900,
+      "sha256": "a1d20624b9405ec4eaa8d8ce80d2bdaec4a68278eb2cc8d75232838a210b8a9a"
+    },
+    "host-processes-before.log": {
+      "bytes": 128884,
+      "sha256": "fef4e6d8a297c71873fa389016114dd07eb0c86048432f10a4694697e4402799"
+    },
+    "inputs-before.json": {
+      "bytes": 34335,
+      "sha256": "2288f17ab2f71e37ba0152c5a4f479f1cbd371b44b9a49bd7b0764c1d4e29d8e"
+    },
+    "review.md": {
+      "bytes": 3138,
+      "sha256": "1a9f2ce77a0f699582ef2c696d632ae288cd553189ecfdc130b941259d25ec72"
+    },
+    "startup/sample-00.json": {
+      "bytes": 2567,
+      "sha256": "e47d2dc8e28912e9e1f4f680133c0af4154139511c2c6630ce9bd2ab9e872fc5"
+    },
+    "startup/sample-01.json": {
+      "bytes": 2565,
+      "sha256": "c6e01bb194a2c49ef5e93cdc8e352ca7519540a9f9fb8dcb7de06dd23d1138ec"
+    },
+    "startup/sample-02.json": {
+      "bytes": 2561,
+      "sha256": "c7f5d5264b2527b6f2b21c7712196decfe2739f90621c4dbdab8a2c89e5f219c"
+    },
+    "summary.json": {
+      "bytes": 11628,
+      "sha256": "0cbd130ed9ca70d184590bba660e3f8920aaa8b9385bc72de6b347f3306ec7c1"
+    }
+  }
+}

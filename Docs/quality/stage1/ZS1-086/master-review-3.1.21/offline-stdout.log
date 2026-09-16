@@ -1,0 +1,155 @@
+{"label": "exact manifest payload", "passed": true}
+{"label": "readonly no symlinks", "passed": true}
+{"label": "formal42009B1255L", "passed": true}
+{"label": "capture capture/zenpi/src/view_model.rs", "passed": true}
+{"label": "capture capture/zenpi/src/core.rs", "passed": true}
+{"label": "capture capture/zenpi/src/tui.rs", "passed": true}
+{"label": "capture capture/zenpi/src/render.rs", "passed": true}
+{"label": "capture capture/zenpi/src/headless.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/view_model.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/headless_event_budget.rs", "passed": true}
+{"label": "capture capture/zenpi/tests/tui_transcript_ux.rs", "passed": true}
+{"label": "capture capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md", "passed": true}
+{"label": "capture capture/zenpi/Docs/execution/active_requirement.json", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/source_manifest.tsv", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/file_learn_index.tsv", "passed": true}
+{"label": "baseline40591B1220L", "passed": true}
+{"label": "exact baseline diff", "passed": true}
+{"label": "old086 current identical", "passed": true}
+{"label": "five contiguous formal reads", "passed": true}
+{"label": "29 read records", "passed": true}
+{"label": "read reads/001.txt", "passed": true}
+{"label": "read reads/002.txt", "passed": true}
+{"label": "read reads/003.txt", "passed": true}
+{"label": "read reads/004.txt", "passed": true}
+{"label": "read reads/005.txt", "passed": true}
+{"label": "read reads/006.txt", "passed": true}
+{"label": "read reads/007.txt", "passed": true}
+{"label": "read reads/008.txt", "passed": true}
+{"label": "read reads/009.txt", "passed": true}
+{"label": "read reads/010.txt", "passed": true}
+{"label": "read reads/011.txt", "passed": true}
+{"label": "read reads/012.txt", "passed": true}
+{"label": "read reads/013.txt", "passed": true}
+{"label": "read reads/014.txt", "passed": true}
+{"label": "read reads/015.txt", "passed": true}
+{"label": "read reads/016.txt", "passed": true}
+{"label": "read reads/017.txt", "passed": true}
+{"label": "read reads/018.txt", "passed": true}
+{"label": "read reads/019.txt", "passed": true}
+{"label": "read reads/020.txt", "passed": true}
+{"label": "read reads/021.txt", "passed": true}
+{"label": "read reads/022.txt", "passed": true}
+{"label": "read reads/023.txt", "passed": true}
+{"label": "read reads/024.txt", "passed": true}
+{"label": "read reads/025.txt", "passed": true}
+{"label": "read reads/026.txt", "passed": true}
+{"label": "read reads/027.txt", "passed": true}
+{"label": "read reads/028.txt", "passed": true}
+{"label": "read reads/029.txt", "passed": true}
+{"label": "21 continuous units", "passed": true}
+{"label": "19 maps with criteria", "passed": true}
+{"label": "unit U01", "passed": true}
+{"label": "unit U02", "passed": true}
+{"label": "unit U03", "passed": true}
+{"label": "unit U04", "passed": true}
+{"label": "unit U05", "passed": true}
+{"label": "unit U06", "passed": true}
+{"label": "unit U07", "passed": true}
+{"label": "unit U08", "passed": true}
+{"label": "unit U09", "passed": true}
+{"label": "unit U10", "passed": true}
+{"label": "unit U11", "passed": true}
+{"label": "unit U12", "passed": true}
+{"label": "unit U13", "passed": true}
+{"label": "unit U14", "passed": true}
+{"label": "unit U15", "passed": true}
+{"label": "unit U16", "passed": true}
+{"label": "unit U17", "passed": true}
+{"label": "unit U18", "passed": true}
+{"label": "unit U19", "passed": true}
+{"label": "unit U20", "passed": true}
+{"label": "unit U21", "passed": true}
+{"label": "44 exact functions including const kind", "passed": true}
+{"label": "fn 42 new", "passed": true}
+{"label": "fn 52 block_id", "passed": true}
+{"label": "fn 56 is_completed", "passed": true}
+{"label": "fn 60 text", "passed": true}
+{"label": "fn 64 append", "passed": true}
+{"label": "fn 82 complete", "passed": true}
+{"label": "fn 234 redacted", "passed": true}
+{"label": "fn 298 validate", "passed": true}
+{"label": "fn 374 kind", "passed": true}
+{"label": "fn 392 from_markdown", "passed": true}
+{"label": "fn 415 from_markdown_text", "passed": true}
+{"label": "fn 455 new", "passed": true}
+{"label": "fn 469 from_markdown", "passed": true}
+{"label": "fn 477 validate", "passed": true}
+{"label": "fn 625 validate", "passed": true}
+{"label": "fn 706 requires_turn_id", "passed": true}
+{"label": "fn 724 requires_block_id", "passed": true}
+{"label": "fn 749 new", "passed": true}
+{"label": "fn 753 with_context", "passed": true}
+{"label": "fn 772 validate", "passed": true}
+{"label": "fn 797 encoded_len", "passed": true}
+{"label": "fn 803 from_agent_event", "passed": true}
+{"label": "fn 916 from_provider_event", "passed": true}
+{"label": "fn 1020 new", "passed": true}
+{"label": "fn 1034 next_sequence", "passed": true}
+{"label": "fn 1038 len", "passed": true}
+{"label": "fn 1042 is_empty", "passed": true}
+{"label": "fn 1046 retained_bytes", "passed": true}
+{"label": "fn 1050 dropped", "passed": true}
+{"label": "fn 1054 take_dropped", "passed": true}
+{"label": "fn 1058 iter", "passed": true}
+{"label": "fn 1062 push", "passed": true}
+{"label": "fn 1075 append", "passed": true}
+{"label": "fn 1133 drain", "passed": true}
+{"label": "fn 1138 replay_from", "passed": true}
+{"label": "fn 1170 from", "passed": true}
+{"label": "fn 1180 from", "passed": true}
+{"label": "fn 1191 default_view_model_version", "passed": true}
+{"label": "fn 1195 default_block_id", "passed": true}
+{"label": "fn 1207 validate_id", "passed": true}
+{"label": "fn 1211 validate_optional_id", "passed": true}
+{"label": "fn 1218 validate_optional_text", "passed": true}
+{"label": "fn 1228 validate_token", "passed": true}
+{"label": "fn 1241 validate_text", "passed": true}
+{"label": "zero source tests", "passed": true}
+{"label": "20 exact event variants", "passed": true}
+{"label": "two full external reads", "passed": true}
+{"label": "11 external52assert0snapshot0runs", "passed": true}
+{"label": "test T01", "passed": true}
+{"label": "test T02", "passed": true}
+{"label": "test T03", "passed": true}
+{"label": "test T04", "passed": true}
+{"label": "test T05", "passed": true}
+{"label": "test T06", "passed": true}
+{"label": "test T07", "passed": true}
+{"label": "test T08", "passed": true}
+{"label": "test T09", "passed": true}
+{"label": "test T10", "passed": true}
+{"label": "test T11", "passed": true}
+{"label": "complete history history/target086-review-3.1.20-ready", "passed": true}
+{"label": "complete history history/target096-render321-ready", "passed": true}
+{"label": "complete history history/reference308-keys321-ready", "passed": true}
+{"label": "complete history history/reference309-status321-ready", "passed": true}
+{"label": "old086 full report read", "passed": true}
+{"label": "samehash reference 096", "passed": true}
+{"label": "samehash reference 308", "passed": true}
+{"label": "samehash reference 309", "passed": true}
+{"label": "105ready31035regular145tracked945history preserved", "passed": true}
+{"label": "formal unchanged at freeze", "passed": true}
+{"label": "separate drift /Users/wangweiyang/GitHub/zenpi/src/tui.rs", "passed": true}
+{"label": "TUI drift outside read contexts", "passed": true}
+{"label": "no runtime execution", "passed": true}
+{"label": "unique owned report creation", "passed": true}
+{"label": "exact bounded patches", "passed": true}
+{"label": "temporary apply report.patch", "passed": true}
+{"label": "forward exact report", "passed": true}
+{"label": "sentinel report.patch", "passed": true}
+{"label": "temporary apply rollback.patch", "passed": true}
+{"label": "rollback only report removed", "passed": true}
+{"label": "sentinel rollback.patch", "passed": true}
+{"label": "post-audit package exact", "passed": true}
+{"checks": 154, "failed": 0, "structural_only": true, "runtime_execution": false}

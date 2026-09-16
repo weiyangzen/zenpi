@@ -1,0 +1,23 @@
+[
+  {
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/unborn-diff-integration/worker/product.patch"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "git",
+      "apply",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/unborn-diff-integration/worker/product.patch"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

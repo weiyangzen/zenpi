@@ -1,0 +1,22 @@
+{
+  "name": "base-v2",
+  "argv": [
+    "python3",
+    "tools/validate_blueprint_v2.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T04:53:07.436780+00:00",
+  "ended_at": "2026-09-12T04:53:07.475938+00:00",
+  "elapsed_seconds": 0.039027541,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 13172736,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/reader-reset-integration/base-v2.log",
+  "bytes": 49,
+  "sha256": "829aaac7ac7175d4b5ad1d704ced7969e88bfa0c169ff8bad98e890f917fbe10"
+}

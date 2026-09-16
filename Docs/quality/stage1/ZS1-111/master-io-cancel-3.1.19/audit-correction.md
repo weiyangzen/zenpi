@@ -1,0 +1,1 @@
+Initial inline controller audit asserted outer code output_invalid and failed. The actual raw JSONL response uses code invalid_turn and error text containing output_invalid. Corrected audit checks both independently; original product evidence unchanged.

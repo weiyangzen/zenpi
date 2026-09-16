@@ -1,0 +1,11 @@
+--- worker-gantt
++++ current-gantt
+@@ -17,7 +17,7 @@
+ REPAIRS = {
+     'ZS1-115': ('扩展超时夹具已复验：主库lib 96通过、0失败、5原有忽略；12个管道子进程场景通过，生产代码及超时门限不变', 'extension-fixture-integration', 'Docs/quality/stage1/ZS1-115/master-pipe-fixture-3.1.20/review.md'),
+     'ZS1-125': ('单条回复跨8,192行后尾部与阅读锚点已修复：主库59项Rust、新PTY14项及原有16项检查通过；整项边界仍待验收', 'single-message-tail-integration', 'Docs/quality/stage1/ZS1-125/master-single-message-entrypoint-3.1.20/review.md'),
+-    'ZS1-123': ('附件保留真实路径身份：旧TUI/headless挂错文件已复现并修复，33项Rust及26项真实入口检查通过；整项仍待验收', 'attachment-identity-integration', 'Docs/quality/stage1/ZS1-123/master-attachment-identity-3.1.20/review.md'),
++    'ZS1-123': ('目录diff已纳入Git引号路径的未跟踪文件：主库88项Rust、15项真实入口检查通过，旧入口12项聚合检查失败；整个新目录和无HEAD混合改动仍待修复', 'quoted-untracked-integration', 'Docs/quality/stage1/ZS1-123/master-quoted-untracked-3.1.20/review.md'),
+     'ZS1-117': ('CI预算失败时保留原始日志、退出码与启动诊断：5种本地shell结果通过；远程上传及当前源码新release仍待验证', 'ci-budget-evidence-integration', 'Docs/quality/stage1/ZS1-117/master-ci-budget-evidence-3.1.20/review.md'),
+     'ZS1-132': ('跨项目/new请求归属已修复：79项Rust、13项新JSONL与20组既有入口通过；新release及完整grace时序待验', 'headless-new-replay-integration', 'Docs/quality/stage1/ZS1-132/master-headless-replay-3.1.20/review.md'),
+     'ZS1-126': ('会话浏览已移出输入线程：68项Rust、5项真实浏览/退出及26项项目分页与长回复回归通过；底层扫描取消和整项边界待验', 'async-session-browser-integration', 'Docs/quality/stage1/ZS1-126/master-async-browser-3.1.20/review.md'),

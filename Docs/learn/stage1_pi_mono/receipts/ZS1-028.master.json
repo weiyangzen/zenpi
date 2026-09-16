@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-028",
+  "role": "master",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "reviewer": "controller",
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-028",
+  "source_path": "packages/coding-agent/src/core/agent-session.ts",
+  "source_hash": "17116255610ad2a3f3a7f6870a12b14b993ace65fbfa461c4a43d0ad9a013237",
+  "read_ranges": [
+    [
+      0,
+      120916
+    ]
+  ],
+  "artifacts": [
+    {
+      "bytes": 7213,
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/agent-session.ts_learn.md",
+      "sha256": "1b3a29ad0ef8d11e98507f0e45beaf765003af474b687a15e2fd485de11120f8"
+    },
+    {
+      "bytes": 497,
+      "path": "Docs/quality/stage1/ZS1-028/master-review-current/review.md",
+      "sha256": "28217beef7d2e21858c344dafbeef5529586448242f77038b55d38222ff877a1"
+    }
+  ],
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "findings": "Complete frozen-source review independently checked; only file-level understanding is accepted.",
+    "evidence": {
+      "bytes": 497,
+      "path": "Docs/quality/stage1/ZS1-028/master-review-current/review.md",
+      "sha256": "28217beef7d2e21858c344dafbeef5529586448242f77038b55d38222ff877a1"
+    }
+  }
+}

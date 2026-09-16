@@ -1,6 +1,6 @@
 # zenpi Execution Blueprint v2
 
-> **Review draft, version 2.1.0 (2026-09-05).** This document is a
+> **Review draft, version 2.3.0 (2026-09-13).** This document is a
 > self-audit and re-plan for the terminal-agent product. It is intentionally
 > **not** the current authoritative checklist and it does not mutate or
 > supersede `Docs/Zenpi_Execution_Blueprint.md` until the Master accepts the
@@ -10,8 +10,8 @@
 
 ```yaml
 schema_version: execution-blueprint/v2
-blueprint_version: 2.1.0
-revision_date: 2026-09-05
+blueprint_version: 2.3.0
+revision_date: 2026-09-13
 status: proposed-audit
 authoritative: false
 predecessor: Docs/Zenpi_Execution_Blueprint.md
@@ -47,7 +47,7 @@ The review draft is checked independently of the v1 authority:
 
 ```text
 python3 tools/validate_blueprint_v2.py
-Blueprint v2 valid: 46 rows, max LOC 2800 < 5000
+Blueprint v2 valid: 56 rows, max LOC 2800 < 5000
 ```
 
 `tools/validate_blueprint.py` continues to validate the single authoritative
@@ -513,7 +513,36 @@ and local-shell integration boundaries.
 | V2-401 | DEFERRED | Publish a stable core/headless/layout protocol that a future GUI can consume | `Docs/Zenpi_GUI_Future_Contract.md` | V2-003,V2-007 | Contract names macOS, Linux, and Windows without adding GUI dependencies now | 0 |
 | V2-402 | DEFERRED | Future macOS GUI workspace (Svelte-quality interaction target) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
 | V2-403 | DEFERRED | Future Linux/Windows GUI workspace (same shared protocol) | `Docs/Zenpi_GUI_Future_Contract.md` | V2-401 | Requires a separately approved blueprint/version and platform acceptance matrix | 0 |
-| V2-999 | PLANNED | Master acceptance, v1 archive/migration, Gantt regeneration, and final user receipt | `Docs/`, `tools/`, `.github/` | V2-001,V2-002,V2-003,V2-004,V2-005,V2-006,V2-007,V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-112,V2-113,V2-114,V2-115,V2-116,V2-117,V2-118,V2-119,V2-201,V2-202,V2-203,V2-204,V2-205,V2-206,V2-207,V2-208,V2-301,V2-302,V2-303,V2-304,V2-305,V2-306 | All required rows `ACCEPTED`, zero unresolved partials, clean gates, and size receipt; deferred adapter/GUI rows are not lightweight v2.1 blockers | 0 |
+
+### G. Account service feature 2.3
+
+These proposed rows add no runtime acceptance. The detailed contracts are
+[provider/account routing](feat-provider-account-routing.md),
+[scheduler plugins](feat-account-scheduler-plugins.md), and
+[local broker](feat-account-broker.md). The matching CF row owns executable
+scope, rollback and validation. External research is separate evidence, not
+an instruction to reproduce another project's implementation. Spec section
+1.1 is the only product service exception; worker policy remains unchanged.
+This feature does not absorb independent Goal-flow changes.
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-501 | PLANNED | Typed provider/account identities and canonical request/event adapters; executable scope CF-901 | `src/`, `tests/`, `Docs/` | V2-003,V2-104 | Protocol fixtures; capability/OAuth eligibility fails closed | 2600 |
+| V2-502 | PLANNED | One explicitly approved local broker with bounded authenticated IPC; executable scope CF-902 | `src/`, `tests/`, `Docs/` | V2-501,V2-113 | Multi-process startup, generation reuse, scoped authorization and lifecycle evidence | 2700 |
+| V2-503 | PLANNED | Single-owner durable model quota admission and recovery; executable scope CF-903 | `src/`, `tests/`, `Docs/` | V2-502 | Commit uncertainty, duplicate receipt, client journal failure and crash fixtures | 2800 |
+| V2-504 | PLANNED | Shared actual provider connections and bounded stream workers; executable scope CF-904 | `src/`, `tests/`, `Docs/` | V2-503 | No per-CLI pools; token isolation, partial body, slow reader and disconnect fixtures | 2600 |
+| V2-505 | PLANNED | Replaceable deterministic account scheduling strategies; executable scope CF-905 | `src/`, `tests/`, `Docs/` | V2-503 | Pinned/sticky/spread/auto, stale snapshot and shared scope fixtures | 2200 |
+| V2-506 | PLANNED | Optional bounded strategy plugins and version-safe replacement; executable scope CF-906 | `src/`, `tests/`, `Docs/` | V2-505 | Sandbox limits, quarantine, unchanged existing bindings and feature-off build | 2500 |
+| V2-507 | PLANNED | TUI/headless routing intervention and subagent overrides; executable scope CF-907 | `src/`, `tests/`, `Docs/` | V2-504,V2-505 | Scheduled versus applied changes, immutable active request and inherited budget limits | 2200 |
+| V2-508 | PLANNED | Explicit external broker adapter with one remote quota authority; executable scope CF-908 | `src/`, `tests/`, `Docs/` | V2-504,V2-505 | Endpoint authorization, remote outage, replay gaps and no local fail-open | 2000 |
+| V2-509 | PLANNED | Measured 5000-client service admission and control performance; executable scope CF-909 | `src/`, `tests/`, `Docs/` | V2-502,V2-503,V2-504,V2-505 | Raw bounded-load evidence; durable throughput not substituted by memory-only throughput | 1800 |
+| V2-510 | PLANNED | Installed account-service compatibility and security acceptance; executable scope CF-910 | `src/`, `tests/`, `Docs/` | V2-501,V2-502,V2-503,V2-504,V2-505,V2-506,V2-507,V2-508,V2-509 | Existing Profile/Session/v1 tools remain readable; two modes and frozen worker policy preserved | 1400 |
+
+### H. Master gate
+
+| ID | State | Deliverable | Paths | Depends | Gate | Estimated LOC |
+|---|---|---|---|---|---|---:|
+| V2-999 | PLANNED | Master acceptance, v1 archive/migration, Gantt regeneration, and final user receipt | `Docs/`, `tools/`, `.github/` | V2-001,V2-002,V2-003,V2-004,V2-005,V2-006,V2-007,V2-101,V2-102,V2-103,V2-104,V2-105,V2-106,V2-107,V2-108,V2-109,V2-110,V2-111,V2-112,V2-113,V2-114,V2-115,V2-116,V2-117,V2-118,V2-119,V2-201,V2-202,V2-203,V2-204,V2-205,V2-206,V2-207,V2-208,V2-301,V2-302,V2-303,V2-304,V2-305,V2-306,V2-501,V2-502,V2-503,V2-504,V2-505,V2-506,V2-507,V2-508,V2-509,V2-510 | All required rows `ACCEPTED`, zero unresolved partials, clean gates, and size receipt; deferred adapter/GUI rows are not lightweight v2 blockers | 0 |
 
 ## 8. Acceptance matrix for the ten core experiences
 

@@ -1,0 +1,117 @@
+{
+  "source": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/prompt-templates.ts",
+  "sha256": "e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a",
+  "cases": 27,
+  "mocks": [],
+  "runtime": "actual Bun TS imports; actual yaml parser and filesystem; owned temporary fixture only",
+  "records": [
+    {
+      "name": "quote concatenation and mixed quote literals",
+      "status": "pass"
+    },
+    {
+      "name": "empty quotes disappear and unmatched quote consumes EOF",
+      "status": "pass"
+    },
+    {
+      "name": "backslash does not escape quote and unicode whitespace splits",
+      "status": "pass"
+    },
+    {
+      "name": "one-pass replacement keeps shell and placeholder strings literal",
+      "status": "pass"
+    },
+    {
+      "name": "multi-digit and missing position plus all arguments",
+      "status": "pass"
+    },
+    {
+      "name": "defaults preserve inserted placeholders and replace empty position",
+      "status": "pass"
+    },
+    {
+      "name": "empty all defaults and huge position",
+      "status": "pass"
+    },
+    {
+      "name": "one-based slices clamp zero and beyond end; zero length",
+      "status": "pass"
+    },
+    {
+      "name": "unknown syntax and literal backslash dollar prefix",
+      "status": "pass"
+    },
+    {
+      "name": "source has no 64KiB substitution input limit",
+      "status": "pass"
+    },
+    {
+      "name": "default discovery order duplicates and source scope",
+      "status": "pass"
+    },
+    {
+      "name": "includeDefaults=false and trimmed relative explicit path",
+      "status": "pass"
+    },
+    {
+      "name": "nonrecursive directory skips extension mismatch and nested files",
+      "status": "pass"
+    },
+    {
+      "name": "frontmatter BOM CRLF body trim description and argument hint",
+      "status": "pass"
+    },
+    {
+      "name": "no-frontmatter body whitespace stays and description uses first nonempty line",
+      "status": "pass"
+    },
+    {
+      "name": "description truncation uses UTF16 and can split surrogate pair",
+      "status": "pass"
+    },
+    {
+      "name": "malformed YAML silently skips file",
+      "status": "pass"
+    },
+    {
+      "name": "unterminated frontmatter remains ordinary body",
+      "status": "pass"
+    },
+    {
+      "name": "runtime frontmatter types are not enforced",
+      "status": "pass"
+    },
+    {
+      "name": "empty file is still a template",
+      "status": "pass"
+    },
+    {
+      "name": "invalid UTF8 is replaced by the filesystem decoder",
+      "status": "pass"
+    },
+    {
+      "name": "missing and unsupported explicit files silently skipped",
+      "status": "pass"
+    },
+    {
+      "name": "symlink file followed, broken and directory links skipped during scan",
+      "status": "pass"
+    },
+    {
+      "name": "repeated explicit file remains duplicated",
+      "status": "pass"
+    },
+    {
+      "name": "source ancestry requires path separator",
+      "status": "pass"
+    },
+    {
+      "name": "reload rereads body while old template snapshot remains eager",
+      "status": "pass"
+    },
+    {
+      "name": "newline command args expand and unknown/case/leading-space remain unchanged",
+      "status": "pass"
+    }
+  ]
+}

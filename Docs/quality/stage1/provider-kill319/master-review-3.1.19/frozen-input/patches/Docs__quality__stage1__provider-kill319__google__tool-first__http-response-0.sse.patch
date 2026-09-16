@@ -1,0 +1,7 @@
+diff --git a/Docs/quality/stage1/provider-kill319/google/tool-first/http-response-0.sse b/Docs/quality/stage1/provider-kill319/google/tool-first/http-response-0.sse
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/google/tool-first/http-response-0.sse
+@@ -0,0 +1,2 @@
++data: {"responseId": "google319", "modelVersion": "gemini-2.5-flash", "candidates": [{"index": 0, "content": {"role": "model", "parts": [{"text": "SIGNED_THOUGHT_319", "thought": true, "thoughtSignature": "c2lnbmF0dXJlLTMxOQ=="}, {"text": "BEFORE_TOOL_319", "thoughtSignature": "dGV4dC0zMTk="}, {"functionCall": {"id": "durable_read_319", "name": "read_file", "args": {"path": "input.txt"}}, "thoughtSignature": "dG9vbC0zMTk="}]}, "finishReason": "STOP"}]}
++

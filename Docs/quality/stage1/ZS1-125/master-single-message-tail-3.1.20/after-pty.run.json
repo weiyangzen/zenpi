@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/executed-tools/tui_single_message_tail_smoke.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/zenpi",
+    "--evidence",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/after-pty"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:54:51.150785+00:00",
+  "elapsed_seconds": 7.098448084,
+  "exit_code": 0,
+  "log_sha256": "9eefd6be6333620200338b428c56b2e97d61337066e82a73365364fe61ce0b53",
+  "binary_sha256": "bdf901227bb2b20ae422f0802c3b361381952ba861b040320c401e6625f2cfa0"
+}

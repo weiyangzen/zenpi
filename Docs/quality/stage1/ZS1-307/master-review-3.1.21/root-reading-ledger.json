@@ -1,0 +1,780 @@
+{
+  "formal_source": {
+    "origin": "/Users/wangweiyang/GitHub/codex/codex-rs/tui/src/file_search.rs",
+    "lines": [
+      1,
+      133
+    ],
+    "read_ranges": [
+      [
+        0,
+        4009
+      ]
+    ],
+    "sha256": "7aaa33ac7fd28cbe5fa3405cd3490b30e614272122bb572c9c352acc418b71d9"
+  },
+  "candidate_report_full": true,
+  "verifier_full_static_before_one_execution": true,
+  "worker_fragments_read": [
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/file_search.rs",
+      "source_bytes": 4009,
+      "source_sha256": "7aaa33ac7fd28cbe5fa3405cd3490b30e614272122bb572c9c352acc418b71d9",
+      "lines": [
+        1,
+        133
+      ],
+      "byte_range": [
+        0,
+        4009
+      ],
+      "path": "reads/001.txt",
+      "bytes": 4009,
+      "sha256": "7aaa33ac7fd28cbe5fa3405cd3490b30e614272122bb572c9c352acc418b71d9"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/file-search/src/lib.rs",
+      "source_bytes": 38320,
+      "source_sha256": "75a6457abe072ba2ad0a330fafe26a8c31c2fef1983471af77923ee7d5582b0c",
+      "lines": [
+        60,
+        235
+      ],
+      "byte_range": [
+        1795,
+        6849
+      ],
+      "path": "reads/005.txt",
+      "bytes": 5054,
+      "sha256": "e3c8ae35a1d0d368eada8bfba5703d35e48833ca48406d66ee46e2b780cd3193"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        550,
+        735
+      ],
+      "byte_range": [
+        18763,
+        24482
+      ],
+      "path": "reads/006.txt",
+      "bytes": 5719,
+      "sha256": "aba299e414e95c4304643500ec3408d53b037bed415f09b6dc217087f51c884c"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/file_search_popup.rs",
+      "source_bytes": 5105,
+      "source_sha256": "32d07857a1c7ef0054b56705e9b680275e23ac31016bf946b55f277a1a71884d",
+      "lines": [
+        1,
+        154
+      ],
+      "byte_range": [
+        0,
+        5105
+      ],
+      "path": "reads/007.txt",
+      "bytes": 5105,
+      "sha256": "32d07857a1c7ef0054b56705e9b680275e23ac31016bf946b55f277a1a71884d"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        4657,
+        4738
+      ],
+      "byte_range": [
+        177773,
+        180622
+      ],
+      "path": "reads/008.txt",
+      "bytes": 2849,
+      "sha256": "65e3d00241769a20d2a85899e19d252c448ef4bc35313f057125fd23a120d918"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        1620,
+        1735
+      ],
+      "byte_range": [
+        66863,
+        71997
+      ],
+      "path": "reads/009.txt",
+      "bytes": 5134,
+      "sha256": "1470e8dc1164395c4e54bc88c92e8914b7eaee3d398e1176ddf6ca5d636a124c"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        3219,
+        3310
+      ],
+      "byte_range": [
+        130904,
+        134339
+      ],
+      "path": "reads/010.txt",
+      "bytes": 3435,
+      "sha256": "f6b947f3034384bccbbf59fa6fa17043f3f3ea29d3d3c9427b447adf10a920c1"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        3509,
+        3553
+      ],
+      "byte_range": [
+        142153,
+        143741
+      ],
+      "path": "reads/011.txt",
+      "bytes": 1588,
+      "sha256": "48985d93173f31f732a12907d025acf06768e2a7f2efbf41aa34a5734b1196a0"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        1736,
+        1823
+      ],
+      "byte_range": [
+        71997,
+        75315
+      ],
+      "path": "reads/012.txt",
+      "bytes": 3318,
+      "sha256": "3f162085ed7e60d6e92efa17bf7b603a2757adb04d82a05d71514c3e2c7e26da"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/file-search/src/lib.rs",
+      "source_bytes": 38320,
+      "source_sha256": "75a6457abe072ba2ad0a330fafe26a8c31c2fef1983471af77923ee7d5582b0c",
+      "lines": [
+        1,
+        59
+      ],
+      "byte_range": [
+        0,
+        1795
+      ],
+      "path": "reads/013.txt",
+      "bytes": 1795,
+      "sha256": "5d212266f4d09647dbb7435b602ec23938b3fc527e2a86e0233d901070214c34"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        11735,
+        11795
+      ],
+      "byte_range": [
+        466864,
+        469622
+      ],
+      "path": "reads/014.txt",
+      "bytes": 2758,
+      "sha256": "0534bd24391184bce7797fda2fd553397fe3df843cd971fa08607805bef48cf3"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/app_event.rs",
+      "source_bytes": 15802,
+      "source_sha256": "037e0394523f4e07585d489d01858e73a92e9156f98cdcf285304efcac6837e8",
+      "lines": [
+        116,
+        131
+      ],
+      "byte_range": [
+        3767,
+        4343
+      ],
+      "path": "reads/015.txt",
+      "bytes": 576,
+      "sha256": "3ddf3e5ffbfec8fc5c03c22d2daea02b2e9e821adb755cd1a34876355e25801b"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/app.rs",
+      "source_bytes": 315696,
+      "source_sha256": "75ffbc77f8e8f65fd31602b7e025fa7d4fccadadec138cf099c568fec65845fc",
+      "lines": [
+        2190,
+        2200
+      ],
+      "byte_range": [
+        85499,
+        85878
+      ],
+      "path": "reads/016.txt",
+      "bytes": 379,
+      "sha256": "ded74f2751b924d9f14ceded637a1d0dc01c10b1e8f644fc25f99c7352ff99f7"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/app.rs",
+      "source_bytes": 315696,
+      "source_sha256": "75ffbc77f8e8f65fd31602b7e025fa7d4fccadadec138cf099c568fec65845fc",
+      "lines": [
+        2498,
+        2525
+      ],
+      "byte_range": [
+        99176,
+        100777
+      ],
+      "path": "reads/017.txt",
+      "bytes": 1601,
+      "sha256": "82898955796dda6da070ef34f8295e6efe19fa3cfa0a93c9bbb14f92b8845948"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/app.rs",
+      "source_bytes": 315696,
+      "source_sha256": "75ffbc77f8e8f65fd31602b7e025fa7d4fccadadec138cf099c568fec65845fc",
+      "lines": [
+        2748,
+        2758
+      ],
+      "byte_range": [
+        111273,
+        111824
+      ],
+      "path": "reads/018.txt",
+      "bytes": 551,
+      "sha256": "70bb3c6883953cefe2ecdd9f1154fc6b46d72facaa56b15edbc77c18d7099215"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/chatwidget.rs",
+      "source_bytes": 380782,
+      "source_sha256": "0453f643d88c62d0ad11aa01217af783719400b6c966b71d980ae8c4eac4829a",
+      "lines": [
+        8635,
+        8644
+      ],
+      "byte_range": [
+        347055,
+        347383
+      ],
+      "path": "reads/019.txt",
+      "bytes": 328,
+      "sha256": "693f5a4b1ccd9545cd47c432b65c120f847cf8c410bdbb9a18ba0bf5ee311526"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/mod.rs",
+      "source_bytes": 72998,
+      "source_sha256": "97af02eed39dbfdf69d1ec3e14dc13b9a91f4b33f5e4b985cc1f2cbae4105823",
+      "lines": [
+        1095,
+        1104
+      ],
+      "byte_range": [
+        40886,
+        41189
+      ],
+      "path": "reads/020.txt",
+      "bytes": 303,
+      "sha256": "ebfea743337189014aff9663c034f29d9a1e2900e9373bba18f8da0752093872"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        1229,
+        1246
+      ],
+      "byte_range": [
+        48642,
+        49236
+      ],
+      "path": "reads/021.txt",
+      "bytes": 594,
+      "sha256": "2a065ffbdddd0a5fc80fdb5ee48df0bfeccbaf660a7e4274e17a16f312fafdd0"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        2095,
+        2157
+      ],
+      "byte_range": [
+        85482,
+        88125
+      ],
+      "path": "reads/022.txt",
+      "bytes": 2643,
+      "sha256": "db57259a84e0347d3d8e16ecdedaf44eb954decdccfb0a9087aae47c1773f955"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        2015,
+        2094
+      ],
+      "byte_range": [
+        82623,
+        85482
+      ],
+      "path": "reads/023.txt",
+      "bytes": 2859,
+      "sha256": "28228a0fbd306a3eda0eb0f65ac08c3f4a49fa94814ebc3b4598fc545aa3ac77"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        2540,
+        2575
+      ],
+      "byte_range": [
+        91474,
+        93177
+      ],
+      "path": "reads/024.txt",
+      "bytes": 1703,
+      "sha256": "3a20f26b663423d70f73cf1880e9206696f6d32f21b95664874ed26a0fb18f0f"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        2653,
+        2671
+      ],
+      "byte_range": [
+        96176,
+        96840
+      ],
+      "path": "reads/025.txt",
+      "bytes": 664,
+      "sha256": "7ebbdb4b99737d63af2b9bc074c9a828928e481657c0210d8216a1359daf1e15"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        4874,
+        4894
+      ],
+      "byte_range": [
+        185473,
+        186308
+      ],
+      "path": "reads/026.txt",
+      "bytes": 835,
+      "sha256": "14ed441d0be5a74b7e79e301e4afa99bcb40012a0b5daa2e5596297ae2b47745"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        5020,
+        5046
+      ],
+      "byte_range": [
+        191066,
+        192063
+      ],
+      "path": "reads/027.txt",
+      "bytes": 997,
+      "sha256": "1bf9303fb17de32374d93ec2c493b642ce9cbaee5d9500b1b4aaf88be3a9da0e"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        5135,
+        5164
+      ],
+      "byte_range": [
+        195953,
+        197083
+      ],
+      "path": "reads/028.txt",
+      "bytes": 1130,
+      "sha256": "cce02664f5f515f94ae86554cf898df9941f18e4fcb081b9130221c2a5132e29"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        11450,
+        11503
+      ],
+      "byte_range": [
+        453625,
+        456634
+      ],
+      "path": "reads/029.txt",
+      "bytes": 3009,
+      "sha256": "0e1a2cb83feef51c050c3dde62b77823561f656191bc8d805a83be189d9dfa8c"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        11543,
+        11560
+      ],
+      "byte_range": [
+        458513,
+        459322
+      ],
+      "path": "reads/030.txt",
+      "bytes": 809,
+      "sha256": "9989236901160519a22459b7125794380a3b0ee69e66d04eec6eec53bbc9c823"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "source_bytes": 374943,
+      "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+      "lines": [
+        1990,
+        2014
+      ],
+      "byte_range": [
+        81509,
+        82623
+      ],
+      "path": "reads/031.txt",
+      "bytes": 1114,
+      "sha256": "c9076267c01d844a99f6ce80b18b4dc54e12ddf5181dc6505421f447069b4c6c"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/tests/tui_command_palette.rs",
+      "source_bytes": 25893,
+      "source_sha256": "3b84deaf2d41b34eae9014861570b5e9e9ad7c1789a939554acd53caa096b41e",
+      "lines": [
+        240,
+        290
+      ],
+      "byte_range": [
+        9346,
+        11636
+      ],
+      "path": "reads/032.txt",
+      "bytes": 2290,
+      "sha256": "9b8e5261e93bdb79897d5ac23ae029fe4ea4860e1d14e55ea1c6eb62435ad1bc"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/tests/tui_command_palette.rs",
+      "source_bytes": 25893,
+      "source_sha256": "3b84deaf2d41b34eae9014861570b5e9e9ad7c1789a939554acd53caa096b41e",
+      "lines": [
+        413,
+        431
+      ],
+      "byte_range": [
+        16348,
+        17083
+      ],
+      "path": "reads/033.txt",
+      "bytes": 735,
+      "sha256": "dfc275d92c021f59af269a6d40c3cacc78c49a87836e70ed264f2e17afe1f037"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        14323,
+        14363
+      ],
+      "byte_range": [
+        586358,
+        587918
+      ],
+      "path": "reads/034.txt",
+      "bytes": 1560,
+      "sha256": "71261c7d05ef89f7ee701dab66ec4fb780669ce3ad18ad2576f62b2e6fdc6383"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        5766,
+        5823
+      ],
+      "byte_range": [
+        221858,
+        224503
+      ],
+      "path": "reads/035.txt",
+      "bytes": 2645,
+      "sha256": "b0c4d75ea539bfb82ddb06689c3b24e58211f7136bf1fc9c3cd85443c57d2704"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        5236,
+        5267
+      ],
+      "byte_range": [
+        199790,
+        201130
+      ],
+      "path": "reads/036.txt",
+      "bytes": 1340,
+      "sha256": "92fc6dce0fea88a8cbe01720542ba04e71fff1c981740bb4a801ee11484476ee"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        10208,
+        10242
+      ],
+      "byte_range": [
+        404389,
+        405824
+      ],
+      "path": "reads/037.txt",
+      "bytes": 1435,
+      "sha256": "0aebf22469b84e5c1dc10c85d4670fc3cea74a6c1136efb39710c1acf2aa1768"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/tui.rs",
+      "source_bytes": 638305,
+      "source_sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557",
+      "lines": [
+        5744,
+        5765
+      ],
+      "byte_range": [
+        221010,
+        221858
+      ],
+      "path": "reads/041.txt",
+      "bytes": 848,
+      "sha256": "37f70270a1a161c3f4a3fe5fc78567837a0e08b4e06c4f50112bc11a28520d35"
+    },
+    {
+      "scope": "root independently read worker captured fragment; current equality or supplement checked separately",
+      "source": "capture/zenpi/src/slash_actions.rs",
+      "source_bytes": 76284,
+      "source_sha256": "f5dbc7862462d314bb8880ad6ee0f02d7c38aafa8b96196a08acb9773490b497",
+      "lines": [
+        559,
+        710
+      ],
+      "byte_range": [
+        21641,
+        26973
+      ],
+      "path": "reads/043.txt",
+      "bytes": 5332,
+      "sha256": "d6dab6f771ccfc09865b674d2e2d4b711aa3e943a35256f89f8a5c3ff156b11e"
+    }
+  ],
+  "new_current_fragments": [
+    {
+      "origin": "/Users/wangweiyang/GitHub/codex/codex-rs/file-search/src/lib.rs",
+      "full_sha256": "75a6457abe072ba2ad0a330fafe26a8c31c2fef1983471af77923ee7d5582b0c",
+      "full_bytes": 38320,
+      "lines": [
+        1,
+        235
+      ],
+      "fragment": "root-reads/000.txt",
+      "fragment_sha256": "914091cdbec95651450073f8fb245a6d6a09f7ab12f067b82febc7a7fd22023e",
+      "fragment_bytes": 6849
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/codex/codex-rs/file-search/src/lib.rs",
+      "full_sha256": "75a6457abe072ba2ad0a330fafe26a8c31c2fef1983471af77923ee7d5582b0c",
+      "full_bytes": 38320,
+      "lines": [
+        337,
+        363
+      ],
+      "fragment": "root-reads/001.txt",
+      "fragment_sha256": "88f3d94437c8131f6ba9f5169f154427b0970690662f4ee5806daf342f60b718",
+      "fragment_bytes": 518
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/codex/codex-rs/tui/src/app_event_sender.rs",
+      "full_sha256": "5ed1c6b6cbb04e3cc207e5df0322a740a6017936cc6d9588024d9445ed76ca6c",
+      "full_bytes": 891,
+      "lines": [
+        1,
+        28
+      ],
+      "fragment": "root-reads/002.txt",
+      "fragment_sha256": "5ed1c6b6cbb04e3cc207e5df0322a740a6017936cc6d9588024d9445ed76ca6c",
+      "fragment_bytes": 891
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        562,
+        803
+      ],
+      "fragment": "root-reads/003.txt",
+      "fragment_sha256": "881c53d343b04457c437471c2528a1e857f473b9c17fafb7e19d300142855756",
+      "fragment_bytes": 7941
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        4817,
+        4919
+      ],
+      "fragment": "root-reads/004.txt",
+      "fragment_sha256": "9554fd11bab4881f7a2edb38cf2e17f1f30ada09cfed35b3319b2731fad88f70",
+      "fragment_bytes": 3487
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        5039,
+        5059
+      ],
+      "fragment": "root-reads/005.txt",
+      "fragment_sha256": "ce0129c10497bf5b50906a3797f40b7b3a9d0fbbff603c0f968965a9bfffd44b",
+      "fragment_bytes": 886
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        5183,
+        5210
+      ],
+      "fragment": "root-reads/006.txt",
+      "fragment_sha256": "c677d94e3f6e971b8dc783e61ab306243f8f394ba4e562d859268079d30e4724",
+      "fragment_bytes": 1041
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        5230,
+        5435
+      ],
+      "fragment": "root-reads/007.txt",
+      "fragment_sha256": "fd066cecf5771d92042895531d00d957195f98b94a49b43b3585845036509784",
+      "fragment_bytes": 8591
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        5936,
+        5972
+      ],
+      "fragment": "root-reads/008.txt",
+      "fragment_sha256": "08753a3c19b0235dbfe3f56e701527f836077c40e36c9d667e42051de5b956d9",
+      "fragment_bytes": 1526
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        11765,
+        11789
+      ],
+      "fragment": "root-reads/009.txt",
+      "fragment_sha256": "9726260edce06b2d958671cf27958ccf2fd54677dc9802a6eef4dbb7359783f2",
+      "fragment_bytes": 1076
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "full_sha256": "e45131dcf190d55068e369e55b8a3cc0dda18234ccee2c2ca335c9cefdd15904",
+      "full_bytes": 668438,
+      "lines": [
+        15076,
+        15114
+      ],
+      "fragment": "root-reads/010.txt",
+      "fragment_sha256": "2c6ae89a8b706fa9eaa63d827bff22b698d7cce304667c2441e2b9a50c164f10",
+      "fragment_bytes": 1538
+    },
+    {
+      "origin": "/Users/wangweiyang/GitHub/zenpi/tests/tui_command_palette.rs",
+      "full_sha256": "9d4e562fe1a61156567918d2d13757f3d63d86b70679a74a971ebf733255e76f",
+      "full_bytes": 32042,
+      "lines": [
+        533,
+        556
+      ],
+      "fragment": "root-reads/011.txt",
+      "fragment_sha256": "7a04bf9cf96a411a6d62478cd3bd5d2bc1418be0a88de282b8c9a5a0639cd808",
+      "fragment_bytes": 882
+    }
+  ],
+  "historical_307_reports_read_by_root_this_turn": false,
+  "whole_target_tui_read": false
+}

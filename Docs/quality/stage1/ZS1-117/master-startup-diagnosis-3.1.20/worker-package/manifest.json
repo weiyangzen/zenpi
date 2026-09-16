@@ -1,0 +1,28 @@
+{
+  "status": "[_] bounded diagnosis; exact cause unresolved; original gate FAIL",
+  "product_changes": false,
+  "new_builds": 0,
+  "new_diagnostic_launches": 5,
+  "files": [
+    {
+      "path": "evidence.tar.gz",
+      "bytes": 22710,
+      "sha256": "50bf772f19a5057b0f0ef1a055be540c210bac23490329296818b3a5a554aca6"
+    },
+    {
+      "path": "read-identities.json",
+      "bytes": 1184,
+      "sha256": "8c802fac475f5e3fb31421940d8f60898cda393b907716cac2666f5393582d5c"
+    },
+    {
+      "path": "review.md",
+      "bytes": 7802,
+      "sha256": "66c81e8f8b3bcaef0cee3bf92d7e49180f1b7da4831aa5049c5d63425d6caa1b"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 2322,
+      "sha256": "e01d43c4275b56191cabd17215195cfd37c447318abe757886d3773ca1cf8f83"
+    }
+  ]
+}

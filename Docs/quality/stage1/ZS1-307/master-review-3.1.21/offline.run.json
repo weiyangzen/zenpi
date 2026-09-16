@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/reference307-current-3.1.21/worker/verify.py",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/reference307-current-3.1.21/worker"
+  ],
+  "cwd": "/tmp",
+  "start": "2026-09-13T00:59:19.107867+00:00",
+  "end": "2026-09-13T00:59:19.419733+00:00",
+  "exit_code": 0
+}

@@ -1,0 +1,227 @@
+LINES 5435-5515
+            // Home/End operate on the current logical line, as users expect
+            // in a multiline prompt.  Ctrl-Home/Ctrl-End still address the
+            // complete buffer.
+            KeyCode::Home => {
+                self.cursor = if modifiers.contains(KeyModifiers::CONTROL) {
+                    0
+                } else {
+                    self.visible_line_boundary(false)
+                };
+                self.preferred_column = None;
+            }
+            KeyCode::End => {
+                self.cursor = if modifiers.contains(KeyModifiers::CONTROL) {
+                    self.input.len()
+                } else {
+                    self.visible_line_boundary(true)
+                };
+                self.preferred_column = None;
+            }
+            KeyCode::Up
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::SessionList) =>
+            {
+                self.move_session_browser_cursor(-1);
+                return TuiAction::Redraw;
+            }
+            KeyCode::Down
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::SessionList) =>
+            {
+                self.move_session_browser_cursor(1);
+                return TuiAction::Redraw;
+            }
+            KeyCode::PageUp
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::SessionList) =>
+            {
+                self.move_session_browser_cursor(-8);
+                return TuiAction::Redraw;
+            }
+            KeyCode::PageDown
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::SessionList) =>
+            {
+                self.move_session_browser_cursor(8);
+                return TuiAction::Redraw;
+            }
+            KeyCode::Up if self.input.is_empty() || self.history_cursor.is_some() => {
+                self.history_move(-1)
+            }
+            KeyCode::Down if self.input.is_empty() || self.history_cursor.is_some() => {
+                self.history_move(1)
+            }
+            KeyCode::Up => self.move_vertical(-1),
+            KeyCode::Down => self.move_vertical(1),
+            KeyCode::PageUp => self.scroll_up(8),
+            KeyCode::PageDown => self.scroll_down(8),
+            KeyCode::Enter => {
+                // A shifted Enter is an insertion operation, never a submit.
+                // This is handled after the Ctrl branch so terminals that
+                // report Ctrl-Shift-Enter remain newline-safe as well.
+                if modifiers.contains(KeyModifiers::SHIFT) {
+                    self.insert_text("\n");
+                    return TuiAction::None;
+                }
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::SessionList)
+                {
+                    if let Some(path) = self.selected_session_browser_path() {
+                        return TuiAction::OpenSession(path.to_owned());
+                    }
+                    return TuiAction::Redraw;
+                }
+                // Use trimming only to decide whether the buffer is blank;
+                // preserve the submitted bytes themselves. Leading spaces,
+                // indentation, and a deliberate trailing newline are part of
+                // a code-oriented prompt and must not be rewritten by the
+                // terminal host.
+                if !self.input.trim().is_empty() {
+                    let text = self.input.clone();
+                    if !self.paste.folds.is_empty() {
+
+LINES 6721-6745
+    fn session_browser_content(&self) -> String {
+        if self.session_browser.is_empty() {
+            return "No sessions".into();
+        }
+        self.session_browser
+            .iter()
+            .take(32)
+            .enumerate()
+            .map(|(index, summary)| {
+                format!(
+                    "{}{}  turns={} events={} next={}",
+                    if index == self.session_browser_cursor {
+                        "> "
+                    } else {
+                        "  "
+                    },
+                    summary.session_id,
+                    summary.turn_count,
+                    summary.event_count,
+                    summary.next_seq
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+LINES 8880-8995
+                crate::headless::resume_last_session_view_with_commit(&mut agent, commit)?
+            }
+            _ => return Err("expected session open or resume-last".into()),
+        };
+        let approval_mode = state
+            .project_metadata(&id)
+            .map(|meta| meta.approval_mode)
+            .unwrap_or_default();
+        let mut metadata = ProjectTabMetadata::from_session(agent.session());
+        metadata.approval_mode = approval_mode;
+        state.set_active_project_metadata(metadata);
+        reload_state_from_agent(state, &agent);
+        state.refresh_transcript_status(&agent);
+        Ok(data)
+    }
+
+    pub fn apply(&mut self, state: &mut TuiState, intent: ProjectIntent) -> Result<(), String> {
+        let current = state
+            .project_workspace
+            .as_ref()
+            .ok_or("project host is not initialized")?;
+        let base = current.active().ok_or("no active project")?.cwd();
+        let workspace = match &intent {
+            ProjectIntent::Open(path) => {
+                current
+                    .with_directory(Some(path), base)
+                    .map_err(|e| e.to_string())?
+                    .0
+            }
+            ProjectIntent::Select(index) => {
+                let key = state.project_tabs.get(*index).ok_or("project not found")?;
+                let tab = current
+                    .tabs()
+                    .iter()
+                    .find(|t| t.id().as_str() == key)
+                    .ok_or("project not found")?;
+                current.with_active(tab.id()).map_err(|e| e.to_string())?
+            }
+            ProjectIntent::Close(key) => {
+                if let Some(owner) = self.pool.owner(key) {
+                    let owner=owner.try_lock().map_err(|_|"Project is running; switch freely, but wait or cancel before closing it.")?;
+                    if owner.phase() == crate::core::AgentPhase::Running {
+                        return Err("Project is running".into());
+                    }
+                }
+                let tab = current
+                    .tabs()
+                    .iter()
+                    .find(|t| t.id().as_str() == key)
+                    .ok_or("project not found")?;
+                current
+                    .without_project(tab.id())
+                    .map_err(|e| e.to_string())?
+            }
+        };
+        let tab = workspace.active().ok_or("no active project")?;
+        let id = tab.id().as_str().to_owned();
+        let saved_sessions = state
+            .project_metadata
+            .iter()
+            .filter_map(|(key, metadata)| {
+                metadata
+                    .session_path
+                    .as_ref()
+                    .map(|path| (key.clone(), std::path::PathBuf::from(path)))
+            })
+            .collect();
+        self.pool.publish(workspace.clone(), &saved_sessions)?;
+        if let Ok(agent) = self.pool.active().try_lock() {
+            state.project_metadata.insert(
+                id.clone(),
+                ProjectTabMetadata::from_session(agent.session()),
+            );
+        }
+        if let Some(index) = state.project_index(&id) {
+            state.select_project_tab(index);
+        } else {
+            state.open_project_tab(id.clone());
+        }
+        if let ProjectIntent::Close(key) = intent {
+            state.close_project_tab(&key);
+        }
+        state.project_workspace = Some(workspace);
+        state.project_checkpoint_dirty = true;
+        state.cached_transcript = None;
+        // A running existing owner needs no lock to switch its saved view.
+        if let Ok(agent) = self.active(state).try_lock() {
+            let changed_session = state
+                .project_session_cursor(state.active_project())
+                .map_or_else(
+                    || {
+                        saved_sessions
+                            .get(state.active_project())
+                            .is_some_and(|path| path.as_path() != agent.session().path())
+                    },
+                    |(id, _)| id != agent.session().session_id(),
+                );
+            state.set_active_project_metadata(ProjectTabMetadata::from_session(agent.session()));
+            state.refresh_session_snapshot(agent.session());
+            state.refresh_transcript_status(&agent);
+            if changed_session || state.messages.is_empty() {
+                reload_state_from_agent(state, &agent);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn mailbox_result_heading(data: &serde_json::Value) -> &'static str {
+    let has_reply = data
+        .get("messages")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|messages| {
+            messages.iter().any(|entry| {
+                entry
+                    .get("message")

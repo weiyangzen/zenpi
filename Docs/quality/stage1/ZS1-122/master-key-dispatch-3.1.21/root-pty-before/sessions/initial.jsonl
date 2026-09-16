@@ -1,0 +1,2 @@
+{"created_at_ms":1789256396062,"cwd":"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-key-dispatch-integration-3.1.21/root-pty-before/workspace","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789256396062-10944-0","timestamp":"2026-09-12T23:39:56Z","timestamp_ms":1789256396062,"version":1}
+{"event":{"generation":1,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789256396062-10944-0","timestamp":"2026-09-12T23:39:56Z","timestamp_ms":1789256396075}

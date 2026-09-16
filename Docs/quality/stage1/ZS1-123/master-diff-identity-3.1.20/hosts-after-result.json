@@ -1,0 +1,289 @@
+{
+  "binary_sha256": "226fe376f114177d812df6eeb807550dc0ae575d77f7b6f622c608e638b35426",
+  "checks": {
+    "headless-0-exact-path-and-hunk": true,
+    "headless-1-exact-path-and-hunk": true,
+    "headless-2-exact-path-and-hunk": true,
+    "headless-3-exact-path-and-hunk": true,
+    "headless-4-exact-path-and-hunk": true,
+    "headless-5-exact-path-and-hunk": true,
+    "headless-shutdown": true,
+    "tui-0-exact-hunk": true,
+    "tui-1-exact-hunk": true,
+    "tui-2-exact-hunk": true,
+    "tui-3-exact-hunk": true,
+    "tui-4-exact-hunk": true,
+    "tui-5-exact-hunk": true,
+    "no-option-side-effect": true,
+    "tui-exit-and-alternate-screen-restored": true
+  },
+  "git_commands": [
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "init",
+        "-q"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "config",
+        "user.name",
+        "Local diff fixture"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "config",
+        "user.email",
+        "diff@example.test"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "config",
+        "commit.gpgsign",
+        "false"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "add",
+        "--",
+        "note\\report.txt",
+        "note/report.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "add",
+        "--",
+        "selected[ab].txt",
+        "selecteda.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "add",
+        "--",
+        ":(glob)*.txt",
+        "glob-neighbor.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "add",
+        "--",
+        "--output=NOT_AN_OPTION.txt",
+        "option-neighbor.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "add",
+        "--",
+        "工作 note.txt",
+        "space-neighbor.txt"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "--literal-pathspecs",
+        "commit",
+        "-qm",
+        "fixture files"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "cases": [
+    {
+      "path": "note\\report.txt",
+      "neighbor": "note/report.txt",
+      "tracked": true,
+      "expected": "SELECTED_00_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_00_DIFF_CONTENT",
+      "selected_inode": 12723291,
+      "neighbor_inode": 12723293
+    },
+    {
+      "path": "selected[ab].txt",
+      "neighbor": "selecteda.txt",
+      "tracked": true,
+      "expected": "SELECTED_01_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_01_DIFF_CONTENT",
+      "selected_inode": 12723299,
+      "neighbor_inode": 12723300
+    },
+    {
+      "path": ":(glob)*.txt",
+      "neighbor": "glob-neighbor.txt",
+      "tracked": true,
+      "expected": "SELECTED_02_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_02_DIFF_CONTENT",
+      "selected_inode": 12723302,
+      "neighbor_inode": 12723303
+    },
+    {
+      "path": "--output=NOT_AN_OPTION.txt",
+      "neighbor": "option-neighbor.txt",
+      "tracked": true,
+      "expected": "SELECTED_03_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_03_DIFF_CONTENT",
+      "selected_inode": 12723305,
+      "neighbor_inode": 12723306
+    },
+    {
+      "path": "工作 note.txt",
+      "neighbor": "space-neighbor.txt",
+      "tracked": true,
+      "expected": "SELECTED_04_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_04_DIFF_CONTENT",
+      "selected_inode": 12723308,
+      "neighbor_inode": 12723309
+    },
+    {
+      "path": "new\\only.txt",
+      "neighbor": "new/only.txt",
+      "tracked": false,
+      "expected": "SELECTED_05_DIFF_CONTENT",
+      "wrong": "NEIGHBOR_05_DIFF_CONTENT",
+      "selected_inode": 12723311,
+      "neighbor_inode": 12723313
+    }
+  ],
+  "tui_messages": [
+    [
+      {
+        "role": "User",
+        "text": "/diff \"note\\\\report.txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff note\\report.txt changed=true truncated=false\nstatus:  M \"note\\\\report.txt\"\n\ndiff --git \"a/note\\\\report.txt\" \"b/note\\\\report.txt\"\nindex cbb0e85..46556cf 100644\n--- \"a/note\\\\report.txt\"\n+++ \"b/note\\\\report.txt\"\n@@ -1 +1 @@\n-BEFORE\n+SELECTED_00_DIFF_CONTENT\n"
+      }
+    ],
+    [
+      {
+        "role": "User",
+        "text": "/diff \"selected[ab].txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff selected[ab].txt changed=true truncated=false\nstatus:  M selected[ab].txt\n\ndiff --git a/selected[ab].txt b/selected[ab].txt\nindex cbb0e85..edf17fd 100644\n--- a/selected[ab].txt\n+++ b/selected[ab].txt\n@@ -1 +1 @@\n-BEFORE\n+SELECTED_01_DIFF_CONTENT\n"
+      }
+    ],
+    [
+      {
+        "role": "User",
+        "text": "/diff \":(glob)*.txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff :(glob)*.txt changed=true truncated=false\nstatus:  M :(glob)*.txt\n\ndiff --git a/:(glob)*.txt b/:(glob)*.txt\nindex cbb0e85..6bb87ca 100644\n--- a/:(glob)*.txt\n+++ b/:(glob)*.txt\n@@ -1 +1 @@\n-BEFORE\n+SELECTED_02_DIFF_CONTENT\n"
+      }
+    ],
+    [
+      {
+        "role": "User",
+        "text": "/diff \"--output=NOT_AN_OPTION.txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff --output=NOT_AN_OPTION.txt changed=true truncated=false\nstatus:  M --output=NOT_AN_OPTION.txt\n\ndiff --git a/--output=NOT_AN_OPTION.txt b/--output=NOT_AN_OPTION.txt\nindex cbb0e85..37b87e4 100644\n--- a/--output=NOT_AN_OPTION.txt\n+++ b/--output=NOT_AN_OPTION.txt\n@@ -1 +1 @@\n-BEFORE\n+SELECTED_03_DIFF_CONTENT\n"
+      }
+    ],
+    [
+      {
+        "role": "User",
+        "text": "/diff \"工作 note.txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff 工作 note.txt changed=true truncated=false\nstatus:  M \"\\345\\267\\245\\344\\275\\234 note.txt\"\n\ndiff --git \"a/\\345\\267\\245\\344\\275\\234 note.txt\" \"b/\\345\\267\\245\\344\\275\\234 note.txt\"\nindex cbb0e85..ac22d0f 100644\n--- \"a/\\345\\267\\245\\344\\275\\234 note.txt\"\t\n+++ \"b/\\345\\267\\245\\344\\275\\234 note.txt\"\t\n@@ -1 +1 @@\n-BEFORE\n+SELECTED_04_DIFF_CONTENT\n"
+      }
+    ],
+    [
+      {
+        "role": "User",
+        "text": "/diff \"new\\\\only.txt\""
+      },
+      {
+        "role": "System",
+        "text": "diff new\\only.txt changed=true truncated=false\nstatus: ?? \"new\\\\only.txt\"\n\ndiff --git \"a/./new\\\\only.txt\" \"b/./new\\\\only.txt\"\nnew file mode 100644\nindex 0000000..b89b2a5\n--- /dev/null\n+++ \"b/./new\\\\only.txt\"\n@@ -0,0 +1 @@\n+SELECTED_05_DIFF_CONTENT\n"
+      }
+    ]
+  ],
+  "screens": [
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│● /diff \"note\\\\report.txt\"                            ││Blueprints 0  Goals 0  gen 0                                                      │\n│● diff note\\report.txt changed=true truncated=false   ││No persisted Blueprint or Goal                                                    │\n│  status:  M \"note\\\\report.txt\"                       ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git \"a/note\\\\report.txt\" \"b/note\\\\report.txt\"││                                                                                  │\n│  index cbb0e85..46556cf 100644                       ││                                                                                  │\n│  --- \"a/note\\\\report.txt\"                            ││                                                                                  │\n│  +++ \"b/note\\\\report.txt\"                            ││                                                                                  │\n│  @@ -1 +1 @@                                         ││                                                                                  │\n│  -BEFORE                                             ││                                                                                  │\n│  +SELECTED_00_DIFF_CONTENT                           ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      ",
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│  +SELECTED_00_DIFF_CONTENT                           ││Blueprints 0  Goals 0  gen 0                                                      │\n│● /diff \"selected[ab].txt\"                            ││No persisted Blueprint or Goal                                                    │\n│● diff selected[ab].txt changed=true truncated=false  ││                                                                                  │\n│  status:  M selected[ab].txt                         ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git a/selected[ab].txt b/selected[ab].txt    ││                                                                                  │\n│  index cbb0e85..edf17fd 100644                       ││                                                                                  │\n│  --- a/selected[ab].txt                              ││                                                                                  │\n│  +++ b/selected[ab].txt                              ││                                                                                  │\n│  @@ -1 +1 @@                                         ││                                                                                  │\n│  -BEFORE                                             ││                                                                                  │\n│  +SELECTED_01_DIFF_CONTENT                           ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      ",
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│  +SELECTED_01_DIFF_CONTENT                           ││Blueprints 0  Goals 0  gen 0                                                      │\n│● /diff \":(glob)*.txt\"                                ││No persisted Blueprint or Goal                                                    │\n│● diff :(glob).txt changed=true truncated=false       ││                                                                                  │\n│  status:  M :(glob).txt                              ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git a/:(glob).txt b/:(glob).txt              ││                                                                                  │\n│  index cbb0e85..6bb87ca 100644                       ││                                                                                  │\n│  --- a/:(glob).txt                                   ││                                                                                  │\n│  +++ b/:(glob).txt                                   ││                                                                                  │\n│  @@ -1 +1 @@                                         ││                                                                                  │\n│  -BEFORE                                             ││                                                                                  │\n│  +SELECTED_02_DIFF_CONTENT                           ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      ",
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│● diff --output=NOT_AN_OPTION.txt changed=true truncat││Blueprints 0  Goals 0  gen 0                                                      │\n│  ed=false                                            ││No persisted Blueprint or Goal                                                    │\n│  status:  M --output=NOT_AN_OPTION.txt               ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git a/--output=NOT_AN_OPTION.txt b/--output=N││                                                                                  │\n│  OT_AN_OPTION.txt                                    ││                                                                                  │\n│  index cbb0e85..37b87e4 100644                       ││                                                                                  │\n│  --- a/--output=NOT_AN_OPTION.txt                    ││                                                                                  │\n│  +++ b/--output=NOT_AN_OPTION.txt                    ││                                                                                  │\n│  @@ -1 +1 @@                                         ││                                                                                  │\n│  -BEFORE                                             ││                                                                                  │\n│  +SELECTED_03_DIFF_CONTENT                           ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      ",
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│● /diff \"工作 note.txt\"                               ││Blueprints 0  Goals 0  gen 0                                                      │\n│● diff 工作 note.txt changed=true truncated=false     ││No persisted Blueprint or Goal                                                    │\n│  status:  M \"\\345\\267\\245\\344\\275\\234 note.txt\"      ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git \"a/\\345\\267\\245\\344\\275\\234 note.txt\" \"b/││                                                                                  │\n│  \\345\\267\\245\\344\\275\\234 note.txt\"                  ││                                                                                  │\n│  index cbb0e85..ac22d0f 100644                       ││                                                                                  │\n│  --- \"a/\\345\\267\\245\\344\\275\\234 note.txt\"           ││                                                                                  │\n│  +++ \"b/\\345\\267\\245\\344\\275\\234 note.txt\"           ││                                                                                  │\n│  @@ -1 +1 @@                                         ││                                                                                  │\n│  -BEFORE                                             ││                                                                                  │\n│  +SELECTED_04_DIFF_CONTENT                           ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                        │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      ",
+    " zenpi | projects: [initial]                                                                                                     [<] [>] [+]\n zenpi    Ready | model gpt-4.1 | tokens — | history ~0/128000 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integra\n┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐\n│  +SELECTED_04_DIFF_CONTENT                           ││Blueprints 0  Goals 0  gen 0                                                      │\n│● /diff \"new\\\\only.txt\"                               ││No persisted Blueprint or Goal                                                    │\n│● diff new\\only.txt changed=true truncated=false      ││                                                                                  │\n│  status: ?? \"new\\\\only.txt\"                          ││                                                                                  │\n│                                                      ││                                                                                  │\n│  diff --git \"a/./new\\\\only.txt\" \"b/./new\\\\only.txt\"  ││                                                                                  │\n│  new file mode 100644                                ││                                                                                  │\n│  index 0000000..b89b2a5                              ││                                                                                  │\n│  --- /dev/null                                       ││                                                                                  │\n│  +++ \"b/./new\\\\only.txt\"                             ││                                                                                  │\n│  @@ -0,0 +1 @@                                       ││                                                                                  │\n│  +SELECTED_05_DIFF_CONTENT                           ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │\n│workspace                                             ││                                                                                  │\n│files 39  dirs 19                                     ││                                                                                  │\n│size 27.7 KiB  nodes 58                               ││                                                                                  │\n│truncated false                                       ││                                                                                  │\n│host                                                  ││                                                                                  │\n│cpu 16  load unavailable                              ││                                                                                  │\n│mem free unavailable                                  ││                                                                                  │\n│process unavailable                                   ││                                                                                  │\n└──────────────────────────────────────────────────────┘│                                                                                  │\n┌ Goal ────────────────────────────────────────────────┐│                                                                                  │\n│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n│                                                      ││                                                                                  │\n└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘\n┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐\n│                                                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      "
+  ],
+  "provider_prompts_sent": 0,
+  "tui_processes": 1,
+  "headless_processes": 1,
+  "environment_overrides": {
+    "GIT_GLOB_PATHSPECS": "1",
+    "GIT_ICASE_PATHSPECS": "1"
+  },
+  "termios_equality_checked": false,
+  "headless_argv": [
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integration/zenpi",
+    "--mode",
+    "headless",
+    "--session",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integration/hosts-after/fixture/sessions/headless.jsonl"
+  ],
+  "headless_exit_code": 0,
+  "passed": true
+}

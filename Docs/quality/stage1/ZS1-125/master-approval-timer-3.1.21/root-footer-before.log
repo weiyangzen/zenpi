@@ -1,0 +1,47 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.99s
+     Running unittests src/lib.rs (target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 2 tests
+test tui::tests::approval_timer_hidden_footer_replaces_shortcut_text_after_resize ... FAILED
+test tui::tests::approval_timer_hidden_footer_preserves_unsaved_draft_warning ... FAILED
+
+failures:
+
+---- tui::tests::approval_timer_hidden_footer_replaces_shortcut_text_after_resize stdout ----
+
+thread 'tui::tests::approval_timer_hidden_footer_replaces_shortcut_text_after_resize' (30374922) panicked at src/tui.rs:15047:13:
+assertion `left == right` failed: width=180
+  left: "1 approvals pending · Alt-A reviewU line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input"
+ right: "1 approvals pending · Alt-A review"
+
+---- tui::tests::approval_timer_hidden_footer_preserves_unsaved_draft_warning stdout ----
+
+thread 'tui::tests::approval_timer_hidden_footer_preserves_unsaved_draft_warning' (30374921) panicked at src/tui.rs:15064:9:
+assertion `left == right` failed
+  left: "1 approvals pending · Alt-A review"
+ right: "Draft not saved · disk full"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tui::tests::approval_timer_hidden_footer_preserves_unsaved_draft_warning
+    tui::tests::approval_timer_hidden_footer_replaces_shortcut_text_after_resize
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--lib`

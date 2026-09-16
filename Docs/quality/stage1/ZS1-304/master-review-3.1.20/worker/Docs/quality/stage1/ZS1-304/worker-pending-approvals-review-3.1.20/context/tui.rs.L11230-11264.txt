@@ -1,0 +1,35 @@
+                match event {
+                    RuntimeEvent::Completed { id, outcome } => {
+                        let rejected_input = submitted_inputs.remove(&id);
+                        let events = stream_buffers.remove(&id);
+                        if Some(id) != active_job {
+                            // A superseded stream may still publish its
+                            // terminal event after the replacement was
+                            // admitted. Its buffered deltas are intentionally
+                            // discarded and must not alter the active turn.
+                            continue;
+                        }
+                        // A final provider delta can race the runtime
+                        // completion notification. Drain this job's buffer
+                        // once more before replacing its provisional line.
+                        if let Some(events) = events
+                            && drain_tui_provider_events(&mut state, id.get(), &events)
+                        {
+                            scheduler.request();
+                        }
+                        // Approval prompts belong to the turn that just
+                        // reached a terminal state. Drop any prompt that
+                        // raced with completion/cancellation; otherwise the
+                        // next normal user message would be consumed as a
+                        // stale y/n response.
+                        pending_approvals.clear();
+                        state
+                            .approval_views
+                            .remove(&state.project_tabs[state.active_project]);
+                        active_job = None;
+                        active_job_kind = None;
+                        state.set_busy(false);
+                        drain_agent_tool_events(
+                            active_job_owner.as_ref().unwrap_or(&shared),
+                            &mut state,
+                        );

@@ -1,0 +1,121 @@
+{
+  "item": "ZS1-023",
+  "status": "[_]",
+  "authority_version": "3.1.11",
+  "authority_digest": "cefbe4a1753cbaa07857ed2db5934aa5f1a778670d00cffa6ab87d7942a43713",
+  "observed_authority_file_sha256": "a71684f37563bbfdc9e8f4090e65763a54775dad43188d63ea34f4066c287fce",
+  "worktree": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "scope": "Independent per-file runnable behavior proof: 20 scenarios against unmodified source. 022 completed before 023. No erased-interface/runtime-validator, upstream full suite, UI, or directory acceptance claim. Only imported theme constant mocked; runtime/session/model/action inputs are explicit fixtures.",
+  "source": {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/runner.ts",
+    "sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084",
+    "bytes": 39774,
+    "lines": 1286
+  },
+  "files": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/extensions/runner.ts_learn.md",
+      "base_exists": true,
+      "base_sha256": "311270d14549cc470e62c2ddf8ec20b872d4ac15ec74a5eec252a1c2c24bef1c",
+      "base_bytes": 3888,
+      "sha256": "26579360c5e545b580575635c3b9fbb9c1a1ae25f1790f1bc974716130e4eb26",
+      "bytes": 4771,
+      "lines": 23,
+      "patch_sha256": "4932389fc5612888f19daa0f8e35afcc24f592d46d02860b96a058f1d5dc6b07",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/README.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "553976e8a7afc1d9444db565c95d6e013beefcf682375a1d61aa9d06e2c1a9a0",
+      "bytes": 3231,
+      "lines": 11,
+      "patch_sha256": "fa4d3968890ead81216aaff83f32c95d2a03fb583f4c1620cb2765b740de5e5f",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/artifact-index.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "e9129052c66e88182514af5395e0d24e64a06254bd164b2efeb621895bac4891",
+      "bytes": 1139,
+      "lines": 32,
+      "patch_sha256": "bda8878596757f8069d9d931a79c4172f2df014ef0211c22af58e9a083d1a3b2",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/probe.ts",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "296baeb89995195fbccdf256737a77bab13241c4b226618012629e89edabba89",
+      "bytes": 17907,
+      "lines": 36,
+      "patch_sha256": "ae1389b8d0407ed34ac51d4fbbec7d17c0389139ddfee27101ab930b06653a98",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/source-runner-final.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "16c23c290acc135e6f18df5515d7e9546d454154301514a79171f7ced2685fbe",
+      "bytes": 845,
+      "lines": 22,
+      "patch_sha256": "021e43d8071425a2c63c0de006c5fae1dba206308c16e82a825eefd17e348e1f",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/source-runner-final.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "fc39a3dc81ca1833009f8a4fc9d11b6aa8de7c0d5371ae851fde0cc484d61a62",
+      "bytes": 3251,
+      "lines": 91,
+      "patch_sha256": "d08bcdda3a606ea197def4aca52c31de3c757b23694f9893c1d37da917d3ed32",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/source-runner.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "5fa620bdc1b3a26310a0d33104022433837da218bbc44355c9b79105f244ba5f",
+      "bytes": 824,
+      "lines": 22,
+      "patch_sha256": "2c6a20405344ae07eb664b13a228a3da7db2880f8cd2acccfcec4238afd9e502",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-023/worker-source-probe/source-runner.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "31a4e947dfbd4891ad9c0a34f1c8a36e8eb55f386788ff8175a1b7acdbd6a166",
+      "bytes": 2979,
+      "lines": 83,
+      "patch_sha256": "14a50dda782703f842c2d3bc1bea612a2db3502e069d17f3c7f795986a410457",
+      "status": "[_]"
+    }
+  ],
+  "validators": [
+    "source-runner-final"
+  ],
+  "evidence_directory": "Docs/quality/stage1/ZS1-023/worker-source-probe",
+  "patch_sha256": "ec8c9aaaf512a0aba8c412176725851e7bdd51d4535c7d0b515933cc2bbab863",
+  "patch_bytes": 34550,
+  "runner_sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8",
+  "verification": "git apply --check, forward full-byte hash verification, reverse --check and exact base restoration; new evidence paths removed by reverse",
+  "immutable_prior_manifest_hashes": {
+    "extension115-ready": "300d3a1cb9c7c58ecee77a459e6846637bc9354bfdedf2996f10fb1f6bf6a2f4",
+    "transport-ready": "4d717a16524918b80d06eeb44ecb6c95f17b94e5f522d978f89fd72d7b06799d",
+    "anthropic-ready": "6e931d64d957735fd624792d83b7c83a5e62258fb40f9a39dd00db218f62295a",
+    "gemini-ready": "a3f4c6b9ab250885ac15bcf04a0b5bb326f35286702c294dbac4059c66e83e26"
+  },
+  "frozen_at": "2026-09-10T19:32:37.241796+00:00",
+  "integration": "Main reviews and integrates only this candidate delta; shared main repository was read-only. No acceptance mark or commit."
+}

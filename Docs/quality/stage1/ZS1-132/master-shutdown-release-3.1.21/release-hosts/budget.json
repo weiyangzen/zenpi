@@ -1,0 +1,243 @@
+{
+  "budgets": {
+    "coalesced_frames_max": 1,
+    "cold_start_max_ms_max": 1000.0,
+    "cold_start_peak_rss_max_bytes": 100663296,
+    "layout_max_us": 100.0,
+    "normal_dependencies_max": 16,
+    "queue_round_trip_max_us": 2000.0,
+    "release_binary_bytes_max": 8388608,
+    "render_max_us": 10000.0
+  },
+  "cold_start": {
+    "binary_sha256": "6891df5d13a373eff656f8c99a5b5367f9ddb4e502f159d0d925162ec6bccbc4",
+    "elapsed_ms": {
+      "max": 464.95075,
+      "median": 42.529875,
+      "min": 41.345167,
+      "sample_count": 3,
+      "samples": [
+        464.95075,
+        42.529875,
+        41.345167
+      ]
+    },
+    "observations": [
+      {
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi",
+          "--mode",
+          "headless",
+          "--session",
+          "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-0.jsonl"
+        ],
+        "binary_sha256": "6891df5d13a373eff656f8c99a5b5367f9ddb4e502f159d0d925162ec6bccbc4",
+        "communicate_ms": 462.547416,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi",
+        "elapsed_ms": 464.95075,
+        "ended_at": "2026-09-12T17:06:15.735984+00:00",
+        "fresh_session": true,
+        "index": 0,
+        "peak_rss_bytes": 5193728,
+        "phase_scope": "parent observations, not internal product phase attribution",
+        "pid_scope": "time(1) wrapper/process-group leader; not the zenpi child PID",
+        "popen_return_ms": 2.105125,
+        "process_observed_ms": 464.652541,
+        "returncode": 0,
+        "session": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-0.jsonl",
+        "started_at": "2026-09-12T17:06:15.271153+00:00",
+        "stderr": {
+          "bytes": 777,
+          "prefix_base64": "ICAgICAgICAwLjQ2IHJlYWwgICAgICAgICAwLjAwIHVzZXIgICAgICAgICAwLjAwIHN5cwogICAgICAgICAgICAgNTE5MzcyOCAgbWF4aW11bSByZXNpZGVudCBzZXQgc2l6ZQogICAgICAgICAgICAgICAgICAgMCAgYXZlcmFnZSBzaGFyZWQgbWVtb3J5IHNpemUKICAgICAgICAgICAgICAgICAgIDAgIGF2ZXJhZ2UgdW5zaGFyZWQgZGF0YSBzaXplCiAgICAgICAgICAgICAgICAgICAwICBhdmVyYWdlIHVuc2hhcmVkIHN0YWNrIHNpemUKICAgICAgICAgICAgICAgICA1MDkgIHBhZ2UgcmVjbGFpbXMKICAgICAgICAgICAgICAgICAgIDAgIHBhZ2UgZmF1bHRzCiAgICAgICAgICAgICAgICAgICAwICBzd2FwcwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgaW5wdXQgb3BlcmF0aW9ucwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgb3V0cHV0IG9wZXJhdGlvbnMKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHNlbnQKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgICAwICBzaWduYWxzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgIDIwICB2b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAgICAgICAxOCAgaW52b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAzODQ5MzUyNSAgaW5zdHJ1Y3Rpb25zIHJldGlyZWQKICAgICAgICAgICAgMjAyMDExMTkgIGN5Y2xlcyBlbGFwc2VkCiAgICAgICAgICAgICAxNzM2OTkyICBwZWFrIG1lbW9yeSBmb290cHJpbnQK",
+          "sha256": "3717905342da8fa67c629b7a0161927ec2e154ff572a7543232e4d1e29cd2be7",
+          "truncated": false
+        },
+        "stdout": {
+          "bytes": 144,
+          "prefix_base64": "eyJzY2hlbWFfdmVyc2lvbiI6MSwiaWQiOiJiZW5jaC1zdG9wIiwidHlwZSI6InJlc3BvbnNlIiwiY29tbWFuZCI6InNodXRkb3duIiwic3VjY2VzcyI6dHJ1ZSwiZGF0YSI6eyJjbG9zaW5nIjp0cnVlLCJkcmFpbmVkIjp0cnVlfSwiY29kZSI6Im9rIn0K",
+          "sha256": "25ec3e42f157458bc2bef231093a547f8ca61277aea7a7400a24075c4f67a8af",
+          "truncated": false
+        },
+        "timed_out": false,
+        "wrapper_pid": 28265
+      },
+      {
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi",
+          "--mode",
+          "headless",
+          "--session",
+          "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-1.jsonl"
+        ],
+        "binary_sha256": "6891df5d13a373eff656f8c99a5b5367f9ddb4e502f159d0d925162ec6bccbc4",
+        "communicate_ms": 40.165875,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi",
+        "elapsed_ms": 42.529875,
+        "ended_at": "2026-09-12T17:06:15.779388+00:00",
+        "fresh_session": true,
+        "index": 1,
+        "peak_rss_bytes": 5160960,
+        "phase_scope": "parent observations, not internal product phase attribution",
+        "pid_scope": "time(1) wrapper/process-group leader; not the zenpi child PID",
+        "popen_return_ms": 2.224,
+        "process_observed_ms": 42.389875,
+        "returncode": 0,
+        "session": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-1.jsonl",
+        "started_at": "2026-09-12T17:06:15.736968+00:00",
+        "stderr": {
+          "bytes": 777,
+          "prefix_base64": "ICAgICAgICAwLjAzIHJlYWwgICAgICAgICAwLjAwIHVzZXIgICAgICAgICAwLjAwIHN5cwogICAgICAgICAgICAgNTE2MDk2MCAgbWF4aW11bSByZXNpZGVudCBzZXQgc2l6ZQogICAgICAgICAgICAgICAgICAgMCAgYXZlcmFnZSBzaGFyZWQgbWVtb3J5IHNpemUKICAgICAgICAgICAgICAgICAgIDAgIGF2ZXJhZ2UgdW5zaGFyZWQgZGF0YSBzaXplCiAgICAgICAgICAgICAgICAgICAwICBhdmVyYWdlIHVuc2hhcmVkIHN0YWNrIHNpemUKICAgICAgICAgICAgICAgICA1MDcgIHBhZ2UgcmVjbGFpbXMKICAgICAgICAgICAgICAgICAgIDAgIHBhZ2UgZmF1bHRzCiAgICAgICAgICAgICAgICAgICAwICBzd2FwcwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgaW5wdXQgb3BlcmF0aW9ucwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgb3V0cHV0IG9wZXJhdGlvbnMKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHNlbnQKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgICAwICBzaWduYWxzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgIDIwICB2b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAgICAgICAxMyAgaW52b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAyOTUyMTQ0MyAgaW5zdHJ1Y3Rpb25zIHJldGlyZWQKICAgICAgICAgICAgMTIzNzcxMjIgIGN5Y2xlcyBlbGFwc2VkCiAgICAgICAgICAgICAxNjg3ODQwICBwZWFrIG1lbW9yeSBmb290cHJpbnQK",
+          "sha256": "b229ed24008e5727e58d4fc6341da9c8669339653ad2fbd7bf085a5994dd8f0f",
+          "truncated": false
+        },
+        "stdout": {
+          "bytes": 144,
+          "prefix_base64": "eyJzY2hlbWFfdmVyc2lvbiI6MSwiaWQiOiJiZW5jaC1zdG9wIiwidHlwZSI6InJlc3BvbnNlIiwiY29tbWFuZCI6InNodXRkb3duIiwic3VjY2VzcyI6dHJ1ZSwiZGF0YSI6eyJjbG9zaW5nIjp0cnVlLCJkcmFpbmVkIjp0cnVlfSwiY29kZSI6Im9rIn0K",
+          "sha256": "25ec3e42f157458bc2bef231093a547f8ca61277aea7a7400a24075c4f67a8af",
+          "truncated": false
+        },
+        "timed_out": false,
+        "wrapper_pid": 28269
+      },
+      {
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi",
+          "--mode",
+          "headless",
+          "--session",
+          "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-2.jsonl"
+        ],
+        "binary_sha256": "6891df5d13a373eff656f8c99a5b5367f9ddb4e502f159d0d925162ec6bccbc4",
+        "communicate_ms": 39.46075,
+        "cwd": "/Users/wangweiyang/GitHub/zenpi",
+        "elapsed_ms": 41.345167,
+        "ended_at": "2026-09-12T17:06:15.821508+00:00",
+        "fresh_session": true,
+        "index": 2,
+        "peak_rss_bytes": 5193728,
+        "phase_scope": "parent observations, not internal product phase attribution",
+        "pid_scope": "time(1) wrapper/process-group leader; not the zenpi child PID",
+        "popen_return_ms": 1.785416,
+        "process_observed_ms": 41.246166,
+        "returncode": 0,
+        "session": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-spx67fjb/session-2.jsonl",
+        "started_at": "2026-09-12T17:06:15.780244+00:00",
+        "stderr": {
+          "bytes": 777,
+          "prefix_base64": "ICAgICAgICAwLjAzIHJlYWwgICAgICAgICAwLjAwIHVzZXIgICAgICAgICAwLjAwIHN5cwogICAgICAgICAgICAgNTE5MzcyOCAgbWF4aW11bSByZXNpZGVudCBzZXQgc2l6ZQogICAgICAgICAgICAgICAgICAgMCAgYXZlcmFnZSBzaGFyZWQgbWVtb3J5IHNpemUKICAgICAgICAgICAgICAgICAgIDAgIGF2ZXJhZ2UgdW5zaGFyZWQgZGF0YSBzaXplCiAgICAgICAgICAgICAgICAgICAwICBhdmVyYWdlIHVuc2hhcmVkIHN0YWNrIHNpemUKICAgICAgICAgICAgICAgICA1MDkgIHBhZ2UgcmVjbGFpbXMKICAgICAgICAgICAgICAgICAgIDAgIHBhZ2UgZmF1bHRzCiAgICAgICAgICAgICAgICAgICAwICBzd2FwcwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgaW5wdXQgb3BlcmF0aW9ucwogICAgICAgICAgICAgICAgICAgMCAgYmxvY2sgb3V0cHV0IG9wZXJhdGlvbnMKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHNlbnQKICAgICAgICAgICAgICAgICAgIDAgIG1lc3NhZ2VzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgICAwICBzaWduYWxzIHJlY2VpdmVkCiAgICAgICAgICAgICAgICAgIDIwICB2b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAgICAgICAxMiAgaW52b2x1bnRhcnkgY29udGV4dCBzd2l0Y2hlcwogICAgICAgICAgICAyOTczMjYxMSAgaW5zdHJ1Y3Rpb25zIHJldGlyZWQKICAgICAgICAgICAgMTI5NTg2NjEgIGN5Y2xlcyBlbGFwc2VkCiAgICAgICAgICAgICAxNzM2OTkyICBwZWFrIG1lbW9yeSBmb290cHJpbnQK",
+          "sha256": "1acae927d4dd191566ce3802a2072fdb258bf04317a3bbec13f56afcdfd90f4c",
+          "truncated": false
+        },
+        "stdout": {
+          "bytes": 144,
+          "prefix_base64": "eyJzY2hlbWFfdmVyc2lvbiI6MSwiaWQiOiJiZW5jaC1zdG9wIiwidHlwZSI6InJlc3BvbnNlIiwiY29tbWFuZCI6InNodXRkb3duIiwic3VjY2VzcyI6dHJ1ZSwiZGF0YSI6eyJjbG9zaW5nIjp0cnVlLCJkcmFpbmVkIjp0cnVlfSwiY29kZSI6Im9rIn0K",
+          "sha256": "25ec3e42f157458bc2bef231093a547f8ca61277aea7a7400a24075c4f67a8af",
+          "truncated": false
+        },
+        "timed_out": false,
+        "wrapper_pid": 28271
+      }
+    ],
+    "process_peak_rss_bytes": {
+      "max": 5193728.0,
+      "median": 5193728.0,
+      "min": 5160960.0,
+      "sample_count": 3,
+      "samples": [
+        5193728.0,
+        5160960.0,
+        5193728.0
+      ]
+    }
+  },
+  "dependencies": {
+    "features": {
+      "default": [],
+      "dev-fixtures": []
+    },
+    "normal": [
+      "base64",
+      "crossterm",
+      "httpdate",
+      "ignore",
+      "libc",
+      "ratatui",
+      "serde",
+      "serde_json",
+      "sha2",
+      "thiserror",
+      "toml",
+      "unicode-segmentation",
+      "unicode-width",
+      "ureq",
+      "yaml_serde"
+    ],
+    "normal_count": 15,
+    "tree": [
+      "zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)",
+      "\u251c\u2500\u2500 base64 v0.23.1",
+      "\u251c\u2500\u2500 crossterm v0.29.0 (/Users/wangweiyang/GitHub/zenpi/vendor/crossterm)",
+      "\u251c\u2500\u2500 httpdate v1.0.3",
+      "\u251c\u2500\u2500 ignore v0.4.33",
+      "\u251c\u2500\u2500 libc v0.2.189",
+      "\u251c\u2500\u2500 ratatui v0.30.2",
+      "\u251c\u2500\u2500 serde v1.0.229",
+      "\u251c\u2500\u2500 serde_json v1.0.151",
+      "\u251c\u2500\u2500 sha2 v0.10.9",
+      "\u251c\u2500\u2500 thiserror v2.0.20",
+      "\u251c\u2500\u2500 toml v0.9.12+spec-1.1.0",
+      "\u251c\u2500\u2500 unicode-segmentation v1.13.3",
+      "\u251c\u2500\u2500 unicode-width v0.2.2",
+      "\u251c\u2500\u2500 ureq v3.4.0",
+      "\u2514\u2500\u2500 yaml_serde v0.10.7",
+      "[dev-dependencies]",
+      "\u2514\u2500\u2500 tempfile v3.27.0"
+    ]
+  },
+  "gates": {
+    "cold_start": true,
+    "cold_start_peak_rss": true,
+    "layout": true,
+    "normal_dependencies": true,
+    "queue_round_trip": true,
+    "release_binary": true,
+    "render": true,
+    "render_coalescing": true
+  },
+  "host": {
+    "machine": "arm64",
+    "python": "3.9.6",
+    "release": "25.6.0",
+    "system": "Darwin"
+  },
+  "measurement_kind": "reproducible_regression_gate_not_p95",
+  "ok": true,
+  "release_binary_bytes": 6073392,
+  "runtime_probe": {
+    "elapsed_us": {
+      "layout": 62901,
+      "queue": 3157858,
+      "render": 593457
+    },
+    "iterations": {
+      "coalesced_dirty_requests": 10000,
+      "layout": 60000,
+      "queue": 2000,
+      "render": 500
+    },
+    "per_operation_us": {
+      "layout": 1.04835,
+      "queue_round_trip": 1578.929,
+      "render": 1186.914
+    },
+    "scheduler_frames_after_10000_dirty_requests": 1
+  },
+  "schema_version": 1,
+  "startup_evidence_dir": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/shutdown-current-3.1.21/release-hosts/startup"
+}

@@ -1,0 +1,27 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt
+@@ -0,0 +1,22 @@
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++#[serde(tag = "status", rename_all = "snake_case")]
++pub enum ToolResult {
++    Success {
++        call_id: String,
++        tool: String,
++        output: Value,
++    },
++    Error {
++        call_id: String,
++        tool: String,
++        error: ToolFailure,
++    },
++}
++
++impl ToolResult {
++    pub fn is_success(&self) -> bool {
++        matches!(self, Self::Success { .. })
++    }
++}
++
++#[derive(Debug, Error)]

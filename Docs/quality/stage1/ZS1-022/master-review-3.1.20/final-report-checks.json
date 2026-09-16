@@ -1,0 +1,62 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "init",
+        "--quiet"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source022-master/final-report.patch"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source022-master/final-report.patch"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source022-master/final-report.patch"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source022-master/final-report.patch"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "passed": true,
+  "sentinel_restored": true,
+  "canonical_absence_restored": true,
+  "final_report_sha256": "e14d2c4437ac989fb9c5d8ef8d9c4570da50c9914a03952662862013fa9427ad"
+}

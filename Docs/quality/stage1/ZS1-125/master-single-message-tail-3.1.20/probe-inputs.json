@@ -1,0 +1,6 @@
+{
+  "tools/tui_single_message_tail_smoke.py": "3da3d940479f25c3ae6f591422ce9fe657e938792d5214146b8ef2cc3bab861f",
+  "tools/tui_transcript_ux_smoke.py": "992a2b335487a230f7bcfd0f0ce7c2909dcd9168e5a840dbe2bf6b84d99b2fa4",
+  "tools/tui_project_workspace_smoke.py": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a",
+  "tools/tui_user_shell_smoke.py": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+}

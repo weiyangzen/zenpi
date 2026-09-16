@@ -1,0 +1,56 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.99s
+     Running tests/slash_actions.rs (target/debug/deps/slash_actions-fc6ced42d706b543)
+
+running 11 tests
+test diff_owner_rejects_escape_and_symlink_paths ... ok
+test attachment_constructor_rejects_oversized_files ... ok
+test attach_owner_stages_reference_and_consumes_it_on_next_turn ... ok
+test tui_diff_owner_keeps_hunks_as_multiline_transcript_text ... ok
+test staged_attachment_is_carried_into_a_cancel_reissue_turn ... ok
+test diff_owner_marks_binary_files_without_emitting_text ... ok
+test headless_slash_owner_actions_are_usable_before_a_prompt ... ok
+test diff_owner_supports_a_new_repository_without_head ... ok
+test diff_owner_redacts_credentials_in_patch_and_status ... ok
+test diff_owner_marks_process_output_truncated_instead_of_failing ... ok
+test diff_owner_reports_tracked_and_untracked_changes_with_bounds ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/tui_command_palette.rs (target/debug/deps/tui_command_palette-3f54e17146f78ec8)
+
+running 17 tests
+test idle_queue_refresh_preserves_the_painted_keyboard_selection ... ok
+test queue_changes_keep_unrelated_selection_and_require_paint_for_changed_choices ... ok
+test tab_selects_the_visible_highlight_without_guessing_an_unpainted_menu ... ok
+test file_completion_is_cwd_bound_quoted_and_stale_query_safe ... ok
+test busy_palette_declares_idle_commands_and_queueable_resources ... ok
+test slash_paths_and_negative_boundaries_do_not_mutate_draft ... ok
+test model_catalog_arrival_requests_a_paint_without_idle_queue_updates ... ok
+test reasoning_menu_intersects_wire_capability_and_registry ... ok
+test source_inspection_rejects_stale_or_missing_owner_metadata ... ok
+test project_catalogue_isolated_and_escape_keeps_literal_input ... ok
+test bare_approval_selectors_defer_owner_changes_until_explicit_submit ... ok
+test long_unicode_provenance_keeps_filename_hash_and_real_source ... ok
+test catalog_contains_actual_explicit_resources_and_source_but_not_bodies ... ok
+test session_search_and_selection_survive_idle_owner_refresh ... ok
+test actual_model_registry_and_effort_setter_drive_project_menu ... ok
+test completion_result_and_path_limits_remain_bounded ... ok
+test selected_source_after_sixteenth_resource_is_complete_without_body_or_draft_change ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

@@ -1,0 +1,28 @@
+{
+  "name": "after-release",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--bin",
+    "zenpi"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:50:16.203838+00:00",
+  "ended_at": "2026-09-12T05:51:14.411463+00:00",
+  "elapsed_seconds": 58.206019333,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1952366592,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/after-release.log",
+  "bytes": 810,
+  "sha256": "a1ec9c5251dcb710a1bf0a87c2ec956af656be6f748aa04289cd8bd78201efb1"
+}

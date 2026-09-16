@@ -1,0 +1,43 @@
+{
+  "status": "legacy14 passed; candidate unchanged; parent acceptance pending",
+  "extends_manifest_sha256": "ee7ef368c27ec81f3aebb39abb051d78aa32af24f08c5673c3b218c6acc4988d",
+  "artifacts": {
+    "REVIEW.md": {
+      "bytes": 1030,
+      "sha256": "d758ca4574dd88b97ffbf1537fe84c625b1962d37c5a107ecfce630dd5de2ad0"
+    },
+    "legacy-ast-audit.json": {
+      "bytes": 276,
+      "sha256": "c1a172d1ca627bc0bf15f2f0a98769bb5b292852844f351c42bde2d809786886"
+    },
+    "old-approval-final.json": {
+      "bytes": 812,
+      "sha256": "21b9edf77e52081a568e6495160c31452593176bc458195b45ebbf719b81f2fe"
+    },
+    "old-approval-final.log": {
+      "bytes": 812,
+      "sha256": "21b9edf77e52081a568e6495160c31452593176bc458195b45ebbf719b81f2fe"
+    },
+    "old-approval-final.pty.log": {
+      "bytes": 179584,
+      "sha256": "503244287d54a126bc53d8510f7fc8541b6e9fe74eb5968ac7fa27247fefe78e"
+    },
+    "run.json": {
+      "bytes": 796,
+      "sha256": "06038fe76c8e697ef8da51a89a8270603976e312d60625aef66d8b9b1bf25f72"
+    },
+    "tools/tui_approval_smoke.py": {
+      "bytes": 19814,
+      "sha256": "f0baed680fdc270e35413675f24f1b4fdaf283a96290d4cfcd912f8346513ff7"
+    },
+    "tools/tui_project_workspace_smoke.py": {
+      "bytes": 30738,
+      "sha256": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a"
+    },
+    "tools/tui_user_shell_smoke.py": {
+      "bytes": 6964,
+      "sha256": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+    }
+  },
+  "artifact_count": 9
+}

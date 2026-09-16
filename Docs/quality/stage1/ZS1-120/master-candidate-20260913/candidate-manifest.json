@@ -1,0 +1,22 @@
+{
+  "item_id": "ZS1-120",
+  "generated_at": "2026-09-13T12:25:14.879638+00:00",
+  "paths": [
+    {
+      "path": "src/project_workspace.rs",
+      "bytes": 30437,
+      "sha256": "f1b3fcd96290c82c9eaad74b9b9a8acfdc8ea133f793ef85d82d1ef8a91d3ca8"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 879,
+      "sha256": "d93926734119ba3a5a0af16a3bd032548dcfecaaa5aeb36dca69f57065dbbc82"
+    },
+    {
+      "path": "tests/project_workspace.rs",
+      "bytes": 8102,
+      "sha256": "a8554809789df1835ac9def276bc38af6b544af804767fa1fd01d4218f967f9e"
+    }
+  ],
+  "status": "candidate_only"
+}

@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "2",
+    "--test",
+    "headless",
+    "--test",
+    "headless_project_workspace",
+    "--test",
+    "slash"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T15:42:11.503233+00:00",
+  "ended_at": "2026-09-12T15:42:11.643601+00:00",
+  "exit_code": 101,
+  "log_sha256": "fd29b9c47a8531b15b3252b7ad62facc0b6a14f5f0eabe55c35bb9a1534da5f9"
+}

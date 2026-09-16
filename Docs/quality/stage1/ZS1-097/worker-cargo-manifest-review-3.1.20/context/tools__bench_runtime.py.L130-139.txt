@@ -1,0 +1,10 @@
+
+
+def dependency_receipt() -> dict[str, Any]:
+    metadata = json.loads(run(["cargo", "metadata", "--format-version", "1", "--no-deps", "--locked"], capture_output=True).stdout)
+    package = next(item for item in metadata["packages"] if item["name"] == "zenpi")
+    normal = sorted(
+        {item["name"] for item in package["dependencies"] if item.get("kind") in (None, "normal")}
+    )
+    tree = run(["cargo", "tree", "--depth", "1", "--locked"], capture_output=True).stdout.splitlines()
+    return {"normal_count": len(normal), "normal": normal, "features": package["features"], "tree": tree}

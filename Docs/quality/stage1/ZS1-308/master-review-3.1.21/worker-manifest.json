@@ -1,0 +1,940 @@
+{
+  "item": "ZS1-308",
+  "blueprint_version": "3.1.21",
+  "created_at": "2026-09-12T23:15:39.995869+00:00",
+  "formal_files": 1,
+  "master_acceptance": false,
+  "report": {
+    "path": "Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md",
+    "bytes": 22556,
+    "lines": 111,
+    "sha256": "ecbc7702be5e74d556eb1a00da57c35ec9825755101a6877f247229761135482",
+    "source": {
+      "bytes": 3306,
+      "lines": 112,
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    "functions_textual": 14,
+    "functions_cfg_selected": 13,
+    "units": 15,
+    "capabilities": 12,
+    "read_blocks": 33,
+    "context_tests_read": 6,
+    "source_tests_present": 0,
+    "source_tests_run": 0,
+    "product_changes": false,
+    "cargo_runs": 0,
+    "pty_runs": 0,
+    "http_runs": 0
+  },
+  "source": {
+    "bytes": 3306,
+    "lines": 112,
+    "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+  },
+  "before_canonical_absent": true,
+  "product_changes": false,
+  "runtime_executions": 0,
+  "patches": {
+    "candidate.patch": {
+      "bytes": 22792,
+      "lines": 114,
+      "sha256": "2bb85537dddff3d19fbe251862355c60cc0a04ab5b7c71969edcfe44c7fad87a"
+    },
+    "rollback.patch": {
+      "bytes": 22792,
+      "lines": 114,
+      "sha256": "ec62fb03fd3a2b14426670f9cea8aae3186a7dfb2c194da818e2aae564d452e9"
+    }
+  },
+  "files": [
+    {
+      "path": "candidate.patch",
+      "bytes": 22792,
+      "lines": 114,
+      "sha256": "2bb85537dddff3d19fbe251862355c60cc0a04ab5b7c71969edcfe44c7fad87a"
+    },
+    {
+      "path": "evidence/capability-matrix.json",
+      "bytes": 8315,
+      "lines": 122,
+      "sha256": "0c97bae87137df86e2242f1acee4b3ccae7a6cbc216a83dd06a02248c63bf363"
+    },
+    {
+      "path": "evidence/capture.json",
+      "bytes": 4535,
+      "lines": 116,
+      "sha256": "a9c04d05bd40ffc53311f19232c6a04263c5cc7095e3730a7d5db43752bddea6"
+    },
+    {
+      "path": "evidence/capture.py",
+      "bytes": 3107,
+      "lines": 30,
+      "sha256": "2807687606f26807e49c5cb9438cd3ac3f487b57bef58371bbe1675c2a576030"
+    },
+    {
+      "path": "evidence/capture/codex/AGENTS.md",
+      "bytes": 15131,
+      "lines": 195,
+      "sha256": "932e35f307f93af625f62d6cea1c2bba356c56823b4c084ae4de803b8cf4aa9e"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/bottom_pane/approval_overlay.rs",
+      "bytes": 57262,
+      "lines": 1556,
+      "sha256": "c924923b402b198f8f77b249f0d37892896c0b84002c0f6e48330917da80cecc"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+      "bytes": 374943,
+      "lines": 9785,
+      "sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/bottom_pane/footer.rs",
+      "bytes": 63230,
+      "lines": 1742,
+      "sha256": "f932785cb38c86e897dd709daea9c3214806d3c1845b984cd9d5295520144a64"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/bottom_pane/mod.rs",
+      "bytes": 72998,
+      "lines": 1974,
+      "sha256": "97af02eed39dbfdf69d1ec3e14dc13b9a91f4b33f5e4b985cc1f2cbae4105823"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/bottom_pane/textarea.rs",
+      "bytes": 91601,
+      "lines": 2449,
+      "sha256": "8cb5241c9e818210bfff63975e703f45a25a3da91bdb395667893903f7cb4b45"
+    },
+    {
+      "path": "evidence/capture/codex/codex-rs/tui/src/key_hint.rs",
+      "bytes": 3306,
+      "lines": 112,
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    {
+      "path": "evidence/capture/zenpi/Docs/execution/active_requirement.json",
+      "bytes": 9853,
+      "lines": 1,
+      "sha256": "b4470673ff3b2b9c4e3aad8dfd050f0e04066f236657ec8dc266eb9aa8fd414a"
+    },
+    {
+      "path": "evidence/capture/zenpi/Docs/learn/stage1_pi_mono/references/codex/file_learn_index.tsv",
+      "bytes": 2229,
+      "lines": 11,
+      "sha256": "43ea54c4989e2a1fbe1c3888c4a34abb0302c58ce422bd5ef8119716d6d2f672"
+    },
+    {
+      "path": "evidence/capture/zenpi/Docs/learn/stage1_pi_mono/references/codex/source_manifest.tsv",
+      "bytes": 3821,
+      "lines": 11,
+      "sha256": "a714cdb8b43e0283da9cc757880104f3930e5201b0eab2b39804fdf38c970c6e"
+    },
+    {
+      "path": "evidence/capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "bytes": 153896,
+      "lines": 632,
+      "sha256": "ca9704da623173c944c5040aa6eb90a731219a8e029a89cd21b4f2f97e99e078"
+    },
+    {
+      "path": "evidence/capture/zenpi/src/tui.rs",
+      "bytes": 638305,
+      "lines": 15607,
+      "sha256": "0deb8e0e13cfdad0aa00e07d79caf573e9aa36095a9bcefb4219ed8f70936557"
+    },
+    {
+      "path": "evidence/capture/zenpi/tests/tui_composer.rs",
+      "bytes": 47476,
+      "lines": 1251,
+      "sha256": "c56a654e5f03ef691f9bb4ffb0ae57ee3577b6630309dee9367debe503da210b"
+    },
+    {
+      "path": "evidence/external-preservation-before.json",
+      "bytes": 19367,
+      "lines": 424,
+      "sha256": "e71982292579693f899fc228b6ff85e73a4ff5f630d52ba6984d5ecb73dd01c2"
+    },
+    {
+      "path": "evidence/freeze-input-state.json",
+      "bytes": 1145,
+      "lines": 36,
+      "sha256": "b014955b091126721edac5cc67f20affba55668f1a8203f61badda3e2f080ee0"
+    },
+    {
+      "path": "evidence/freeze.py",
+      "bytes": 3448,
+      "lines": 41,
+      "sha256": "d83f37ea4c8186bf8ca5f9fde7088ac24d72f63380ab5fd14db93e1e6a476f8a"
+    },
+    {
+      "path": "evidence/function-inventory.json",
+      "bytes": 673,
+      "lines": 58,
+      "sha256": "c5b9ace8a9827f56c987a4ed6cafff3444c3e8897eeafb12914a874d2c24f30c"
+    },
+    {
+      "path": "evidence/history-comparison.json",
+      "bytes": 13583,
+      "lines": 505,
+      "sha256": "5aec52b883af70530fac3206f918d6c3e002ff3d0010f33ffc38a3e8676eee9e"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/current_folder_learn.md",
+      "bytes": 1701,
+      "lines": 9,
+      "sha256": "d68fc811344190f9d268ba3a940f3344d2d4715b4c9b25cfac05d6baa0054302"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/current_folder_learn.md",
+      "bytes": 1705,
+      "lines": 9,
+      "sha256": "56966e36c997caff4bbfd487ff8ccd16206d7564d418a89aef00bde6eb81f3c1"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/bottom_pane/current_folder_learn.md",
+      "bytes": 1704,
+      "lines": 9,
+      "sha256": "480a344340b3b85c1f0aa8e07132cc46db725fda59f00fa51c5a55ae8a85c881"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/current_folder_learn.md",
+      "bytes": 1709,
+      "lines": 9,
+      "sha256": "efc4754784eb93da9f74ea6f78a8516f75bfa6cc18f49df068c71abb09e32469"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/current_folder_learn.md",
+      "bytes": 1713,
+      "lines": 9,
+      "sha256": "cab2a14ea88b1a48aa8a702b8e72b7934004e31ff638321b50b663038d5b702e"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/approval_overlay.rs_learn.md",
+      "bytes": 3623,
+      "lines": 16,
+      "sha256": "29c2cbd33bbc44f2b1f4ec3f2c78ee1c783182236cc923ea521036feb08b2472"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/chat_composer.rs_learn.md",
+      "bytes": 8227,
+      "lines": 27,
+      "sha256": "424f21990557651a7b32ac9bdc0e9542904ed6a38424279069a8dc1a25f16fd4"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/mod.rs_learn.md",
+      "bytes": 4060,
+      "lines": 18,
+      "sha256": "f5836e5029337fe104b139c99e086c985873e0acf53dfb338c9b52ffab970c55"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/paste_burst.rs_learn.md",
+      "bytes": 2669,
+      "lines": 16,
+      "sha256": "741572c24e1348d0271b353c13c07b607a31d2f23d18f69ceb7d1906198d6067"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs_learn.md",
+      "bytes": 1891,
+      "lines": 14,
+      "sha256": "ffc1ef71262191c43aee1f05650427b2b041625c3459bf286afd5fa901e236b0"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/textarea.rs_learn.md",
+      "bytes": 3504,
+      "lines": 16,
+      "sha256": "5066bf1f7593b09e593111aad12f36d0fe974d76c71ea1be5a8a0cdb7b1dbb35"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/file_search.rs_learn.md",
+      "bytes": 2040,
+      "lines": 14,
+      "sha256": "eb836e68285dea1791ca042f633bd0f252f0f66ea51555ec970ab83659400d2d"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md",
+      "bytes": 1537,
+      "lines": 20,
+      "sha256": "37e21c9bd266b6acc24f596b467e291e1c7abaa42b025414ee1ef56a5da36755"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/slash_command.rs_learn.md",
+      "bytes": 1835,
+      "lines": 14,
+      "sha256": "6445fcc0f0c31b1d40812608459c265f2ee851a6f80dee5b9555db46b7fee004"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md",
+      "bytes": 1875,
+      "lines": 20,
+      "sha256": "697590640b31170f46becab07b6db969f11b2da655f8c04be517a13ded9dbfc6"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/Docs/quality/stage1/codex-composer-chunks.json",
+      "bytes": 545,
+      "lines": 18,
+      "sha256": "99264b18df3ec7efa5aeb628453a2fb039e0ac1e22aba850b27ec55ac8ab0363"
+    },
+    {
+      "path": "evidence/history/codex-reference-ready/manifest.json",
+      "bytes": 3582,
+      "lines": 72,
+      "sha256": "ddeedf88d21d8980c5e7de68f85f44e91519856dab2fcee1317969b53c8392cd"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md",
+      "bytes": 22332,
+      "lines": 183,
+      "sha256": "2f564627276bed05bdd345d5e5a592e354bfe777cf4adf928d96c406ef7b78c9"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/capability-matrix.json",
+      "bytes": 3957,
+      "lines": 86,
+      "sha256": "dc658f4d47c7084467381f145d95891eaaa90289ac0a0b06c636e3c354388697"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/check_static.py",
+      "bytes": 4837,
+      "lines": 50,
+      "sha256": "5a9852864f1a778a8291695a51abb48eb103ff3d07350c646aae6e72eb0755e1"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context-capture.json",
+      "bytes": 9272,
+      "lines": 245,
+      "sha256": "bc51ec5e78d0e419de2930b4a6e25aec48742e1766428661340dfd47f4bc872f"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context-tests.json",
+      "bytes": 386,
+      "lines": 14,
+      "sha256": "6098af68c3ee0452d53de1a240f7e9dde0a245ac7a66d89d90cd4652ea072199"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/blueprint-3.1.20.md",
+      "bytes": 146422,
+      "lines": 608,
+      "sha256": "60f407c1bed414a6fa78ed37acd27f828c8dc8727c28b56ec49899fb73fe195c"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-approval.L370-422.txt",
+      "bytes": 1703,
+      "lines": 53,
+      "sha256": "cf63e42748ae3a17096b072f742765c184df92246b0fae2a57abb5332b8d17e4"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-bottom-pane.L112-128.txt",
+      "bytes": 753,
+      "lines": 17,
+      "sha256": "0442cd7b9fad9d1dbbaa14661c169e1b385b80120cabb0ebf853ff8e3fd06961"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-bottom-pane.L656-680.txt",
+      "bytes": 983,
+      "lines": 25,
+      "sha256": "078913e79caa8fabadd9afda36f5ee330bff391510a7db62159cc734133848e1"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-composer.L3007-3045.txt",
+      "bytes": 2013,
+      "lines": 39,
+      "sha256": "f8b7ebf898687b3f788f61827cf4c93419c693989c6270c17c5611ac87000049"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-composer.L3090-3113.txt",
+      "bytes": 865,
+      "lines": 24,
+      "sha256": "dbeee38ff8e9f7692b218988cfef4c6d8ec658910ea33f4a657367e41c80e5a1"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-composer.L3150-3174.txt",
+      "bytes": 799,
+      "lines": 25,
+      "sha256": "1325f35b188a0812a5de9177c3cf3f5191dcbad02d112b0b854ceb8ea4c84601"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-footer.L1044-1060.txt",
+      "bytes": 398,
+      "lines": 17,
+      "sha256": "a69025a84a23f6ccdc59d32766455ee4c52f7eb0dce8b00d9525462e716c1857"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-footer.L1706-1743.txt",
+      "bytes": 1038,
+      "lines": 37,
+      "sha256": "8eb65277680d01d7f3451bb4235d7f5e15dc96177f7ac7d401b27ec203c7fb73"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/codex-footer.L880-1020.txt",
+      "bytes": 4452,
+      "lines": 141,
+      "sha256": "6f85b4de11c9afe1187a562791658419e71016d9a1a0f39d3caf5d742090d7b9"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L1140-1208.txt",
+      "bytes": 2762,
+      "lines": 69,
+      "sha256": "a2aa9a082d99f29da157985ea05cda332cd2ac9113cddbb757515b153ea5c51d"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L4900-4928.txt",
+      "bytes": 1500,
+      "lines": 29,
+      "sha256": "73695c4c4c56d478c9c2d5e11110acd9895a5319752989c16f8fb0f088677331"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L4952-4970.txt",
+      "bytes": 930,
+      "lines": 19,
+      "sha256": "6181a035cd5588b114b4f5d3a2b083c2f2ba1d0e9a8666fc3819b554599e2416"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L5081-5106.txt",
+      "bytes": 952,
+      "lines": 26,
+      "sha256": "4b54f392be0af41966128bd0ae4f5abb44328f262117efd854b0ee2f1656e631"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L5184-5206.txt",
+      "bytes": 1173,
+      "lines": 23,
+      "sha256": "37b29e26d28d3a2076ad4d0095877d53c207319b7e3464a8440160701ad4db20"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L5348-5365.txt",
+      "bytes": 880,
+      "lines": 18,
+      "sha256": "45e842bad9fa13e384adfaac538d3c66800f0f80f2420af92e4a2a53106a122f"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L5478-5497.txt",
+      "bytes": 666,
+      "lines": 20,
+      "sha256": "dae8912f8d5ca423c89b0f1e0004067d1a6b754af88b901162f75417028345eb"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L6354-6390.txt",
+      "bytes": 1541,
+      "lines": 37,
+      "sha256": "5b6ceb083889ac686193424ae0f4777ed4ca423c5e67ddccee000ae24fd5e3ce"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/context/target-tui.L998-1075.txt",
+      "bytes": 2852,
+      "lines": 78,
+      "sha256": "b39fc9d26e1e8d6a5794ff29646c69aeeda8d61ebcd1f80efce7e4c498868e30"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/function-inventory.json",
+      "bytes": 1023,
+      "lines": 72,
+      "sha256": "a180571f232598c2e88e25b2bd61dfb3fffee6a9fc8a268a18938f3e108615d6"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/historical-result-summary.json",
+      "bytes": 7681,
+      "lines": 177,
+      "sha256": "beb8ef6d9431b793e3bbf35f495145e24f28f771329285051269586376b1769d"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/original-ready-manifest.json",
+      "bytes": 3582,
+      "lines": 72,
+      "sha256": "ddeedf88d21d8980c5e7de68f85f44e91519856dab2fcee1317969b53c8392cd"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/original-worker-report.md",
+      "bytes": 1537,
+      "lines": 20,
+      "sha256": "37e21c9bd266b6acc24f596b467e291e1c7abaa42b025414ee1ef56a5da36755"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/approval.json",
+      "bytes": 812,
+      "lines": 21,
+      "sha256": "0288074bed404262ce19d028b5cb196a9dacbec49fc8635264c9fe5db70a9774"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/approval.run.json",
+      "bytes": 1050,
+      "lines": 26,
+      "sha256": "2264675c26e8c15a811f6800c818fb372c27f1a1336b3cd39bed98ac2172d41c"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/background.json",
+      "bytes": 7985,
+      "lines": 18,
+      "sha256": "9efa34503a281019b06b2902e3000ea6d7593b6b3811d49186f72daca1ceaa53"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/background.run.json",
+      "bytes": 1076,
+      "lines": 27,
+      "sha256": "3e3bf949a25ef9dacbe6c6538c4942f582df60b8d8cba47017b1b4309c63a740"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/bentobox.json",
+      "bytes": 1271,
+      "lines": 50,
+      "sha256": "2a77d0dbd087b8353d34fac25de9a191b6de4cd7fac1a6b77a9a40b5e62f0716"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/bentobox.run.json",
+      "bytes": 1073,
+      "lines": 28,
+      "sha256": "23aa0ade02b94cb3ce332cc27c0c626cd038c7c2a0ce96cb7c633450bc30ace2"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/binary.json",
+      "bytes": 103,
+      "lines": 4,
+      "sha256": "f6b576b7f6b8269dfd22134b7af04a4cf50723b705ce2121836bcdedd72c33de"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/budget.json",
+      "bytes": 17297,
+      "lines": 327,
+      "sha256": "423695ea985aa557671cddd7b35ad5eac69ef90495d8ae51fee401260b638ffa"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/budget.run.json",
+      "bytes": 936,
+      "lines": 26,
+      "sha256": "ecd1457eae959cd79279f70027eab672ebda8138c4128ffb263f3561fd7783e4"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/build-inputs.json",
+      "bytes": 31944,
+      "lines": 906,
+      "sha256": "268f5b93248697a221e5e5b8329925a321c12cf67a9e65e768db7e5f3d1b8118"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/manifest.json",
+      "bytes": 22044,
+      "lines": 533,
+      "sha256": "4a3e21c0fb5738b18abbda180fea89282c69932cbf7d916aa9aa87bd800ece7f"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/master-verification.json",
+      "bytes": 393,
+      "lines": 12,
+      "sha256": "98b7822704ce7d6ac0a283a8c1c12c8926b777f7ea38abcc0479ede4beaac6d8"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/new.json",
+      "bytes": 852,
+      "lines": 18,
+      "sha256": "98413ddd7aba7e49e207f22dca69c41aee8ca743392fbb5dcff14cca4662a906"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/new.run.json",
+      "bytes": 1114,
+      "lines": 26,
+      "sha256": "451f2793df1b202f365555d1bdde8d47cf15ddb4657a0195b7cfe4d84154d196"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/picker.json",
+      "bytes": 640,
+      "lines": 19,
+      "sha256": "98012909025866d28e6d9df3ef64831b2d686dfb4e8f96235befa8fbb4feb9a8"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/picker.run.json",
+      "bytes": 1128,
+      "lines": 26,
+      "sha256": "75d1ce54e23188506632aa16af46cb3243fbd9bc1d6a6ac334d3c11f5a57c4ef"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/policy.json",
+      "bytes": 1066,
+      "lines": 20,
+      "sha256": "2442fafb674ff56da66fe54b11226d2153bd9c3ed398720f4dd194bdba28ace9"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/policy.run.json",
+      "bytes": 1144,
+      "lines": 27,
+      "sha256": "fd7f6dd2e75dfa5348f72efcf916d0e9b40a334d28f7a56ed99d198ee3963419"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/recovery.json",
+      "bytes": 763,
+      "lines": 14,
+      "sha256": "929bc5f74f9c14276183c94146e33ef2cf26542d2a7b20dc62122789c8a9f3dd"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/recovery.run.json",
+      "bytes": 1151,
+      "lines": 27,
+      "sha256": "11a49b52899789a659ede6e9b5c26dd46aff863f94dd4d8c3b3643fe26d3f863"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/review.md",
+      "bytes": 5393,
+      "lines": 31,
+      "sha256": "c56e46fa5a2f82bcad853cfd1be52fae62b287abff9353eb3af5fafa134c0031"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/history/release/ux-run-summary.json",
+      "bytes": 360,
+      "lines": 30,
+      "sha256": "0859dbc6936f78108ed5f42543a740d88399b8b14933d4df17db9625c31ba56f"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/inputs.json",
+      "bytes": 17884,
+      "lines": 386,
+      "sha256": "249b7b63a52e440fbc163259c655474db738773962f73bed0ca399f20c2676a9"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/master-baseline.json",
+      "bytes": 259,
+      "lines": 8,
+      "sha256": "d06c15653061acc9980c1941d2428c1fe5284c1dd733959b6501cc18d197b630"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/packaging-attempts.json",
+      "bytes": 346,
+      "lines": 9,
+      "sha256": "befdae6cb92a1a82ed97d2b880cae297e3d3ba825acfb5ae06e2e679969cfc70"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/patch-replay.json",
+      "bytes": 4341,
+      "lines": 139,
+      "sha256": "8fe14fddcdb4723e3206ff75239e7c41709780f04a75d885d2f745b4f482b077"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/read-log.json",
+      "bytes": 620,
+      "lines": 29,
+      "sha256": "6c8fa8df8210b469dc79dfe36e055dd63e6811d63ddf08db438d2e32573a93a7"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/source-drift.json",
+      "bytes": 4846,
+      "lines": 49,
+      "sha256": "b8e2b0f7b6b4fb9df4c8d169f645860062fdc4ea89833210b8e590e347047e45"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/source-tests.json",
+      "bytes": 3,
+      "lines": 1,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/source/key_hint.rs",
+      "bytes": 3306,
+      "lines": 112,
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/static-check.json",
+      "bytes": 1376,
+      "lines": 65,
+      "sha256": "cd4cf75da6283f498de45950b7442c240a2ffe3e2418d53d735594eee1e9a1ab"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/verify_package.py",
+      "bytes": 2853,
+      "lines": 47,
+      "sha256": "65d0579a05392337bb37f6bf712741a1870acc24a70555deeb84cd0a4d3290be"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/Docs/quality/stage1/ZS1-308/worker-key-hint-review-3.1.20/worker-review-receipt.json",
+      "bytes": 1475,
+      "lines": 39,
+      "sha256": "2af962e7e194b97a3d2b078383a64869acc2fef35bc7232452f5ca1654cb69a8"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/README.md",
+      "bytes": 1426,
+      "lines": 14,
+      "sha256": "f8d8bd87e57159bc55fd4ad9ead829447ec229809e9bcdd45a49b8acb28a6795"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/manifest.json",
+      "bytes": 13573,
+      "lines": 276,
+      "sha256": "305bf26e6b67fd850851bb27a836a444aecaa9eb3bef2397eba523097052eb7c"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/master.patch",
+      "bytes": 22640,
+      "lines": 186,
+      "sha256": "b7497c39a654123434f2f48d448fba67b769cfaf7e79fd3f29aafa59b52485e4"
+    },
+    {
+      "path": "evidence/history/zs1-308-ready/worker.patch",
+      "bytes": 24263,
+      "lines": 199,
+      "sha256": "f9c87bc5a6495040693abd150fe6dd78e8415d768ba538c56f210f75aeef373c"
+    },
+    {
+      "path": "evidence/preparation-issues.json",
+      "bytes": 327,
+      "lines": 8,
+      "sha256": "0732a811851f88279ff7c7f6d47ffcc8e239ef8ea626e6cf4df0289dc37c4e0d"
+    },
+    {
+      "path": "evidence/preservation-after.json",
+      "bytes": 20660,
+      "lines": 406,
+      "sha256": "14162b2779da19c2d57feac862b9f2184b7f65ec15fd97b0e78f05d6b7cdc417"
+    },
+    {
+      "path": "evidence/preservation-before.json",
+      "bytes": 7059727,
+      "lines": 142055,
+      "sha256": "d8ac787e906acad39a9c2ec79cee0e0275dc130a147aee5922b612c75c44c77a"
+    },
+    {
+      "path": "evidence/read-binding.json",
+      "bytes": 13639,
+      "lines": 530,
+      "sha256": "d5116fcfcc6e0313b68f1d21407cc2322ff575f095d1f58a5bca18f96f9ce68e"
+    },
+    {
+      "path": "evidence/read.py",
+      "bytes": 876,
+      "lines": 6,
+      "sha256": "507ca47a8cf605fdced6d2828a5a682919a7bec144acfe2a16f43d7413884bf6"
+    },
+    {
+      "path": "evidence/reads/001.txt",
+      "bytes": 10170,
+      "lines": 64,
+      "sha256": "b320e7f90fc6815d17b5df9e7656bb7e0cf8e77bc534dbc83a2607198f6c8aaa"
+    },
+    {
+      "path": "evidence/reads/002.txt",
+      "bytes": 7881,
+      "lines": 62,
+      "sha256": "66367abec40cda3bbb25abc0aa2137ec158ac22133cc495c6d2741d3d82b2c25"
+    },
+    {
+      "path": "evidence/reads/003.txt",
+      "bytes": 3306,
+      "lines": 112,
+      "sha256": "07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8"
+    },
+    {
+      "path": "evidence/reads/004.txt",
+      "bytes": 4281,
+      "lines": 57,
+      "sha256": "1a8d5031071c7693dcdd02a77b92121eff76bfd2a240741de48441235df5dd9e"
+    },
+    {
+      "path": "evidence/reads/005.txt",
+      "bytes": 5663,
+      "lines": 183,
+      "sha256": "b42e60e69476849079199c07c8d32cabcb9a36dd24bb8f61a7534507f63bf1c3"
+    },
+    {
+      "path": "evidence/reads/006.txt",
+      "bytes": 2013,
+      "lines": 39,
+      "sha256": "f8b7ebf898687b3f788f61827cf4c93419c693989c6270c17c5611ac87000049"
+    },
+    {
+      "path": "evidence/reads/007.txt",
+      "bytes": 2873,
+      "lines": 85,
+      "sha256": "7a300a43443daea7ae69efe09f12ffd2a688f82b87acc633645636100105ccb7"
+    },
+    {
+      "path": "evidence/reads/008.txt",
+      "bytes": 1337,
+      "lines": 37,
+      "sha256": "678245200e044393ac2d47e6cf5336cdfb95ab8520bddba56bdf17d146d89745"
+    },
+    {
+      "path": "evidence/reads/009.txt",
+      "bytes": 1703,
+      "lines": 53,
+      "sha256": "cf63e42748ae3a17096b072f742765c184df92246b0fae2a57abb5332b8d17e4"
+    },
+    {
+      "path": "evidence/reads/010.txt",
+      "bytes": 753,
+      "lines": 17,
+      "sha256": "0442cd7b9fad9d1dbbaa14661c169e1b385b80120cabb0ebf853ff8e3fd06961"
+    },
+    {
+      "path": "evidence/reads/011.txt",
+      "bytes": 983,
+      "lines": 25,
+      "sha256": "078913e79caa8fabadd9afda36f5ee330bff391510a7db62159cc734133848e1"
+    },
+    {
+      "path": "evidence/reads/012.txt",
+      "bytes": 1038,
+      "lines": 37,
+      "sha256": "8eb65277680d01d7f3451bb4235d7f5e15dc96177f7ac7d401b27ec203c7fb73"
+    },
+    {
+      "path": "evidence/reads/013.txt",
+      "bytes": 921,
+      "lines": 37,
+      "sha256": "39648678a7fcf340baef91f1cf7f3564b08f5069b86e4a674c3cabd135733f2e"
+    },
+    {
+      "path": "evidence/reads/014.txt",
+      "bytes": 327,
+      "lines": 11,
+      "sha256": "dc28750e0fef0c7f60db1d25c2a9a3b7187d5adece9ef0c2f4186561c80007b8"
+    },
+    {
+      "path": "evidence/reads/015.txt",
+      "bytes": 3755,
+      "lines": 77,
+      "sha256": "f46d2406c73ea440d231a73c4251eaed10a97278cc06b56b5716be083bb3db64"
+    },
+    {
+      "path": "evidence/reads/016.txt",
+      "bytes": 3816,
+      "lines": 110,
+      "sha256": "9fb9358b420afc7fb6d0156faa173a1b8522d7f15d6ab31b76cef0e1c2141ea0"
+    },
+    {
+      "path": "evidence/reads/017.txt",
+      "bytes": 9650,
+      "lines": 204,
+      "sha256": "029786b72f076a31f0419734765361ea77e99dd38a8de1bf28658a4de9dbd4d6"
+    },
+    {
+      "path": "evidence/reads/018.txt",
+      "bytes": 1867,
+      "lines": 45,
+      "sha256": "bd459c098d91318ea8a66f1b095e4b03a6b5c6678c73b27f3f9c9aa67ba0b397"
+    },
+    {
+      "path": "evidence/reads/019.txt",
+      "bytes": 1864,
+      "lines": 47,
+      "sha256": "79eec043f2bbf931e144148aa5ff032df05ce1153bb49dee34e40b4aca72029e"
+    },
+    {
+      "path": "evidence/reads/020.txt",
+      "bytes": 3777,
+      "lines": 103,
+      "sha256": "bce480fdc281d0111fd091753ff1d62f29593b08f593f44b2b6cc2235cd22d1a"
+    },
+    {
+      "path": "evidence/reads/021.txt",
+      "bytes": 2636,
+      "lines": 69,
+      "sha256": "1171a2e885c625c3161abd2883c49154e3c52f391097d8d1d6983b0b5dd7a494"
+    },
+    {
+      "path": "evidence/reads/022.txt",
+      "bytes": 1575,
+      "lines": 39,
+      "sha256": "886b053f99d16f514db76f264b625825d143b31c0c033d96f569843942a1dd74"
+    },
+    {
+      "path": "evidence/reads/023.txt",
+      "bytes": 1003,
+      "lines": 20,
+      "sha256": "6f7601f1e9c325f850f815c467ea6d8d5864be2dd9ebb36f5ec228e9c027c8a1"
+    },
+    {
+      "path": "evidence/reads/024.txt",
+      "bytes": 1342,
+      "lines": 43,
+      "sha256": "f1be62ef551df68ecca600801865b71732890dd58547bcb5f2a9f4e3f0196940"
+    },
+    {
+      "path": "evidence/reads/025.txt",
+      "bytes": 691,
+      "lines": 25,
+      "sha256": "fed26c499166e9ac349f1d51d2b9c2376d41e4e0526847746088f220543c7aa0"
+    },
+    {
+      "path": "evidence/reads/026.txt",
+      "bytes": 1841,
+      "lines": 42,
+      "sha256": "0c5972a1ddeac862338a1112e5aa147710cc704fe7529119aef1b1373685fd3a"
+    },
+    {
+      "path": "evidence/reads/027.txt",
+      "bytes": 511,
+      "lines": 14,
+      "sha256": "884cdddbf377a363acac8f0c3ebe579c187f14c7838d4f357b6fe889df3fb30b"
+    },
+    {
+      "path": "evidence/reads/028.txt",
+      "bytes": 2710,
+      "lines": 68,
+      "sha256": "1fe54afe5f7e4ffa02cc0c5d7cddc65b716b810fe5ef2bf96585b46adf6480ee"
+    },
+    {
+      "path": "evidence/reads/029.txt",
+      "bytes": 760,
+      "lines": 18,
+      "sha256": "56817e13d5d863eb36d99c8f4287bac79b2d06fc3fedaa8adba8d039c6c5d334"
+    },
+    {
+      "path": "evidence/reads/030.txt",
+      "bytes": 720,
+      "lines": 31,
+      "sha256": "4ac34ba938362c2b4efffb837ebae5e2e4f2caf3d458625b9375f75208d4082a"
+    },
+    {
+      "path": "evidence/reads/031.txt",
+      "bytes": 526,
+      "lines": 13,
+      "sha256": "2151698995337786e64577d85d97e7e2984b89b5cc264374a9044a33d152a223"
+    },
+    {
+      "path": "evidence/reads/032.txt",
+      "bytes": 2796,
+      "lines": 9,
+      "sha256": "b5a7508236697ca3a352ff75f74bf9145fc70c68f746c6ed3d7fc2c8e86593a0"
+    },
+    {
+      "path": "evidence/reads/033.txt",
+      "bytes": 2483,
+      "lines": 6,
+      "sha256": "74d5ea92be6553a2b1432e1acef81cd9aa62f7bdab8d6a5741814fadee19e3a6"
+    },
+    {
+      "path": "evidence/report-binding.json",
+      "bytes": 634,
+      "lines": 23,
+      "sha256": "78bb747b59c7bded03e7a071fed82bdece1d7120a9461a5aac72bd201f8946da"
+    },
+    {
+      "path": "evidence/report.py",
+      "bytes": 24057,
+      "lines": 129,
+      "sha256": "b2146ab1a0539d54b474afe342959414a0b4db1b358ddd2fd35f19cb6102bc47"
+    },
+    {
+      "path": "evidence/source-units.json",
+      "bytes": 5113,
+      "lines": 197,
+      "sha256": "cf702e5b82e43794ced8a39eae3fc75f8fce904e96b36ef5773ba852785130e5"
+    },
+    {
+      "path": "files/Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md",
+      "bytes": 22556,
+      "lines": 111,
+      "sha256": "ecbc7702be5e74d556eb1a00da57c35ec9825755101a6877f247229761135482"
+    },
+    {
+      "path": "rollback.patch",
+      "bytes": 22792,
+      "lines": 114,
+      "sha256": "ec62fb03fd3a2b14426670f9cea8aae3186a7dfb2c194da818e2aae564d452e9"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 9838,
+      "lines": 85,
+      "sha256": "16a0106a21484e44cabe229865aa08373a7cea9bb54a2de554f4dcca93c31607"
+    }
+  ]
+}

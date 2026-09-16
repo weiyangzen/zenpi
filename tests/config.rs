@@ -101,6 +101,7 @@ fn effective_config_can_issue_policy_bound_secret_handle() {
         max_retries: None,
         requires_openai_auth: true,
         supports_websockets: false,
+        model_overrides: Vec::new(),
     };
     let digest = "d".repeat(64);
     let (handle, revoke) = config.issue_secret_handle(digest.clone()).unwrap().unwrap();
@@ -472,4 +473,183 @@ fn runtime_profile_is_a_validated_first_class_override() {
             "accepted invalid profile {invalid:?}"
         );
     }
+}
+
+fn editor_environment(items: &[(&str, &str)]) -> BTreeMap<std::ffi::OsString, std::ffi::OsString> {
+    items
+        .iter()
+        .map(|(k, v)| ((*k).into(), (*v).into()))
+        .collect()
+}
+
+#[test]
+fn editor_selection_has_no_invalid_visual_fallback_or_provider_configuration() {
+    use zenpi::config::resolve_editor_command;
+    let mut env = editor_environment(&[("VISUAL", "visual --wait"), ("EDITOR", "fallback")]);
+    let result = resolve_editor_command(&env).unwrap();
+    assert_eq!(result.source, "VISUAL");
+    assert_eq!(result.argv, ["visual", "--wait"]);
+    assert_eq!(result.timeout.as_secs(), 1800);
+    for invalid in ["", "  \t", "'unfinished", "private-secret\nargument"] {
+        env.insert("VISUAL".into(), invalid.into());
+        let error = resolve_editor_command(&env).err().unwrap();
+        assert!(!error.contains("private-secret"));
+    }
+    env.remove(std::ffi::OsStr::new("VISUAL"));
+    assert_eq!(resolve_editor_command(&env).unwrap().source, "EDITOR");
+    env.remove(std::ffi::OsStr::new("EDITOR"));
+    assert!(resolve_editor_command(&env).is_err());
+}
+
+#[test]
+fn editor_argv_quotes_escapes_and_shell_syntax_are_literal() {
+    use zenpi::config::resolve_editor_command;
+    let cases = [
+        (
+            "'/path with 空格/editor' --wait '' a\"b\"'c'",
+            vec!["/path with 空格/editor", "--wait", "", "abc"],
+        ),
+        (
+            r#"ed a\ b 'C:\Users\name' "keep\q" "\$VAR" "\`id\`" "a\\b" "a\"b""#,
+            vec![
+                "ed",
+                "a b",
+                r"C:\Users\name",
+                r"keep\q",
+                "$VAR",
+                "`id`",
+                r"a\b",
+                "a\"b",
+            ],
+        ),
+        (
+            "ed $VAR ~ '*.rs' '$(touch sentinel)' ';' '|' '>'",
+            vec![
+                "ed",
+                "$VAR",
+                "~",
+                "*.rs",
+                "$(touch sentinel)",
+                ";",
+                "|",
+                ">",
+            ],
+        ),
+        ("ed 'quoted\ttab'", vec!["ed", "quoted\ttab"]),
+    ];
+    for (raw, expected) in cases {
+        let parsed = resolve_editor_command(&editor_environment(&[("EDITOR", raw)])).unwrap();
+        assert_eq!(parsed.argv, expected, "{raw}");
+    }
+    for raw in [
+        "ed \\",
+        "ed \"open",
+        "'' arg",
+        "ed\0arg",
+        "ed\rarg",
+        "ed\narg",
+        "ed\u{1b}arg",
+    ] {
+        assert!(resolve_editor_command(&editor_environment(&[("EDITOR", raw)])).is_err());
+    }
+}
+
+#[test]
+fn editor_argument_and_environment_budgets_reject_without_truncation() {
+    use zenpi::config::resolve_editor_command;
+    for raw in [
+        format!("ed {}", "a".repeat(2049)),
+        "a".repeat(4097),
+        format!("ed {}", "x ".repeat(32)),
+    ] {
+        assert!(resolve_editor_command(&editor_environment(&[("EDITOR", &raw)])).is_err());
+    }
+    let mut env = editor_environment(&[
+        ("EDITOR", "ed"),
+        ("PATH", "/usr/bin:/bin"),
+        ("HOME", "/private/user home"),
+        ("TERM", "xterm-256color"),
+        ("OPENAI_API_KEY", "must-not-pass"),
+        ("ZENPI_HOME", "/private/runtime"),
+        ("SSH_AUTH_SOCK", "must-not-pass"),
+        ("LC_NOT_REGISTERED", "must-not-pass"),
+    ]);
+    let before = env.clone();
+    let command = resolve_editor_command(&env).unwrap();
+    assert_eq!(
+        command.environment,
+        editor_environment(&[
+            ("PATH", "/usr/bin:/bin"),
+            ("HOME", "/private/user home"),
+            ("TERM", "xterm-256color")
+        ])
+    );
+    assert_eq!(env, before);
+    env.insert("TERM".into(), "t".repeat(4097).into());
+    assert!(resolve_editor_command(&env).is_err());
+    let mut crowded = editor_environment(&[("EDITOR", "ed")]);
+    for key in [
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TERM",
+        "COLORTERM",
+        "LANG",
+        "TMPDIR",
+        "TERMINFO",
+        "TERMINFO_DIRS",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_CACHE_HOME",
+    ] {
+        crowded.insert(key.into(), "x".repeat(4096).into());
+    }
+    assert!(resolve_editor_command(&crowded).is_err());
+}
+
+#[test]
+fn editor_deadline_is_separate_bounded_and_never_forwarded() {
+    use zenpi::config::resolve_editor_command;
+    for value in ["1", "1800", "7200"] {
+        let env = editor_environment(&[("EDITOR", "ed"), ("ZENPI_EDITOR_TIMEOUT_SECONDS", value)]);
+        let command = resolve_editor_command(&env).unwrap();
+        assert_eq!(command.timeout.as_secs(), value.parse::<u64>().unwrap());
+        assert!(
+            !command
+                .environment
+                .contains_key(std::ffi::OsStr::new("ZENPI_EDITOR_TIMEOUT_SECONDS"))
+        );
+    }
+    for value in [
+        "0",
+        "7201",
+        "",
+        "-1",
+        "1.5",
+        " 2",
+        "+2",
+        "999999999999999999999999",
+    ] {
+        assert!(
+            resolve_editor_command(&editor_environment(&[
+                ("EDITOR", "ed"),
+                ("ZENPI_EDITOR_TIMEOUT_SECONDS", value)
+            ]))
+            .is_err()
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn non_utf8_visual_is_rejected_instead_of_using_editor() {
+    use std::os::unix::ffi::OsStringExt;
+    let mut env = editor_environment(&[("EDITOR", "fallback")]);
+    env.insert("VISUAL".into(), std::ffi::OsString::from_vec(vec![0xff]));
+    assert!(zenpi::config::resolve_editor_command(&env).is_err());
 }

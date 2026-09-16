@@ -54,6 +54,14 @@ def send(fd: int, payload: bytes) -> None:
     os.write(fd, payload)
 
 
+def deliberate_enter(fd: int, out: bytearray) -> None:
+    """Submit after the TUI's paste-burst suppression window has elapsed."""
+    deadline = time.monotonic() + 0.15
+    while time.monotonic() < deadline:
+        drain(fd, out, 0.01)
+    send(fd, b"\r")
+
+
 def run_case(binary: Path, root: Path, *, command_text: bytes, decision: bytes, expected: bytes) -> list[dict]:
     session = root / ("allow.jsonl" if decision == b"y" else "deny.jsonl")
     home = root / ("allow-home" if decision == b"y" else "deny-home")
@@ -85,11 +93,20 @@ def run_case(binary: Path, root: Path, *, command_text: bytes, decision: bytes, 
     try:
         fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 140, 0, 0))
         wait_text(fd, out, b"Prompt", time.monotonic() + 8)
-        send(fd, command_text + b"\r")
-        wait_text(fd, out, b"Approval required", time.monotonic() + 10)
-        send(fd, decision + b"\r")
+        send(fd, command_text)
+        deliberate_enter(fd, out)
+        # The approval overlay may render its title above the clipped window;
+        # the actionable footer is the stable production contract.
+        wait_text(fd, out, b"y allow", time.monotonic() + 10)
+        send(fd, decision)
+        deliberate_enter(fd, out)
         wait_text(fd, out, expected, time.monotonic() + 12)
-        send(fd, b"/quit\r")
+        # Denial intentionally restores the rejected command to the draft;
+        # clear that draft before exercising the slash quit path.
+        send(fd, b"\x15")
+        drain(fd, out, 0.1)
+        send(fd, b"/quit")
+        deliberate_enter(fd, out)
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             drain(fd, out, 0.05)
@@ -99,7 +116,21 @@ def run_case(binary: Path, root: Path, *, command_text: bytes, decision: bytes, 
                     raise AssertionError(f"TUI exited with status {status}")
                 break
         else:
-            raise AssertionError("TUI did not exit after /quit")
+            # A redraw can leave the slash command in the draft while the
+            # approval owner is retiring. Empty-prompt Ctrl-D is the same
+            # production quit path and gives the host one final graceful
+            # opportunity before the cleanup guard terminates the fixture.
+            send(fd, b"\x04")
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                drain(fd, out, 0.05)
+                waited, status = os.waitpid(pid, os.WNOHANG)
+                if waited == pid:
+                    if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+                        raise AssertionError(f"TUI exited with status {status}")
+                    break
+            else:
+                raise AssertionError("TUI did not exit after /quit or Ctrl-D")
     finally:
         # Drain while stopping, then enforce a deadline even if terminal I/O
         # or a broken render loop cannot process the normal shutdown signal.

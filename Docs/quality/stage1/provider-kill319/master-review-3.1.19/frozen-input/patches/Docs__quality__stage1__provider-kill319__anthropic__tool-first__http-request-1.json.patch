@@ -1,0 +1,338 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/tool-first/http-request-1.json b/Docs/quality/stage1/provider-kill319/anthropic/tool-first/http-request-1.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/tool-first/http-request-1.json
+@@ -0,0 +1,333 @@
++{
++  "index": 1,
++  "headers": "POST /v1/messages HTTP/1.1\r\ncontent-length: 8449\r\nuser-agent: ureq/3.4.0\r\naccept: */*\r\nhost: 127.0.0.1:55072\r\ncontent-type: application/json\r\nx-idempotency-key: zenpi-89abf031287bc21b768856466031aaca54a6da79dc84eea7179aeb26fa39d38e\r\nanthropic-version: 2023-06-01\r\nauthorization: Bearer local-fixture-key\r\naccept-encoding: identity",
++  "body": {
++    "max_tokens": 8192,
++    "messages": [
++      {
++        "content": [
++          {
++            "text": "read input then answer",
++            "type": "text"
++          }
++        ],
++        "role": "user"
++      },
++      {
++        "content": [
++          {
++            "signature": "opaque-signature-319",
++            "thinking": "SIGNED_THOUGHT_319",
++            "type": "thinking"
++          },
++          {
++            "text": "BEFORE_TOOL_319",
++            "type": "text"
++          },
++          {
++            "id": "durable_read_319",
++            "input": {
++              "path": "input.txt"
++            },
++            "name": "read_file",
++            "type": "tool_use"
++          }
++        ],
++        "role": "assistant"
++      },
++      {
++        "content": [
++          {
++            "content": "{\"call_id\":\"durable_read_319\",\"output\":{\"content\":\"DURABLE_READ_RESULT_319\",\"path\":\"input.txt\",\"truncated\":false},\"status\":\"success\",\"tool\":\"read_file\"}",
++            "is_error": false,
++            "tool_use_id": "durable_read_319",
++            "type": "tool_result"
++          }
++        ],
++        "role": "user"
++      }
++    ],
++    "model": "claude-sonnet-4-6",
++    "output_config": {
++      "effort": "high"
++    },
++    "stream": true,
++    "system": [
++      {
++        "text": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
++        "type": "text"
++      }
++    ],
++    "thinking": {
++      "display": "summarized",
++      "type": "adaptive"
++    },
++    "tools": [
++      {
++        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "new": {
++              "maxLength": 524288,
++              "type": "string"
++            },
++            "old": {
++              "maxLength": 524288,
++              "type": "string"
++            },
++            "path": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "path",
++            "old",
++            "new"
++          ],
++          "type": "object"
++        },
++        "name": "edit_file"
++      },
++      {
++        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "hidden": {
++              "default": false,
++              "type": "boolean"
++            },
++            "ignore": {
++              "default": true,
++              "type": "boolean"
++            },
++            "limit": {
++              "maximum": 256,
++              "minimum": 1,
++              "type": "integer"
++            },
++            "path": {
++              "default": ".",
++              "type": "string"
++            },
++            "pattern": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "pattern"
++          ],
++          "type": "object"
++        },
++        "name": "find"
++      },
++      {
++        "description": "List one workspace directory without recursively following links.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "max_entries": {
++              "maximum": 128,
++              "minimum": 1,
++              "type": "integer"
++            },
++            "path": {
++              "default": ".",
++              "type": "string"
++            }
++          },
++          "type": "object"
++        },
++        "name": "list_directory"
++      },
++      {
++        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "arguments": {
++              "type": "string"
++            },
++            "name": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "name"
++          ],
++          "type": "object"
++        },
++        "name": "load_skill"
++      },
++      {
++        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "max_bytes": {
++              "maximum": 524288,
++              "minimum": 1,
++              "type": "integer"
++            },
++            "path": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "path"
++          ],
++          "type": "object"
++        },
++        "name": "read_file"
++      },
++      {
++        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "path": {
++              "type": "string"
++            },
++            "skill": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "skill",
++            "path"
++          ],
++          "type": "object"
++        },
++        "name": "read_skill_resource"
++      },
++      {
++        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "artifact_id": {
++              "maxLength": 64,
++              "minLength": 64,
++              "type": "string"
++            },
++            "call_id": {
++              "maxLength": 128,
++              "minLength": 1,
++              "type": "string"
++            },
++            "length": {
++              "maximum": 8192,
++              "minimum": 1,
++              "type": "integer"
++            },
++            "offset": {
++              "minimum": 0,
++              "type": "integer"
++            }
++          },
++          "required": [
++            "artifact_id",
++            "call_id",
++            "offset",
++            "length"
++          ],
++          "type": "object"
++        },
++        "name": "read_tool_output"
++      },
++      {
++        "description": "Run a bounded shell command in the workspace.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "command": {
++              "maxLength": 16384,
++              "type": "string"
++            },
++            "timeout_ms": {
++              "maximum": 120000,
++              "minimum": 1,
++              "type": "integer"
++            }
++          },
++          "required": [
++            "command"
++          ],
++          "type": "object"
++        },
++        "name": "run_command"
++      },
++      {
++        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "case_sensitive": {
++              "default": true,
++              "type": "boolean"
++            },
++            "context": {
++              "maximum": 10,
++              "minimum": 0,
++              "type": "integer"
++            },
++            "glob": {
++              "type": "string"
++            },
++            "hidden": {
++              "default": false,
++              "type": "boolean"
++            },
++            "ignore": {
++              "default": true,
++              "type": "boolean"
++            },
++            "max_matches": {
++              "maximum": 100,
++              "minimum": 1,
++              "type": "integer"
++            },
++            "path": {
++              "default": ".",
++              "type": "string"
++            },
++            "query": {
++              "type": "string"
++            },
++            "regex": {
++              "default": false,
++              "type": "boolean"
++            }
++          },
++          "required": [
++            "query"
++          ],
++          "type": "object"
++        },
++        "name": "search_text"
++      },
++      {
++        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
++        "input_schema": {
++          "additionalProperties": false,
++          "properties": {
++            "content": {
++              "maxLength": 524288,
++              "type": "string"
++            },
++            "path": {
++              "type": "string"
++            }
++          },
++          "required": [
++            "path",
++            "content"
++          ],
++          "type": "object"
++        },
++        "name": "write_file"
++      }
++    ]
++  }
++}

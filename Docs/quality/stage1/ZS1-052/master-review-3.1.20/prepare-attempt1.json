@@ -1,0 +1,1 @@
+{"exit_code":1,"phase":"stdin Python parse before execution","error":"SyntaxError: Non-UTF-8 code starting with byte 0xe4; no encoding declared","effects":"No Python statement executed; preparation artifacts not created by this attempt","resolution":"Save UTF-8 source with explicit encoding header and review before executing; do not change evidence or semantic checks"}

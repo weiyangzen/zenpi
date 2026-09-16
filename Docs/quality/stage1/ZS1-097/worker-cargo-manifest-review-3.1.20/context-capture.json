@@ -1,0 +1,466 @@
+[
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/vendor/crossterm/Cargo.toml",
+    "captured_at": "2026-09-12T11:38:48.489636+00:00",
+    "full_bytes": 4455,
+    "full_sha256": "78b5e8b5cd6660067195979533e61d4b33c375c74613f24180efd94c86f7d295",
+    "excerpts": [
+      {
+        "snapshot": "context/vendor__crossterm__Cargo.toml.L12-40.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/vendor/crossterm/Cargo.toml",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.489636+00:00",
+        "bytes": 562,
+        "sha256": "217b160defb1557ce19b1b609372d2ec768a9d31913a437d5493c9994e27f3bd",
+        "source_lines": [
+          12,
+          40
+        ]
+      },
+      {
+        "snapshot": "context/vendor__crossterm__Cargo.toml.L48-88.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/vendor/crossterm/Cargo.toml",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.489636+00:00",
+        "bytes": 638,
+        "sha256": "e453392297be3ba0ef4325f0e3ee0e76b5a3bb04167fd15022ad39f2dd8111a0",
+        "source_lines": [
+          48,
+          88
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/vendor/crossterm/src/event.rs",
+    "captured_at": "2026-09-12T11:38:48.489853+00:00",
+    "full_bytes": 63629,
+    "full_sha256": "989c472a11a6b471e663e191fd64337593423de2aa4774344cb246fb975bbd42",
+    "excerpts": [
+      {
+        "snapshot": "context/vendor__crossterm__src__event.rs.L145-166.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/vendor/crossterm/src/event.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.489853+00:00",
+        "bytes": 1062,
+        "sha256": "b7e993f1c0242f52b11d582573063e0881a3330feb952a8b42dcbf72ebc89a3e",
+        "source_lines": [
+          145,
+          166
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+    "captured_at": "2026-09-12T11:38:48.490083+00:00",
+    "full_bytes": 278737,
+    "full_sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869",
+    "excerpts": [
+      {
+        "snapshot": "context/src__core.rs.L5727-5738.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490083+00:00",
+        "bytes": 617,
+        "sha256": "46c1259890fdcf9648f55c99d6bdeea465c414ea0a8c0398d94e0137fc74fed8",
+        "source_lines": [
+          5727,
+          5738
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
+    "captured_at": "2026-09-12T11:38:48.490656+00:00",
+    "full_bytes": 40533,
+    "full_sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8",
+    "excerpts": [
+      {
+        "snapshot": "context/src__skills.rs.L601-638.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490656+00:00",
+        "bytes": 1640,
+        "sha256": "520d07319a927f3c07c2c2ddbade0c0ac64c98f0b11f3e24bbe609c0c18888ed",
+        "source_lines": [
+          601,
+          638
+        ]
+      },
+      {
+        "snapshot": "context/src__skills.rs.L710-730.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/skills.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490656+00:00",
+        "bytes": 924,
+        "sha256": "97604db7cbefa651c04d61c58cbeaa00788451560c7ecf20b76c7997246b2e29",
+        "source_lines": [
+          710,
+          730
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+    "captured_at": "2026-09-12T11:38:48.490967+00:00",
+    "full_bytes": 587952,
+    "full_sha256": "19fcdd4d7cb98e45096bfb122300815738dd80734d671c7a7714002f6af4d339",
+    "excerpts": [
+      {
+        "snapshot": "context/src__tui.rs.L1284-1300.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490967+00:00",
+        "bytes": 596,
+        "sha256": "cb8016a88dd06854c72f8d0847da4189275e8e3cd3137b643d2ada4126b4bd5b",
+        "source_lines": [
+          1284,
+          1300
+        ]
+      },
+      {
+        "snapshot": "context/src__tui.rs.L12688-12748.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490967+00:00",
+        "bytes": 2507,
+        "sha256": "1a0336a20b0ca0875c928dfd322111dc2cb5455fbf3994f0f423f6f80005fea0",
+        "source_lines": [
+          12688,
+          12748
+        ]
+      },
+      {
+        "snapshot": "context/src__tui.rs.L12755-12772.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.490967+00:00",
+        "bytes": 698,
+        "sha256": "69d7a5efe4963c1c31fea24fe7f1c45bd25bcedcd2e68e41d4ea56e157e33f02",
+        "source_lines": [
+          12755,
+          12772
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/ci.yml",
+    "captured_at": "2026-09-12T11:38:48.492134+00:00",
+    "full_bytes": 3104,
+    "full_sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd",
+    "excerpts": [
+      {
+        "snapshot": "context/.github__workflows__ci.yml.L15-76.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/ci.yml",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492134+00:00",
+        "bytes": 2209,
+        "sha256": "8bddf9bdc46dcaf3ab75315319932aca85f9ced184c8432c9678771241394840",
+        "source_lines": [
+          15,
+          76
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/release.yml",
+    "captured_at": "2026-09-12T11:38:48.492348+00:00",
+    "full_bytes": 3779,
+    "full_sha256": "caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd",
+    "excerpts": [
+      {
+        "snapshot": "context/.github__workflows__release.yml.L13-57.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/release.yml",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492348+00:00",
+        "bytes": 2227,
+        "sha256": "ebe358d09a352692c58982ea563966d3356e46b5a05d438eb9410b268fcabed9",
+        "source_lines": [
+          13,
+          57
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/release.sh",
+    "captured_at": "2026-09-12T11:38:48.492468+00:00",
+    "full_bytes": 2222,
+    "full_sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094",
+    "excerpts": [
+      {
+        "snapshot": "context/tools__release.sh.L1-49.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/tools/release.sh",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492468+00:00",
+        "bytes": 2222,
+        "sha256": "78b395354e9c404488d17e9c8dd4c1c9c30fcd65ec926e7c61e5eb51df521094",
+        "source_lines": [
+          1,
+          49
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+    "captured_at": "2026-09-12T11:38:48.492594+00:00",
+    "full_bytes": 15327,
+    "full_sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c",
+    "excerpts": [
+      {
+        "snapshot": "context/tools__bench_runtime.py.L24-40.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492594+00:00",
+        "bytes": 423,
+        "sha256": "af4c27a83329747513defa97d941dee6c13c73caab237a57988fbbfe1d2a35f8",
+        "source_lines": [
+          24,
+          40
+        ]
+      },
+      {
+        "snapshot": "context/tools__bench_runtime.py.L130-139.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492594+00:00",
+        "bytes": 598,
+        "sha256": "e0303069b75d6e5fc1eb42b701cfc291d87408a8b8abe34ac0073b847c02161b",
+        "source_lines": [
+          130,
+          139
+        ]
+      },
+      {
+        "snapshot": "context/tools__bench_runtime.py.L250-270.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/tools/bench_runtime.py",
+        "role": "context-only excerpt",
+        "captured_at": "2026-09-12T11:38:48.492594+00:00",
+        "bytes": 594,
+        "sha256": "ba8569a7a4267d21789270795b11c27f6cad988397c20d4e095304fbc4624ffe",
+        "source_lines": [
+          250,
+          270
+        ]
+      }
+    ]
+  },
+  {
+    "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+    "captured_at": "2026-09-12T11:38:48.492909+00:00",
+    "full_bytes": 46021,
+    "full_sha256": "7311d1133e06e428707d9aa10c95c6a0c1efa983865472f6b5e24b640f4b1348",
+    "excerpts": [
+      {
+        "snapshot": "context/lock/base64.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 191,
+        "sha256": "c0133660504bec61a775f57ed3426db30d3f5521cba2b9b7510c4ac0982eeb16",
+        "source_lines": [
+          41,
+          46
+        ]
+      },
+      {
+        "snapshot": "context/lock/crossterm.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 224,
+        "sha256": "8cf3f37d0a935a4baf47818677197519914ac700a4af3347a76ca48f95972529",
+        "source_lines": [
+          204,
+          219
+        ]
+      },
+      {
+        "snapshot": "context/lock/httpdate.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 192,
+        "sha256": "f57c5491e0096bf044f2c35631017dc619e7880b28f59d348dd2d41fa3028129",
+        "source_lines": [
+          487,
+          492
+        ]
+      },
+      {
+        "snapshot": "context/lock/ignore.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 322,
+        "sha256": "6e6b86e5a4938d80d9d9f0f84da6dce5c0e5815dcb01d05c12e23310d723d832",
+        "source_lines": [
+          601,
+          616
+        ]
+      },
+      {
+        "snapshot": "context/lock/libc.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 190,
+        "sha256": "9fe2dc0b2f20d84237e611b8bc49056d86abd4c479ee35e6def0789a37813d14",
+        "source_lines": [
+          675,
+          680
+        ]
+      },
+      {
+        "snapshot": "context/lock/ratatui.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 296,
+        "sha256": "008abd18307627a1cb2690d1b79e0b6aa0441f224e63fa9ab8f530d855f608be",
+        "source_lines": [
+          909,
+          921
+        ]
+      },
+      {
+        "snapshot": "context/lock/serde.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 242,
+        "sha256": "4b56ac4f17c15c5aff87f5dd993f5d56d4fb2bc876237e9e425d69adb548aa08",
+        "source_lines": [
+          1105,
+          1114
+        ]
+      },
+      {
+        "snapshot": "context/lock/serde_json.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 269,
+        "sha256": "7ff0cd3925e88e10948d814caeb079b529bc7b81563bb23c7365f4c0b21d9499",
+        "source_lines": [
+          1135,
+          1147
+        ]
+      },
+      {
+        "snapshot": "context/lock/sha2.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 246,
+        "sha256": "562d355bd0049b5ca282f8d08054905a86133077e35f071665e56d35eebb7a93",
+        "source_lines": [
+          1157,
+          1167
+        ]
+      },
+      {
+        "snapshot": "context/lock/tempfile.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 293,
+        "sha256": "338a62279bee3c057ae2b48eb761a16e19b7d93e7334edbb6f876b3246285da0",
+        "source_lines": [
+          1295,
+          1307
+        ]
+      },
+      {
+        "snapshot": "context/lock/thiserror.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 232,
+        "sha256": "740af2c3e0a26ba52ba7a6fb9317fca83f3f89717f916b87e7fbab968dc9b7a5",
+        "source_lines": [
+          1308,
+          1316
+        ]
+      },
+      {
+        "snapshot": "context/lock/toml.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 333,
+        "sha256": "212366bbd6590453240dabe868b56a9ed32f47a32b5bd537afdddfb59136ce88",
+        "source_lines": [
+          1370,
+          1384
+        ]
+      },
+      {
+        "snapshot": "context/lock/unicode-segmentation.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 205,
+        "sha256": "e64f954bff1ddd98c2823aa3bb037a4ad93418e8fbe19f89110c8288048763ab",
+        "source_lines": [
+          1421,
+          1426
+        ]
+      },
+      {
+        "snapshot": "context/lock/unicode-width.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 197,
+        "sha256": "c181fc30f5b1a39885071b283ce8ac390d61c2072145e2a7db432d51f7a36f14",
+        "source_lines": [
+          1438,
+          1443
+        ]
+      },
+      {
+        "snapshot": "context/lock/ureq.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 378,
+        "sha256": "e55fc50a0ac6344ce13cfd17bda1eaf43dead7aa49890c9078501749bcbc2ffb",
+        "source_lines": [
+          1450,
+          1469
+        ]
+      },
+      {
+        "snapshot": "context/lock/yaml_serde.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 269,
+        "sha256": "1e3465b502b4030b188496fd2aa548e1a0a641e81676ad8940476fa13b9b27ec",
+        "source_lines": [
+          1674,
+          1686
+        ]
+      },
+      {
+        "snapshot": "context/lock/zenpi.txt",
+        "path": "/Users/wangweiyang/GitHub/zenpi/Cargo.lock",
+        "role": "selected package block only",
+        "captured_at": "2026-09-12T11:38:48.492909+00:00",
+        "bytes": 272,
+        "sha256": "1e340cbc47dc7f3eee2841218670155c090b93a0e60035aa599896cc54d57482",
+        "source_lines": [
+          1710,
+          1731
+        ]
+      }
+    ]
+  }
+]

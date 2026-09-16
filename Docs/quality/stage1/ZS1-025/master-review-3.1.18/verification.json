@@ -1,0 +1,13 @@
+{
+  "package_files": 59,
+  "source_copies": 13,
+  "fixtures": 21,
+  "node": {
+    "path": "/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "version": "24.19.0",
+    "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "platform": "Darwin",
+    "machine": "arm64"
+  },
+  "all_verified": true
+}

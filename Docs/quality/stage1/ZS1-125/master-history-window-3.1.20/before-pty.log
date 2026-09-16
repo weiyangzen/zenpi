@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_transcript_ux_smoke.py", line 203, in <module>
+    if __name__=='__main__':main()
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_transcript_ux_smoke.py", line 109, in main
+    if args.long_history_only:return long_history_smoke(binary,args.evidence)
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_transcript_ux_smoke.py", line 104, in long_history_smoke
+    assert result['ok'],result['checks']
+AssertionError: {'long_history_reading_anchor_stays_put': True, 'latest_reply_visible_beyond_18000_rows': False, 'old_journal_and_new_reply_preserved': True, 'exactly_four_provider_calls': True, 'terminal_restored': True}

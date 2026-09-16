@@ -1,0 +1,30 @@
+{
+  "src/tui.rs": {
+    "bytes": 531726,
+    "sha256": "f40a58b79ca9b733733fed61b9fb1fbf06747a7e81444203cea25fc924ed9424"
+  },
+  "src/core.rs": {
+    "bytes": 274261,
+    "sha256": "93953e4af528935ece167056e02c174632ae42e0a370e5ba61a09eeac1cdf1d9"
+  },
+  "src/protocol.rs": {
+    "bytes": 45517,
+    "sha256": "90a5644d5a818a8051172b42b302614fb3263ebac737ce9dbf4a842791370d27"
+  },
+  "src/tool_output.rs": {
+    "bytes": 61670,
+    "sha256": "6b24c89dbc8b49a5721fea0e74de00db0c3f9826614b4de65a76e4c8fe007327"
+  },
+  "target/debug/zenpi": {
+    "bytes": 49976904,
+    "sha256": "4410982e43fe281e2f5a14e4b25550a096c58c8e0ec08f751ed50b55119db2ee"
+  },
+  "tools/tui_project_workspace_smoke.py": {
+    "bytes": 30299,
+    "sha256": "fd15750ef274fc22e05f9a97e0e048794cd0b08195bff8a100b800ea01daadea"
+  },
+  ".ops/stage1_execution/queue-identity-integration/frozen-input/tools/tui_composer_smoke.py": {
+    "bytes": 54830,
+    "sha256": "95fd1390f8d2425700adb270341bf0ce6d829bec1532b471ab9be61785a8cc41"
+  }
+}

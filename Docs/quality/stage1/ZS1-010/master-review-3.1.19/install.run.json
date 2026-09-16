@@ -1,0 +1,27 @@
+{
+  "name": "install",
+  "argv": [
+    "npm",
+    "ci",
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+    "--prefix",
+    ".ops/stage1_execution/source010-integration/work/runtime"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:15:12.394927+00:00",
+  "ended_at": "2026-09-12T05:15:12.917601+00:00",
+  "elapsed_seconds": 0.5225437079999999,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 113377280,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source010-integration/install.log",
+  "bytes": 26,
+  "sha256": "4721ad527a12164d9d9f30dff062c829b1108c43b39f90d2c3d0bd9bcfe6d610"
+}

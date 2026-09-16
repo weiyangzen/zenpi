@@ -1,0 +1,9 @@
+test_export_is_bounded_and_cannot_overwrite_first_sample (test_bench_runtime.StartupEvidence) ... ok
+test_failed_sample_is_durable_before_exception (test_bench_runtime.StartupEvidence) ... ok
+test_success_keeps_exact_streams_and_timing_identity (test_bench_runtime.StartupEvidence) ... ok
+test_timeout_retains_partial_output_and_kills_probe_group (test_bench_runtime.StartupEvidence) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.809s
+
+OK

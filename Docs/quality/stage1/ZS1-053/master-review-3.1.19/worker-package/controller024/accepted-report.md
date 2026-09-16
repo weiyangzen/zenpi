@@ -1,0 +1,32 @@
+# ZS1-024 — output-accumulator.ts
+
+状态：[x] 本文件 understand 独立审阅通过；不代表 ZS1-111 产品完成。
+source_id: SRC-0953
+source_path: packages/coding-agent/src/core/tools/output-accumulator.ts
+source_hash: c601ddd8e10934be6f3db30696eacba7b9544f2dd1648a5ec3c9935f0d4625c3
+source_bytes: 6049
+read_ranges: [[0, 6049]]
+run_id: zenpi-stage1-20260911
+
+完整阅读 1–222 行；文件小于256KiB。OutputAccumulatorOptions 支持 maxLines/maxBytes/tempFilePrefix；默认 truncate 模块限制，rolling cap 至少1且为maxBytes*2。原始 Buffer chunks 在未溢出前保留，TextDecoder(stream=true)跨chunk处理UTF-8，解码文本独立跟踪totalDecodedBytes、行数、当前行字节；decoded与rawbytes不同，不能混当artifact原始范围。
+
+append在finished后抛错；先增原始字节、追加解码tail，再判断超过原始字节/解码字节/行数任一阈值，ensureTempFile建立tmpdir随机8字节hex路径并写出此前rawChunks，后续直接write(data)。tailBytes超过rolling*2才trim，trim用UTF-8 continuation-byte对齐，不切坏字符，并记录起始是否行边界。snapshot按truncateTail裁剪显示；若tail起于半行且含换行，则跳到下一完整行；一条超长行无换行时仍保留尾部。totalLines=completed+openline，getLastLineBytes提供最后一行大小。
+
+finish幂等、flush TextDecoder残留、必要时spill；它不关闭或验证临时文件。snapshot(persistIfTruncated)可确保临时路径存在，但完整性不能仅由fullOutputPath存在推断。closeTempFile以WriteStream finish/error Promise确认end，不在finish里自动调用，也没有fsync、读回hash、每流身份或持久恢复元数据。write返回的backpressure布尔值没有等待；原始输出没有磁盘单文件/总量/文件数量/TTL配额，也没有目录私有权限/范围读取权限合同。
+
+对应zenpi G06：保存原始stdout/stderr应在read_limited_stream丢弃超过内存cap之前，而不是对既有截断Value再compact。111候选采用host选定私有目录、生成ID而非模型路径、openat/no-follow/单链接、有限单文件/总量/数量/TTL、流式hash和终态读回验证，显示尾部与原始字节范围分离。取消/磁盘错误不声明full；progress经过既有canonical view kind适配，slow consumer有drop marker。与pi的区别须保留：zenpi不会默许worker gate产生未经授予的raw artifact写入。此文件不能替代同目录bash/grep/find等独立阅读和目录报告。
+
+
+## 主控独立复核与可运行判据
+
+主控完整读取同一冻结文件1–222行、6049字节，并核对原始source hash。文件全部成员均已覆盖：options/snapshot接口、随机路径及UTF-8字节辅助函数、构造状态、append、finish、snapshot、closeTempFile、getLastLineBytes、appendDecodedText、trimTail、getSnapshotText、shouldUseTempFile、ensureTempFile。默认maxLines=2000/maxBytes=51200由truncate.ts提供；该依赖仅作context-only读取其计数/尾部裁剪分支，不计为本轮额外文件覆盖。
+
+已直接运行冻结TypeScript源文件，Node v22.14.0 --experimental-strip-types，source-probe.mjs含9组实际断言，退出0。它验证空输出/无spill/重复close、分块UTF-8与最后行计数、finish幂等和禁止后续append、字节阈值落盘且原始prefix保留、行阈值、非法UTF-8导致decoded bytes大于raw bytes、finish flush不完整编码、rolling trim完整行、超长单行尾部，以及磁盘路径不可创建时close Promise确实拒绝。此为主控直接源行为探针，不冒称执行上游完整测试套件。
+
+第一次探针把截断显示尾部的换行误判为保留，因此失败；主控检查truncateTail实现后确认，其截断分支把按行数组join("\n")，会去掉最后换行，未截断分支则保留原content。纠正探针预期后9组通过，首次代码和失败日志均保留。这说明display content不能作为raw output的替代。源文件没有取消参数、session恢复、redaction或授权读取接口；不能为它宣称这些行为已实现。
+
+当前zenpi对应实现为src/tool_output.rs的OutputLimits/OutputArtifactStore/ArtifactWriter/CommandOutputCapture：open/begin负责私有目录及单流身份，append/snapshot提供有界原始tail，finish在子进程回收后验证存储前缀与hash，read_range检查引用身份和字节范围，cleanup_*处理过期/会话/调用。src/core.rs的begin_output_capture/persist_output_capture负责预算预留和durable引用，已接普通run_command及用户shell；工具结果把output_capture带入下一次真实模型请求。取消/磁盘失败会保留incomplete引用，不能从路径存在推导完整输出。
+
+目标证据映射：tests/stage1_tool_output.rs的preserves_exact_raw_bytes_with_split_utf8_and_bounded_display对应UTF-8/raw分离；per_file_quota_keeps_verified_prefix_and_never_claims_full_output对应配额前缀；actual_command_output_over_memory_cap_is_reconstructible_from_raw_artifacts对应实际命令spill；command_cancel_reaps_then_flushes_incomplete_prefix_and_stops_updates对应取消和reader回收；host_user_shell_raw_capture_survives_restart_and_keeps_terminal_order、host_capture_disk_reservation_precedes_artifacts_and_shell_effects、real_http_model_command_sends_capture_reference_in_next_request对应生产owner接线、预算和下次wire引用。这些目标测试已在主控集成回归执行；其成功不代替本文件源语义复核。
+
+有意差异及剩余缺口：zenpi以byte cap为当前显示边界，尚未提供与source maxLines完全相同的显示合同；强制quota、TTL、generated ID、权限和hash是目标的明确加强。当前progress queue和canonical_kind已存在，但TUI/headless尚未实时消费；read_range仍是内部原始字节读取，公开授权/脱敏接口及跨chunk敏感值边界尚未完成；host生命周期清理入口仍需补齐。故ZS1-111保持未完成。本文件不关闭bash.ts、其它工具文件或tools目录；目录关系按独立G-DIR接受。

@@ -1,0 +1,51 @@
+test_activation_header_changes_preserve_requirement_digest (__main__.Stage1Tests) ... ok
+test_bad_states_and_ids_rejected (__main__.Stage1Tests) ... ok
+test_bootstrap_does_not_inherit_old_accepted_state (__main__.Stage1Tests) ... ok
+test_bootstrap_explicit_master_without_selector (__main__.Stage1Tests) ... ok
+test_bootstrap_rejects_second_authority_before_any_write (__main__.Stage1Tests) ... ok
+test_chunk_gap_overlap_and_truncated_tail_rejected (__main__.Stage1Tests) ... ok
+test_claim_and_integration_are_separate (__main__.Stage1Tests) ... ok
+test_claim_binding_ownership_and_capacity (__main__.Stage1Tests) ... ok
+test_cli_draft_and_strict_exit_codes (__main__.Stage1Tests) ... ok
+test_cross_tree_report_substitution_rejected (__main__.Stage1Tests) ... ok
+test_current_repository_draft_and_counts_are_derived (__main__.Stage1Tests) ... ok
+test_cycle_and_unknown_dependency_rejected (__main__.Stage1Tests) ... ok
+test_duplicate_field_loc_limit_and_path_traversal (__main__.Stage1Tests) ... ok
+test_duplicate_id_rejected (__main__.Stage1Tests) ... ok
+test_explicit_toolchain_alias_preserves_validation_argv (__main__.Stage1Tests) ... ok
+test_extra_final_report_cannot_inflate_coverage (__main__.Stage1Tests) ... ok
+test_finished_claim_does_not_hide_another_live_path_conflict (__main__.Stage1Tests) ... ok
+test_forged_master_checkbox_rejected_even_after_snapshot_refresh (__main__.Stage1Tests) ... ok
+test_historical_integrated_revision_survives_unrelated_checkpoint (__main__.Stage1Tests) ... ok
+test_integration_hash_covers_cargo_lock_and_owned_ci_bytes (__main__.Stage1Tests) ... ok
+test_item_evidence_requires_selector_and_actual_receipt (__main__.Stage1Tests) ... ok
+test_manifest_missing_row_directory_or_duplicate_rejected (__main__.Stage1Tests) ... ok
+test_missing_directory_even_with_dependency_rewired_rejected (__main__.Stage1Tests) ... ok
+test_missing_file_checklist_rejected (__main__.Stage1Tests) ... ok
+test_missing_file_row_cannot_be_hidden_by_partition (__main__.Stage1Tests) ... ok
+test_missing_reference_file_and_root_directory_rejected (__main__.Stage1Tests) ... ok
+test_multiple_active_requirement_rejected (__main__.Stage1Tests) ... ok
+test_nonancestor_and_missing_integrated_revisions_are_rejected (__main__.Stage1Tests) ... ok
+test_provisional_claims_do_not_close_unaccepted_dependencies (__main__.Stage1Tests) ... ok
+test_real_requirement_changes_invalidate_digest (__main__.Stage1Tests) ... ok
+test_real_subprocess_test_output_can_be_checked (__main__.Stage1Tests) ... ok
+test_reference_hash_and_chunk_tail_are_independent (__main__.Stage1Tests) ... ok
+test_reference_tree_counts_and_indexes_remain_independent (__main__.Stage1Tests) ... ok
+test_requirement_stable_for_all_cursor_transitions (__main__.Stage1Tests) ... ok
+test_runtime_record_exclusion_is_narrow_and_fail_closed (__main__.Stage1Tests) ... ok
+test_selector_cannot_replace_baseline_or_requirement (__main__.Stage1Tests) ... ok
+test_skip_immediate_child_directory_rejected (__main__.Stage1Tests) ... ok
+test_source_and_reference_actual_head_are_checked_even_when_bytes_match (__main__.Stage1Tests) ... ok
+test_symlink_is_rejected (__main__.Stage1Tests) ... ok
+test_todo_preserves_three_states_and_unfinished_counts (__main__.Stage1Tests) ... ok
+test_truncated_and_duplicate_json_records_rejected (__main__.Stage1Tests) ... ok
+test_wrong_integrated_revision_is_rejected (__main__.Stage1Tests) ... ok
+test_wrong_manifest_hash_rejected (__main__.Stage1Tests) ... ok
+test_wrong_source_hash_and_target_dirty_baseline_hash (__main__.Stage1Tests) ... ok
+test_zero_tests_in_one_target_not_hidden_by_other_target (__main__.Stage1Tests) ... ok
+test_zero_tests_missing_command_wrong_hash_and_forged_argv (__main__.Stage1Tests) ... ok
+
+----------------------------------------------------------------------
+Ran 46 tests in 8.523s
+
+OK

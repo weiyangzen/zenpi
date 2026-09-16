@@ -1,0 +1,3592 @@
+diff --git a/Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md b/Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md
+@@ -0,0 +1,72 @@
++# ZS1-015 / SRC-0440 — packages/ai/src/types.ts
++
++本报告是 authority 3.1.19 下的单文件源码审查候选，未作主控验收，未覆盖目录验收。唯一 Pi 源对象为 `/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/types.ts`：37,411 bytes，881 lines，SHA-256 `f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0`，与当前主库 active_requirement.json 的 ZS1-015 冻结项一致。需求 digest 为 `3ce9613262de0a8499837571137782becc01daa7b56923a53b11f7f04058f60d`。
++
++本次重新完整读取 1–220、221–440、441–660、661–881 行。`Docs/quality/stage1/ZS1-015/worker-types319/input-manifest.json` 给出连续、无重叠的半开字节范围及逐段 hash；四份 read 文本拼接等于完整源快照。`export-inventory.json` 列出全部 72 个具名 type/interface 声明的起始行；另有第15行 type-only re-export。旧本地报告保存在 prior-local-report.md，仅作历史保全；其中旧行号、旧目标实现状态、其他文件和运行时测试声明不充当本次证据。
++
++## 完整文件合同分区
++
++| 源行 | 全量分区及其边界 |
++|---|---|
++| 1–16 | TelemetryContext、10个 API options、diagnostics、event-stream 的 type-only import，以及 event-stream 的 type-only re-export。此文件引用它们的类型，未在本次扩展读取或执行这些 Pi 文件。 |
++| 17–80 | 10个 KnownApi 与可扩展 Api；独立 ImagesApi；KnownProvider、ProviderId 和图片 provider 身份。Api 的 `string & {}` 保留自定义字面量通道，ProviderId 接受任意 string；字符串可表示不等于实现存在。 |
++| 82–122 | ToolChoice 仅 auto/none；ThinkingLevel 为 minimal/low/medium/high/xhigh/max；ModelThinkingLevel 另含 off。ThinkingLevelMap 为部分映射，值可 string/null；ThinkingBudgets 只有 minimal/low/medium/high。ChatTemplateKwargValue 接受标量/null 或 thinking.enabled/effort/budget 变量及 omitWhenOff。另定义三种 reasoning token budget 字段、CacheRetention、四种 Transport、env/header/fetch/session affinity 和 HTTP response 形状。 |
++| 124–177 | 通用 ProviderRequestOptions：signal、telemetryContext、apiKey、fetch、env、onPayload/onResponse、headers、timeoutMs、maxRetries、maxRetryDelayMs。这里只声明输入和注释合同，没有 HTTP、取消、重试或参数校验实现。 |
++| 179–236 | StreamOptions 增加采样、token、transport/cache/session、websocketConnectTimeoutMs、metadata；ProviderStreamOptions 开放额外字段。DeferredFetchOptions.wait 默认语义为一次状态检查；DeferredCancelOptions 是通用 options 的别名，注释明确 best-effort。 |
++| 243–303 | ApiOptionsMap 对已知 API 指向具体 options 类型；ApiStreamOptions 条件类型对自定义 API 回退通用形状。ProviderStreams 定义 stream、streamSimple 及可选 fetchDeferred/cancelDeferred；ProviderImages 定义 Promise 图片生成，ImagesOptions 共享认证/回调合同。 |
++| 305–343 | 开放 ProviderImagesOptions；AnthropicAllowedFallbackModel 的 provider/model/cost；SimpleStreamOptions 的 toolChoice、reasoning、deferred 窗口和 thinkingBudgets；StreamFunction 与 ImagesFunction 泛型签名。同步 missing-auth 与流内失败合同见下节。 |
++| 345–381 | TextSignatureV1、TextContent、ThinkingContent、ImageContent、ToolCall。签名是回放资料，redacted thinking 可保留不透明密文；图片为 base64 + MIME；工具参数是 Record<string, any>，还有 thoughtSignature、namespace。类型本身不校验签名、base64、JSON schema 或工具执行权限。 |
++| 383–420 | Usage、7种 StopReason、递归 JsonValue、DeferredHandle。usage 中 reasoning 是 output 子集，cacheWrite1h 是 cacheWrite 子集；deferred 保存 provider/model/api/id、过期/轮询提示及可选 JSON 重建数据。 |
++| 422–490 | UserMessage、AssistantMessage、ToolResultMessage、Message 联合；独立 ImagesContext/AssistantImages。assistant 同时保存请求 model 和可选 responseModel/responseId、native effort、diagnostics、usage、stopReason、deferred、error/rawStopReason/endTurn；endTurn 注释明确当前不控制 agent 流程。tool usage 不计入主 LLM context accounting；addedToolNames 表示新工具加载点。 |
++| 492–528 | type-only TSchema import；GrammarFormat/GrammarVariants；ConstrainedSamplingConfig 的 json_schema strict prefer/require 或 grammar variants；Tool 泛型 schema 及 constrainedSampling=false；Context 的 systemPrompt/messages/tools。并非运行时 validator。 |
++| 530–562 | AssistantMessageEvent 的注释状态机与12个事件分支：start，text/thinking/toolcall 各 start/delta/end，done，error。共享 partial、开始顺序、终止分支及 redaction 例外见下节。 |
++| 564–643 | OpenAICompletionsCompat：字段/角色/usage/finishReason、token field、工具历史格式、11种 thinkingFormat、chat template args/kwargs、两类 routing、zai tool stream、thinking budget 字段与旧别名、grammar/strict、cache、session affinity、deferred tools、long retention、vllmPriority。URL 推断和格式转换都发生在别处；这里没有 adapter 逻辑。 |
++| 645–665 | OpenAIResponsesCompat：developer、session affinity、long retention、strict/grammar、additional tools/tool search、explicit prompt cache、max output 支持开关。注释内各默认值不能被理解成该 interface 自动填值。 |
++| 667–737 | AnthropicMessagesCompat：eager tool streaming 与旧 beta header、cache/session/tool-cache、temperature、adaptive thinking、empty signature、strict tools、mid-conversation effort、允许的 fallback model/cost、tool references；BedrockCompat 的 strict。无 fallback 数组或为空时需省略字段，是声明的适配器义务。 |
++| 739–825 | OpenRouterRouting 全部字段：fallback、参数支持、data collection/ZDR/distillation、order/only/ignore、quantizations、sort、max_price、吞吐/延迟标量或分位阈值；VercelGatewayRouting 的 only/order。外链是源码注释，未联网核实当前服务行为。 |
++| 827–881 | ModelCostRates、ModelCostTier、ModelCost；Model 的身份、baseUrl、reasoning/map、input、cost、contextWindow/maxTokens、sampling/header 与条件 compat；ImagesModel 通过 Omit 移除 api/provider/reasoning/contextWindow/maxTokens/compat，再给独立身份和 output。它仍继承未被 Omit 的 thinkingLevelMap、cost、headers、samplingParams 等，不能泛称删除所有 reasoning 相关字段。 |
++
++## 事件、错误、取消与重试
++
++成功流先 start，再 partial 更新，最后 done。请求设置在生成开始前失败可以直接 error；已经 start 的失败也以 error 结束。updates/done 不得早于 start。done.reason 仅 stop/length/toolUse/deferred；error.reason 仅 aborted/error；pending 不能作为 terminal reason。每个 event 的 message/partial 自身 stopReason 未被联合类型进一步约束，因此仅靠类型不能证明 event.reason 与 message.stopReason 一致，也不能证明单 terminal、顺序正确或 EOF 完整。
++
++partial 是共享 live response-so-far 引用，不是事件时刻快照。普通 text/thinking block 在 start 时为空，经 delta 生长，以 end 为权威内容；redacted thinking 可以 start 就完整且没有 delta。toolcall_start 参数形态由 provider 决定，后续 delta 是 JSON 更新；消费者应等待 toolcall_end 的最终 ToolCall，不能把中间参数当成可执行调用。这些都是源码注释规定的协议，不是本文件执行的状态机。
++
++StreamFunction 注释允许直接 streamSimple 在认证缺失时同步 throw；一旦返回 stream，请求/model/runtime failure 应在流中表达。错误终止要求 assistant 的 stopReason 为 error/aborted 并提供 errorMessage，不过 interface 将 errorMessage 声明为可选，没有类型级强制。必须把“声明义务”和“实际执行器验证”分开。
++
++取消入口是可选 AbortSignal。DeferredCancelOptions 与可选 cancelDeferred 的 best-effort 语义不等价于保证远端任务停止，也没有声明取消延迟、清理、幂等或恢复重放算法。signal 缺席、错误类型、回调 throw、结束后取消等时序都不能由这个文件推出。
++
++重试有三个独立维度：timeoutMs 是支持它的 provider/SDK 的 HTTP timeout；maxRetries 是支持 client retry 的 provider/SDK 最大重试次数；maxRetryDelayMs 对服务器要求的等待设上限，注释默认60000ms，0关闭该上限，超过上限应立即失败并在错误中包含所要求的延迟以便上层透明处理。注释举例 OpenAI/Anthropic SDK 默认10分钟和2次，不是本文件落实的全局默认。文件没有定义可重试状态码、退避公式、累计期限、幂等键或已输出后的重试策略。
++
++## 请求覆盖规则、usage 和模型能力
++
++通用 env 覆盖 process.env。headers 中调用者值覆盖 provider 默认，null 抑制默认字段；Bedrock 例外注释说保留头 x-amz-*/authorization/host 会被忽略以维护签名。onPayload 可同步/异步返回替代 payload，undefined 保持原值；onResponse 可异步，stream 专门承诺在消费 body 之前调用。fetch 默认 globalThis.fetch，不能注入的 adapter 可以拒绝，而且不影响 WebSocket。websocketConnectTimeoutMs 仅涵盖连接握手，之后流空闲受 timeoutMs 管理。
++
++samplingParams 按 key 覆盖 Model.samplingParams，并在已命名请求字段后合并，因此可覆盖命名字段；注释限定 OpenAI-compatible completions/responses/Azure，其他 API 忽略。transport/cache/session/metadata 也是能力相关选项，不能从公共字段存在推断每个 provider 都支持。
++
++Usage 有 input/output/cacheRead/cacheWrite/totalTokens，以及可选 cacheWrite1h、reasoning；reasoning 可能为0，undefined 表示未报告，不能当成额外 output。cost 有 input/output/cacheRead/cacheWrite/total，没有在此文件执行加总或校验非负/有限数，也未规定 totalTokens 必须等于哪个字段公式。ToolResultMessage.usage 明确不属于主 LLM 上下文计费。ModelCostRates 的单位为美元/百万 token；tiers 采用总输入严格超过 inputTokensAbove 的门槛，最高匹配 tier 适用于整次请求，不能推成分段累进价格。源类型没有价格来源/版本字段。
++
++Model API 泛型限制 compat：completions→OpenAICompletionsCompat，Responses/Azure/Codex→OpenAIResponsesCompat，Anthropic→AnthropicMessagesCompat，Bedrock→BedrockCompat，其余为 never。thinkingLevelMap 缺 key 用 provider 默认，null 表示不支持，不能把两者合并。input 仅 text/image，不含通用文件；Model 没有一般 tools/streaming/structured-output 布尔字段。基于 wire 或名字猜模型能力不由本文件授权。类型中的 number 也没有自行验证 contextWindow、maxTokens 或价格范围。
++
++## 当前 Zenpi 对应路径与明确差异
++
++目标引用是主库只读片段快照，不构成这些目标文件的完整验收。`target-references.json` 为每个引用给出文件 hash、行号、字节范围及片段 hash；行号属于该次捕获，不套用旧报告。主库观察 HEAD 为 `6f252a20c628e9b1ede14e2887acc04657c71d7c`，包含用户工作树修改；本报告没有合并或提交。
++
++| Pi 合同 | 当前 Zenpi 定位 | 源码可确认的映射与不足 |
++|---|---|---|
++| Model / G05 / reasoning / context | `src/providers/registry.rs:18` ReasoningLevel，`:60` ModelDescriptor，`:71` effective_capabilities，`:84` validate_reasoning，`:102` context_budget；`src/backend.rs:124` ProviderCapabilities；`src/config.rs:1274` ModelCatalogEntry | 已有 exact provider/id、模型×wire能力交集、reasoning成员校验、上下文/输出上限、字段来源及可选价格；不是旧报告所述“仅 wire 能力”。目标 none/ultra 与源 off/max 词表不同，未映射 levelMap 的 provider-specific string/null，也没有完整源 compat 族。这里只确认所读方法，不宣称目录全部行为。 |
++| Context / StreamOptions | `src/backend.rs:169` CompletionRequest 及 builders | turn/turns/model/tools/instructions/metadata/attachments/response_format/max_output_tokens 与部分源输入对应；没有同构的通用 AbortSignal、fetch/env/headers/onPayload/transport/sampling/cache/deferred options bundle。是否在具体配置或 adapter 有局部机制，需要单独确认。 |
++| Event stream | `src/backend.rs:229` ProviderEvent，`:301` Completion，`:389` Backend | 使用同步 complete_with_control + cancel predicate + sink(Result)，有 response-created/text/reasoning/tool/usage/warning/completed/failed；不携带 source 的共享 partial/contentIndex 或 thinking end 的完整同构状态。默认 trait complete_with_control 只在 complete 前后检查取消，不能凭 trait 声明保证任意实现的中途取消。 |
++| Usage / pricing | `src/backend.rs:292` Usage；`src/providers/registry.rs:42` ModelPrice | 公共 Usage 仅 input/output/total 三个 u64；没有 cacheRead/cacheWrite/cacheWrite1h/reasoning/cost 明确字段。ModelPrice 采用整数单位、来源版本、可选 cached input 价格，未涵盖源 cache-write/tier 成本结构。不要将缺失字段默认为零或假称 usage 全等。 |
++| User/assistant/tool messages | `src/core.rs:133` TurnRole，`:143` Turn；`src/tools.rs:540` ToolCall，`:652` ToolResult | Turn 是角色、字符串内容、时间与通用 metadata，不是源内容块联合；ToolCall 有 id/name/JSON arguments，通用结构没有 thoughtSignature/namespace；ToolResult 是 Success/Error 的 JSON output/失败。通用 metadata 可承载额外资料，但类型存在不能证明每个 opaque signature 的保留/回放实现。 |
++| Tool/schema | `src/tools.rs:505` ToolDefinition 与 validate | JSON-Schema形状、side_effect、名称/描述/容量/object校验，工具执行器仍是权威validator；未提供源 grammar variants、strict prefer/require、addedToolNames 的完整公共同构字段。 |
++| Cancellation / retry | `src/backend.rs:324` BackendError，`:354` is_retryable，`:1587` 具体 complete_with_control | Cancelled/Steered 不重试；Transport 与408/409/425/429/5xx可重试。所读实现只在未发 event、次数未耗尽且非 semantic_compaction 时重试，warning + capped exponent、Retry-After取较大值、等待期间10ms轮询取消，另有circuit。它和源 maxRetryDelayMs 的字段合同不是逐项相同；本次不执行网络或取消验证。 |
++| Deferred / image generation / routing | 对照所读 CompletionRequest、Completion、ProviderEvent 和通用 Tool/Turn 结构 | 未见 DeferredHandle/cancelDeferred/fetchDeferred、ProviderImages、OpenRouter/Vercel routing 的同构公共合同；这只描述已核对的公共类型，不据此宣称整个仓库完全没有相关功能。 |
++
++## 验证、适用范围与移交
++
++本次工作仅为单文件逐行审查、hash/连续字节覆盖、72个声明 inventory 和目标片段映射。没有安装依赖，也未执行 TypeScript 完整类型检查、源消费者测试、网络服务或深度搜索探针。现有本地常用位置没有 TypeScript 编译器；完整 typecheck 会解析其他 API 模块，不是完成此单文件审查的必要条件。verification 只能验证引用/字节结构，语义需要主控独立复核。
++
++G-FILE 的源身份、唯一报告、完整范围和artifact hash已用本地主控校验函数核对通过。G-STAGE --item ZS1-015 需要主控 receipt；本工作不会伪造 master receipt、修改主库 selector/checklist，或声称该项已验收。本次实际 G-STAGE --item ZS1-015 返回 exit 1：structural.ok=true，缺少 ZS1-015.master.json；失败日志完整保留在 gstage-main.log，SHA-256 e6d52a5677eb9504629ff83d30bc3c8c7a29c6a256e3fb826b562524263d6ca7。
++
++待主控处理的是本报告是否完整、差异划分是否正确，以及后续实现项如何承接 usage/compat/deferred 等缺口；不在本文件审查中修改产品源码或扩大目录状态。回滚只撤回本报告候选及本次 worker-types319 证据；旧本地报告、主库和所有已冻结包保持保全。中止的深度搜索候选仅在 depth-work-locations.json 中列位置和未完成状态，不继续运行。
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/README.md b/Docs/quality/stage1/ZS1-015/worker-types319/README.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/README.md
+@@ -0,0 +1,11 @@
++# ZS1-015 pure single-source review / 3.1.19
++
++Only Pi source reviewed: packages/ai/src/types.ts, 37411 bytes, 881 lines, SHA f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0. Read ranges [0,8064), [8064,15965), [15965,28201), [28201,37411) concatenate byte-exactly. 72 named type/interface declarations plus the type-only re-export are accounted for. Target reference evidence contains five Zenpi files and ten excerpts, not directory acceptance.
++
++Report owned path: Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md. Main baseline report was absent; local inherited historical report is preserved as prior-local-report.md and not reused as current evidence. The frozen patch adds the final report to main; it does not modify runtime source, selectors, checkmarks, or prior packages.
++
++verify_source.py checks frozen identity, byte coverage, inventory, target excerpts and the actual G-FILE check_ranges/artifact functions. source-verified-final receipt is integrity/structure evidence only. No TypeScript compiler execution, source consumer runtime tests, provider requests, process-termination tests or depth probes were performed for this task. The earlier source-verified receipt binds the report before the final G-STAGE outcome paragraph; it remains preserved, while final receipt binds final bytes.
++
++Actual G-STAGE against read-only main: structural.ok=true; exit1 solely because ZS1-015.master.json is absent. No master receipt fabricated. Original logs are retained and not converted to a pass. Main must independently review and accept.
++
++Depth work has stopped by main instruction. depth-work-locations.json only lists already-existing candidate/evidence paths and hashes. Unfrozen depth candidate is incomplete and unaccepted; its latest prescribed-after log reports 22 search passes and 4 failures, not investigated further. public_fifo.py was never run. No depth artifacts are incorporated as product changes in this source-review package.
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/artifact-index.json b/Docs/quality/stage1/ZS1-015/worker-types319/artifact-index.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/artifact-index.json
+@@ -0,0 +1,142 @@
++[
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/README.md",
++    "bytes": 1984,
++    "sha256": "98ba4dbecbefff73daea43c143415748b57b6bec664ddab8e097e57ed6531af3"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/depth-work-locations.json",
++    "bytes": 2186,
++    "sha256": "e8119817444458880027e70e5e33143cd61aa8ec700031c504aaf66a69782e28"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json",
++    "bytes": 5620,
++    "sha256": "f79f946db4ef9dcaf386c03adb793c7bb5e42fb91e8138ecf4a106487dc93cd0"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.json",
++    "bytes": 925,
++    "sha256": "8b848d412898d6259e693acf03c7ab9bcd7dfe49d2064bacdbeaceb3e366f5c4"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.log",
++    "bytes": 408,
++    "sha256": "e6d52a5677eb9504629ff83d30bc3c8c7a29c6a256e3fb826b562524263d6ca7"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/input-manifest.json",
++    "bytes": 1826,
++    "sha256": "1e4607387e144802de70a26cbdb7e116cfb5ed3d2e181e8db0bd2d78d12ea110"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/prior-local-report.md",
++    "bytes": 10539,
++    "sha256": "d3b63958f09d574935c821ce6b17ab9f564f4c8c9761af43111eac114f8928dc"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/read-0001-0220.txt",
++    "bytes": 8064,
++    "sha256": "6db7d9b7bf2f3856d9724708e327179c88094cff6ca33eb99c3f6160c27d6031"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/read-0221-0440.txt",
++    "bytes": 7901,
++    "sha256": "691bf84d6a052dff1acff8edaf605468ccf2fc8b9811141696c97637ab33ea7c"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/read-0441-0660.txt",
++    "bytes": 12236,
++    "sha256": "fc0607f482f51b6cac1659211293b4230c931b8e3dbd24d74d3875515bc6b904"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/read-0661-0881.txt",
++    "bytes": 9210,
++    "sha256": "ae3016bd0fecfda083ea751dbe4dfc0000ce3b95920e6fc7bb12dd8ed9cc8b68"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.json",
++    "bytes": 843,
++    "sha256": "762fe49a7e20515907eae29d87607f66dbc15087e2a32734e5148788cd7c3d1d"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log",
++    "bytes": 949,
++    "sha256": "22f966c571dd6e5344fd5dcf2c1d1e4e1f1721304915744d9beda38df671de8d"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json",
++    "bytes": 830,
++    "sha256": "10a5f0f4f581b70f34bd02644069d6d14daac47965fff1e43ba98468721cfd67"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log",
++    "bytes": 949,
++    "sha256": "48029c7603a0c482f7e1ecc6149b3ad819a84c6b86294e61a65b3eb25afe0d5e"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-124-159.txt",
++    "bytes": 1179,
++    "sha256": "0acea89aba9e16019c55fd4d17797570cf39584ea21e6c0527af50b7f0f16219"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-1587-1702.txt",
++    "bytes": 4900,
++    "sha256": "f0b4524b42ffd896818dbeda43accc518d478a77a89d87596fb7b50c1673da83"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-169-225.txt",
++    "bytes": 1646,
++    "sha256": "7a0fc175d9e888e26e78f90f6c460de813e13ee426728dbcc8f0937844ecce23"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-229-322.txt",
++    "bytes": 2390,
++    "sha256": "1f163146bd26c6665fdda6d92d3dedb1146f0a1d77e22cf60df4cdf86854c294"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-324-416.txt",
++    "bytes": 3456,
++    "sha256": "910b7b68332d6c759c78ec249748c0a852d6b99ff53b1436516bf943e5490971"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt",
++    "bytes": 1927,
++    "sha256": "e734322b1d12d5ed42ce998154f22cdd4a40d5d642e210841bb515fd77a91b98"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__core.rs-130-160.txt",
++    "bytes": 878,
++    "sha256": "8f1f43867c005f8034060785f95b1b6e3795e38e92dfe58c9ee68ce592a2d214"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt",
++    "bytes": 3414,
++    "sha256": "757d20bed72914d7b85a965ba436a343350d2fa36d87ef2f05b5f8eea3bddd41"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt",
++    "bytes": 1622,
++    "sha256": "dbd953cf7ed74db1ad4af3a2d0a4d29319f0374b2c7922afb177cea744ad9e36"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt",
++    "bytes": 456,
++    "sha256": "0c34c241b081c944b3a909159cba315cdf2a25464284855e0e9c74dcdeb31037"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/target-references.json",
++    "bytes": 4408,
++    "sha256": "65f626cde4996f6eabbeb9490a1cdeeb917d91aa9f18f364a91a2d300e319031"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/types.ts",
++    "bytes": 37411,
++    "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py",
++    "bytes": 2451,
++    "sha256": "aaee876e1cac1808ddfd41c9e97fc8147fdf547e9f7e1979c493319751cd783c"
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/depth-work-locations.json b/Docs/quality/stage1/ZS1-015/worker-types319/depth-work-locations.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/depth-work-locations.json
+@@ -0,0 +1,40 @@
++{
++  "status": "Stopped by main instruction; no related probes resumed. No final repair acceptance.",
++  "frozen_audit_manifest": "64bee79bc2a442107dd3e66ee53f51f6070cc22b40f014f3355fdc04e1955232",
++  "unfrozen_candidate": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current",
++  "before_control": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-before",
++  "evidence_directory": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319",
++  "last_reported_status": "prescribed-after reports 22 search passed / 4 failed, not further investigated. public_fifo.py not run. Earlier focused-before-canonical 2 passed / 4 failed.",
++  "regular_file_locations_only": [
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depth-audit319-ready/manifest.json",
++      "bytes": 64281,
++      "sha256": "64bee79bc2a442107dd3e66ee53f51f6070cc22b40f014f3355fdc04e1955232"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-public319-final-ready/manifest.json",
++      "bytes": 397435,
++      "sha256": "d53149b26b7f5546bab960d0612ab3e207966f524306d03e7e568fa6bb9c27e0"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current/src/search.rs",
++      "bytes": 31128,
++      "sha256": "356f9720a51207365b1632489b622f287e7948ccbdd041040d779de0c6ca093a"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current/tests/stage1_search.rs",
++      "bytes": 42261,
++      "sha256": "7290235f0f7ce85c5ac0eb1c0a4cb181e60f2598ad557862cd8ea6336ad67d5e"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319/public_fifo.py",
++      "bytes": 3145,
++      "sha256": "839bddfb661fef0bc0758b66b901c629f8cba661fa163da6e5b2034dfef5ea96"
++    },
++    {
++      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319/prescribed-after.log",
++      "bytes": 6221,
++      "sha256": "ff7a2326a359fcd93d5ff10babf235802ae295ace96e598f49c3de1a31c5d94e"
++    }
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json b/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/export-inventory.json
+@@ -0,0 +1,362 @@
++[
++  {
++    "line": 17,
++    "kind": "type",
++    "name": "KnownApi"
++  },
++  {
++    "line": 29,
++    "kind": "type",
++    "name": "Api"
++  },
++  {
++    "line": 31,
++    "kind": "type",
++    "name": "KnownImagesApi"
++  },
++  {
++    "line": 33,
++    "kind": "type",
++    "name": "ImagesApi"
++  },
++  {
++    "line": 35,
++    "kind": "type",
++    "name": "KnownProvider"
++  },
++  {
++    "line": 76,
++    "kind": "type",
++    "name": "ProviderId"
++  },
++  {
++    "line": 78,
++    "kind": "type",
++    "name": "KnownImagesProvider"
++  },
++  {
++    "line": 80,
++    "kind": "type",
++    "name": "ImagesProviderId"
++  },
++  {
++    "line": 82,
++    "kind": "type",
++    "name": "ToolChoice"
++  },
++  {
++    "line": 83,
++    "kind": "type",
++    "name": "ThinkingLevel"
++  },
++  {
++    "line": 84,
++    "kind": "type",
++    "name": "ModelThinkingLevel"
++  },
++  {
++    "line": 85,
++    "kind": "type",
++    "name": "ThinkingLevelMap"
++  },
++  {
++    "line": 86,
++    "kind": "type",
++    "name": "ChatTemplateKwargValue"
++  },
++  {
++    "line": 97,
++    "kind": "type",
++    "name": "ThinkingTokenBudgetField"
++  },
++  {
++    "line": 100,
++    "kind": "interface",
++    "name": "ThinkingBudgets"
++  },
++  {
++    "line": 108,
++    "kind": "type",
++    "name": "CacheRetention"
++  },
++  {
++    "line": 110,
++    "kind": "type",
++    "name": "Transport"
++  },
++  {
++    "line": 113,
++    "kind": "type",
++    "name": "ProviderEnv"
++  },
++  {
++    "line": 114,
++    "kind": "type",
++    "name": "ProviderHeaders"
++  },
++  {
++    "line": 115,
++    "kind": "type",
++    "name": "FetchFunction"
++  },
++  {
++    "line": 116,
++    "kind": "type",
++    "name": "SessionAffinityFormat"
++  },
++  {
++    "line": 118,
++    "kind": "interface",
++    "name": "ProviderResponse"
++  },
++  {
++    "line": 124,
++    "kind": "interface",
++    "name": "ProviderRequestOptions"
++  },
++  {
++    "line": 179,
++    "kind": "interface",
++    "name": "StreamOptions"
++  },
++  {
++    "line": 225,
++    "kind": "type",
++    "name": "ProviderStreamOptions"
++  },
++  {
++    "line": 227,
++    "kind": "interface",
++    "name": "DeferredFetchOptions"
++  },
++  {
++    "line": 236,
++    "kind": "type",
++    "name": "DeferredCancelOptions"
++  },
++  {
++    "line": 243,
++    "kind": "interface",
++    "name": "ApiOptionsMap"
++  },
++  {
++    "line": 260,
++    "kind": "type",
++    "name": "ApiStreamOptions"
++  },
++  {
++    "line": 272,
++    "kind": "interface",
++    "name": "ProviderStreams"
++  },
++  {
++    "line": 289,
++    "kind": "interface",
++    "name": "ProviderImages"
++  },
++  {
++    "line": 297,
++    "kind": "interface",
++    "name": "ImagesOptions"
++  },
++  {
++    "line": 305,
++    "kind": "type",
++    "name": "ProviderImagesOptions"
++  },
++  {
++    "line": 307,
++    "kind": "interface",
++    "name": "AnthropicAllowedFallbackModel"
++  },
++  {
++    "line": 314,
++    "kind": "interface",
++    "name": "SimpleStreamOptions"
++  },
++  {
++    "line": 333,
++    "kind": "type",
++    "name": "StreamFunction"
++  },
++  {
++    "line": 339,
++    "kind": "type",
++    "name": "ImagesFunction"
++  },
++  {
++    "line": 345,
++    "kind": "interface",
++    "name": "TextSignatureV1"
++  },
++  {
++    "line": 351,
++    "kind": "interface",
++    "name": "TextContent"
++  },
++  {
++    "line": 357,
++    "kind": "interface",
++    "name": "ThinkingContent"
++  },
++  {
++    "line": 367,
++    "kind": "interface",
++    "name": "ImageContent"
++  },
++  {
++    "line": 373,
++    "kind": "interface",
++    "name": "ToolCall"
++  },
++  {
++    "line": 383,
++    "kind": "interface",
++    "name": "Usage"
++  },
++  {
++    "line": 406,
++    "kind": "type",
++    "name": "StopReason"
++  },
++  {
++    "line": 408,
++    "kind": "type",
++    "name": "JsonValue"
++  },
++  {
++    "line": 410,
++    "kind": "interface",
++    "name": "DeferredHandle"
++  },
++  {
++    "line": 422,
++    "kind": "interface",
++    "name": "UserMessage"
++  },
++  {
++    "line": 428,
++    "kind": "interface",
++    "name": "AssistantMessage"
++  },
++  {
++    "line": 452,
++    "kind": "interface",
++    "name": "ToolResultMessage"
++  },
++  {
++    "line": 470,
++    "kind": "type",
++    "name": "Message"
++  },
++  {
++    "line": 472,
++    "kind": "type",
++    "name": "ImagesInputContent"
++  },
++  {
++    "line": 473,
++    "kind": "type",
++    "name": "ImagesOutputContent"
++  },
++  {
++    "line": 475,
++    "kind": "interface",
++    "name": "ImagesContext"
++  },
++  {
++    "line": 479,
++    "kind": "type",
++    "name": "ImagesStopReason"
++  },
++  {
++    "line": 481,
++    "kind": "interface",
++    "name": "AssistantImages"
++  },
++  {
++    "line": 496,
++    "kind": "type",
++    "name": "GrammarFormat"
++  },
++  {
++    "line": 498,
++    "kind": "type",
++    "name": "GrammarVariants"
++  },
++  {
++    "line": 507,
++    "kind": "type",
++    "name": "ConstrainedSamplingConfig"
++  },
++  {
++    "line": 517,
++    "kind": "interface",
++    "name": "Tool"
++  },
++  {
++    "line": 524,
++    "kind": "interface",
++    "name": "Context"
++  },
++  {
++    "line": 546,
++    "kind": "type",
++    "name": "AssistantMessageEvent"
++  },
++  {
++    "line": 568,
++    "kind": "interface",
++    "name": "OpenAICompletionsCompat"
++  },
++  {
++    "line": 646,
++    "kind": "interface",
++    "name": "OpenAIResponsesCompat"
++  },
++  {
++    "line": 668,
++    "kind": "interface",
++    "name": "AnthropicMessagesCompat"
++  },
++  {
++    "line": 735,
++    "kind": "interface",
++    "name": "BedrockCompat"
++  },
++  {
++    "line": 746,
++    "kind": "interface",
++    "name": "OpenRouterRouting"
++  },
++  {
++    "line": 820,
++    "kind": "interface",
++    "name": "VercelGatewayRouting"
++  },
++  {
++    "line": 827,
++    "kind": "interface",
++    "name": "ModelCostRates"
++  },
++  {
++    "line": 834,
++    "kind": "interface",
++    "name": "ModelCostTier"
++  },
++  {
++    "line": 839,
++    "kind": "interface",
++    "name": "ModelCost"
++  },
++  {
++    "line": 845,
++    "kind": "interface",
++    "name": "Model"
++  },
++  {
++    "line": 876,
++    "kind": "interface",
++    "name": "ImagesModel"
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.json b/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.json
+@@ -0,0 +1,27 @@
++{
++  "name": "gstage-main",
++  "argv": [
++    "python3",
++    "/Users/wangweiyang/GitHub/zenpi/tools/validate_stage1_blueprint.py",
++    "--root",
++    "/Users/wangweiyang/GitHub/zenpi",
++    "--item",
++    "ZS1-015",
++    "--json"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T06:35:21.285576+00:00",
++  "ended_at": "2026-09-12T06:35:21.482192+00:00",
++  "elapsed_seconds": 0.196487625,
++  "exit_code": 1,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 23150592,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.log",
++  "bytes": 408,
++  "sha256": "e6d52a5677eb9504629ff83d30bc3c8c7a29c6a256e3fb826b562524263d6ca7"
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.log b/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/gstage-main.log
+@@ -0,0 +1,14 @@
++{
++  "ok": false,
++  "structural": {
++    "ok": true
++  },
++  "semantic_manual": {
++    "verified_by_checker": false,
++    "note": "Artifact structure is machine checked; semantic truth requires independent master review.",
++    "receipt_structure_ok": false
++  },
++  "errors": [
++    "[Errno 2] No such file or directory: '/Users/wangweiyang/GitHub/zenpi/Docs/learn/stage1_pi_mono/receipts/ZS1-015.master.json'"
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/input-manifest.json b/Docs/quality/stage1/ZS1-015/worker-types319/input-manifest.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/input-manifest.json
+@@ -0,0 +1,54 @@
++{
++  "item_id": "ZS1-015",
++  "authority_version": "3.1.19",
++  "requirement_digest": "3ce9613262de0a8499837571137782becc01daa7b56923a53b11f7f04058f60d",
++  "source_path": "packages/ai/src/types.ts",
++  "source_absolute_path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/types.ts",
++  "bytes": 37411,
++  "lines": 881,
++  "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
++  "frozen_record": {
++    "bytes": 37411,
++    "path": "packages/ai/src/types.ts",
++    "scope": "source",
++    "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0"
++  },
++  "ordered_complete_read_chunks": [
++    {
++      "line_start": 1,
++      "line_end": 220,
++      "byte_start": 0,
++      "byte_end": 8064,
++      "bytes": 8064,
++      "sha256": "6db7d9b7bf2f3856d9724708e327179c88094cff6ca33eb99c3f6160c27d6031",
++      "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/read-0001-0220.txt"
++    },
++    {
++      "line_start": 221,
++      "line_end": 440,
++      "byte_start": 8064,
++      "byte_end": 15965,
++      "bytes": 7901,
++      "sha256": "691bf84d6a052dff1acff8edaf605468ccf2fc8b9811141696c97637ab33ea7c",
++      "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/read-0221-0440.txt"
++    },
++    {
++      "line_start": 441,
++      "line_end": 660,
++      "byte_start": 15965,
++      "byte_end": 28201,
++      "bytes": 12236,
++      "sha256": "fc0607f482f51b6cac1659211293b4230c931b8e3dbd24d74d3875515bc6b904",
++      "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/read-0441-0660.txt"
++    },
++    {
++      "line_start": 661,
++      "line_end": 881,
++      "byte_start": 28201,
++      "byte_end": 37411,
++      "bytes": 9210,
++      "sha256": "ae3016bd0fecfda083ea751dbe4dfc0000ce3b95920e6fc7bb12dd8ed9cc8b68",
++      "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/read-0661-0881.txt"
++    }
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/prior-local-report.md b/Docs/quality/stage1/ZS1-015/worker-types319/prior-local-report.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/prior-local-report.md
+@@ -0,0 +1,45 @@
++# ZS1-015 / SRC-0440 — packages/ai/src/types.ts
++
++Status: [_] worker candidate. Frozen source `/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/types.ts`: 37411 bytes, 881 lines, SHA256 `f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0`. Entire file read in consecutive ranges 1–430 and 431–881; no source edits.
++
++## Contract inventory
++
++Lines 1–134 define type-only API imports, extensible KnownApi/Api and provider IDs, separate image APIs/providers, tool choice, thinking levels and mappings, cache/transport/environment/header types. Provider strings are intentionally extensible; a string being representable does not prove an adapter exists. ThinkingLevelMap missing entries use provider defaults while null denotes unsupported. Model reasoning is therefore not just a boolean.
++
++Lines 135–288 describe request/stream/deferred options: AbortSignal, telemetry, API key, custom fetch, scoped env, payload/response callbacks, overriding/suppressing headers, timeout/retry/retry-delay limits, temperature, arbitrary OpenAI-compatible sampling parameters, maxTokens, transport, cache/session affinity and metadata. These are type contracts, not implementations of validation, cancellation, secure credential storage or retries. Arbitrary sampling parameters can override named payload fields by the documented source contract; a strict Rust implementation must deliberately decide its supported subset.
++
++Lines 289–369 map concrete API types to provider-specific options and define runtime dispatch shapes ProviderStreams and ProviderImages. Optional deferred methods indicate support, not guaranteed behavior for all wires. streamSimple reasoning/toolChoice/thinking budgets are provider-neutral input. The StreamFunction contract allows synchronous missing-auth errors before stream creation; after creation failures should terminate through the stream with error/aborted.
++
++Lines 370–498 define text/thinking/image/tool-call blocks, signatures and replay data, usage/cost, stop reasons and durable deferred handles; user/assistant/tool result message identities preserve API/provider/model plus concrete responseModel/responseId. Reasoning token usage is a subset of output, not an extra charge. Tool calls retain Google thoughtSignature and optional OpenAI namespace; thinking can be redacted while retaining opaque replay data. Tool results may carry images and newly available tool names. Images generation has a distinct context/result/stop contract.
++
++Lines 499–580 describe tool schemas and constrained sampling: JSON schema strict prefer/require versus grammar variants, Context system/messages/tools, and the event union. Event order requires start before updates/done; setup can emit error directly. Each content block has start/delta/end, tool argument deltas are provider-specific, and partial is shared mutable response-so-far rather than an immutable event-time snapshot. A consumer must not treat intermediate tool arguments as final or normal EOF as a terminal done.
++
++Lines 581–723 enumerate OpenAI completion/Responses compatibility. These include store/developer/reasoning/usage/finish-reason support, token field choice, tool-history shape, thinking serialization, chat-template variables, routing preferences, grammar/strict tools, caches, session affinity and optional explicit maximum output. Some completion compatibility permits inferring stop on EOF; zenpi's stricter Stage 1 terminal requirement intentionally rejects that fallback. URL autodetection mentioned in comments is performed elsewhere.
++
++Lines 724–786 cover Anthropic and Bedrock compatibility: eager tool input streaming, cache markers, session affinity, temperature, adaptive effort, signatures, strict tools, effort binding, permitted refusal fallback targets and deferred tools. This file does not itself implement any native adapter.
++
++Lines 787–850 describe OpenRouter and Vercel routing (provider allow/deny, data handling, ordering, quantization, price/latency/throughput constraints) and pricing rates/tiers. Cost rates are dollars per million tokens; a matching input threshold applies a tier to the whole request. These numbers have no source/version fields in this type.
++
++Lines 851–881 define Model and ImagesModel: exact id/name/api/provider/baseUrl, reasoning and optional level map, input text/image, cost, contextWindow, maxTokens, sampling parameters, headers and conditional API-specific compat. Image model output modalities are separate and reasoning/context limits are omitted. Model type has no generic file-input or structured-output capability flag, nor a per-model general tool/stream boolean. Those desired zenpi fields must be supported extensions and intersected with actual adapter behavior.
++
++## Target comparison
++
++Baseline zenpi src/backend.rs ProviderCapabilities::for_wire_api grants broad capabilities solely from Chat versus Responses, including all Responses models as image/file/structured/reasoning capable. It has no model context/output metadata or reasoning-level membership and accepts model names as bounded opaque strings. ConfigFile/model_catalog returns provider profiles, not exact model records with provenance. This makes advertised wire support insufficient for validating a chosen model.
++
++ZS1-107 should distinguish an implemented wire envelope from a source/version-tagged model descriptor; intersect the two and apply explicit user overrides with field-level provenance. Missing capabilities should not become true, absent context should have a conservative finite fallback, and unknown model identity must not silently map to another known model. Current existing Responses input/file/structured paths must remain usable when explicitly configured/supported. No secret/header values belong in model listings.
++
++## Test references, errors and restart
++
++Read all 25 lines of model-catalog-types.test.ts (literal provider/API/model types; Copilot routing), and all 177 lines of model-data-validation.test.ts (exact IDs, API groups, duplicates, missing shards, stale file hashes/schema/timestamps). These test files reference the model-data generator and do not prove runtime negotiation. Relevant further source test inventory includes max-thinking, cross-provider-handoff, Google signatures and per-adapter compat; not read in full and not executed here.
++
++This file contains only types/imports, so it performs no I/O, runtime rejection, cancellation, publication or restart recovery. The declarations specify AbortSignal, deferred handles and terminal errors, which consuming adapters must implement and test. No source tests, G-FILE/G-STAGE master acceptance or directory closure are claimed. Required Rust evidence: exact lookup, source-tagged overrides, wire/model intersection, unsupported attachments/reasoning rejected before HTTP, finite input/output bounds, list operation without network calls and deterministic reload/restart.
++
++## Independent source-consumer validation — 3.1.11
++
++The original complete-file report above is reused, not regenerated. On this pass the unchanged 881-line source was reread in contiguous ranges 1–330, 331–620, 621–881, SHA f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0. No prior frozen package includes this report; its exact pre-supplement bytes are preserved as the candidate base. The earlier Target comparison is historical, predating implemented 107/123.
++
++`Docs/quality/stage1/ZS1-015/worker-source-probe/probe.ts` executes 11 behavioral scenarios through actual unchanged models.ts, simple-options.ts, estimate.ts, event-stream.ts and models-store.ts; no import is mocked. These real consumers import the declarations in this file. Covered behavior: missing/null/extended thinking levels and clamping; exact model identity/API discrimination; request-wide strict pricing-tier thresholds and no double charge for reasoning; real context estimation/output cap and sampling override; preserving signal/header/callback identity; shared thinking/answer ceiling; FIFO events and mutable partial references; error/abort terminal resolution; end-without-result remains unresolved; event class itself does not enforce start-before-done; provider dispatch/missing API errors; snapshot model store and aborted mutation refusal. This tests consumer behavior, not execution of erased interfaces, static typing, every request option, or all provider algorithms. Full adapter use remains separate 016/017/029 work. The original first probe failed solely on floating-point literal equality (0.00030000000000000003 vs 0.0003); final probe uses 1e-15 tolerance, with both logs retained.
++
++Current exact target owners: src/providers/registry.rs ModelDescriptor::effective_capabilities (line 71) intersects each model flag with the wire; validate_reasoning (84) rejects unsupported levels; context_budget (102) clamps user limits; ModelRegistry::with_overrides (294) validates bounded exact-identity overrides and per-field provenance; resolve (366) returns finite conservative metadata for unknown names. src/backend.rs capabilities (837), with_model_registry (843), model_capabilities (1422) bind production selection; src/core.rs owns selection/budget journaling and restart. Existing frozen registry-ready and reasoning-ready implementation packages are reused. Target-owner command reruns 14 model registry and 5 reasoning-owner tests, including real HTTP/production JSONL, no-network unsupported rejection, failed switch rollback, metadata fingerprint mismatch and restart. Exact current owner hashes are in owner-hashes.json; main has later shared-path changes and must rerun against its integrated tree.
++
++Intentional differences: zenpi exposes explicit finite model×wire capabilities, provenance and unknown-model fallback; source declarations alone do not. Native reasoning refuses unsupported effort instead of silently clamping to another level; registry adds none/ultra rather than copying source off/max vocabulary verbatim. Target pricing records provenance and integer units, but does not implement the complete source tiered floating cost calculation or dynamic remote model discovery/OAuth/deferred/image-generation/router ecosystem. Source event-stream does not enforce start-before-done; target adapters require complete terminals before tools become executable. Signed/native history stays in host-owned provider metadata. Non-macOS DNS and non-Unix connect cancellation remain unfinished as documented in the shared transport supplement. Item stays [_]; no directory/master acceptance implied.
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/read-0001-0220.txt b/Docs/quality/stage1/ZS1-015/worker-types319/read-0001-0220.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/read-0001-0220.txt
+@@ -0,0 +1,220 @@
++import type { TelemetryContext } from "@earendil-works/pi-telemetry";
++import type { AnthropicOptions } from "./api/anthropic-messages.ts";
++import type { AzureOpenAIResponsesOptions } from "./api/azure-openai-responses.ts";
++import type { BedrockOptions } from "./api/bedrock-converse-stream.ts";
++import type { GoogleOptions } from "./api/google-generative-ai.ts";
++import type { GoogleVertexOptions } from "./api/google-vertex.ts";
++import type { MistralOptions } from "./api/mistral-conversations.ts";
++import type { OpenAICodexResponsesOptions } from "./api/openai-codex-responses.ts";
++import type { OpenAICompletionsOptions } from "./api/openai-completions.ts";
++import type { OpenAIResponsesOptions } from "./api/openai-responses.ts";
++import type { PiMessagesOptions } from "./api/pi-messages.ts";
++import type { AssistantMessageDiagnostic } from "./utils/diagnostics.ts";
++import type { AssistantMessageEventStream } from "./utils/event-stream.ts";
++
++export type { AssistantMessageEventStream } from "./utils/event-stream.ts";
++
++export type KnownApi =
++	| "openai-completions"
++	| "mistral-conversations"
++	| "openai-responses"
++	| "azure-openai-responses"
++	| "openai-codex-responses"
++	| "anthropic-messages"
++	| "bedrock-converse-stream"
++	| "google-generative-ai"
++	| "google-vertex"
++	| "pi-messages";
++
++export type Api = KnownApi | (string & {});
++
++export type KnownImagesApi = "openrouter-images";
++
++export type ImagesApi = KnownImagesApi | (string & {});
++
++export type KnownProvider =
++	| "amazon-bedrock"
++	| "ant-ling"
++	| "anthropic"
++	| "google"
++	| "google-vertex"
++	| "openai"
++	| "azure-openai-responses"
++	| "openai-codex"
++	| "radius"
++	| "nvidia"
++	| "deepseek"
++	| "github-copilot"
++	| "xai"
++	| "groq"
++	| "cerebras"
++	| "openrouter"
++	| "vercel-ai-gateway"
++	| "zai"
++	| "zai-coding-cn"
++	| "mistral"
++	| "minimax"
++	| "minimax-cn"
++	| "moonshotai"
++	| "moonshotai-cn"
++	| "huggingface"
++	| "fireworks"
++	| "together"
++	| "baseten"
++	| "opencode"
++	| "opencode-go"
++	| "kimi-coding"
++	| "cloudflare-workers-ai"
++	| "cloudflare-ai-gateway"
++	| "qwen-token-plan"
++	| "qwen-token-plan-cn"
++	| "qwen-token-plan-individual"
++	| "xiaomi"
++	| "xiaomi-token-plan-cn"
++	| "xiaomi-token-plan-ams"
++	| "xiaomi-token-plan-sgp";
++export type ProviderId = KnownProvider | string;
++
++export type KnownImagesProvider = "openrouter";
++
++export type ImagesProviderId = KnownImagesProvider | string;
++
++export type ToolChoice = "auto" | "none";
++export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
++export type ModelThinkingLevel = "off" | ThinkingLevel;
++export type ThinkingLevelMap = Partial<Record<ModelThinkingLevel, string | null>>;
++export type ChatTemplateKwargValue =
++	| string
++	| number
++	| boolean
++	| null
++	| {
++			$var: "thinking.enabled" | "thinking.effort" | "thinking.budget";
++			omitWhenOff?: boolean;
++	  };
++
++/** Top-level request field used to cap reasoning tokens on OpenAI-compatible servers. */
++export type ThinkingTokenBudgetField = "thinking_token_budget" | "thinking_budget" | "thinking_budget_tokens";
++
++/** Token budgets for each thinking level (token-based providers only) */
++export interface ThinkingBudgets {
++	minimal?: number;
++	low?: number;
++	medium?: number;
++	high?: number;
++}
++
++// Base options all providers share
++export type CacheRetention = "none" | "short" | "long";
++
++export type Transport = "sse" | "websocket" | "websocket-cached" | "auto";
++
++/** Provider-scoped environment overrides. Values take precedence over process.env. */
++export type ProviderEnv = Record<string, string>;
++export type ProviderHeaders = Record<string, string | null>;
++export type FetchFunction = typeof globalThis.fetch;
++export type SessionAffinityFormat = "openai" | "openai-nosession" | "openrouter";
++
++export interface ProviderResponse {
++	status: number;
++	headers: Record<string, string>;
++}
++
++/** Authentication, HTTP transport, and lifecycle callbacks shared by provider requests. */
++export interface ProviderRequestOptions<TModel = Model<Api>> {
++	signal?: AbortSignal;
++	/** Explicit parent context for telemetry produced by this logical request. */
++	telemetryContext?: TelemetryContext;
++	apiKey?: string;
++	/**
++	 * Optional fetch implementation for provider HTTP requests.
++	 * Defaults to `globalThis.fetch`. Provider adapters that cannot inject a custom implementation may reject it.
++	 * This does not affect WebSocket transports.
++	 */
++	fetch?: FetchFunction;
++	/**
++	 * Provider-scoped environment values. These take precedence over process.env for
++	 * provider configuration such as regional settings, endpoint placeholders, and
++	 * proxy variables.
++	 */
++	env?: ProviderEnv;
++	/**
++	 * Optional callback for inspecting or replacing provider payloads before sending.
++	 * Return undefined to keep the payload unchanged.
++	 */
++	onPayload?: (payload: unknown, model: TModel) => unknown | undefined | Promise<unknown | undefined>;
++	/**
++	 * Optional callback invoked after an HTTP response is received.
++	 */
++	onResponse?: (response: ProviderResponse, model: TModel) => void | Promise<void>;
++	/**
++	 * Optional custom HTTP headers to include in API requests.
++	 * Merged with provider defaults; caller values override default headers.
++	 * On AWS Bedrock these are injected via a Smithy `build`-step middleware so
++	 * they are covered by SigV4 signing; reserved headers (`x-amz-*`,
++	 * `authorization`, `host`) are silently ignored to preserve SigV4 / bearer auth.
++	 * A null value suppresses a provider/API default header with the same name.
++	 */
++	headers?: ProviderHeaders;
++	/**
++	 * HTTP request timeout in milliseconds for providers/SDKs that support it.
++	 * For example, OpenAI and Anthropic SDK clients default to 10 minutes.
++	 */
++	timeoutMs?: number;
++	/**
++	 * Maximum retry attempts for providers/SDKs that support client-side retries.
++	 * For example, OpenAI and Anthropic SDK clients default to 2.
++	 */
++	maxRetries?: number;
++	/**
++	 * Maximum delay in milliseconds to wait for a retry when the server requests a long wait.
++	 * If the server's requested delay exceeds this value, the request fails immediately
++	 * with an error containing the requested delay, allowing higher-level retry logic
++	 * to handle it with user visibility.
++	 * Default: 60000 (60 seconds). Set to 0 to disable the cap.
++	 */
++	maxRetryDelayMs?: number;
++}
++
++export interface StreamOptions extends ProviderRequestOptions<Model<Api>> {
++	/**
++	 * Optional callback invoked after an HTTP response is received and before
++	 * its body stream is consumed.
++	 */
++	onResponse?: (response: ProviderResponse, model: Model<Api>) => void | Promise<void>;
++	temperature?: number;
++	/**
++	 * Arbitrary sampling parameters merged into the request body as-is, after the named request
++	 * fields, so keys here override them. Lets custom OpenAI-compatible servers (llama.cpp, vLLM,
++	 * SGLang, ...) receive parameters pi does not model, e.g. `top_p`, `top_k`, `min_p`,
++	 * `repetition_penalty`. Merged over `Model.samplingParams` per key. Only applied by
++	 * OpenAI-compatible adapters (completions, responses, Azure responses); other APIs ignore it.
++	 */
++	samplingParams?: Record<string, unknown>;
++	maxTokens?: number;
++	/**
++	 * Preferred transport for providers that support multiple transports.
++	 * Providers that do not support this option ignore it.
++	 */
++	transport?: Transport;
++	/**
++	 * Prompt cache retention preference. Providers map this to their supported values.
++	 * Default: "short".
++	 */
++	cacheRetention?: CacheRetention;
++	/**
++	 * Optional session identifier for providers that support session-based caching.
++	 * Providers can use this to enable prompt caching, request routing, or other
++	 * session-aware features. Ignored by providers that don't support it.
++	 */
++	sessionId?: string;
++	/**
++	 * WebSocket connect timeout in milliseconds for providers that support
++	 * WebSocket transports. This covers the connection/open handshake only;
++	 * stream idleness after connection uses timeoutMs.
++	 */
++	websocketConnectTimeoutMs?: number;
++	/**
++	 * Optional metadata to include in API requests.
++	 * Providers extract the fields they understand and ignore the rest.
++	 * For example, Anthropic uses `user_id` for abuse tracking and rate limiting.
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/read-0221-0440.txt b/Docs/quality/stage1/ZS1-015/worker-types319/read-0221-0440.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/read-0221-0440.txt
+@@ -0,0 +1,220 @@
++	 */
++	metadata?: Record<string, unknown>;
++}
++
++export type ProviderStreamOptions = StreamOptions & Record<string, unknown>;
++
++export interface DeferredFetchOptions extends ProviderRequestOptions<Model<Api>> {
++	/**
++	 * Maximum provider long-poll duration in milliseconds.
++	 * Defaults to 0, which performs one status check.
++	 */
++	wait?: number;
++}
++
++/** Request options for best-effort deferred-response cancellation. */
++export type DeferredCancelOptions = ProviderRequestOptions<Model<Api>>;
++
++/**
++ * Maps known APIs to their full provider-specific stream option types.
++ * Type-only imports from API implementation modules are erased at emit, so
++ * this is tree-shake safe.
++ */
++export interface ApiOptionsMap {
++	"anthropic-messages": AnthropicOptions;
++	"openai-completions": OpenAICompletionsOptions;
++	"openai-responses": OpenAIResponsesOptions;
++	"openai-codex-responses": OpenAICodexResponsesOptions;
++	"azure-openai-responses": AzureOpenAIResponsesOptions;
++	"google-generative-ai": GoogleOptions;
++	"google-vertex": GoogleVertexOptions;
++	"mistral-conversations": MistralOptions;
++	"bedrock-converse-stream": BedrockOptions;
++	"pi-messages": PiMessagesOptions;
++}
++
++/**
++ * Full stream options for an API. Known APIs resolve to their concrete option
++ * type; custom API strings fall back to the generic shape.
++ */
++export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMap
++	? ApiOptionsMap[TApi]
++	: StreamOptions & Record<string, unknown>;
++
++/**
++ * The uniform stream contract of an API implementation module: every module
++ * under `src/api/` exports `stream` and `streamSimple`; capable modules may also
++ * export deferred-response methods. Lazy wrappers (`lazyApi()`) and provider
++ * factories pass these around as values. This is the untyped dispatch shape;
++ * per-API option typing lives on the implementation modules themselves and on
++ * `Provider.stream()` via `ApiStreamOptions`.
++ */
++export interface ProviderStreams {
++	stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
++	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
++	fetchDeferred?(
++		model: Model<Api>,
++		handle: DeferredHandle,
++		options?: DeferredFetchOptions,
++	): AssistantMessageEventStream;
++	cancelDeferred?(model: Model<Api>, handle: DeferredHandle, options?: DeferredCancelOptions): Promise<void>;
++}
++
++/**
++ * The uniform contract of an image-generation API implementation module:
++ * every image API module under `src/api/` exports exactly `generateImages`,
++ * so the module itself satisfies this interface. Lazy wrappers and image
++ * provider factories pass these around as values.
++ */
++export interface ProviderImages {
++	generateImages(
++		model: ImagesModel<ImagesApi>,
++		context: ImagesContext,
++		options?: ImagesOptions,
++	): Promise<AssistantImages>;
++}
++
++export interface ImagesOptions extends ProviderRequestOptions<ImagesModel<ImagesApi>> {
++	/**
++	 * Optional metadata to include in API requests.
++	 * Providers extract the fields they understand and ignore the rest.
++	 */
++	metadata?: Record<string, unknown>;
++}
++
++export type ProviderImagesOptions = ImagesOptions & Record<string, unknown>;
++
++export interface AnthropicAllowedFallbackModel {
++	provider: ProviderId;
++	model: string;
++	cost: ModelCost;
++}
++
++// Unified options with reasoning passed to streamSimple() and completeSimple()
++export interface SimpleStreamOptions extends StreamOptions {
++	/** Provider-neutral tool selection for simple requests. When omitted, adapters use provider-specific behavior. */
++	toolChoice?: ToolChoice;
++	reasoning?: ThinkingLevel;
++	/** Ask a capable provider to return a durable handle and continue the request asynchronously. */
++	deferred?: boolean | { window?: "15m" | "1h" | "24h" };
++	/** Custom token budgets for thinking levels (token-based providers only) */
++	thinkingBudgets?: ThinkingBudgets;
++}
++
++// Generic StreamFunction with typed options.
++//
++// Contract:
++// - Must return an AssistantMessageEventStream.
++// - Direct streamSimple() calls may throw synchronously when request auth is
++//   missing. Once a stream is returned, request/model/runtime failures should
++//   be encoded in that stream.
++// - Error termination must produce an AssistantMessage with stopReason
++//   "error" or "aborted" and errorMessage, emitted via the stream protocol.
++export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (
++	model: Model<TApi>,
++	context: Context,
++	options?: TOptions,
++) => AssistantMessageEventStream;
++
++export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> = (
++	model: ImagesModel<TApi>,
++	context: ImagesContext,
++	options?: TOptions,
++) => Promise<AssistantImages>;
++
++export interface TextSignatureV1 {
++	v: 1;
++	id: string;
++	phase?: "commentary" | "final_answer";
++}
++
++export interface TextContent {
++	type: "text";
++	text: string;
++	textSignature?: string; // e.g., for OpenAI responses, message metadata (legacy id string or TextSignatureV1 JSON)
++}
++
++export interface ThinkingContent {
++	type: "thinking";
++	thinking: string;
++	thinkingSignature?: string; // Provider-specific opaque or serialized reasoning replay data
++	/** When true, the thinking content was redacted by safety filters. The opaque
++	 *  encrypted payload is stored in `thinkingSignature` so it can be passed back
++	 *  to the API for multi-turn continuity. */
++	redacted?: boolean;
++}
++
++export interface ImageContent {
++	type: "image";
++	data: string; // base64 encoded image data
++	mimeType: string; // e.g., "image/jpeg", "image/png"
++}
++
++export interface ToolCall {
++	type: "toolCall";
++	id: string;
++	name: string;
++	arguments: Record<string, any>;
++	thoughtSignature?: string; // Google-specific: opaque signature for reusing thought context
++	/** OpenAI Responses namespace for calls to dynamically loaded or namespaced tools. */
++	namespace?: string;
++}
++
++export interface Usage {
++	input: number;
++	output: number;
++	cacheRead: number;
++	cacheWrite: number;
++	/** Subset of `cacheWrite` written with 1h retention. Only Anthropic reports this split. */
++	cacheWrite1h?: number;
++	/**
++	 * Reasoning/thinking tokens, when the provider reports them. This is a subset of
++	 * `output`: `output` already includes these tokens. Set to a number (possibly 0) by
++	 * providers that expose a reasoning breakdown; left undefined by providers that don't.
++	 */
++	reasoning?: number;
++	totalTokens: number;
++	cost: {
++		input: number;
++		output: number;
++		cacheRead: number;
++		cacheWrite: number;
++		total: number;
++	};
++}
++
++export type StopReason = "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
++
++export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
++
++export interface DeferredHandle {
++	provider: string;
++	modelId: string;
++	api: string;
++	/** Provider token, such as a response id or batch id plus row id. */
++	id: string;
++	expiresAt?: number;
++	pollAfterMs?: number;
++	/** Provider conversion data required to reconstruct the final assistant message. */
++	data?: JsonValue;
++}
++
++export interface UserMessage {
++	role: "user";
++	content: string | (TextContent | ImageContent)[];
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export interface AssistantMessage {
++	role: "assistant";
++	content: (TextContent | ThinkingContent | ToolCall)[];
++	api: Api;
++	provider: ProviderId;
++	model: string;
++	responseModel?: string; // Concrete `chunk.model` when different from the requested `model` (e.g. OpenRouter `auto` -> `anthropic/...`)
++	responseId?: string; // Provider-specific response/message identifier when the upstream API exposes one
++	/** Exact provider-native effort level used for this response. Absent for legacy or unmanaged responses. */
++	providerThinkingLevel?: string;
++	diagnostics?: AssistantMessageDiagnostic[]; // Redacted provider/runtime diagnostics for failures and recoveries.
++	usage: Usage;
++	stopReason: StopReason;
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/read-0441-0660.txt b/Docs/quality/stage1/ZS1-015/worker-types319/read-0441-0660.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/read-0441-0660.txt
+@@ -0,0 +1,220 @@
++	deferred?: DeferredHandle;
++	errorMessage?: string;
++	rawStopReason?: string;
++	/**
++	 * Provider indication of whether the model explicitly ended its turn.
++	 * Preserved for debugging and does not currently affect agent control flow.
++	 */
++	endTurn?: boolean;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export interface ToolResultMessage<TDetails = any> {
++	role: "toolResult";
++	toolCallId: string;
++	toolName: string;
++	content: (TextContent | ImageContent)[]; // Supports text and images
++	details?: TDetails;
++	/** Usage from the tool execution itself, if available. Not part of main LLM context accounting. */
++	usage?: Usage;
++	/**
++	 * Names from `Context.tools` that became available after this result.
++	 * Providers with native deferred tool loading use this as the load point;
++	 * other providers ignore it and use `Context.tools` normally.
++	 */
++	addedToolNames?: string[];
++	isError: boolean;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export type Message = UserMessage | AssistantMessage | ToolResultMessage;
++
++export type ImagesInputContent = TextContent | ImageContent;
++export type ImagesOutputContent = TextContent | ImageContent;
++
++export interface ImagesContext {
++	input: ImagesInputContent[];
++}
++
++export type ImagesStopReason = "stop" | "error" | "aborted";
++
++export interface AssistantImages {
++	api: ImagesApi;
++	provider: ImagesProviderId;
++	model: string;
++	output: ImagesOutputContent[];
++	responseId?: string;
++	usage?: Usage;
++	stopReason: ImagesStopReason;
++	errorMessage?: string;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++import type { TSchema } from "typebox";
++
++/** OpenAI grammar variants for constrained sampling. */
++export type GrammarFormat = "openai_lark" | "openai_regex";
++
++export type GrammarVariants = Partial<Record<GrammarFormat, string>>;
++
++/**
++ * Optional provider-side constrained sampling configs for a tool.
++ *
++ * The `json_schema` value roughly maps to the concept of `strict` in APIs which is
++ * implemented as json-schema constrained sampling by APIs. Grammar variants let
++ * callers provide provider-specific encodings of the same intended language.
++ */
++export type ConstrainedSamplingConfig =
++	| {
++			type: "json_schema";
++			strict: "prefer" | "require";
++	  }
++	| {
++			type: "grammar";
++			variants: GrammarVariants;
++	  };
++
++export interface Tool<TParameters extends TSchema = TSchema> {
++	name: string;
++	description: string;
++	parameters: TParameters;
++	constrainedSampling?: false | ConstrainedSamplingConfig;
++}
++
++export interface Context {
++	systemPrompt?: string;
++	messages: Message[];
++	tools?: Tool[];
++}
++
++/**
++ * Event protocol for AssistantMessageEventStream.
++ *
++ * Successful streams emit `start` before partial updates and terminate with
++ * `done`. A stream may terminate directly with `error` when request setup fails
++ * before generation starts; after `start`, failures also terminate with `error`.
++ * Direct `streamSimple()` calls throw synchronously when request auth is missing.
++ * Updates and `done` must never appear before `start`.
++ *
++ * `partial` is the shared live response-so-far helper, not an event-time
++ * snapshot. Text and thinking blocks are empty when their `*_start` event is
++ * emitted and grow only through their corresponding `*_delta` events until the
++ * authoritative `*_end`. Redacted thinking may be complete at start and emit no
++ * deltas. Tool-call arguments at `toolcall_start` are provider-specific;
++ * `toolcall_delta` carries subsequent JSON updates.
++ */
++export type AssistantMessageEvent =
++	| { type: "start"; partial: AssistantMessage }
++	| { type: "text_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "text_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "text_end"; contentIndex: number; content: string; partial: AssistantMessage }
++	| { type: "thinking_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "thinking_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "thinking_end"; contentIndex: number; content: string; partial: AssistantMessage }
++	| { type: "toolcall_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "toolcall_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "toolcall_end"; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }
++	| {
++			type: "done";
++			reason: Extract<StopReason, "stop" | "length" | "toolUse" | "deferred">;
++			message: AssistantMessage;
++	  }
++	| { type: "error"; reason: Extract<StopReason, "aborted" | "error">; error: AssistantMessage };
++
++/**
++ * Compatibility settings for OpenAI-compatible completions APIs.
++ * Use this to override URL-based auto-detection for custom providers.
++ */
++export interface OpenAICompletionsCompat {
++	/** Whether the provider supports the `store` field. Default: auto-detected from URL. */
++	supportsStore?: boolean;
++	/** Whether the provider supports the `developer` role (vs `system`). Default: auto-detected from URL. */
++	supportsDeveloperRole?: boolean;
++	/** Whether the provider supports `reasoning_effort`. Default: auto-detected from URL. */
++	supportsReasoningEffort?: boolean;
++	/** Whether the provider supports `stream_options: { include_usage: true }` for token usage in streaming responses. Default: true. */
++	supportsUsageInStreaming?: boolean;
++	/** Whether streamed responses include `finish_reason`. When false, pi infers `stop` or `toolUse` when the stream ends. Default: true. */
++	supportsFinishReason?: boolean;
++	/** Which field to use for max tokens. Default: auto-detected from URL. */
++	maxTokensField?: "max_completion_tokens" | "max_tokens";
++	/** Whether tool results require the `name` field. Default: auto-detected from URL. */
++	requiresToolResultName?: boolean;
++	/** Whether a user message after tool results requires an assistant message in between. Default: auto-detected from URL. */
++	requiresAssistantAfterToolResult?: boolean;
++	/** Whether thinking blocks must be converted to text blocks with <thinking> delimiters. Default: auto-detected from URL. */
++	requiresThinkingAsText?: boolean;
++	/** Whether all replayed assistant messages must include an empty reasoning_content field when reasoning is enabled. Default: auto-detected from URL. */
++	requiresReasoningContentOnAssistantMessages?: boolean;
++	/** Format for reasoning/thinking parameter. "openai" uses reasoning_effort, "openrouter" uses reasoning: { effort }, "deepseek" uses thinking: { type } plus reasoning_effort when supported, "together" uses reasoning: { enabled } plus reasoning_effort when supported, "baseten" uses configurable chat_template_args plus reasoning_effort when supported, "zai" uses thinking: { type }, "qwen" uses top-level enable_thinking: boolean, "qwen-chat-template" uses chat_template_kwargs.enable_thinking and preserve_thinking, "chat-template" uses configurable chat_template_kwargs, "string-thinking" uses top-level thinking: string, and "ant-ling" uses reasoning: { effort } only when the mapped effort is non-null. Default: "openai". */
++	thinkingFormat?:
++		| "openai"
++		| "openrouter"
++		| "deepseek"
++		| "together"
++		| "baseten"
++		| "zai"
++		| "qwen"
++		| "chat-template"
++		| "qwen-chat-template"
++		| "string-thinking"
++		| "ant-ling";
++	/** Kwargs to send as `chat_template_kwargs` when `thinkingFormat` is `chat-template`. Use `{ "$var": "thinking.enabled" }`, `{ "$var": "thinking.effort" }`, or `{ "$var": "thinking.budget" }` for pi-controlled thinking values. */
++	chatTemplateKwargs?: Record<string, ChatTemplateKwargValue>;
++	/** Arguments to send as `chat_template_args` when `thinkingFormat` is `baseten`. Use `{ "$var": "thinking.enabled" }`, `{ "$var": "thinking.effort" }`, or `{ "$var": "thinking.budget" }` for pi-controlled thinking values. */
++	chatTemplateArgs?: Record<string, ChatTemplateKwargValue>;
++	/** OpenRouter-compatible routing preferences sent as the `provider` request field. */
++	openRouterRouting?: OpenRouterRouting;
++	/** Vercel AI Gateway routing preferences. Only used when baseUrl points to Vercel AI Gateway. */
++	vercelGatewayRouting?: VercelGatewayRouting;
++	/** Whether z.ai supports top-level `tool_stream: true` for streaming tool call deltas. Default: false. */
++	zaiToolStream?: boolean;
++	/**
++	 * Top-level request field used to cap reasoning tokens from `thinkingBudgets`.
++	 * Reasoning and the answer share `max_tokens` on these endpoints, so without a budget a
++	 * reasoning-heavy turn can consume the whole response and emit no answer.
++	 * `"thinking_token_budget"` is vLLM, `"thinking_budget"` is Qwen/DashScope/SGLang,
++	 * `"thinking_budget_tokens"` is llama.cpp. Off by default; not set on the generated catalog.
++	 */
++	thinkingTokenBudgetField?: ThinkingTokenBudgetField;
++	/** Alias for `thinkingTokenBudgetField: "thinking_token_budget"` (vLLM). Prefer `thinkingTokenBudgetField`. Default: false. */
++	supportsThinkingTokenBudget?: boolean;
++	/** Whether the provider supports OpenAI custom tools with Lark/regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. Default: false; the generated model catalog enables it for capable models. */
++	supportsOpenAIGrammarTools?: boolean;
++	/** Whether the provider supports the `strict` field in tool definitions. Default: true. */
++	supportsStrictMode?: boolean;
++	/** Cache control convention for prompt caching. "anthropic" applies Anthropic-style `cache_control` markers to the system prompt, last tool definition, and last user, assistant, or tool-result text content. */
++	cacheControlFormat?: "anthropic";
++	/** Whether to send session-affinity data from `options.sessionId`. Default: true for OpenRouter endpoints, false otherwise. */
++	sendSessionAffinityHeaders?: boolean;
++	/** Provider-specific deferred tool serialization mode. */
++	deferredToolsMode?: "kimi";
++	/** Session-affinity header format: `openai` sends `session_id`, `x-client-request-id`, and `x-session-affinity`; `openai-nosession` sends `x-client-request-id` and `x-session-affinity`; `openrouter` sends `x-session-id`. Does not affect the `prompt_cache_key` body param, which is governed by cache retention. Default: auto-detected. */
++	sessionAffinityFormat?: SessionAffinityFormat;
++	/** Whether the provider supports long prompt cache retention (`prompt_cache_retention: "24h"` or Anthropic-style `cache_control.ttl: "1h"`, depending on format). Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/**
++	 * vLLM scheduler priority sent as the top-level `priority` request field (lower values are
++	 * handled earlier; server default 0). Only meaningful when vLLM runs with
++	 * `--scheduling-policy priority`; useful for keeping background/batch work from stalling
++	 * interactive sessions. Off by default; not set on the generated catalog.
++	 */
++	vllmPriority?: number;
++}
++
++/** Compatibility settings for OpenAI Responses APIs. */
++export interface OpenAIResponsesCompat {
++	/** Whether the provider supports the `developer` role (vs `system`). Default: true. */
++	supportsDeveloperRole?: boolean;
++	/** Session-affinity header format: `openai` sends `session_id` and `x-client-request-id`; `openai-nosession` sends `x-client-request-id`; `openrouter` sends `x-session-id`. Does not affect the `prompt_cache_key` body param, which is governed by cache retention. Default: auto-detected. */
++	sessionAffinityFormat?: SessionAffinityFormat;
++	/** Whether the provider supports long prompt cache retention. This uses `prompt_cache_options.ttl: "30m"` on GPT-5.6+ and `prompt_cache_retention: "24h"` on earlier models. Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/** Whether the provider supports strict JSON-schema function tools. Defaults are API-specific; generated OpenAI models enable it explicitly. */
++	supportsStrictMode?: boolean;
++	/** Whether to emit OpenAI custom tools with Lark/regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. Default: false; the generated model catalog enables it for capable models. */
++	supportsOpenAIGrammarTools?: boolean;
++	/** Whether the model supports message-anchored `additional_tools` input items. Default: false. */
++	supportsAdditionalTools?: boolean;
++	/** Whether the model supports client-executed tool search for deferred tools. Default: false. */
++	supportsToolSearch?: boolean;
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/read-0661-0881.txt b/Docs/quality/stage1/ZS1-015/worker-types319/read-0661-0881.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/read-0661-0881.txt
+@@ -0,0 +1,221 @@
++	/** Whether the model accepts `prompt_cache_options` (OpenAI GPT-5.6+ prompt caching). Older OpenAI models reject the parameter. Default: false. */
++	supportsExplicitPromptCacheMode?: boolean;
++	/** Whether the provider accepts the `max_output_tokens` parameter. Some Codex-protocol gateways reject it. Default: true. */
++	supportsMaxOutputTokens?: boolean;
++}
++
++/** Compatibility settings for Anthropic Messages-compatible APIs. */
++export interface AnthropicMessagesCompat {
++	/**
++	 * Whether the provider accepts per-tool `eager_input_streaming`.
++	 * When false, the Anthropic provider omits `tools[].eager_input_streaming`
++	 * and sends the legacy `fine-grained-tool-streaming-2025-05-14` beta header
++	 * for tool-enabled requests.
++	 * Default: true.
++	 */
++	supportsEagerToolInputStreaming?: boolean;
++	/** Whether the provider supports Anthropic long cache retention (`cache_control.ttl: "1h"`). Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/**
++	 * Whether to send the `x-session-affinity` header from `options.sessionId`
++	 * when caching is enabled. Required for providers like Fireworks that use
++	 * session affinity for prompt cache routing (requests to the same replica
++	 * maximize cache hits).
++	 * Default: false.
++	 */
++	sendSessionAffinityHeaders?: boolean;
++	/** Session-affinity format. `"openrouter"` sends `x-session-id`; when unset, sends `x-session-affinity`. */
++	sessionAffinityFormat?: "openrouter";
++	/**
++	 * Whether the provider supports Anthropic-style `cache_control` markers on
++	 * tool definitions. When false, `cache_control` is omitted from tool params.
++	 * Some Anthropic-compatible providers (e.g., Fireworks) do not support this
++	 * field on tools and may reject or ignore it.
++	 * Default: true.
++	 */
++	supportsCacheControlOnTools?: boolean;
++	/**
++	 * Whether the model accepts the Anthropic `temperature` request field.
++	 * Claude Opus 4.7+ rejects non-default temperature values.
++	 * Default: true.
++	 */
++	supportsTemperature?: boolean;
++	/**
++	 * Whether to force adaptive thinking (`thinking.type: "adaptive"` plus
++	 * `output_config.effort`) regardless of the model id. Built-in models that
++	 * require adaptive thinking set this in generated metadata. Custom
++	 * Anthropic-compatible providers can set this to `true` for any model whose
++	 * upstream requires the adaptive format. Set to `false` to
++	 * opt out on overridden built-in models.
++	 * Default: false.
++	 */
++	forceAdaptiveThinking?: boolean;
++	/** Whether to replay empty thinking signatures as `signature: ""` instead of converting thinking to text. Default: false. */
++	allowEmptySignature?: boolean;
++	/** Whether the provider supports Anthropic strict tool schemas. Default: false; generated Anthropic models enable it explicitly. */
++	supportsStrictTools?: boolean;
++	/** Whether the exact model transport supports effort-only system messages and thinking binding controls. Default: false. */
++	supportsMidConvoEffort?: boolean;
++	/**
++	 * Models Anthropic accepts in `fallbacks` for server-side refusal fallback,
++	 * with local pricing metadata for returned fallback responses. When absent or
++	 * empty, callers must omit `fallbacks`; Anthropic rejects the field for models
++	 * with no permitted fallback targets.
++	 */
++	allowedFallbackModels?: AnthropicAllowedFallbackModel[];
++	/**
++	 * Whether the provider supports deferred tools loaded by `tool_reference`
++	 * blocks in tool results. Default: true for first-party Anthropic models
++	 * except Haiku and models older than Claude 4.5; false for other providers.
++	 */
++	supportsToolReferences?: boolean;
++}
++
++/** Compatibility settings for Amazon Bedrock models. */
++export interface BedrockCompat {
++	/** Whether the model supports Bedrock strict tool schemas. Default: false. */
++	supportsStrictMode?: boolean;
++}
++
++/**
++ * OpenRouter provider routing preferences.
++ * Controls which upstream providers OpenRouter routes requests to.
++ * Sent as the `provider` field in the OpenRouter API request body.
++ * @see https://openrouter.ai/docs/guides/routing/provider-selection
++ */
++export interface OpenRouterRouting {
++	/** Whether to allow backup providers to serve requests. Default: true. */
++	allow_fallbacks?: boolean;
++	/** Whether to filter providers to only those that support all parameters in the request. Default: false. */
++	require_parameters?: boolean;
++	/** Data collection setting. "allow" (default): allow providers that may store/train on data. "deny": only use providers that don't collect user data. */
++	data_collection?: "deny" | "allow";
++	/** Whether to restrict routing to only ZDR (Zero Data Retention) endpoints. */
++	zdr?: boolean;
++	/** Whether to restrict routing to only models that allow text distillation. */
++	enforce_distillable_text?: boolean;
++	/** An ordered list of provider names/slugs to try in sequence, falling back to the next if unavailable. */
++	order?: string[];
++	/** List of provider names/slugs to exclusively allow for this request. */
++	only?: string[];
++	/** List of provider names/slugs to skip for this request. */
++	ignore?: string[];
++	/** A list of quantization levels to filter providers by (e.g., ["fp16", "bf16", "fp8", "fp6", "int8", "int4", "fp4", "fp32"]). */
++	quantizations?: string[];
++	/** Sorting strategy. Can be a string (e.g., "price", "throughput", "latency") or an object with `by` and `partition`. */
++	sort?:
++		| string
++		| {
++				/** The sorting metric: "price", "throughput", "latency". */
++				by?: string;
++				/** Partitioning strategy: "model" (default) or "none". */
++				partition?: string | null;
++		  };
++	/** Maximum price per million tokens (USD). */
++	max_price?: {
++		/** Price per million prompt tokens. */
++		prompt?: number | string;
++		/** Price per million completion tokens. */
++		completion?: number | string;
++		/** Price per image. */
++		image?: number | string;
++		/** Price per audio unit. */
++		audio?: number | string;
++		/** Price per request. */
++		request?: number | string;
++	};
++	/** Preferred minimum throughput (tokens/second). Can be a number (applies to p50) or an object with percentile-specific cutoffs. */
++	preferred_min_throughput?:
++		| number
++		| {
++				/** Minimum tokens/second at the 50th percentile. */
++				p50?: number;
++				/** Minimum tokens/second at the 75th percentile. */
++				p75?: number;
++				/** Minimum tokens/second at the 90th percentile. */
++				p90?: number;
++				/** Minimum tokens/second at the 99th percentile. */
++				p99?: number;
++		  };
++	/** Preferred maximum latency (seconds). Can be a number (applies to p50) or an object with percentile-specific cutoffs. */
++	preferred_max_latency?:
++		| number
++		| {
++				/** Maximum latency in seconds at the 50th percentile. */
++				p50?: number;
++				/** Maximum latency in seconds at the 75th percentile. */
++				p75?: number;
++				/** Maximum latency in seconds at the 90th percentile. */
++				p90?: number;
++				/** Maximum latency in seconds at the 99th percentile. */
++				p99?: number;
++		  };
++}
++
++/**
++ * Vercel AI Gateway routing preferences.
++ * Controls which upstream providers the gateway routes requests to.
++ * @see https://vercel.com/docs/ai-gateway/models-and-providers/provider-options
++ */
++export interface VercelGatewayRouting {
++	/** List of provider slugs to exclusively use for this request (e.g., ["bedrock", "anthropic"]). */
++	only?: string[];
++	/** List of provider slugs to try in order (e.g., ["anthropic", "openai"]). */
++	order?: string[];
++}
++
++export interface ModelCostRates {
++	input: number; // $/million tokens
++	output: number; // $/million tokens
++	cacheRead: number; // $/million tokens
++	cacheWrite: number; // $/million tokens
++}
++
++export interface ModelCostTier extends ModelCostRates {
++	/** Use this tier for requests whose total input usage exceeds this token count. */
++	inputTokensAbove: number;
++}
++
++export interface ModelCost extends ModelCostRates {
++	/** Request-wide pricing tiers. The highest matching input threshold applies to the full request. */
++	tiers?: ModelCostTier[];
++}
++
++// Model interface for the unified model system
++export interface Model<TApi extends Api> {
++	id: string;
++	name: string;
++	api: TApi;
++	provider: ProviderId;
++	baseUrl: string;
++	reasoning: boolean;
++	/**
++	 * Maps pi thinking levels to provider/model-specific values.
++	 * Missing keys use provider defaults. null marks a level as unsupported.
++	 */
++	thinkingLevelMap?: ThinkingLevelMap;
++	input: ("text" | "image")[];
++	cost: ModelCost;
++	contextWindow: number;
++	maxTokens: number;
++	/** Default sampling parameters for this model. See {@link StreamOptions.samplingParams}; per-request keys override these. */
++	samplingParams?: Record<string, unknown>;
++	headers?: Record<string, string>;
++	/** Compatibility overrides for OpenAI-compatible APIs. If not set, auto-detected from baseUrl. */
++	compat?: TApi extends "openai-completions"
++		? OpenAICompletionsCompat
++		: TApi extends "openai-responses" | "azure-openai-responses" | "openai-codex-responses"
++			? OpenAIResponsesCompat
++			: TApi extends "anthropic-messages"
++				? AnthropicMessagesCompat
++				: TApi extends "bedrock-converse-stream"
++					? BedrockCompat
++					: never;
++}
++
++export interface ImagesModel<TApi extends ImagesApi>
++	extends Omit<Model<Api>, "api" | "provider" | "reasoning" | "contextWindow" | "maxTokens" | "compat"> {
++	api: TApi;
++	provider: ImagesProviderId;
++	output: ("text" | "image")[];
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.json b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.json
+@@ -0,0 +1,22 @@
++{
++  "name": "source-verified-final",
++  "argv": [
++    "python3",
++    "Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T06:36:13.702695+00:00",
++  "ended_at": "2026-09-12T06:36:13.771548+00:00",
++  "elapsed_seconds": 0.068722125,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 20201472,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log",
++  "bytes": 949,
++  "sha256": "22f966c571dd6e5344fd5dcf2c1d1e4e1f1721304915744d9beda38df671de8d"
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified-final.log
+@@ -0,0 +1,41 @@
++{
++  "ok": true,
++  "item": "ZS1-015",
++  "authority": "3.1.19",
++  "source_bytes": 37411,
++  "source_lines": 881,
++  "source_sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
++  "complete_read_ranges": [
++    [
++      0,
++      8064
++    ],
++    [
++      8064,
++      15965
++    ],
++    [
++      15965,
++      28201
++    ],
++    [
++      28201,
++      37411
++    ]
++  ],
++  "named_declarations": 72,
++  "target_files": 5,
++  "target_excerpts": 10,
++  "report": {
++    "path": "Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md",
++    "bytes": 16386,
++    "sha256": "482fe9c3c41e6e0058c22a306ac3838ffbbded83c39e4ff89d203f3c78bb63d4"
++  },
++  "checks": "source frozen identity; complete ordered bytes; declaration inventory; G-FILE check_ranges/artifact/source identity; current target excerpt hashes",
++  "not_claimed": [
++    "TypeScript typecheck",
++    "runtime behavior",
++    "G-STAGE master acceptance",
++    "directory acceptance"
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json
+@@ -0,0 +1,22 @@
++{
++  "name": "source-verified",
++  "argv": [
++    "python3",
++    "Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T06:35:04.933527+00:00",
++  "ended_at": "2026-09-12T06:35:05.003893+00:00",
++  "elapsed_seconds": 0.07025675,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 20217856,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log",
++  "bytes": 949,
++  "sha256": "48029c7603a0c482f7e1ecc6149b3ad819a84c6b86294e61a65b3eb25afe0d5e"
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log
+@@ -0,0 +1,41 @@
++{
++  "ok": true,
++  "item": "ZS1-015",
++  "authority": "3.1.19",
++  "source_bytes": 37411,
++  "source_lines": 881,
++  "source_sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
++  "complete_read_ranges": [
++    [
++      0,
++      8064
++    ],
++    [
++      8064,
++      15965
++    ],
++    [
++      15965,
++      28201
++    ],
++    [
++      28201,
++      37411
++    ]
++  ],
++  "named_declarations": 72,
++  "target_files": 5,
++  "target_excerpts": 10,
++  "report": {
++    "path": "Docs/learn/stage1_pi_mono/files/packages/ai/src/types.ts_learn.md",
++    "bytes": 16214,
++    "sha256": "8ed8003713ad3d507f4e05f8de6ac126b4569f2a97284774938161d7f4d20201"
++  },
++  "checks": "source frozen identity; complete ordered bytes; declaration inventory; G-FILE check_ranges/artifact/source identity; current target excerpt hashes",
++  "not_claimed": [
++    "TypeScript typecheck",
++    "runtime behavior",
++    "G-STAGE master acceptance",
++    "directory acceptance"
++  ]
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-124-159.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-124-159.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-124-159.txt
+@@ -0,0 +1,36 @@
++#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
++pub struct ProviderCapabilities {
++    pub text: bool,
++    pub images: bool,
++    pub files: bool,
++    pub tools: bool,
++    pub structured_output: bool,
++    pub streaming: bool,
++    pub reasoning: bool,
++}
++
++impl ProviderCapabilities {
++    pub const fn for_wire_api(wire_api: OpenAiWireApi) -> Self {
++        match wire_api {
++            OpenAiWireApi::AnthropicMessages => crate::providers::anthropic::CAPABILITIES,
++            OpenAiWireApi::GoogleGenerativeAi => crate::providers::google::CAPABILITIES,
++            OpenAiWireApi::Responses => Self {
++                text: true,
++                images: true,
++                files: true,
++                tools: true,
++                structured_output: true,
++                streaming: true,
++                reasoning: true,
++            },
++            OpenAiWireApi::ChatCompletions => Self {
++                text: true,
++                images: true,
++                files: false,
++                tools: true,
++                structured_output: true,
++                streaming: true,
++                reasoning: false,
++            },
++        }
++    }
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-1587-1702.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-1587-1702.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-1587-1702.txt
+@@ -0,0 +1,116 @@
++    fn complete_with_control(
++        &self,
++        request: CompletionRequest<'_>,
++        cancelled: &dyn Fn() -> bool,
++        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
++    ) -> Result<Completion, BackendError> {
++        {
++            let mut circuit = self
++                .circuit
++                .lock()
++                .map_err(|_| BackendError::Transport("provider circuit lock poisoned".into()))?;
++            if let Some(until) = circuit.open_until
++                && until > Instant::now()
++            {
++                let remaining = until.saturating_duration_since(Instant::now());
++                return Err(BackendError::CircuitOpen {
++                    retry_after_ms: duration_ms_ceil(remaining),
++                });
++            }
++            circuit.open_until = None;
++        }
++        let model_tools = self
++            .model_capabilities(request.model)?
++            .map(|capabilities| capabilities.tools);
++        let mut attempt = 0_u32;
++        loop {
++            let mut emitted = false;
++            let result = self.complete_openai(
++                CompletionRequest {
++                    turn_id: request.turn_id,
++                    turns: request.turns,
++                    model: request.model,
++                    tools: request.tools,
++                    instructions: request.instructions,
++                    metadata: request.metadata,
++                    attachments: request.attachments,
++                    response_format: request.response_format,
++                    max_output_tokens: request.max_output_tokens,
++                },
++                cancelled,
++                &mut |event| {
++                    if model_tools == Some(false)
++                        && matches!(
++                            event,
++                            ProviderEvent::ToolCallDelta { .. }
++                                | ProviderEvent::ToolCallDone { .. }
++                        )
++                    {
++                        return Err(BackendError::InvalidResponse(
++                            "selected model returned an unsupported tool call".into(),
++                        ));
++                    }
++                    emitted = true;
++                    sink(event)
++                },
++            );
++            let should_retry = result.as_ref().is_err_and(|error| {
++                !emitted
++                    && error.is_retryable()
++                    && attempt < self.max_retries
++                    && !request
++                        .metadata
++                        .is_some_and(|v| v["purpose"] == "semantic_compaction")
++            });
++            if !should_retry {
++                let mut circuit = self.circuit.lock().map_err(|_| {
++                    BackendError::Transport("provider circuit lock poisoned".into())
++                })?;
++                match &result {
++                    Ok(_) => {
++                        circuit.consecutive_failures = 0;
++                        circuit.open_until = None;
++                    }
++                    Err(error) if error.is_retryable() => {
++                        circuit.consecutive_failures =
++                            circuit.consecutive_failures.saturating_add(1);
++                        if circuit.consecutive_failures >= self.circuit_failure_threshold {
++                            circuit.open_until = Some(Instant::now() + self.circuit_cooldown);
++                        }
++                    }
++                    Err(_) => {}
++                }
++                return result;
++            }
++            attempt = attempt.saturating_add(1);
++            sink(ProviderEvent::Warning {
++                message: format!("provider request retry {attempt}/{}", self.max_retries),
++            })?;
++            // Capped exponential backoff. Polling the cancellation predicate
++            // avoids making an interrupt wait for the whole sleep.
++            let exponential = Duration::from_millis(
++                100_u64.saturating_mul(1_u64 << attempt.saturating_sub(1).min(5)),
++            );
++            let retry_after = match &result {
++                Err(BackendError::HttpStatus {
++                    retry_after_ms: Some(milliseconds),
++                    ..
++                }) => Duration::from_millis(*milliseconds),
++                _ => Duration::ZERO,
++            };
++            let delay = exponential.max(retry_after);
++            let deadline = std::time::Instant::now() + delay;
++            while std::time::Instant::now() < deadline {
++                if cancelled() {
++                    return Err(BackendError::Cancelled);
++                }
++                std::thread::sleep(Duration::from_millis(10));
++            }
++        }
++    }
++
++    fn name(&self) -> &str {
++        if self.wire_api == OpenAiWireApi::GoogleGenerativeAi {
++            return "google-generative-ai";
++        }
++        if self.wire_api == OpenAiWireApi::AnthropicMessages {
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-169-225.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-169-225.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-169-225.txt
+@@ -0,0 +1,57 @@
++#[derive(Debug)]
++pub struct CompletionRequest<'a> {
++    pub turn_id: &'a str,
++    pub turns: &'a [Turn],
++    pub model: Option<&'a str>,
++    /// Tools advertised for this turn. Providers must not infer or invent
++    /// capabilities that are absent from this bounded list.
++    pub tools: &'a [ToolDefinition],
++    pub instructions: Option<&'a str>,
++    pub metadata: Option<&'a Value>,
++    pub attachments: &'a [RequestAttachment],
++    pub response_format: Option<&'a Value>,
++    pub max_output_tokens: Option<u64>,
++}
++
++impl<'a> CompletionRequest<'a> {
++    pub fn new(
++        turn_id: &'a str,
++        turns: &'a [Turn],
++        model: Option<&'a str>,
++        tools: &'a [ToolDefinition],
++    ) -> Self {
++        Self {
++            turn_id,
++            turns,
++            model,
++            tools,
++            instructions: None,
++            metadata: None,
++            attachments: &[],
++            response_format: None,
++            max_output_tokens: None,
++        }
++    }
++
++    pub fn with_instructions(mut self, instructions: Option<&'a str>) -> Self {
++        self.instructions = instructions;
++        self
++    }
++
++    pub fn with_max_output_tokens(mut self, tokens: u64) -> Self {
++        self.max_output_tokens = Some(tokens);
++        self
++    }
++
++    pub fn with_response_format(mut self, format: Option<&'a Value>) -> Self {
++        self.response_format = format;
++        self
++    }
++
++    pub fn with_metadata(mut self, metadata: Option<&'a Value>) -> Self {
++        self.metadata = metadata;
++        self
++    }
++
++    pub fn with_attachments(mut self, attachments: &'a [RequestAttachment]) -> Self {
++        self.attachments = attachments;
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-229-322.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-229-322.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-229-322.txt
+@@ -0,0 +1,94 @@
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++#[serde(tag = "type", rename_all = "snake_case")]
++pub enum ProviderEvent {
++    ResponseCreated {
++        response_id: Option<String>,
++        model: Option<String>,
++    },
++    TextDelta {
++        delta: String,
++    },
++    ReasoningDelta {
++        delta: String,
++    },
++    TextDone {
++        text: String,
++    },
++    Refusal {
++        text: String,
++    },
++    ToolCallDelta {
++        call_id: Option<String>,
++        name: Option<String>,
++        arguments_delta: String,
++    },
++    ToolCallDone {
++        call: ToolCall,
++    },
++    Usage {
++        usage: Usage,
++    },
++    Warning {
++        message: String,
++    },
++    Completed {
++        response_id: Option<String>,
++        model: Option<String>,
++    },
++    Failed {
++        message: String,
++    },
++}
++
++impl ProviderEvent {
++    pub fn kind(&self) -> &'static str {
++        match self {
++            Self::ResponseCreated { .. } => "response_created",
++            Self::TextDelta { .. } => "text_delta",
++            Self::ReasoningDelta { .. } => "reasoning_delta",
++            Self::TextDone { .. } => "text_done",
++            Self::Refusal { .. } => "refusal",
++            Self::ToolCallDelta { .. } => "tool_call_delta",
++            Self::ToolCallDone { .. } => "tool_call_done",
++            Self::Usage { .. } => "usage",
++            Self::Warning { .. } => "warning",
++            Self::Completed { .. } => "completed",
++            Self::Failed { .. } => "failed",
++        }
++    }
++}
++
++/// Optional usage information returned by a provider.
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
++pub struct Usage {
++    pub input_tokens: u64,
++    pub output_tokens: u64,
++    pub total_tokens: u64,
++}
++
++/// Provider-independent completion result.
++#[derive(Debug, Default, PartialEq)]
++pub struct Completion {
++    pub content: String,
++    pub usage: Option<Usage>,
++    pub model: Option<String>,
++    pub tool_calls: Vec<ToolCall>,
++    pub response_id: Option<String>,
++    pub refusal: Option<String>,
++    pub annotations: Vec<Value>,
++}
++
++impl Completion {
++    pub fn text(content: impl Into<String>) -> Self {
++        Self {
++            content: content.into(),
++            usage: None,
++            model: None,
++            tool_calls: Vec::new(),
++            response_id: None,
++            refusal: None,
++            annotations: Vec::new(),
++        }
++    }
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-324-416.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-324-416.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-324-416.txt
+@@ -0,0 +1,93 @@
++/// Errors at the provider boundary.  They are surfaced as typed headless
++/// responses rather than panics or silent fallback to another model.
++#[derive(Debug, Error)]
++pub enum BackendError {
++    #[error("backend configuration: {0}")]
++    Configuration(String),
++    #[error("backend transport: {0}")]
++    Transport(String),
++    #[error("backend HTTP status: {status}")]
++    HttpStatus {
++        status: u16,
++        /// Provider-directed retry delay. The value is bounded while parsing
++        /// so an endpoint cannot stall the runtime indefinitely.
++        retry_after_ms: Option<u64>,
++    },
++    #[error("backend circuit is open for another {retry_after_ms} ms")]
++    CircuitOpen { retry_after_ms: u64 },
++    #[error("backend returned an invalid response: {0}")]
++    InvalidResponse(String),
++    #[error("backend returned an empty completion")]
++    EmptyResponse,
++    #[error("backend request was cancelled")]
++    Cancelled,
++    #[error("backend request was superseded by a steer")]
++    Steered,
++}
++
++impl BackendError {
++    /// Stable classification for hosts that need to decide whether a failed
++    /// turn may be retried without parsing display text.
++    pub const fn is_retryable(&self) -> bool {
++        match self {
++            Self::Transport(_) => true,
++            Self::HttpStatus { status, .. } => {
++                *status == 408
++                    || *status == 409
++                    || *status == 425
++                    || *status == 429
++                    || (*status >= 500 && *status <= 599)
++            }
++            Self::Configuration(_)
++            | Self::CircuitOpen { .. }
++            | Self::InvalidResponse(_)
++            | Self::EmptyResponse
++            | Self::Cancelled
++            | Self::Steered => false,
++        }
++    }
++
++    pub const fn code(&self) -> &'static str {
++        match self {
++            Self::Configuration(_) => "backend_configuration",
++            Self::Transport(_) => "backend_transport",
++            Self::HttpStatus { .. } => "backend_http_status",
++            Self::CircuitOpen { .. } => "backend_circuit_open",
++            Self::InvalidResponse(_) => "backend_invalid_response",
++            Self::EmptyResponse => "backend_empty_response",
++            Self::Cancelled => "backend_cancelled",
++            Self::Steered => "backend_steered",
++        }
++    }
++}
++
++/// Synchronous provider contract.  A synchronous boundary is intentional:
++/// the default binary stays tiny and callers that need concurrency can run
++/// independent agents in their own processes.
++pub trait Backend: Send + Sync {
++    fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError>;
++
++    fn complete_with_control(
++        &self,
++        request: CompletionRequest<'_>,
++        cancelled: &dyn Fn() -> bool,
++        sink: &mut dyn FnMut(ProviderEvent) -> Result<(), BackendError>,
++    ) -> Result<Completion, BackendError> {
++        if cancelled() {
++            return Err(BackendError::Cancelled);
++        }
++        let completion = self.complete(request)?;
++        if cancelled() {
++            return Err(BackendError::Cancelled);
++        }
++        if !completion.content.is_empty() {
++            sink(ProviderEvent::TextDelta {
++                delta: completion.content.clone(),
++            })?;
++        }
++        sink(ProviderEvent::Completed {
++            response_id: completion.response_id.clone(),
++            model: completion.model.clone(),
++        })?;
++        Ok(completion)
++    }
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt
+@@ -0,0 +1,43 @@
++/// A secret-free entry in the model picker exposed by the interactive hosts.
++/// Profiles are listed rather than credentials, so `/models` remains useful
++/// even when a provider is not currently reachable.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ModelCatalogEntry {
++    pub profile: Option<String>,
++    pub active: bool,
++    pub provider: Option<String>,
++    pub model: Option<String>,
++    pub backend: String,
++    pub configured: bool,
++    pub metadata: Option<crate::providers::registry::ModelDescriptor>,
++}
++
++/// Return the bounded, redacted model/profile catalogue used by `/models`.
++/// This is deliberately read-only and never contacts a provider. A legacy
++/// flat config is represented by one `default` entry; named profiles remain
++/// independently selectable in the output.
++pub fn model_catalog(profile: Option<&str>) -> Result<Vec<ModelCatalogEntry>, ConfigError> {
++    model_catalog_in_workspace(profile, None)
++}
++
++pub fn model_catalog_in_workspace(
++    profile: Option<&str>,
++    workspace: Option<&Path>,
++) -> Result<Vec<ModelCatalogEntry>, ConfigError> {
++    let paths = ConfigPaths::discover()?;
++    let config = load_workspace_config(&paths, workspace)?;
++    let metadata = |provider: Option<&str>,
++                    id: Option<&str>,
++                    overrides: &[crate::providers::registry::ModelOverride]| {
++        let registry = crate::providers::registry::ModelRegistry::with_overrides(overrides)
++            .map_err(|error| ConfigError::Invalid(error.to_string()))?;
++        id.map(|id| registry.resolve(provider.unwrap_or("openai"), id))
++            .transpose()
++            .map_err(|error| ConfigError::Invalid(error.to_string()))
++    };
++    if config.profiles.is_empty() {
++        let resolved = resolve_workspace(
++            &ConfigOverrides {
++                profile: profile.map(str::to_owned),
++                ..ConfigOverrides::default()
++            },
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__core.rs-130-160.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__core.rs-130-160.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__core.rs-130-160.txt
+@@ -0,0 +1,31 @@
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum TurnRole {
++    System,
++    User,
++    Assistant,
++    Tool,
++}
++
++/// One immutable conversational record.  IDs are generated by the core and
++/// parent IDs preserve the active-turn relationship for steering.
++#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
++pub struct Turn {
++    pub id: String,
++    #[serde(default)]
++    pub parent_id: Option<String>,
++    pub role: TurnRole,
++    pub content: String,
++    pub created_at_ms: u64,
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub metadata: Option<Value>,
++}
++
++impl Turn {
++    pub fn new(id: impl Into<String>, role: TurnRole, content: impl Into<String>) -> Self {
++        Self {
++            id: id.into(),
++            parent_id: None,
++            role,
++            content: content.into(),
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt
+@@ -0,0 +1,101 @@
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum ReasoningLevel {
++    None,
++    Minimal,
++    Low,
++    Medium,
++    High,
++    Xhigh,
++    Max,
++    Ultra,
++}
++
++impl ReasoningLevel {
++    pub fn parse(value: &str) -> Result<Self, RegistryError> {
++        serde_json::from_value(serde_json::Value::String(value.into()))
++            .map_err(|_| RegistryError::Invalid("unknown reasoning level".into()))
++    }
++}
++
++/// Integer millionths of one USD per million text tokens. Missing prices mean
++/// unknown, not free. A quotation belongs to its own source/version snapshot.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct ModelPrice {
++    pub input_micro_usd_per_million: u64,
++    pub output_micro_usd_per_million: u64,
++    pub cached_input_micro_usd_per_million: Option<u64>,
++    pub source: String,
++    pub version: String,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case", tag = "kind")]
++pub enum FieldSource {
++    Builtin { reference: String, version: String },
++    UserOverride { version: String },
++    Conservative { version: String },
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ModelDescriptor {
++    pub provider: String,
++    pub id: String,
++    pub context_window: u64,
++    pub max_output_tokens: u64,
++    pub capabilities: ProviderCapabilities,
++    pub reasoning_levels: BTreeSet<ReasoningLevel>,
++    pub price: Option<ModelPrice>,
++    pub sources: BTreeMap<String, FieldSource>,
++}
++
++impl ModelDescriptor {
++    pub fn effective_capabilities(&self, wire: ProviderCapabilities) -> ProviderCapabilities {
++        let m = self.capabilities;
++        ProviderCapabilities {
++            text: m.text && wire.text,
++            images: m.images && wire.images,
++            files: m.files && wire.files,
++            tools: m.tools && wire.tools,
++            structured_output: m.structured_output && wire.structured_output,
++            streaming: m.streaming && wire.streaming,
++            reasoning: m.reasoning && wire.reasoning,
++        }
++    }
++
++    pub fn validate_reasoning(
++        &self,
++        wire: ProviderCapabilities,
++        effort: Option<&str>,
++    ) -> Result<(), RegistryError> {
++        if let Some(effort) = effort {
++            let level = ReasoningLevel::parse(effort)?;
++            if !self.effective_capabilities(wire).reasoning
++                || !self.reasoning_levels.contains(&level)
++            {
++                return Err(RegistryError::Unsupported("reasoning effort"));
++            }
++        }
++        Ok(())
++    }
++
++    /// Keep explicit user limits, clamp them to the selected model and reserve
++    /// the configured output tokens. This is a local estimate, not tokenization.
++    pub fn context_budget(
++        &self,
++        user: crate::context::ContextBudget,
++    ) -> crate::context::ContextBudget {
++        crate::context::ContextBudget {
++            max_tokens: user.max_tokens.min(self.context_window),
++            reserved_output_tokens: user.reserved_output_tokens.min(self.max_output_tokens),
++        }
++    }
++
++    pub fn digest(&self) -> String {
++        // All fields are finite integers, strings and ordered maps/sets.
++        format!(
++            "{:x}",
++            Sha256::digest(serde_json::to_vec(self).expect("model metadata serializes"))
++        )
++    }
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt
+@@ -0,0 +1,48 @@
++
++/// Definition sent to a model. `input_schema` is JSON-Schema-shaped discovery
++/// metadata; tool implementations remain the authoritative validators.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ToolDefinition {
++    pub name: String,
++    pub description: String,
++    pub input_schema: Value,
++    pub side_effect: ToolSideEffect,
++}
++
++impl ToolDefinition {
++    pub fn validate(&self) -> Result<(), ToolError> {
++        validate_identifier(&self.name, "tool name", MAX_TOOL_NAME_BYTES)?;
++        if self.description.trim().is_empty() || self.description.len() > 1_024 {
++            return Err(ToolError::InvalidDefinition(
++                "tool description must be non-empty and at most 1024 bytes".into(),
++            ));
++        }
++        if self.input_schema.get("type").and_then(Value::as_str) != Some("object") {
++            return Err(ToolError::InvalidDefinition(
++                "tool input schema must describe an object".into(),
++            ));
++        }
++        if serde_json::to_vec(&self.input_schema)
++            .map_err(ToolError::Json)?
++            .len()
++            > MAX_TOOL_CALL_BYTES
++        {
++            return Err(ToolError::InvalidDefinition(
++                "tool input schema is too large".into(),
++            ));
++        }
++        Ok(())
++    }
++}
++
++/// A model-requested tool invocation. Arguments must be a JSON object.
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct ToolCall {
++    pub id: String,
++    pub name: String,
++    #[serde(default = "empty_object")]
++    pub arguments: Value,
++}
++
++fn empty_object() -> Value {
++    Value::Object(Map::new())
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt
+@@ -0,0 +1,22 @@
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++#[serde(tag = "status", rename_all = "snake_case")]
++pub enum ToolResult {
++    Success {
++        call_id: String,
++        tool: String,
++        output: Value,
++    },
++    Error {
++        call_id: String,
++        tool: String,
++        error: ToolFailure,
++    },
++}
++
++impl ToolResult {
++    pub fn is_success(&self) -> bool {
++        matches!(self, Self::Success { .. })
++    }
++}
++
++#[derive(Debug, Error)]
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-references.json b/Docs/quality/stage1/ZS1-015/worker-types319/target-references.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-references.json
+@@ -0,0 +1,122 @@
++[
++  {
++    "path": "/Users/wangweiyang/GitHub/zenpi/src/backend.rs",
++    "repository_path": "src/backend.rs",
++    "bytes": 98741,
++    "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357",
++    "excerpts": [
++      {
++        "line_start": 124,
++        "line_end": 159,
++        "byte_start": 4451,
++        "byte_end": 5630,
++        "sha256": "0acea89aba9e16019c55fd4d17797570cf39584ea21e6c0527af50b7f0f16219",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-124-159.txt"
++      },
++      {
++        "line_start": 169,
++        "line_end": 225,
++        "byte_start": 5811,
++        "byte_end": 7457,
++        "sha256": "7a0fc175d9e888e26e78f90f6c460de813e13ee426728dbcc8f0937844ecce23",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-169-225.txt"
++      },
++      {
++        "line_start": 229,
++        "line_end": 322,
++        "byte_start": 7478,
++        "byte_end": 9868,
++        "sha256": "1f163146bd26c6665fdda6d92d3dedb1146f0a1d77e22cf60df4cdf86854c294",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-229-322.txt"
++      },
++      {
++        "line_start": 324,
++        "line_end": 416,
++        "byte_start": 9869,
++        "byte_end": 13325,
++        "sha256": "910b7b68332d6c759c78ec249748c0a852d6b99ff53b1436516bf943e5490971",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-324-416.txt"
++      },
++      {
++        "line_start": 1587,
++        "line_end": 1702,
++        "byte_start": 58910,
++        "byte_end": 63810,
++        "sha256": "f0b4524b42ffd896818dbeda43accc518d478a77a89d87596fb7b50c1673da83",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__backend.rs-1587-1702.txt"
++      }
++    ]
++  },
++  {
++    "path": "/Users/wangweiyang/GitHub/zenpi/src/config.rs",
++    "repository_path": "src/config.rs",
++    "bytes": 77782,
++    "sha256": "f5691bd3818dcaf1481a88b63cc4f3874bc6b007234059e26124b74046325d12",
++    "excerpts": [
++      {
++        "line_start": 1270,
++        "line_end": 1312,
++        "byte_start": 47641,
++        "byte_end": 49568,
++        "sha256": "e734322b1d12d5ed42ce998154f22cdd4a40d5d642e210841bb515fd77a91b98",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt"
++      }
++    ]
++  },
++  {
++    "path": "/Users/wangweiyang/GitHub/zenpi/src/providers/registry.rs",
++    "repository_path": "src/providers/registry.rs",
++    "bytes": 15905,
++    "sha256": "cf229a62681933e7c1b4058c4d2fada41dff4fcd05c4cd300e18accfe245b944",
++    "excerpts": [
++      {
++        "line_start": 18,
++        "line_end": 118,
++        "byte_start": 601,
++        "byte_end": 4015,
++        "sha256": "757d20bed72914d7b85a965ba436a343350d2fa36d87ef2f05b5f8eea3bddd41",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt"
++      }
++    ]
++  },
++  {
++    "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
++    "repository_path": "src/core.rs",
++    "bytes": 274600,
++    "sha256": "6a881cc8eb1193dfbe4d4b06e71d6d28b3b78f4fe00bc836c1ea74c2f2c60b63",
++    "excerpts": [
++      {
++        "line_start": 130,
++        "line_end": 160,
++        "byte_start": 3911,
++        "byte_end": 4789,
++        "sha256": "8f1f43867c005f8034060785f95b1b6e3795e38e92dfe58c9ee68ce592a2d214",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__core.rs-130-160.txt"
++      }
++    ]
++  },
++  {
++    "path": "/Users/wangweiyang/GitHub/zenpi/src/tools.rs",
++    "repository_path": "src/tools.rs",
++    "bytes": 119778,
++    "sha256": "c3149b926933e5800cd41a2e8d3fcf6f109f8a455f2ef6ed8e2d48d696dbe33c",
++    "excerpts": [
++      {
++        "line_start": 501,
++        "line_end": 548,
++        "byte_start": 18541,
++        "byte_end": 20163,
++        "sha256": "dbd953cf7ed74db1ad4af3a2d0a4d29319f0374b2c7922afb177cea744ad9e36",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-501-548.txt"
++      },
++      {
++        "line_start": 650,
++        "line_end": 671,
++        "byte_start": 23319,
++        "byte_end": 23775,
++        "sha256": "0c34c241b081c944b3a909159cba315cdf2a25464284855e0e9c74dcdeb31037",
++        "artifact": "Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__tools.rs-650-671.txt"
++      }
++    ]
++  }
++]
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/types.ts b/Docs/quality/stage1/ZS1-015/worker-types319/types.ts
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/types.ts
+@@ -0,0 +1,881 @@
++import type { TelemetryContext } from "@earendil-works/pi-telemetry";
++import type { AnthropicOptions } from "./api/anthropic-messages.ts";
++import type { AzureOpenAIResponsesOptions } from "./api/azure-openai-responses.ts";
++import type { BedrockOptions } from "./api/bedrock-converse-stream.ts";
++import type { GoogleOptions } from "./api/google-generative-ai.ts";
++import type { GoogleVertexOptions } from "./api/google-vertex.ts";
++import type { MistralOptions } from "./api/mistral-conversations.ts";
++import type { OpenAICodexResponsesOptions } from "./api/openai-codex-responses.ts";
++import type { OpenAICompletionsOptions } from "./api/openai-completions.ts";
++import type { OpenAIResponsesOptions } from "./api/openai-responses.ts";
++import type { PiMessagesOptions } from "./api/pi-messages.ts";
++import type { AssistantMessageDiagnostic } from "./utils/diagnostics.ts";
++import type { AssistantMessageEventStream } from "./utils/event-stream.ts";
++
++export type { AssistantMessageEventStream } from "./utils/event-stream.ts";
++
++export type KnownApi =
++	| "openai-completions"
++	| "mistral-conversations"
++	| "openai-responses"
++	| "azure-openai-responses"
++	| "openai-codex-responses"
++	| "anthropic-messages"
++	| "bedrock-converse-stream"
++	| "google-generative-ai"
++	| "google-vertex"
++	| "pi-messages";
++
++export type Api = KnownApi | (string & {});
++
++export type KnownImagesApi = "openrouter-images";
++
++export type ImagesApi = KnownImagesApi | (string & {});
++
++export type KnownProvider =
++	| "amazon-bedrock"
++	| "ant-ling"
++	| "anthropic"
++	| "google"
++	| "google-vertex"
++	| "openai"
++	| "azure-openai-responses"
++	| "openai-codex"
++	| "radius"
++	| "nvidia"
++	| "deepseek"
++	| "github-copilot"
++	| "xai"
++	| "groq"
++	| "cerebras"
++	| "openrouter"
++	| "vercel-ai-gateway"
++	| "zai"
++	| "zai-coding-cn"
++	| "mistral"
++	| "minimax"
++	| "minimax-cn"
++	| "moonshotai"
++	| "moonshotai-cn"
++	| "huggingface"
++	| "fireworks"
++	| "together"
++	| "baseten"
++	| "opencode"
++	| "opencode-go"
++	| "kimi-coding"
++	| "cloudflare-workers-ai"
++	| "cloudflare-ai-gateway"
++	| "qwen-token-plan"
++	| "qwen-token-plan-cn"
++	| "qwen-token-plan-individual"
++	| "xiaomi"
++	| "xiaomi-token-plan-cn"
++	| "xiaomi-token-plan-ams"
++	| "xiaomi-token-plan-sgp";
++export type ProviderId = KnownProvider | string;
++
++export type KnownImagesProvider = "openrouter";
++
++export type ImagesProviderId = KnownImagesProvider | string;
++
++export type ToolChoice = "auto" | "none";
++export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
++export type ModelThinkingLevel = "off" | ThinkingLevel;
++export type ThinkingLevelMap = Partial<Record<ModelThinkingLevel, string | null>>;
++export type ChatTemplateKwargValue =
++	| string
++	| number
++	| boolean
++	| null
++	| {
++			$var: "thinking.enabled" | "thinking.effort" | "thinking.budget";
++			omitWhenOff?: boolean;
++	  };
++
++/** Top-level request field used to cap reasoning tokens on OpenAI-compatible servers. */
++export type ThinkingTokenBudgetField = "thinking_token_budget" | "thinking_budget" | "thinking_budget_tokens";
++
++/** Token budgets for each thinking level (token-based providers only) */
++export interface ThinkingBudgets {
++	minimal?: number;
++	low?: number;
++	medium?: number;
++	high?: number;
++}
++
++// Base options all providers share
++export type CacheRetention = "none" | "short" | "long";
++
++export type Transport = "sse" | "websocket" | "websocket-cached" | "auto";
++
++/** Provider-scoped environment overrides. Values take precedence over process.env. */
++export type ProviderEnv = Record<string, string>;
++export type ProviderHeaders = Record<string, string | null>;
++export type FetchFunction = typeof globalThis.fetch;
++export type SessionAffinityFormat = "openai" | "openai-nosession" | "openrouter";
++
++export interface ProviderResponse {
++	status: number;
++	headers: Record<string, string>;
++}
++
++/** Authentication, HTTP transport, and lifecycle callbacks shared by provider requests. */
++export interface ProviderRequestOptions<TModel = Model<Api>> {
++	signal?: AbortSignal;
++	/** Explicit parent context for telemetry produced by this logical request. */
++	telemetryContext?: TelemetryContext;
++	apiKey?: string;
++	/**
++	 * Optional fetch implementation for provider HTTP requests.
++	 * Defaults to `globalThis.fetch`. Provider adapters that cannot inject a custom implementation may reject it.
++	 * This does not affect WebSocket transports.
++	 */
++	fetch?: FetchFunction;
++	/**
++	 * Provider-scoped environment values. These take precedence over process.env for
++	 * provider configuration such as regional settings, endpoint placeholders, and
++	 * proxy variables.
++	 */
++	env?: ProviderEnv;
++	/**
++	 * Optional callback for inspecting or replacing provider payloads before sending.
++	 * Return undefined to keep the payload unchanged.
++	 */
++	onPayload?: (payload: unknown, model: TModel) => unknown | undefined | Promise<unknown | undefined>;
++	/**
++	 * Optional callback invoked after an HTTP response is received.
++	 */
++	onResponse?: (response: ProviderResponse, model: TModel) => void | Promise<void>;
++	/**
++	 * Optional custom HTTP headers to include in API requests.
++	 * Merged with provider defaults; caller values override default headers.
++	 * On AWS Bedrock these are injected via a Smithy `build`-step middleware so
++	 * they are covered by SigV4 signing; reserved headers (`x-amz-*`,
++	 * `authorization`, `host`) are silently ignored to preserve SigV4 / bearer auth.
++	 * A null value suppresses a provider/API default header with the same name.
++	 */
++	headers?: ProviderHeaders;
++	/**
++	 * HTTP request timeout in milliseconds for providers/SDKs that support it.
++	 * For example, OpenAI and Anthropic SDK clients default to 10 minutes.
++	 */
++	timeoutMs?: number;
++	/**
++	 * Maximum retry attempts for providers/SDKs that support client-side retries.
++	 * For example, OpenAI and Anthropic SDK clients default to 2.
++	 */
++	maxRetries?: number;
++	/**
++	 * Maximum delay in milliseconds to wait for a retry when the server requests a long wait.
++	 * If the server's requested delay exceeds this value, the request fails immediately
++	 * with an error containing the requested delay, allowing higher-level retry logic
++	 * to handle it with user visibility.
++	 * Default: 60000 (60 seconds). Set to 0 to disable the cap.
++	 */
++	maxRetryDelayMs?: number;
++}
++
++export interface StreamOptions extends ProviderRequestOptions<Model<Api>> {
++	/**
++	 * Optional callback invoked after an HTTP response is received and before
++	 * its body stream is consumed.
++	 */
++	onResponse?: (response: ProviderResponse, model: Model<Api>) => void | Promise<void>;
++	temperature?: number;
++	/**
++	 * Arbitrary sampling parameters merged into the request body as-is, after the named request
++	 * fields, so keys here override them. Lets custom OpenAI-compatible servers (llama.cpp, vLLM,
++	 * SGLang, ...) receive parameters pi does not model, e.g. `top_p`, `top_k`, `min_p`,
++	 * `repetition_penalty`. Merged over `Model.samplingParams` per key. Only applied by
++	 * OpenAI-compatible adapters (completions, responses, Azure responses); other APIs ignore it.
++	 */
++	samplingParams?: Record<string, unknown>;
++	maxTokens?: number;
++	/**
++	 * Preferred transport for providers that support multiple transports.
++	 * Providers that do not support this option ignore it.
++	 */
++	transport?: Transport;
++	/**
++	 * Prompt cache retention preference. Providers map this to their supported values.
++	 * Default: "short".
++	 */
++	cacheRetention?: CacheRetention;
++	/**
++	 * Optional session identifier for providers that support session-based caching.
++	 * Providers can use this to enable prompt caching, request routing, or other
++	 * session-aware features. Ignored by providers that don't support it.
++	 */
++	sessionId?: string;
++	/**
++	 * WebSocket connect timeout in milliseconds for providers that support
++	 * WebSocket transports. This covers the connection/open handshake only;
++	 * stream idleness after connection uses timeoutMs.
++	 */
++	websocketConnectTimeoutMs?: number;
++	/**
++	 * Optional metadata to include in API requests.
++	 * Providers extract the fields they understand and ignore the rest.
++	 * For example, Anthropic uses `user_id` for abuse tracking and rate limiting.
++	 */
++	metadata?: Record<string, unknown>;
++}
++
++export type ProviderStreamOptions = StreamOptions & Record<string, unknown>;
++
++export interface DeferredFetchOptions extends ProviderRequestOptions<Model<Api>> {
++	/**
++	 * Maximum provider long-poll duration in milliseconds.
++	 * Defaults to 0, which performs one status check.
++	 */
++	wait?: number;
++}
++
++/** Request options for best-effort deferred-response cancellation. */
++export type DeferredCancelOptions = ProviderRequestOptions<Model<Api>>;
++
++/**
++ * Maps known APIs to their full provider-specific stream option types.
++ * Type-only imports from API implementation modules are erased at emit, so
++ * this is tree-shake safe.
++ */
++export interface ApiOptionsMap {
++	"anthropic-messages": AnthropicOptions;
++	"openai-completions": OpenAICompletionsOptions;
++	"openai-responses": OpenAIResponsesOptions;
++	"openai-codex-responses": OpenAICodexResponsesOptions;
++	"azure-openai-responses": AzureOpenAIResponsesOptions;
++	"google-generative-ai": GoogleOptions;
++	"google-vertex": GoogleVertexOptions;
++	"mistral-conversations": MistralOptions;
++	"bedrock-converse-stream": BedrockOptions;
++	"pi-messages": PiMessagesOptions;
++}
++
++/**
++ * Full stream options for an API. Known APIs resolve to their concrete option
++ * type; custom API strings fall back to the generic shape.
++ */
++export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMap
++	? ApiOptionsMap[TApi]
++	: StreamOptions & Record<string, unknown>;
++
++/**
++ * The uniform stream contract of an API implementation module: every module
++ * under `src/api/` exports `stream` and `streamSimple`; capable modules may also
++ * export deferred-response methods. Lazy wrappers (`lazyApi()`) and provider
++ * factories pass these around as values. This is the untyped dispatch shape;
++ * per-API option typing lives on the implementation modules themselves and on
++ * `Provider.stream()` via `ApiStreamOptions`.
++ */
++export interface ProviderStreams {
++	stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
++	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
++	fetchDeferred?(
++		model: Model<Api>,
++		handle: DeferredHandle,
++		options?: DeferredFetchOptions,
++	): AssistantMessageEventStream;
++	cancelDeferred?(model: Model<Api>, handle: DeferredHandle, options?: DeferredCancelOptions): Promise<void>;
++}
++
++/**
++ * The uniform contract of an image-generation API implementation module:
++ * every image API module under `src/api/` exports exactly `generateImages`,
++ * so the module itself satisfies this interface. Lazy wrappers and image
++ * provider factories pass these around as values.
++ */
++export interface ProviderImages {
++	generateImages(
++		model: ImagesModel<ImagesApi>,
++		context: ImagesContext,
++		options?: ImagesOptions,
++	): Promise<AssistantImages>;
++}
++
++export interface ImagesOptions extends ProviderRequestOptions<ImagesModel<ImagesApi>> {
++	/**
++	 * Optional metadata to include in API requests.
++	 * Providers extract the fields they understand and ignore the rest.
++	 */
++	metadata?: Record<string, unknown>;
++}
++
++export type ProviderImagesOptions = ImagesOptions & Record<string, unknown>;
++
++export interface AnthropicAllowedFallbackModel {
++	provider: ProviderId;
++	model: string;
++	cost: ModelCost;
++}
++
++// Unified options with reasoning passed to streamSimple() and completeSimple()
++export interface SimpleStreamOptions extends StreamOptions {
++	/** Provider-neutral tool selection for simple requests. When omitted, adapters use provider-specific behavior. */
++	toolChoice?: ToolChoice;
++	reasoning?: ThinkingLevel;
++	/** Ask a capable provider to return a durable handle and continue the request asynchronously. */
++	deferred?: boolean | { window?: "15m" | "1h" | "24h" };
++	/** Custom token budgets for thinking levels (token-based providers only) */
++	thinkingBudgets?: ThinkingBudgets;
++}
++
++// Generic StreamFunction with typed options.
++//
++// Contract:
++// - Must return an AssistantMessageEventStream.
++// - Direct streamSimple() calls may throw synchronously when request auth is
++//   missing. Once a stream is returned, request/model/runtime failures should
++//   be encoded in that stream.
++// - Error termination must produce an AssistantMessage with stopReason
++//   "error" or "aborted" and errorMessage, emitted via the stream protocol.
++export type StreamFunction<TApi extends Api = Api, TOptions extends StreamOptions = StreamOptions> = (
++	model: Model<TApi>,
++	context: Context,
++	options?: TOptions,
++) => AssistantMessageEventStream;
++
++export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> = (
++	model: ImagesModel<TApi>,
++	context: ImagesContext,
++	options?: TOptions,
++) => Promise<AssistantImages>;
++
++export interface TextSignatureV1 {
++	v: 1;
++	id: string;
++	phase?: "commentary" | "final_answer";
++}
++
++export interface TextContent {
++	type: "text";
++	text: string;
++	textSignature?: string; // e.g., for OpenAI responses, message metadata (legacy id string or TextSignatureV1 JSON)
++}
++
++export interface ThinkingContent {
++	type: "thinking";
++	thinking: string;
++	thinkingSignature?: string; // Provider-specific opaque or serialized reasoning replay data
++	/** When true, the thinking content was redacted by safety filters. The opaque
++	 *  encrypted payload is stored in `thinkingSignature` so it can be passed back
++	 *  to the API for multi-turn continuity. */
++	redacted?: boolean;
++}
++
++export interface ImageContent {
++	type: "image";
++	data: string; // base64 encoded image data
++	mimeType: string; // e.g., "image/jpeg", "image/png"
++}
++
++export interface ToolCall {
++	type: "toolCall";
++	id: string;
++	name: string;
++	arguments: Record<string, any>;
++	thoughtSignature?: string; // Google-specific: opaque signature for reusing thought context
++	/** OpenAI Responses namespace for calls to dynamically loaded or namespaced tools. */
++	namespace?: string;
++}
++
++export interface Usage {
++	input: number;
++	output: number;
++	cacheRead: number;
++	cacheWrite: number;
++	/** Subset of `cacheWrite` written with 1h retention. Only Anthropic reports this split. */
++	cacheWrite1h?: number;
++	/**
++	 * Reasoning/thinking tokens, when the provider reports them. This is a subset of
++	 * `output`: `output` already includes these tokens. Set to a number (possibly 0) by
++	 * providers that expose a reasoning breakdown; left undefined by providers that don't.
++	 */
++	reasoning?: number;
++	totalTokens: number;
++	cost: {
++		input: number;
++		output: number;
++		cacheRead: number;
++		cacheWrite: number;
++		total: number;
++	};
++}
++
++export type StopReason = "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
++
++export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
++
++export interface DeferredHandle {
++	provider: string;
++	modelId: string;
++	api: string;
++	/** Provider token, such as a response id or batch id plus row id. */
++	id: string;
++	expiresAt?: number;
++	pollAfterMs?: number;
++	/** Provider conversion data required to reconstruct the final assistant message. */
++	data?: JsonValue;
++}
++
++export interface UserMessage {
++	role: "user";
++	content: string | (TextContent | ImageContent)[];
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export interface AssistantMessage {
++	role: "assistant";
++	content: (TextContent | ThinkingContent | ToolCall)[];
++	api: Api;
++	provider: ProviderId;
++	model: string;
++	responseModel?: string; // Concrete `chunk.model` when different from the requested `model` (e.g. OpenRouter `auto` -> `anthropic/...`)
++	responseId?: string; // Provider-specific response/message identifier when the upstream API exposes one
++	/** Exact provider-native effort level used for this response. Absent for legacy or unmanaged responses. */
++	providerThinkingLevel?: string;
++	diagnostics?: AssistantMessageDiagnostic[]; // Redacted provider/runtime diagnostics for failures and recoveries.
++	usage: Usage;
++	stopReason: StopReason;
++	deferred?: DeferredHandle;
++	errorMessage?: string;
++	rawStopReason?: string;
++	/**
++	 * Provider indication of whether the model explicitly ended its turn.
++	 * Preserved for debugging and does not currently affect agent control flow.
++	 */
++	endTurn?: boolean;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export interface ToolResultMessage<TDetails = any> {
++	role: "toolResult";
++	toolCallId: string;
++	toolName: string;
++	content: (TextContent | ImageContent)[]; // Supports text and images
++	details?: TDetails;
++	/** Usage from the tool execution itself, if available. Not part of main LLM context accounting. */
++	usage?: Usage;
++	/**
++	 * Names from `Context.tools` that became available after this result.
++	 * Providers with native deferred tool loading use this as the load point;
++	 * other providers ignore it and use `Context.tools` normally.
++	 */
++	addedToolNames?: string[];
++	isError: boolean;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++export type Message = UserMessage | AssistantMessage | ToolResultMessage;
++
++export type ImagesInputContent = TextContent | ImageContent;
++export type ImagesOutputContent = TextContent | ImageContent;
++
++export interface ImagesContext {
++	input: ImagesInputContent[];
++}
++
++export type ImagesStopReason = "stop" | "error" | "aborted";
++
++export interface AssistantImages {
++	api: ImagesApi;
++	provider: ImagesProviderId;
++	model: string;
++	output: ImagesOutputContent[];
++	responseId?: string;
++	usage?: Usage;
++	stopReason: ImagesStopReason;
++	errorMessage?: string;
++	timestamp: number; // Unix timestamp in milliseconds
++}
++
++import type { TSchema } from "typebox";
++
++/** OpenAI grammar variants for constrained sampling. */
++export type GrammarFormat = "openai_lark" | "openai_regex";
++
++export type GrammarVariants = Partial<Record<GrammarFormat, string>>;
++
++/**
++ * Optional provider-side constrained sampling configs for a tool.
++ *
++ * The `json_schema` value roughly maps to the concept of `strict` in APIs which is
++ * implemented as json-schema constrained sampling by APIs. Grammar variants let
++ * callers provide provider-specific encodings of the same intended language.
++ */
++export type ConstrainedSamplingConfig =
++	| {
++			type: "json_schema";
++			strict: "prefer" | "require";
++	  }
++	| {
++			type: "grammar";
++			variants: GrammarVariants;
++	  };
++
++export interface Tool<TParameters extends TSchema = TSchema> {
++	name: string;
++	description: string;
++	parameters: TParameters;
++	constrainedSampling?: false | ConstrainedSamplingConfig;
++}
++
++export interface Context {
++	systemPrompt?: string;
++	messages: Message[];
++	tools?: Tool[];
++}
++
++/**
++ * Event protocol for AssistantMessageEventStream.
++ *
++ * Successful streams emit `start` before partial updates and terminate with
++ * `done`. A stream may terminate directly with `error` when request setup fails
++ * before generation starts; after `start`, failures also terminate with `error`.
++ * Direct `streamSimple()` calls throw synchronously when request auth is missing.
++ * Updates and `done` must never appear before `start`.
++ *
++ * `partial` is the shared live response-so-far helper, not an event-time
++ * snapshot. Text and thinking blocks are empty when their `*_start` event is
++ * emitted and grow only through their corresponding `*_delta` events until the
++ * authoritative `*_end`. Redacted thinking may be complete at start and emit no
++ * deltas. Tool-call arguments at `toolcall_start` are provider-specific;
++ * `toolcall_delta` carries subsequent JSON updates.
++ */
++export type AssistantMessageEvent =
++	| { type: "start"; partial: AssistantMessage }
++	| { type: "text_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "text_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "text_end"; contentIndex: number; content: string; partial: AssistantMessage }
++	| { type: "thinking_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "thinking_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "thinking_end"; contentIndex: number; content: string; partial: AssistantMessage }
++	| { type: "toolcall_start"; contentIndex: number; partial: AssistantMessage }
++	| { type: "toolcall_delta"; contentIndex: number; delta: string; partial: AssistantMessage }
++	| { type: "toolcall_end"; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }
++	| {
++			type: "done";
++			reason: Extract<StopReason, "stop" | "length" | "toolUse" | "deferred">;
++			message: AssistantMessage;
++	  }
++	| { type: "error"; reason: Extract<StopReason, "aborted" | "error">; error: AssistantMessage };
++
++/**
++ * Compatibility settings for OpenAI-compatible completions APIs.
++ * Use this to override URL-based auto-detection for custom providers.
++ */
++export interface OpenAICompletionsCompat {
++	/** Whether the provider supports the `store` field. Default: auto-detected from URL. */
++	supportsStore?: boolean;
++	/** Whether the provider supports the `developer` role (vs `system`). Default: auto-detected from URL. */
++	supportsDeveloperRole?: boolean;
++	/** Whether the provider supports `reasoning_effort`. Default: auto-detected from URL. */
++	supportsReasoningEffort?: boolean;
++	/** Whether the provider supports `stream_options: { include_usage: true }` for token usage in streaming responses. Default: true. */
++	supportsUsageInStreaming?: boolean;
++	/** Whether streamed responses include `finish_reason`. When false, pi infers `stop` or `toolUse` when the stream ends. Default: true. */
++	supportsFinishReason?: boolean;
++	/** Which field to use for max tokens. Default: auto-detected from URL. */
++	maxTokensField?: "max_completion_tokens" | "max_tokens";
++	/** Whether tool results require the `name` field. Default: auto-detected from URL. */
++	requiresToolResultName?: boolean;
++	/** Whether a user message after tool results requires an assistant message in between. Default: auto-detected from URL. */
++	requiresAssistantAfterToolResult?: boolean;
++	/** Whether thinking blocks must be converted to text blocks with <thinking> delimiters. Default: auto-detected from URL. */
++	requiresThinkingAsText?: boolean;
++	/** Whether all replayed assistant messages must include an empty reasoning_content field when reasoning is enabled. Default: auto-detected from URL. */
++	requiresReasoningContentOnAssistantMessages?: boolean;
++	/** Format for reasoning/thinking parameter. "openai" uses reasoning_effort, "openrouter" uses reasoning: { effort }, "deepseek" uses thinking: { type } plus reasoning_effort when supported, "together" uses reasoning: { enabled } plus reasoning_effort when supported, "baseten" uses configurable chat_template_args plus reasoning_effort when supported, "zai" uses thinking: { type }, "qwen" uses top-level enable_thinking: boolean, "qwen-chat-template" uses chat_template_kwargs.enable_thinking and preserve_thinking, "chat-template" uses configurable chat_template_kwargs, "string-thinking" uses top-level thinking: string, and "ant-ling" uses reasoning: { effort } only when the mapped effort is non-null. Default: "openai". */
++	thinkingFormat?:
++		| "openai"
++		| "openrouter"
++		| "deepseek"
++		| "together"
++		| "baseten"
++		| "zai"
++		| "qwen"
++		| "chat-template"
++		| "qwen-chat-template"
++		| "string-thinking"
++		| "ant-ling";
++	/** Kwargs to send as `chat_template_kwargs` when `thinkingFormat` is `chat-template`. Use `{ "$var": "thinking.enabled" }`, `{ "$var": "thinking.effort" }`, or `{ "$var": "thinking.budget" }` for pi-controlled thinking values. */
++	chatTemplateKwargs?: Record<string, ChatTemplateKwargValue>;
++	/** Arguments to send as `chat_template_args` when `thinkingFormat` is `baseten`. Use `{ "$var": "thinking.enabled" }`, `{ "$var": "thinking.effort" }`, or `{ "$var": "thinking.budget" }` for pi-controlled thinking values. */
++	chatTemplateArgs?: Record<string, ChatTemplateKwargValue>;
++	/** OpenRouter-compatible routing preferences sent as the `provider` request field. */
++	openRouterRouting?: OpenRouterRouting;
++	/** Vercel AI Gateway routing preferences. Only used when baseUrl points to Vercel AI Gateway. */
++	vercelGatewayRouting?: VercelGatewayRouting;
++	/** Whether z.ai supports top-level `tool_stream: true` for streaming tool call deltas. Default: false. */
++	zaiToolStream?: boolean;
++	/**
++	 * Top-level request field used to cap reasoning tokens from `thinkingBudgets`.
++	 * Reasoning and the answer share `max_tokens` on these endpoints, so without a budget a
++	 * reasoning-heavy turn can consume the whole response and emit no answer.
++	 * `"thinking_token_budget"` is vLLM, `"thinking_budget"` is Qwen/DashScope/SGLang,
++	 * `"thinking_budget_tokens"` is llama.cpp. Off by default; not set on the generated catalog.
++	 */
++	thinkingTokenBudgetField?: ThinkingTokenBudgetField;
++	/** Alias for `thinkingTokenBudgetField: "thinking_token_budget"` (vLLM). Prefer `thinkingTokenBudgetField`. Default: false. */
++	supportsThinkingTokenBudget?: boolean;
++	/** Whether the provider supports OpenAI custom tools with Lark/regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. Default: false; the generated model catalog enables it for capable models. */
++	supportsOpenAIGrammarTools?: boolean;
++	/** Whether the provider supports the `strict` field in tool definitions. Default: true. */
++	supportsStrictMode?: boolean;
++	/** Cache control convention for prompt caching. "anthropic" applies Anthropic-style `cache_control` markers to the system prompt, last tool definition, and last user, assistant, or tool-result text content. */
++	cacheControlFormat?: "anthropic";
++	/** Whether to send session-affinity data from `options.sessionId`. Default: true for OpenRouter endpoints, false otherwise. */
++	sendSessionAffinityHeaders?: boolean;
++	/** Provider-specific deferred tool serialization mode. */
++	deferredToolsMode?: "kimi";
++	/** Session-affinity header format: `openai` sends `session_id`, `x-client-request-id`, and `x-session-affinity`; `openai-nosession` sends `x-client-request-id` and `x-session-affinity`; `openrouter` sends `x-session-id`. Does not affect the `prompt_cache_key` body param, which is governed by cache retention. Default: auto-detected. */
++	sessionAffinityFormat?: SessionAffinityFormat;
++	/** Whether the provider supports long prompt cache retention (`prompt_cache_retention: "24h"` or Anthropic-style `cache_control.ttl: "1h"`, depending on format). Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/**
++	 * vLLM scheduler priority sent as the top-level `priority` request field (lower values are
++	 * handled earlier; server default 0). Only meaningful when vLLM runs with
++	 * `--scheduling-policy priority`; useful for keeping background/batch work from stalling
++	 * interactive sessions. Off by default; not set on the generated catalog.
++	 */
++	vllmPriority?: number;
++}
++
++/** Compatibility settings for OpenAI Responses APIs. */
++export interface OpenAIResponsesCompat {
++	/** Whether the provider supports the `developer` role (vs `system`). Default: true. */
++	supportsDeveloperRole?: boolean;
++	/** Session-affinity header format: `openai` sends `session_id` and `x-client-request-id`; `openai-nosession` sends `x-client-request-id`; `openrouter` sends `x-session-id`. Does not affect the `prompt_cache_key` body param, which is governed by cache retention. Default: auto-detected. */
++	sessionAffinityFormat?: SessionAffinityFormat;
++	/** Whether the provider supports long prompt cache retention. This uses `prompt_cache_options.ttl: "30m"` on GPT-5.6+ and `prompt_cache_retention: "24h"` on earlier models. Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/** Whether the provider supports strict JSON-schema function tools. Defaults are API-specific; generated OpenAI models enable it explicitly. */
++	supportsStrictMode?: boolean;
++	/** Whether to emit OpenAI custom tools with Lark/regex grammar formats. When false, grammar-constrained tools fall back to normal function tools. Default: false; the generated model catalog enables it for capable models. */
++	supportsOpenAIGrammarTools?: boolean;
++	/** Whether the model supports message-anchored `additional_tools` input items. Default: false. */
++	supportsAdditionalTools?: boolean;
++	/** Whether the model supports client-executed tool search for deferred tools. Default: false. */
++	supportsToolSearch?: boolean;
++	/** Whether the model accepts `prompt_cache_options` (OpenAI GPT-5.6+ prompt caching). Older OpenAI models reject the parameter. Default: false. */
++	supportsExplicitPromptCacheMode?: boolean;
++	/** Whether the provider accepts the `max_output_tokens` parameter. Some Codex-protocol gateways reject it. Default: true. */
++	supportsMaxOutputTokens?: boolean;
++}
++
++/** Compatibility settings for Anthropic Messages-compatible APIs. */
++export interface AnthropicMessagesCompat {
++	/**
++	 * Whether the provider accepts per-tool `eager_input_streaming`.
++	 * When false, the Anthropic provider omits `tools[].eager_input_streaming`
++	 * and sends the legacy `fine-grained-tool-streaming-2025-05-14` beta header
++	 * for tool-enabled requests.
++	 * Default: true.
++	 */
++	supportsEagerToolInputStreaming?: boolean;
++	/** Whether the provider supports Anthropic long cache retention (`cache_control.ttl: "1h"`). Default: true. */
++	supportsLongCacheRetention?: boolean;
++	/**
++	 * Whether to send the `x-session-affinity` header from `options.sessionId`
++	 * when caching is enabled. Required for providers like Fireworks that use
++	 * session affinity for prompt cache routing (requests to the same replica
++	 * maximize cache hits).
++	 * Default: false.
++	 */
++	sendSessionAffinityHeaders?: boolean;
++	/** Session-affinity format. `"openrouter"` sends `x-session-id`; when unset, sends `x-session-affinity`. */
++	sessionAffinityFormat?: "openrouter";
++	/**
++	 * Whether the provider supports Anthropic-style `cache_control` markers on
++	 * tool definitions. When false, `cache_control` is omitted from tool params.
++	 * Some Anthropic-compatible providers (e.g., Fireworks) do not support this
++	 * field on tools and may reject or ignore it.
++	 * Default: true.
++	 */
++	supportsCacheControlOnTools?: boolean;
++	/**
++	 * Whether the model accepts the Anthropic `temperature` request field.
++	 * Claude Opus 4.7+ rejects non-default temperature values.
++	 * Default: true.
++	 */
++	supportsTemperature?: boolean;
++	/**
++	 * Whether to force adaptive thinking (`thinking.type: "adaptive"` plus
++	 * `output_config.effort`) regardless of the model id. Built-in models that
++	 * require adaptive thinking set this in generated metadata. Custom
++	 * Anthropic-compatible providers can set this to `true` for any model whose
++	 * upstream requires the adaptive format. Set to `false` to
++	 * opt out on overridden built-in models.
++	 * Default: false.
++	 */
++	forceAdaptiveThinking?: boolean;
++	/** Whether to replay empty thinking signatures as `signature: ""` instead of converting thinking to text. Default: false. */
++	allowEmptySignature?: boolean;
++	/** Whether the provider supports Anthropic strict tool schemas. Default: false; generated Anthropic models enable it explicitly. */
++	supportsStrictTools?: boolean;
++	/** Whether the exact model transport supports effort-only system messages and thinking binding controls. Default: false. */
++	supportsMidConvoEffort?: boolean;
++	/**
++	 * Models Anthropic accepts in `fallbacks` for server-side refusal fallback,
++	 * with local pricing metadata for returned fallback responses. When absent or
++	 * empty, callers must omit `fallbacks`; Anthropic rejects the field for models
++	 * with no permitted fallback targets.
++	 */
++	allowedFallbackModels?: AnthropicAllowedFallbackModel[];
++	/**
++	 * Whether the provider supports deferred tools loaded by `tool_reference`
++	 * blocks in tool results. Default: true for first-party Anthropic models
++	 * except Haiku and models older than Claude 4.5; false for other providers.
++	 */
++	supportsToolReferences?: boolean;
++}
++
++/** Compatibility settings for Amazon Bedrock models. */
++export interface BedrockCompat {
++	/** Whether the model supports Bedrock strict tool schemas. Default: false. */
++	supportsStrictMode?: boolean;
++}
++
++/**
++ * OpenRouter provider routing preferences.
++ * Controls which upstream providers OpenRouter routes requests to.
++ * Sent as the `provider` field in the OpenRouter API request body.
++ * @see https://openrouter.ai/docs/guides/routing/provider-selection
++ */
++export interface OpenRouterRouting {
++	/** Whether to allow backup providers to serve requests. Default: true. */
++	allow_fallbacks?: boolean;
++	/** Whether to filter providers to only those that support all parameters in the request. Default: false. */
++	require_parameters?: boolean;
++	/** Data collection setting. "allow" (default): allow providers that may store/train on data. "deny": only use providers that don't collect user data. */
++	data_collection?: "deny" | "allow";
++	/** Whether to restrict routing to only ZDR (Zero Data Retention) endpoints. */
++	zdr?: boolean;
++	/** Whether to restrict routing to only models that allow text distillation. */
++	enforce_distillable_text?: boolean;
++	/** An ordered list of provider names/slugs to try in sequence, falling back to the next if unavailable. */
++	order?: string[];
++	/** List of provider names/slugs to exclusively allow for this request. */
++	only?: string[];
++	/** List of provider names/slugs to skip for this request. */
++	ignore?: string[];
++	/** A list of quantization levels to filter providers by (e.g., ["fp16", "bf16", "fp8", "fp6", "int8", "int4", "fp4", "fp32"]). */
++	quantizations?: string[];
++	/** Sorting strategy. Can be a string (e.g., "price", "throughput", "latency") or an object with `by` and `partition`. */
++	sort?:
++		| string
++		| {
++				/** The sorting metric: "price", "throughput", "latency". */
++				by?: string;
++				/** Partitioning strategy: "model" (default) or "none". */
++				partition?: string | null;
++		  };
++	/** Maximum price per million tokens (USD). */
++	max_price?: {
++		/** Price per million prompt tokens. */
++		prompt?: number | string;
++		/** Price per million completion tokens. */
++		completion?: number | string;
++		/** Price per image. */
++		image?: number | string;
++		/** Price per audio unit. */
++		audio?: number | string;
++		/** Price per request. */
++		request?: number | string;
++	};
++	/** Preferred minimum throughput (tokens/second). Can be a number (applies to p50) or an object with percentile-specific cutoffs. */
++	preferred_min_throughput?:
++		| number
++		| {
++				/** Minimum tokens/second at the 50th percentile. */
++				p50?: number;
++				/** Minimum tokens/second at the 75th percentile. */
++				p75?: number;
++				/** Minimum tokens/second at the 90th percentile. */
++				p90?: number;
++				/** Minimum tokens/second at the 99th percentile. */
++				p99?: number;
++		  };
++	/** Preferred maximum latency (seconds). Can be a number (applies to p50) or an object with percentile-specific cutoffs. */
++	preferred_max_latency?:
++		| number
++		| {
++				/** Maximum latency in seconds at the 50th percentile. */
++				p50?: number;
++				/** Maximum latency in seconds at the 75th percentile. */
++				p75?: number;
++				/** Maximum latency in seconds at the 90th percentile. */
++				p90?: number;
++				/** Maximum latency in seconds at the 99th percentile. */
++				p99?: number;
++		  };
++}
++
++/**
++ * Vercel AI Gateway routing preferences.
++ * Controls which upstream providers the gateway routes requests to.
++ * @see https://vercel.com/docs/ai-gateway/models-and-providers/provider-options
++ */
++export interface VercelGatewayRouting {
++	/** List of provider slugs to exclusively use for this request (e.g., ["bedrock", "anthropic"]). */
++	only?: string[];
++	/** List of provider slugs to try in order (e.g., ["anthropic", "openai"]). */
++	order?: string[];
++}
++
++export interface ModelCostRates {
++	input: number; // $/million tokens
++	output: number; // $/million tokens
++	cacheRead: number; // $/million tokens
++	cacheWrite: number; // $/million tokens
++}
++
++export interface ModelCostTier extends ModelCostRates {
++	/** Use this tier for requests whose total input usage exceeds this token count. */
++	inputTokensAbove: number;
++}
++
++export interface ModelCost extends ModelCostRates {
++	/** Request-wide pricing tiers. The highest matching input threshold applies to the full request. */
++	tiers?: ModelCostTier[];
++}
++
++// Model interface for the unified model system
++export interface Model<TApi extends Api> {
++	id: string;
++	name: string;
++	api: TApi;
++	provider: ProviderId;
++	baseUrl: string;
++	reasoning: boolean;
++	/**
++	 * Maps pi thinking levels to provider/model-specific values.
++	 * Missing keys use provider defaults. null marks a level as unsupported.
++	 */
++	thinkingLevelMap?: ThinkingLevelMap;
++	input: ("text" | "image")[];
++	cost: ModelCost;
++	contextWindow: number;
++	maxTokens: number;
++	/** Default sampling parameters for this model. See {@link StreamOptions.samplingParams}; per-request keys override these. */
++	samplingParams?: Record<string, unknown>;
++	headers?: Record<string, string>;
++	/** Compatibility overrides for OpenAI-compatible APIs. If not set, auto-detected from baseUrl. */
++	compat?: TApi extends "openai-completions"
++		? OpenAICompletionsCompat
++		: TApi extends "openai-responses" | "azure-openai-responses" | "openai-codex-responses"
++			? OpenAIResponsesCompat
++			: TApi extends "anthropic-messages"
++				? AnthropicMessagesCompat
++				: TApi extends "bedrock-converse-stream"
++					? BedrockCompat
++					: never;
++}
++
++export interface ImagesModel<TApi extends ImagesApi>
++	extends Omit<Model<Api>, "api" | "provider" | "reasoning" | "contextWindow" | "maxTokens" | "compat"> {
++	api: TApi;
++	provider: ImagesProviderId;
++	output: ("text" | "image")[];
++}
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py b/Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py
+@@ -0,0 +1,24 @@
++from pathlib import Path
++import hashlib,json,re,runpy,sys
++ROOT=Path.cwd();EV=ROOT/'Docs/quality/stage1/ZS1-015/worker-types319';MAIN=Path('/Users/wangweiyang/GitHub/zenpi')
++sha=lambda b:hashlib.sha256(b).hexdigest()
++m=json.loads((EV/'input-manifest.json').read_text());b=Path(m['source_absolute_path']).read_bytes()
++assert sha(b)==m['sha256']==m['frozen_record']['sha256'] and len(b)==m['bytes']==37411
++assert (EV/'types.ts').read_bytes()==b and len(b.splitlines())==881
++ranges=[];joined=b''
++for row in m['ordered_complete_read_chunks']:
++ part=(ROOT/row['artifact']).read_bytes();assert part==b[row['byte_start']:row['byte_end']] and sha(part)==row['sha256'];joined+=part;ranges.append([row['byte_start'],row['byte_end']])
++assert joined==b
++inventory=[{'line':i,'kind':x[1],'name':x[2]} for i,line in enumerate(b.decode().splitlines(),1) if (x:=re.match(r'export (type|interface) (\w+)',line))]
++assert inventory==json.loads((EV/'export-inventory.json').read_text()) and len(inventory)==72
++sys.path.insert(0,str(MAIN/'tools'));gate=runpy.run_path(str(MAIN/'tools/validate_stage1_blueprint.py'))
++bp=gate['parse']((MAIN/'Docs/stage_1_v3_pi_mono_blueprint.md').read_text());file=bp.files['ZS1-015'];gate['check_ranges'](ranges,len(b))
++assert file.path==m['source_path'] and file.sha256==m['sha256'] and bp.requirement==m['requirement_digest']
++report=ROOT/file.artifact;r=report.read_bytes();record={'path':file.artifact,'bytes':len(r),'sha256':sha(r)}
++gate['artifact'](ROOT,record);assert file.path in r.decode() and file.sha256 in r.decode()
++refs=json.loads((EV/'target-references.json').read_text());count=0
++for ref in refs:
++ current=Path(ref['path']).read_bytes();assert len(current)==ref['bytes'] and sha(current)==ref['sha256'],ref['path']
++ for part in ref['excerpts']:
++  data=(ROOT/part['artifact']).read_bytes();assert data==current[part['byte_start']:part['byte_end']] and sha(data)==part['sha256'];count+=1
++print(json.dumps({'ok':True,'item':'ZS1-015','authority':'3.1.19','source_bytes':len(b),'source_lines':881,'source_sha256':sha(b),'complete_read_ranges':ranges,'named_declarations':len(inventory),'target_files':len(refs),'target_excerpts':count,'report':record,'checks':'source frozen identity; complete ordered bytes; declaration inventory; G-FILE check_ranges/artifact/source identity; current target excerpt hashes','not_claimed':['TypeScript typecheck','runtime behavior','G-STAGE master acceptance','directory acceptance']},indent=2))

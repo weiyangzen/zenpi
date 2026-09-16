@@ -1,0 +1,16 @@
+{
+  "item": "058",
+  "directory": "packages/agent/test",
+  "dependencies": [
+    "014"
+  ],
+  "in_scope_files": {
+    "agent-loop.test.ts": "014"
+  },
+  "in_scope_dirs": {},
+  "reuse": [
+    "source014-ready"
+  ],
+  "tests": 0,
+  "mode": "collection"
+}

@@ -1,0 +1,9 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/partial-first/user/config.toml b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/user/config.toml
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/user/config.toml
+@@ -0,0 +1,4 @@
++backend='anthropic'
++base_url='http://127.0.0.1:55069'
++model='claude-sonnet-4-6'
++model_reasoning_effort='high'

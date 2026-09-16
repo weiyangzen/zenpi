@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integration/probe_hosts.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/zenpi",
+    "--out",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/diff-identity-integration/hosts-before"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T13:52:54.938974+00:00",
+  "elapsed_seconds": 4.749717208,
+  "exit_code": 1,
+  "log_sha256": "f8a88a135e672693447127ad947f3c4e12e8ec3dab8f9a1a94e57a758ae78caa"
+}

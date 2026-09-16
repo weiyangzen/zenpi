@@ -1,0 +1,363 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/build-context)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.56s
+     Running unittests src/lib.rs (/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/cargo-target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 5 tests
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ignored, subprocess helper with parent-owned deadline and fixture cleanup
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=1 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=214 fixture_pids=["20493", "20496"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988639.797862000 pid=20491 helper-entry
+1988639.803498000 pid=20491 host-start
+1988639.894228000 pid=20493 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.894625000 pid=20493 fork-start
+1988639.902851000 pid=20493 fork-return
+1988639.903311000 pid=20496 python-holder-entry
+1988639.903866000 pid=20496 escaped-ready
+1988640.005976000 pid=20491 host-return
+
+inner_elapsed_ms=202 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpLymngL/fixture" bytes=408 truncated=false phases=1988639.797862000 pid=20491 helper-entry
+1988639.803498000 pid=20491 host-start
+1988639.894228000 pid=20493 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.894625000 pid=20493 fork-start
+1988639.902851000 pid=20493 fork-return
+1988639.903311000 pid=20496 python-holder-entry
+1988639.903866000 pid=20496 escaped-ready
+1988640.005976000 pid=20491 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdout stop=panic outer_timeout=false elapsed_ms=222 fixture_pids=["20495", "20498"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Err(Any { .. }) phases=1988639.797861000 pid=20488 helper-entry
+1988639.803915000 pid=20488 host-start
+1988639.894763000 pid=20495 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.895293000 pid=20495 fork-start
+1988639.903288000 pid=20495 fork-return
+1988639.903749000 pid=20498 python-holder-entry
+1988639.904419000 pid=20498 escaped-ready
+1988640.012060000 pid=20488 host-return
+
+inner_elapsed_ms=208 fd_count=6->6 escaped_still_alive=true outcome=Err(Any { .. })
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28938668) panicked at src/extension_runtime.rs:1031:25:
+assertion `left != right` failed: fixture cancellation predicate unwind
+  left: "panic"
+ right: "panic"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpJP8A9L/fixture" bytes=408 truncated=false phases=1988639.797861000 pid=20488 helper-entry
+1988639.803915000 pid=20488 host-start
+1988639.894763000 pid=20495 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.895293000 pid=20495 fork-start
+1988639.903288000 pid=20495 fork-return
+1988639.903749000 pid=20498 python-holder-entry
+1988639.904419000 pid=20498 escaped-ready
+1988640.012060000 pid=20488 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdout stop=revoke outer_timeout=false elapsed_ms=224 fixture_pids=["20494", "20497"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Unsupported("stale extension generation"))) phases=1988639.797825000 pid=20490 helper-entry
+1988639.803224000 pid=20490 host-start
+1988639.894110000 pid=20494 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.894581000 pid=20494 fork-start
+1988639.902803000 pid=20494 fork-return
+1988639.903311000 pid=20497 python-holder-entry
+1988639.903869000 pid=20497 escaped-ready
+1988640.003449000 pid=20490 host-return
+
+inner_elapsed_ms=201 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Unsupported("stale extension generation")))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpZPFOUn/fixture" bytes=408 truncated=false phases=1988639.797825000 pid=20490 helper-entry
+1988639.803224000 pid=20490 host-start
+1988639.894110000 pid=20494 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.894581000 pid=20494 fork-start
+1988639.902803000 pid=20494 fork-return
+1988639.903311000 pid=20497 python-holder-entry
+1988639.903869000 pid=20497 escaped-ready
+1988640.003449000 pid=20490 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=1 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=219 fixture_pids=["20504", "20507"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988640.013899000 pid=20501 helper-entry
+1988640.014994000 pid=20501 host-start
+1988640.118527000 pid=20504 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119032000 pid=20504 fork-start
+1988640.125474000 pid=20504 fork-return
+1988640.126070000 pid=20507 python-holder-entry
+1988640.126693000 pid=20507 escaped-ready
+1988640.221569000 pid=20501 host-return
+
+inner_elapsed_ms=207 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpmajfh4/fixture" bytes=408 truncated=false phases=1988640.013899000 pid=20501 helper-entry
+1988640.014994000 pid=20501 host-start
+1988640.118527000 pid=20504 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119032000 pid=20504 fork-start
+1988640.125474000 pid=20504 fork-return
+1988640.126070000 pid=20507 python-holder-entry
+1988640.126693000 pid=20507 escaped-ready
+1988640.221569000 pid=20501 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdin stop=revoke outer_timeout=false elapsed_ms=215 fixture_pids=["20506", "20509"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Unsupported("stale extension generation"))) phases=1988640.021280000 pid=20503 helper-entry
+1988640.021926000 pid=20503 host-start
+1988640.118517000 pid=20506 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119028000 pid=20506 fork-start
+1988640.125323000 pid=20506 fork-return
+1988640.125863000 pid=20509 python-holder-entry
+1988640.126565000 pid=20509 escaped-ready
+1988640.227079000 pid=20503 host-return
+
+inner_elapsed_ms=205 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Unsupported("stale extension generation")))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpWYwmQy/fixture" bytes=408 truncated=false phases=1988640.021280000 pid=20503 helper-entry
+1988640.021926000 pid=20503 host-start
+1988640.118517000 pid=20506 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119028000 pid=20506 fork-start
+1988640.125323000 pid=20506 fork-return
+1988640.125863000 pid=20509 python-holder-entry
+1988640.126565000 pid=20509 escaped-ready
+1988640.227079000 pid=20503 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_revoke_is_bounded ... ok
+api=2 pipe=stdin stop=panic outer_timeout=false elapsed_ms=219 fixture_pids=["20505", "20508"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Err(Any { .. }) phases=1988640.020811000 pid=20502 helper-entry
+1988640.021832000 pid=20502 host-start
+1988640.118635000 pid=20505 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119025000 pid=20505 fork-start
+1988640.125462000 pid=20505 fork-return
+1988640.126008000 pid=20508 python-holder-entry
+1988640.126542000 pid=20508 escaped-ready
+1988640.228372000 pid=20502 host-return
+
+inner_elapsed_ms=206 fd_count=4->4 escaped_still_alive=true outcome=Err(Any { .. })
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28938714) panicked at src/extension_runtime.rs:1031:25:
+assertion `left != right` failed: fixture cancellation predicate unwind
+  left: "panic"
+ right: "panic"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpSZ7foq/fixture" bytes=408 truncated=false phases=1988640.020811000 pid=20502 helper-entry
+1988640.021832000 pid=20502 host-start
+1988640.118635000 pid=20505 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.119025000 pid=20505 fork-start
+1988640.125462000 pid=20505 fork-return
+1988640.126008000 pid=20508 python-holder-entry
+1988640.126542000 pid=20508 escaped-ready
+1988640.228372000 pid=20502 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_unwind_closes_owned_endpoints ... ok
+api=2 pipe=stdout stop=cancel outer_timeout=false elapsed_ms=213 fixture_pids=["20511", "20512"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988640.234213000 pid=20510 helper-entry
+1988640.235349000 pid=20510 host-start
+1988640.324940000 pid=20511 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.325334000 pid=20511 fork-start
+1988640.327943000 pid=20511 fork-return
+1988640.328430000 pid=20512 python-holder-entry
+1988640.328942000 pid=20512 escaped-ready
+1988640.439191000 pid=20510 host-return
+
+inner_elapsed_ms=204 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpeBJpj8/fixture" bytes=408 truncated=false phases=1988640.234213000 pid=20510 helper-entry
+1988640.235349000 pid=20510 host-start
+1988640.324940000 pid=20511 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.325334000 pid=20511 fork-start
+1988640.327943000 pid=20511 fork-return
+1988640.328430000 pid=20512 python-holder-entry
+1988640.328942000 pid=20512 escaped-ready
+1988640.439191000 pid=20510 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=1 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=812 fixture_pids=["20492", "20499"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988639.797866000 pid=20489 helper-entry
+1988639.803494000 pid=20489 host-start
+1988639.894774000 pid=20492 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.895293000 pid=20492 fork-start
+1988639.903391000 pid=20492 fork-return
+1988639.903798000 pid=20499 python-holder-entry
+1988639.904421000 pid=20499 escaped-ready
+1988640.603989000 pid=20489 host-return
+
+inner_elapsed_ms=800 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.81s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmp08otco/fixture" bytes=408 truncated=false phases=1988639.797866000 pid=20489 helper-entry
+1988639.803494000 pid=20489 host-start
+1988639.894774000 pid=20492 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988639.895293000 pid=20492 fork-start
+1988639.903391000 pid=20492 fork-return
+1988639.903798000 pid=20499 python-holder-entry
+1988639.904421000 pid=20499 escaped-ready
+1988640.603989000 pid=20489 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdin stop=cancel outer_timeout=false elapsed_ms=218 fixture_pids=["20514", "20515"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(Cancelled)) phases=1988640.450703000 pid=20513 helper-entry
+1988640.451908000 pid=20513 host-start
+1988640.553828000 pid=20514 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.554185000 pid=20514 fork-start
+1988640.556969000 pid=20514 fork-return
+1988640.557425000 pid=20515 python-holder-entry
+1988640.557941000 pid=20515 escaped-ready
+1988640.658022000 pid=20513 host-return
+
+inner_elapsed_ms=206 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(Cancelled))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.21s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpRzCNtf/fixture" bytes=408 truncated=false phases=1988640.450703000 pid=20513 helper-entry
+1988640.451908000 pid=20513 host-start
+1988640.553828000 pid=20514 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.554185000 pid=20514 fork-start
+1988640.556969000 pid=20514 fork-return
+1988640.557425000 pid=20515 python-holder-entry
+1988640.557941000 pid=20515 escaped-ready
+1988640.658022000 pid=20513 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_cancel_is_bounded ... ok
+api=1 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=827 fixture_pids=["20517", "20518"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988640.610154000 pid=20516 helper-entry
+1988640.610883000 pid=20516 host-start
+1988640.700341000 pid=20517 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.700738000 pid=20517 fork-start
+1988640.703436000 pid=20517 fork-return
+1988640.703860000 pid=20518 python-holder-entry
+1988640.704377000 pid=20518 escaped-ready
+1988641.430901000 pid=20516 host-return
+
+inner_elapsed_ms=821 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.82s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpu5HzPX/fixture" bytes=408 truncated=false phases=1988640.610154000 pid=20516 helper-entry
+1988640.610883000 pid=20516 host-start
+1988640.700341000 pid=20517 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988640.700738000 pid=20517 fork-start
+1988640.703436000 pid=20517 fork-return
+1988640.703860000 pid=20518 python-holder-entry
+1988640.704377000 pid=20518 escaped-ready
+1988641.430901000 pid=20516 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=817 fixture_pids=["20521", "20522"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988641.443160000 pid=20520 helper-entry
+1988641.444722000 pid=20520 host-start
+1988641.542953000 pid=20521 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988641.543302000 pid=20521 fork-start
+1988641.546144000 pid=20521 fork-return
+1988641.546594000 pid=20522 python-holder-entry
+1988641.547139000 pid=20522 escaped-ready
+1988642.246916000 pid=20520 host-return
+
+inner_elapsed_ms=803 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.81s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpm8kwp5/fixture" bytes=408 truncated=false phases=1988641.443160000 pid=20520 helper-entry
+1988641.444722000 pid=20520 host-start
+1988641.542953000 pid=20521 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988641.543302000 pid=20521 fork-start
+1988641.546144000 pid=20521 fork-return
+1988641.546594000 pid=20522 python-holder-entry
+1988641.547139000 pid=20522 escaped-ready
+1988642.246916000 pid=20520 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=895 source_sha256=5d9cb56fb6bd261d4985c66898d4c3846b842bc82aec81cf46b840939f6ee115
+api=2 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=839 fixture_pids=["20525", "20526"] status=exit status: 0 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988642.263001000 pid=20524 helper-entry
+1988642.264535000 pid=20524 host-start
+1988642.375773000 pid=20525 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988642.376130000 pid=20525 fork-start
+1988642.378826000 pid=20525 fork-return
+1988642.379246000 pid=20526 python-holder-entry
+1988642.379778000 pid=20526 escaped-ready
+1988643.094832000 pid=20524 host-return
+
+inner_elapsed_ms=830 fd_count=4->4 escaped_still_alive=true outcome=Ok(Err(CommandTimeout(800)))
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.83s
+
+ stderr=
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmptrb1PH/fixture" bytes=408 truncated=false phases=1988642.263001000 pid=20524 helper-entry
+1988642.264535000 pid=20524 host-start
+1988642.375773000 pid=20525 python-parent-entry interpreter=/Applications/Xcode.app/Contents/Developer/usr/bin/python3
+1988642.376130000 pid=20525 fork-start
+1988642.378826000 pid=20525 fork-return
+1988642.379246000 pid=20526 python-holder-entry
+1988642.379778000 pid=20526 escaped-ready
+1988643.094832000 pid=20524 host-return
+
+test extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 91 filtered out; finished in 3.31s
+

@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/dir092-master/worker/files/Docs/quality/stage1/ZS1-092/worker-review320/verify_review.py",
+    "--frozen"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T14:04:00.396705+00:00",
+  "log_sha256": "c5dac298bd043568f5bdb5b2ffdeb91fe0572017c59c9684555127deeb7472a4"
+}

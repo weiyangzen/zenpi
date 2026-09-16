@@ -1,0 +1,64 @@
+{
+  "authority_version": "3.1.19",
+  "requirement_digest": "3ce9613262de0a8499837571137782becc01daa7b56923a53b11f7f04058f60d",
+  "source_sha256": "6e7aec0d27cb566f8f85f7dd13850eda98f5ddf7e78f9a919fb3dd03c3ea3a8a",
+  "payload_files": 51,
+  "source_files": 27,
+  "dependency_files": 677,
+  "node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+  "runtime_symlinks": [
+    ".bin/nanoid",
+    ".bin/rolldown",
+    ".bin/vitest",
+    ".bin/vite",
+    ".bin/why-is-node-running"
+  ],
+  "cases": 37,
+  "actual_test_files": 3,
+  "original_subject_cases": 22,
+  "original_sibling_support_cases": 2,
+  "supplemental_cases": 13,
+  "probe_records": 13,
+  "source_subject_lines": 865,
+  "source_subject_bytes": 27410,
+  "subject_read_ranges_lines": [
+    [
+      1,
+      290
+    ],
+    [
+      291,
+      596
+    ],
+    [
+      597,
+      865
+    ]
+  ],
+  "support_identity_only": true,
+  "all_case_names_match_review": true,
+  "actual_directory": ".ops/stage1_execution/source012-integration/work/replay.1eoso9",
+  "artifacts": [
+    {
+      "path": ".ops/stage1_execution/source012-integration/work/replay.1eoso9/probe-observations.json",
+      "bytes": 55596,
+      "sha256": "725bb7a1d1274054d6fc3995c44244ad1675a0dd7c20efd797ccd471657b6953"
+    },
+    {
+      "path": ".ops/stage1_execution/source012-integration/work/replay.1eoso9/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".ops/stage1_execution/source012-integration/work/replay.1eoso9/stdout.log",
+      "bytes": 5468,
+      "sha256": "9ccda3dabea0b4b3d4ba30d11d6cebeb48f4fd856109d59bf561c8ab31ce5d32"
+    },
+    {
+      "path": ".ops/stage1_execution/source012-integration/work/replay.1eoso9/test-results.json",
+      "bytes": 12431,
+      "sha256": "4462ad96fd9fc86c2a236877f0ec430a8b3f466efcf926230e982e3c7bb4319b"
+    }
+  ],
+  "scope": "Source012 understanding only; scripted model boundary; no transport, inference, durable host commit or sibling/directory acceptance"
+}

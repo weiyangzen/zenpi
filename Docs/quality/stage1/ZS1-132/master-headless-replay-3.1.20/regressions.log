@@ -1,0 +1,97 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.76s
+     Running tests/headless_protocol.rs (.ops/stage1_execution/new132-integration/target/debug/deps/headless_protocol-4970f6db765b37c2)
+
+running 43 tests
+test approval_command_is_typed_and_bounded ... ok
+test async_reader_bounds_overlong_and_invalid_frames_without_stopping ... ok
+test checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence ... ok
+test cross_process_owner_lock_survives_contention_and_releases_after_kill ... ok
+test async_shutdown_acknowledges_only_after_prior_turn_terminal_response ... ok
+test headless_common_model_and_doctor_commands_are_redacted_and_local ... ok
+test async_runtime_lifecycle_events_are_correlated_ordered_and_replayable ... ok
+test async_recovery_event_does_not_overtake_turn_admission ... ok
+test protocol_v2_accepts_resume_sequence_and_v1_remains_supported ... ok
+test in_flight_duplicate_request_id_is_suppressed_before_side_effects ... ok
+test reconnect_process_fixture ... ok
+test async_eof_denies_unanswerable_side_effect_approval_without_hanging ... ok
+test inspection_responses_redact_paths_and_reject_domain_escape ... ok
+test headless_session_lifecycle_and_queue_slash_commands_use_typed_owner ... ok
+test async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it ... ok
+test session_control_requests_roundtrip_into_typed_commands ... ok
+test session_control_validation_is_bounded_and_rejects_origin_confusion ... ok
+test disconnected_wire_preserves_unknown_or_completed_outcome_without_retry ... ok
+test headless_slash_commands_are_control_plane_only ... ok
+test mailbox_retirement_is_confirmed_and_owned_in_both_hosts ... ok
+test checkpoint_pages_and_mailbox_are_local_durable_and_addressed ... ok
+test stale_session_writers_are_rejected_without_duplicate_sequences ... ok
+test malformed_frame_isolated_from_all_commands ... ok
+test live_steer_cancels_and_reissues_without_losing_or_duplicating_input ... ok
+test reconnect_restores_terminal_events_ack_and_monotonic_sequence ... ok
+test sequential_steer_and_eof_are_safe_terminal_paths ... ok
+test unsupported_version_and_missing_id_are_rejected ... ok
+test steer_shell_guard_keeps_expected_turn_rejection_before_side_effects ... ok
+test async_user_shell_runs_through_bounded_runtime_and_shutdown ... ok
+test headless_domain_put_commands_persist_and_round_trip ... ok
+test steer_shell_guard_rejects_attachments_before_side_effects ... ok
+test steer_shell_guard_rejects_mode_before_side_effects ... ok
+test session_slash_list_and_open_use_real_session_owner_paths ... ok
+test session_controls_remain_readable_while_provider_is_in_flight ... ok
+test status_snapshots_redact_session_paths_in_sync_and_async_hosts ... ok
+test shutdown_promotes_a_steer_admitted_before_the_shutdown_frame ... ok
+test resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history ... ok
+test resume_path_rejects_missing_journals_without_creating_them ... ok
+test unowned_session_controls_are_fail_closed_without_session_or_provider_effects ... ok
+test recovery_slash_is_durable_confirmed_and_never_dispatches_retry ... ok
+test synchronous_replay_and_control_idempotency_are_explicit ... ok
+test steer_shell_guard_preserves_valid_owned_shell_execution ... ok
+test user_shell_echo_is_explicit_and_does_not_call_provider ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.12s
+
+     Running tests/project_workspace.rs (.ops/stage1_execution/new132-integration/target/debug/deps/project_workspace-4004c3e78f9d04f0)
+
+running 7 tests
+test last_tab_and_removed_directory_cannot_be_selected_or_restored ... ok
+test checkpoint_roundtrip_preserves_stable_identity_and_selected_order ... ok
+test confirmation_prepares_a_directory_bound_candidate_without_mutating_current_state ... ok
+test invalid_checkpoint_is_rejected_atomically ... ok
+test cancellation_errors_and_failed_host_preparation_leave_selection_and_checkpoint_unchanged ... ok
+test duplicate_basenames_remain_distinct_and_aliases_reselect_existing_project ... ok
+test bounded_tabs_allow_reselection_at_capacity_and_closing_preserves_active_identity ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/session_new.rs (.ops/stage1_execution/new132-integration/target/debug/deps/session_new-960bff5bb994ad0a)
+
+running 13 tests
+test bare_new_is_the_only_public_syntax_and_is_registered ... ok
+test staged_attachment_is_not_dropped_or_moved_by_new ... ok
+test durable_pending_input_and_unknown_operation_are_not_erased ... ok
+test old_port_cannot_acquire_the_new_sessions_running_turn ... ok
+test actual_directory_permission_failure_keeps_old_owner_usable ... ok
+test failed_owner_checkpoint_preserves_old_session_and_removes_candidate ... ok
+test configured_tool_deny_survives_jsonl_new_even_with_process_never ... ok
+test new_keeps_project_and_preferences_but_has_empty_history_and_durable_replay ... ok
+test running_request_rejects_new_without_cancelling_old_work_then_allows_retry ... ok
+test actual_extension_preparation_jsonl_cancel_keeps_owner_and_old_port ... ok
+test exclusive_names_skip_existing_files_links_directories_and_stop_at_limit ... ok
+test worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_new ... ok
+test replaced_candidate_regular_link_and_directory_are_retained_without_switching ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.21s
+

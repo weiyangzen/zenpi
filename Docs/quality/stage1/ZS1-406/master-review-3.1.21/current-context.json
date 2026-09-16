@@ -1,0 +1,62 @@
+{
+  "Cargo.toml": {
+    "bytes": 1228,
+    "sha256": "d5fafd029ef77454e178222c2b62530d28859374f72a2ce6bd972a465bed5884"
+  },
+  "Cargo.lock": {
+    "bytes": 46021,
+    "sha256": "7311d1133e06e428707d9aa10c95c6a0c1efa983865472f6b5e24b640f4b1348"
+  },
+  "src/lib.rs": {
+    "bytes": 879,
+    "sha256": "d93926734119ba3a5a0af16a3bd032548dcfecaaa5aeb36dca69f57065dbbc82"
+  },
+  "src/main.rs": {
+    "bytes": 234,
+    "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b"
+  },
+  "src/headless.rs": {
+    "bytes": 368974,
+    "sha256": "521c2102519b502fbd6184f31ffb53cba8eeef840bf84d19450836429d9b49f0"
+  },
+  "src/project_workspace.rs": {
+    "bytes": 30437,
+    "sha256": "f1b3fcd96290c82c9eaad74b9b9a8acfdc8ea133f793ef85d82d1ef8a91d3ca8"
+  },
+  "src/protocol.rs": {
+    "bytes": 45517,
+    "sha256": "90a5644d5a818a8051172b42b302614fb3263ebac737ce9dbf4a842791370d27"
+  },
+  "src/slash_actions.rs": {
+    "bytes": 63692,
+    "sha256": "e8635a418ccd613ef0587695ee9318d05e679be202494c0f04eb04651c12184e"
+  },
+  "src/core.rs": {
+    "bytes": 278737,
+    "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+  },
+  "src/session.rs": {
+    "bytes": 176828,
+    "sha256": "8fb3ff2c387b13d34d8bbe4533bb2b0a81b5e546f5e03216b74b5cf2c61c9a2b"
+  },
+  "src/tui.rs": {
+    "bytes": 621728,
+    "sha256": "994215c7ca6cc471bb35247a04460d6c5ef52192999e4b5585ea1c818a429578"
+  },
+  "vendor/crossterm/src/event/source/unix/mio.rs": {
+    "bytes": 25801,
+    "sha256": "41321e242e21fa85533dbae42314bcf80ab916e1d55e065d5ce98076002ac93f"
+  },
+  ".github/workflows/release.yml": {
+    "bytes": 3779,
+    "sha256": "caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd"
+  },
+  ".github/workflows/ci.yml": {
+    "bytes": 3973,
+    "sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9"
+  },
+  "tools/generate_stage1_gantt.py": {
+    "bytes": 13345,
+    "sha256": "2ff99168255bd736248de806fb6289736392206d8b03581afcca60d597f0eb74"
+  }
+}

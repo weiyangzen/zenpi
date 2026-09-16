@@ -1,0 +1,134 @@
+{
+  "baseline": [
+    {
+      "line": 20,
+      "name": "Check out source"
+    },
+    {
+      "line": 23,
+      "name": "Install stable Rust"
+    },
+    {
+      "line": 28,
+      "name": "Cache Cargo artifacts"
+    },
+    {
+      "line": 31,
+      "name": "Check formatting"
+    },
+    {
+      "line": 34,
+      "name": "Run Clippy"
+    },
+    {
+      "line": 37,
+      "name": "Run tests"
+    },
+    {
+      "line": 43,
+      "name": "Validate execution blueprint and Gantt"
+    },
+    {
+      "line": 46,
+      "name": "Validate v2 blueprint review draft"
+    },
+    {
+      "line": 49,
+      "name": "Report Rust source inventory"
+    },
+    {
+      "line": 52,
+      "name": "Run runtime and size budget gate"
+    },
+    {
+      "line": 55,
+      "name": "Upload runtime budget receipt"
+    },
+    {
+      "line": 61,
+      "name": "Check two-mode boundary"
+    },
+    {
+      "line": 64,
+      "name": "Exercise headless JSONL protocol"
+    },
+    {
+      "line": 67,
+      "name": "Exercise the installed release user paths"
+    },
+    {
+      "line": 70,
+      "name": "Exercise the release headless protocol"
+    },
+    {
+      "line": 73,
+      "name": "Package and verify the production artifact"
+    }
+  ],
+  "current": [
+    {
+      "line": 20,
+      "name": "Check out source"
+    },
+    {
+      "line": 23,
+      "name": "Install stable Rust"
+    },
+    {
+      "line": 28,
+      "name": "Cache Cargo artifacts"
+    },
+    {
+      "line": 31,
+      "name": "Check formatting"
+    },
+    {
+      "line": 34,
+      "name": "Run Clippy"
+    },
+    {
+      "line": 37,
+      "name": "Run tests"
+    },
+    {
+      "line": 43,
+      "name": "Validate execution blueprint and Gantt"
+    },
+    {
+      "line": 46,
+      "name": "Validate v2 blueprint review draft"
+    },
+    {
+      "line": 49,
+      "name": "Report Rust source inventory"
+    },
+    {
+      "line": 52,
+      "name": "Run runtime and size budget gate"
+    },
+    {
+      "line": 55,
+      "name": "Upload runtime budget receipt"
+    },
+    {
+      "line": 61,
+      "name": "Check two-mode boundary"
+    },
+    {
+      "line": 64,
+      "name": "Exercise headless JSONL protocol"
+    },
+    {
+      "line": 67,
+      "name": "Exercise the installed release user paths"
+    },
+    {
+      "line": 70,
+      "name": "Exercise the release headless protocol"
+    },
+    {
+      "line": 73,
+      "name": "Package and verify the production artifact"
+    }
+  ]
+}

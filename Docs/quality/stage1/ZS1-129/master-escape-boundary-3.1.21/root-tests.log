@@ -1,0 +1,199 @@
+   Compiling crossterm v0.29.0 (/Users/wangweiyang/GitHub/zenpi/vendor/crossterm)
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+   Compiling ratatui-crossterm v0.1.2
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling ratatui v0.30.2
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.62s
+     Running tests/headless_project_workspace.rs (target/debug/deps/headless_project_workspace-0f8536dfd6d0456e)
+
+running 13 tests
+test project_envelope_preserves_strict_identity_and_action_parsing ... ok
+test project_protocol_is_strict_versioned_bounded_and_owned ... ok
+test shared_checkpoint_rejects_concurrent_stale_writer_and_corrupt_input_atomically ... ok
+test typed_tree_mutation_runs_in_the_selected_project_owner ... ok
+test tui_and_jsonl_share_the_checkpoint_and_actual_session_owner ... ok
+test resumed_journal_restores_as_the_real_agent_in_the_shared_project_pool ... ok
+test cancelled_invalid_and_mismatched_requests_leave_selection_and_journal_unchanged ... ok
+test selected_project_bounds_inspection_resume_and_reopening_the_initial_tab ... ok
+test project_controls_are_real_idempotent_and_restore_across_independent_hosts ... ok
+test project_capacity_and_checkpoint_permission_failure_preserve_the_previous_owner ... ok
+test rejected_resume_checkpoint_keeps_actual_owner_and_host_usable ... ok
+test busy_switch_keeps_queued_owners_events_approval_and_tools_in_their_project ... ok
+test busy_diff_uses_selected_project_through_new_replay_switch_and_cancel ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s
+
+     Running tests/headless_protocol.rs (target/debug/deps/headless_protocol-4970f6db765b37c2)
+
+running 43 tests
+test approval_command_is_typed_and_bounded ... ok
+test checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence ... ok
+test async_reader_bounds_overlong_and_invalid_frames_without_stopping ... ok
+test cross_process_owner_lock_survives_contention_and_releases_after_kill ... ok
+test headless_common_model_and_doctor_commands_are_redacted_and_local ... ok
+test async_recovery_event_does_not_overtake_turn_admission ... ok
+test in_flight_duplicate_request_id_is_suppressed_before_side_effects ... ok
+test async_runtime_lifecycle_events_are_correlated_ordered_and_replayable ... ok
+test async_shutdown_acknowledges_only_after_prior_turn_terminal_response ... ok
+test protocol_v2_accepts_resume_sequence_and_v1_remains_supported ... ok
+test reconnect_process_fixture ... ok
+test headless_session_lifecycle_and_queue_slash_commands_use_typed_owner ... ok
+test async_eof_denies_unanswerable_side_effect_approval_without_hanging ... ok
+test inspection_responses_redact_paths_and_reject_domain_escape ... ok
+test async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it ... ok
+test disconnected_wire_preserves_unknown_or_completed_outcome_without_retry ... ok
+test session_control_requests_roundtrip_into_typed_commands ... ok
+test session_control_validation_is_bounded_and_rejects_origin_confusion ... ok
+test headless_slash_commands_are_control_plane_only ... ok
+test checkpoint_pages_and_mailbox_are_local_durable_and_addressed ... ok
+test mailbox_retirement_is_confirmed_and_owned_in_both_hosts ... ok
+test stale_session_writers_are_rejected_without_duplicate_sequences ... ok
+test malformed_frame_isolated_from_all_commands ... ok
+test live_steer_cancels_and_reissues_without_losing_or_duplicating_input ... ok
+test steer_shell_guard_keeps_expected_turn_rejection_before_side_effects ... ok
+test sequential_steer_and_eof_are_safe_terminal_paths ... ok
+test unsupported_version_and_missing_id_are_rejected ... ok
+test reconnect_restores_terminal_events_ack_and_monotonic_sequence ... ok
+test steer_shell_guard_rejects_attachments_before_side_effects ... ok
+test async_user_shell_runs_through_bounded_runtime_and_shutdown ... ok
+test steer_shell_guard_rejects_mode_before_side_effects ... ok
+test headless_domain_put_commands_persist_and_round_trip ... ok
+test session_slash_list_and_open_use_real_session_owner_paths ... ok
+test status_snapshots_redact_session_paths_in_sync_and_async_hosts ... ok
+test recovery_slash_is_durable_confirmed_and_never_dispatches_retry ... ok
+test session_controls_remain_readable_while_provider_is_in_flight ... ok
+test resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history ... ok
+test unowned_session_controls_are_fail_closed_without_session_or_provider_effects ... ok
+test shutdown_promotes_a_steer_admitted_before_the_shutdown_frame ... ok
+test resume_path_rejects_missing_journals_without_creating_them ... ok
+test synchronous_replay_and_control_idempotency_are_explicit ... ok
+test steer_shell_guard_preserves_valid_owned_shell_execution ... ok
+test user_shell_echo_is_explicit_and_does_not_call_provider ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
+
+     Running tests/layout_persistence.rs (target/debug/deps/layout_persistence-97e33ace7aaa3e8d)
+
+running 7 tests
+test layout_preferences_json_round_trip_is_bounded_and_deterministic ... ok
+test invalid_state_is_rejected_without_replacing_a_valid_snapshot ... ok
+test legacy_layout_model_is_migrated_to_default_profile ... ok
+test corrupt_and_oversized_documents_fail_closed_without_mutation ... ok
+test layout_symlink_is_rejected_for_read_write_and_reset ... ok
+test out_of_range_and_unknown_pane_values_are_rejected ... ok
+test profile_and_tab_states_round_trip_independently_and_reset_is_idempotent ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/slash.rs (target/debug/deps/slash-21634d0e25159df9)
+
+running 19 tests
+test oversized_slash_input_is_rejected_before_tokenization ... ok
+test recovery_commands_require_explicit_confirmation ... ok
+test route_input_keeps_slash_commands_out_of_prompt_path ... ok
+test route_input_classifies_explicit_user_shell_before_provider ... ok
+test malformed_commands_fail_closed ... ok
+test slash_help_explains_goal_boundary_and_posture_controls ... ok
+test every_command_spec_has_help_and_completion_entry ... ok
+test compete_and_loop_are_runtime_routes ... ok
+test core_slash_commands_parse_to_typed_values ... ok
+test common_workflow_commands_fail_closed_on_invalid_arguments ... ok
+test common_workflow_commands_have_typed_arguments_and_metadata ... ok
+test dispatch_cancel_and_exit_are_control_actions ... ok
+test history_default_and_completion_are_bounded ... ok
+test typed_commands_round_trip_for_journal_events ... ok
+test approval_slash_commands_mutate_configured_agent_policy ... ok
+test local_dispatch_updates_view_without_creating_a_turn ... ok
+test session_open_rejects_missing_target_without_creating_a_journal ... ok
+test tui_mailbox_receive_labels_correlated_replies ... ok
+test session_open_replaces_tui_transcript_from_existing_journal ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/tui_bentobox.rs (target/debug/deps/tui_bentobox-0c7b7c0a8727a605)
+
+running 16 tests
+test ctrl_number_switches_workspace_tab_without_submitting_prompt ... ok
+test adapter_translates_and_clips_model_rectangles ... ok
+test disabled_optional_panes_are_not_rendered_or_allocated ... ok
+test terminal_backtab_moves_workspace_focus_backwards ... ok
+test workspace_keyboard_controls_focus_and_split_without_touching_prompt ... ok
+test tab_switch_keeps_independent_layout_state_and_dirty_bit ... ok
+test restoring_tab_models_preserves_each_tab_and_clears_dirty_state ... ok
+test active_layout_edits_after_restore_replace_cached_project_layout ... ok
+test production_workspace_renders_tabs_and_existing_transcript_prompt ... ok
+test production_workspace_is_resize_safe_at_tiny_viewports ... ok
+test production_resources_pane_renders_completed_snapshot ... ok
+test gantt_refresh_failure_retains_last_valid_projection ... ok
+test production_gantt_pane_renders_bounded_domain_projection ... ok
+test gantt_projection_truncates_maximal_valid_blueprint ... ok
+test gantt_projection_does_not_create_a_missing_execution_store_and_stays_bounded ... ok
+test gantt_projection_annotates_each_item_with_latest_execution_status_and_attempt ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/tui_composer.rs (target/debug/deps/tui_composer-69c8fa2b8a92f5dd)
+
+running 46 tests
+test escape_keeps_draft_and_key_release_never_types_or_submits ... ok
+test deliberate_tab_reopens_completion_after_a_literal_ordinary_burst ... ok
+test external_editor_shortcut_respects_focus_and_explicit_popup_dismissal ... ok
+test ctrl_u_uses_fold_projection_instead_of_hidden_payload_newlines ... ok
+test external_edit_owner_revision_survives_unrelated_background_projection ... ok
+test external_edit_changes_are_plain_exact_and_keep_kill_buffer_and_ids ... ok
+test history_preview_cannot_leak_across_projects ... ok
+test grapheme_cursor_and_deletion_keep_combining_emoji_and_flags_whole ... ok
+test history_navigation_restores_original_draft_and_cursor ... ok
+test cross_boundary_combining_and_zwj_unfold_without_dropping_characters ... ok
+test external_edit_rejects_explicit_project_roundtrip_and_checkpoint_restore ... ok
+test isolated_unicode_ime_followed_by_enter_submits_normally ... ok
+test kill_yank_is_single_nonempty_buffer_and_plain_deletion_does_not_replace_it ... ok
+test external_edit_revision_rejects_new_text_cursor_fold_history_and_project_instances ... ok
+test adjacent_alt_enter_expands_only_that_fold_and_keeps_bytes ... ok
+test folded_word_and_line_deletion_are_atomic_and_keep_literal_labels ... ok
+test ctrl_u_and_k_use_logical_lines_and_newlines_even_when_soft_wrapped ... ok
+test history_project_and_checkpoint_preserve_unsent_folds_but_recall_full_text ... ok
+test corrupt_fold_metadata_restores_full_text_with_notice_and_legacy_compatibility ... ok
+test legacy_checkpoint_cursor_inside_combined_glyph_is_normalized ... ok
+test multiline_word_and_line_commands_keep_wide_columns ... ok
+test ordinary_ascii_hold_flush_and_deliberate_enter_have_bounded_latency ... ok
+test ordinary_burst_cancel_history_and_project_switch_preserve_the_correct_draft ... ok
+test normalized_paste_batches_fold_but_normal_keys_never_do ... ok
+test large_paste_threshold_and_atomic_identity_keep_full_payload ... ok
+test ordinary_multiline_burst_and_trailing_enter_never_submit_before_quiet_window ... ok
+test ordinary_unicode_ime_is_immediate_and_modified_keys_flush_without_losing_text ... ok
+test search_accept_never_submits_and_cancel_restores_persisted_draft ... ok
+test scheduled_fifo_edit_cancel_and_revision_use_actual_project_bound_entries ... ok
+test scheduled_restart_is_explicitly_unconfirmed_and_never_automatically_readmitted ... ok
+test yank_flushes_held_ascii_before_editing_without_new_paste_classification ... ok
+test yank_buffer_survives_submission_slash_history_but_is_project_local_and_ephemeral ... ok
+test yank_combines_unicode_safely_and_paste_control_bytes_do_not_execute_it ... ok
+test folded_projection_resize_and_visible_line_navigation_never_enter_hidden_lines ... ok
+test paste_is_literal_and_limit_failure_is_atomic ... ok
+test fold_suppresses_hidden_completion_but_preserves_visible_file_suffix_completion ... ok
+test text_only_input_owner_never_silently_loses_file_attachments ... ok
+test ctrl_u_after_one_cell_resize_keeps_following_fold_and_yanks_exact_unicode ... ok
+test kill_yank_restores_canonical_fold_payload_as_plain_text_without_reusing_ids ... ok
+test actual_owner_receipts_drive_queue_menu_and_lossless_edits ... ok
+test ordinary_burst_is_bounded_and_rejects_overflow_without_partial_insertion ... ok
+test interrupted_and_live_scheduled_jobs_share_one_byte_budget ... ok
+test maximum_size_single_word_navigation_is_bounded_and_complete ... ok
+test external_edit_noop_cancel_empty_and_capacity_failure_are_atomic ... ok
+test folded_payload_counts_toward_input_and_pretty_checkpoint_budgets ... ok
+test yank_input_and_pretty_checkpoint_rejections_preserve_full_buffer_and_draft ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+

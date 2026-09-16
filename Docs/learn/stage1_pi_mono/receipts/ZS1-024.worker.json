@@ -1,0 +1,129 @@
+{
+  "artifacts": [
+    {
+      "bytes": 6109,
+      "path": "Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/tools/output-accumulator.ts_learn.md",
+      "sha256": "ce97c69599b60cf1ef6a5601df5aa2a7ce10c39c5a6de730952b6c9de8c7462e"
+    },
+    {
+      "bytes": 1124,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/review.md",
+      "sha256": "8903e194ff899ab96e2294a48c035a0ec8372a3c5138c45c34792e007c3c5b2c"
+    },
+    {
+      "bytes": 2503,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/worker-original.md",
+      "sha256": "50ad3cf3f3812dbbed0884f647c186847a58d299df02ac96024f97a38260908b"
+    },
+    {
+      "bytes": 4231,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/source-probe.mjs",
+      "sha256": "10bed47aaa72b4331d6f55fbc0ce4ad8a1bd8bfbfa1d9e10d0e1bae8506c5e04"
+    },
+    {
+      "bytes": 580,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/source-probe.stdout.log",
+      "sha256": "42db03bcb3f3e4462bc584e320e75bdd6a1cc80a1bd4bedb4ee21d017bc45fda"
+    },
+    {
+      "bytes": 177,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/source-probe.stderr.log",
+      "sha256": "1a78e64099d049abca5be7ddf636ed21b60b2c3a43cd29421c9a485d4eb763fe"
+    },
+    {
+      "bytes": 4235,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/first-source-probe.mjs",
+      "sha256": "0f7b8da765ac1a324d501266f089f2468deb1786fa6bb9f43252b14f5908767b"
+    },
+    {
+      "bytes": 740,
+      "path": "Docs/quality/stage1/ZS1-024/master-review-3.1.8/first-source-probe.stderr.log",
+      "sha256": "6e3e8fa6d4fcfc8774f4c0a366471e0a5321c035e45456b028a609e8673fcc20"
+    },
+    {
+      "bytes": 1050,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.9/review.md",
+      "sha256": "a7f4edee46b79fc60e356877e6c150932d455fac7e368f3fff326372077b9a84"
+    },
+    {
+      "bytes": 1057,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.10/review.md",
+      "sha256": "51636108720f27e7db9eee2aa0cce36ab5e68a73e9e965eed52e13e5b48db0fc"
+    },
+    {
+      "bytes": 1042,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.11/review.md",
+      "sha256": "673a327529caaa1704e194d51da6e1d054de339c1a1ee2b9b0d0059193608a3a"
+    },
+    {
+      "bytes": 1049,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.12/review.md",
+      "sha256": "1c50c84e2b2c179782667f94a5ee2c64468cab57eb69e43c6f182f7294c1629c"
+    },
+    {
+      "bytes": 1041,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.13/review.md",
+      "sha256": "82dbba6f9ff7b7b1adab451688506754fab3390b72a166c51ee0715a593b8662"
+    },
+    {
+      "bytes": 1132,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.14/review.md",
+      "sha256": "5af1ad8b21d81ea8d031a8bf22a129f091f7e0db7e481434ff6be79a05f5cd74"
+    },
+    {
+      "bytes": 1123,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.15/review.md",
+      "sha256": "dba160933201ffed1fcf0e10fc9cdd435c92d2d08e5f1e80fffb5f083f809623"
+    },
+    {
+      "bytes": 1388,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.16/review.md",
+      "sha256": "7c5a68a42735c1d7f481678a5c010b7ca7bece4fa28fcc78940001ccea219043"
+    },
+    {
+      "bytes": 855,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.17/review.md",
+      "sha256": "fdd3d265beea982c9f8d27cdc97e73de56a23bb24f176d38ad9d9ec072e483e3"
+    },
+    {
+      "bytes": 1011,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.18/review.md",
+      "sha256": "14ea5d78ae470d5a3eb5b6a3c9507ce9941baa2332caafbe3aa5b7c8b4e660f4"
+    },
+    {
+      "bytes": 1128,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.19/review.md",
+      "sha256": "8ed6e4b394cdb9fe898aef933660a7053fb1449672205efac06bb642d5c16413"
+    },
+    {
+      "bytes": 1620,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.20/review.md",
+      "sha256": "7765827db6791c59e1e3ceb519a4486dbdcd3d70c9a35d2fc24786238fb80009"
+    },
+    {
+      "bytes": 2845,
+      "path": "Docs/quality/stage1/ZS1-024/master-rebind-3.1.21/review.md",
+      "sha256": "2003ccd5abd8797ffa43b1826828eb6b4ccb6587054c27705c8a2dd05dc163dc"
+    }
+  ],
+  "attempt_id": "master-review-3.1.8",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "item_id": "ZS1-024",
+  "provenance": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/Docs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/tools/output-accumulator.ts_learn.md",
+  "read_ranges": [
+    [
+      0,
+      6049
+    ]
+  ],
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "reviewer": "session A candidate, controller replay",
+  "role": "worker",
+  "run_id": "zenpi-stage1-20260911",
+  "schema_version": "stage1-receipt/v1",
+  "source_hash": "c601ddd8e10934be6f3db30696eacba7b9544f2dd1648a5ec3c9935f0d4625c3",
+  "source_path": "packages/coding-agent/src/core/tools/output-accumulator.ts",
+  "validators": "G-FILE；G-STAGE --item ZS1-024"
+}

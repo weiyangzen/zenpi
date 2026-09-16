@@ -1,0 +1,40 @@
+{
+  "status": "Stopped by main instruction; no related probes resumed. No final repair acceptance.",
+  "frozen_audit_manifest": "64bee79bc2a442107dd3e66ee53f51f6070cc22b40f014f3355fdc04e1955232",
+  "unfrozen_candidate": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current",
+  "before_control": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-before",
+  "evidence_directory": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319",
+  "last_reported_status": "prescribed-after reports 22 search passed / 4 failed, not further investigated. public_fifo.py not run. Earlier focused-before-canonical 2 passed / 4 failed.",
+  "regular_file_locations_only": [
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depth-audit319-ready/manifest.json",
+      "bytes": 64281,
+      "sha256": "64bee79bc2a442107dd3e66ee53f51f6070cc22b40f014f3355fdc04e1955232"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-public319-final-ready/manifest.json",
+      "bytes": 397435,
+      "sha256": "d53149b26b7f5546bab960d0612ab3e207966f524306d03e7e568fa6bb9c27e0"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current/src/search.rs",
+      "bytes": 31128,
+      "sha256": "356f9720a51207365b1632489b622f287e7948ccbdd041040d779de0c6ca093a"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/search112-depthfix319-current/tests/stage1_search.rs",
+      "bytes": 42261,
+      "sha256": "7290235f0f7ce85c5ac0eb1c0a4cb181e60f2598ad557862cd8ea6336ad67d5e"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319/public_fifo.py",
+      "bytes": 3145,
+      "sha256": "839bddfb661fef0bc0758b66b901c629f8cba661fa163da6e5b2034dfef5ea96"
+    },
+    {
+      "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-112/worker-depthfix319/prescribed-after.log",
+      "bytes": 6221,
+      "sha256": "ff7a2326a359fcd93d5ff10babf235802ae295ace96e598f49c3de1a31c5d94e"
+    }
+  ]
+}

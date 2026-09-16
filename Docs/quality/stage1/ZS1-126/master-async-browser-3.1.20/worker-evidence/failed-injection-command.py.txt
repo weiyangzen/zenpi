@@ -1,0 +1,6 @@
+# Exact failed first negative-injection script (shell continued to Cargo afterward).
+from pathlib import Path
+w=Path('.ops/stage1-worker/target126-session-browser-3.1.20');s=(w/'after.rs').read_text();a=s.index('        if self.async_session_browser {',s.index('    fn refresh_session_browser('));b=s.index('        let directory = session\n',a)
+# Deliberately reconnect the exact synchronous legacy scan below the new
+# ownership-only branch. Keep the branch's owner metadata so host routing stays live.
+x=s[a:b];assert x.count('            return;\n')==1;s=s[:a]+x.replace('            return;\n','')+s[b:];(w/'negative-sync-reconnected.rs').write_text(s);(w/'build/src/tui.rs').write_text(s)

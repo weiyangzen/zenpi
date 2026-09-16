@@ -1,0 +1,19 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-reuse319/gstage-main.log b/Docs/quality/stage1/ZS1-016/worker-reuse319/gstage-main.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-reuse319/gstage-main.log
+@@ -0,0 +1,14 @@
++{
++  "ok": false,
++  "structural": {
++    "ok": true
++  },
++  "semantic_manual": {
++    "verified_by_checker": false,
++    "note": "Artifact structure is machine checked; semantic truth requires independent master review.",
++    "receipt_structure_ok": false
++  },
++  "errors": [
++    "[Errno 2] No such file or directory: '/Users/wangweiyang/GitHub/zenpi/Docs/learn/stage1_pi_mono/receipts/ZS1-016.master.json'"
++  ]
++}

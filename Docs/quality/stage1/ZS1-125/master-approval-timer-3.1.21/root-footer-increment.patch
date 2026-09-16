@@ -1,0 +1,109 @@
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -1264,16 +1264,8 @@
+         }
+         let area = frame.area();
+         if !view.focused {
+-            if area.height > 0 {
+-                frame.render_widget(
+-                    Paragraph::new(format!(
+-                        " {} approvals pending · Alt-A review",
+-                        view.requests.len()
+-                    ))
+-                    .style(Style::default().fg(Color::Yellow)),
+-                    Rect::new(area.x, area.bottom() - 1, area.width, 1),
+-                );
+-            }
++            // The footer owns the pending hint and its priority relative to
++            // save failures; drawing it here would overwrite existing text.
+             return;
+         }
+         if area.width < 4 || area.height < 5 {
+@@ -7245,10 +7237,17 @@
+             .checkpoint_error
+             .as_ref()
+             .map(|error| format!(" Draft not saved · {error}"));
++        let pending_approval = self
++            .approval_views
++            .get(self.active_project())
++            .filter(|view| !view.focused && !view.requests.is_empty())
++            .map(|view| format!(" {} approvals pending · Alt-A review", view.requests.len()));
+         let background_approval = self.background_approval_hint();
+         let text = truncate_to_width(
+             if let Some(warning) = unsaved.as_deref() {
+                 warning
++            } else if let Some(hint) = pending_approval.as_deref() {
++                hint
+             } else if let Some(hint) = background_approval.as_deref() {
+                 hint
+             } else if self.adjacent_paste().is_some() {
+@@ -7265,11 +7264,15 @@
+         frame.render_widget(
+             Paragraph::new(Span::styled(
+                 text,
+-                Style::default().fg(if unsaved.is_none() && background_approval.is_some() {
+-                    Color::Yellow
+-                } else {
+-                    Color::DarkGray
+-                }),
++                Style::default().fg(
++                    if unsaved.is_none()
++                        && (pending_approval.is_some() || background_approval.is_some())
++                    {
++                        Color::Yellow
++                    } else {
++                        Color::DarkGray
++                    },
++                ),
+             )),
+             area,
+         );
+@@ -15033,6 +15036,48 @@
+     }
+ 
+     #[test]
++    fn approval_timer_hidden_footer_replaces_shortcut_text_after_resize() {
++        let mut state = TuiState::default();
++        state.set_input("keep this draft");
++        state.present_approval(approval_timer_request("footer"));
++        state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
++        for width in [180, 40, 80, 180] {
++            let mut terminal =
++                Terminal::new(ratatui::backend::TestBackend::new(width, 40)).unwrap();
++            terminal
++                .draw(|frame| state.render_bentobox(frame, "zenpi"))
++                .unwrap();
++            let footer: String = (0..width)
++                .map(|x| terminal.backend().buffer()[(x, 39)].symbol())
++                .collect();
++            assert_eq!(
++                footer.trim(),
++                "1 approvals pending · Alt-A review",
++                "width={width}"
++            );
++            assert_eq!(state.input(), "keep this draft");
++            assert_eq!(state.approval_count(), 1);
++        }
++    }
++
++    #[test]
++    fn approval_timer_hidden_footer_preserves_unsaved_draft_warning() {
++        let mut state = TuiState::default();
++        state.present_approval(approval_timer_request("footer"));
++        state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
++        state.checkpoint_result(Err("disk full".into()));
++        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(180, 40)).unwrap();
++        terminal
++            .draw(|frame| state.render_bentobox(frame, "zenpi"))
++            .unwrap();
++        let footer: String = (0..180)
++            .map(|x| terminal.backend().buffer()[(x, 39)].symbol())
++            .collect();
++        assert_eq!(footer.trim(), "Draft not saved · disk full");
++        assert_eq!(state.approval_count(), 1);
++    }
++
++    #[test]
+     fn normal_unicode_typing_reopens_file_completion_after_escape() {
+         let root = tempfile::tempdir().unwrap();
+         std::fs::write(root.path().join("工作.txt"), "file").unwrap();

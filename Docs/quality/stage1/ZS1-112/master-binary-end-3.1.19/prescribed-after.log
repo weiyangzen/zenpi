@@ -1,0 +1,100 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.73s
+     Running tests/security.rs (target/debug/deps/security-b0b18f0e6d7cdab1)
+
+running 8 tests
+test filtered_child_environment_contains_no_credential_names ... ok
+test text_redaction_covers_header_colons_and_query_credentials ... ok
+test active_secret_handles_are_redacted_without_explicit_secret_lists ... ok
+test revocation_debug_never_exposes_secret_bytes ... ok
+test secret_handle_is_opaque_and_policy_bound ... ok
+test redaction_covers_cookie_proxy_and_provider_specific_key_headers ... ok
+test redaction_covers_headers_urls_nested_json_and_known_values ... ok
+test debug_output_redacts_backend_credentials ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/stage1_search.rs (target/debug/deps/stage1_search-06c5d622989d3c74)
+
+running 22 tests
+test default_search_keeps_original_literal_behavior_without_rg ... ok
+test a_live_worker_gate_denies_unconfined_advanced_search_before_any_spawn ... ok
+test invalid_patterns_and_arguments_fail_even_without_files ... ok
+test search_subprocess_budget_hook_distinguishes_default_literal ... ok
+test find_lists_large_files_without_loading_their_contents ... ok
+test explicit_literal_advanced_search_still_treats_regex_symbols_literally ... ok
+test path_escape_and_symlink_targets_are_never_searched ... ok
+test unavailable_or_disappeared_executable_is_explicit ... ok
+test actual_agent_rejects_insufficient_search_budget_before_any_spawn ... ok
+test positive_glob_does_not_override_ignore_true_and_false_explicitly_includes_ignored ... ok
+test small_binary_end_marker_is_visible_and_does_not_return_text_matches ... ok
+test whitespace_names_are_preserved_and_hidden_is_explicit ... ok
+test regex_glob_ignore_and_context_use_actual_rg_and_workspace_paths ... ok
+test actual_headless_queue_returns_search_results_and_durable_budget ... ok
+test caps_match_count_file_count_and_long_lines_with_reasons ... ok
+test oversized_binary_and_deep_tree_are_bounded_without_partial_index ... ok
+test pure_depth_cutoff_is_reported_by_search_and_find ... ok
+test cancellation_reaps_the_actual_search_process_and_its_descendant ... ok
+test depth_probe_respects_ignored_hidden_and_empty_boundary_directories ... ok
+test cumulative_process_budget_includes_preflight_listings_and_search_chunks ... ok
+test actual_search_owner_cancellation_reaps_child_without_refunding_process_starts ... ok
+test actual_agent_reserves_all_search_starts_before_spawn_and_retains_usage_after_reopen ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.97s
+
+     Running tests/tools.rs (target/debug/deps/tools-313d9444d6b7edb3)
+
+running 36 tests
+test reliability_collision_child ... ignored, fresh process for deterministic temporary-name collision fixtures
+test builtins_publish_typed_object_schemas ... ok
+test side_effects_are_denied_before_handler_execution ... ok
+test read_file_is_bounded_and_workspace_scoped ... ok
+test malformed_calls_and_unknown_arguments_are_typed_errors ... ok
+test tool_output::private_inode_tests::marker_detection_error_is_not_unmarked ... ok
+test edit_rejects_a_source_larger_than_the_write_budget ... ok
+test list_directory_is_sorted_and_reports_truncation ... ok
+test read_file_rejects_a_symlink_that_escapes_the_workspace ... ok
+test list_directory_describes_symlinks_without_following_them ... ok
+test search_is_literal_case_configurable_and_bounded ... ok
+test worker_action_budget_is_shared_across_context_clones_and_direct_invocation ... ok
+test reliability_permissions_do_not_add_execute_or_propagate_set_id_bits ... ok
+test precancelled_command_does_not_spawn_and_user_shell_keeps_exit_evidence ... ok
+test large_tool_results_become_private_retrievable_artifacts ... ok
+test worker_preflight_rejects_unknown_effects_network_and_general_shell ... ok
+test worker_commands_are_declared_direct_argv_with_no_shell_expansion ... ok
+test worker_gate_rejects_unbound_origin_cross_origin_and_revocation ... ok
+test worker_gate_refuses_symlinks_and_hardlinks_even_inside_workspace ... ok
+test tool_output::tests::failed_spill_write_preserves_error_and_never_claims_complete ... ok
+test command_tool_is_bounded_and_scrubs_environment ... ok
+test write_preview_rejects_binary_existing_sources_without_writing ... ok
+test worker_gate_is_immutable_digest_bound_and_deny_over_allow ... ok
+test write_to_directory_fails_without_leaving_atomic_temporary_files ... ok
+test write_diff_is_empty_when_content_is_unchanged ... ok
+test write_diff_represents_final_newline_changes_as_a_hunk ... ok
+test write_diff_is_bounded_for_large_replacements ... ok
+test worker_search_listing_and_compaction_do_not_leak_prohibited_paths ... ok
+test write_and_edit_tools_are_atomic_and_policy_guarded ... ok
+test tool_output::tests::failed_metadata_publication_keeps_terminal_reference_and_error ... ok
+test reliability_write_and_edit_preserve_permissions_and_replace_the_inode ... ok
+test reliability_create_new_collision_never_removes_or_overwrites_another_path ... ok
+test timed_out_command_reaps_its_descendant_process_group ... ok
+test reliability_line_ending_diff_is_exact_and_can_be_applied ... ok
+test term_resistant_descendants_die_after_timeout_and_host_cancel ... ok
+test successful_shell_cannot_leave_background_process_or_hold_pipe_forever ... ok
+
+test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.28s
+

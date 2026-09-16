@@ -1,0 +1,12 @@
+{
+  "before": {
+    "bytes": 621728,
+    "sha256": "994215c7ca6cc471bb35247a04460d6c5ef52192999e4b5585ea1c818a429578"
+  },
+  "test_only_append": "\n#[cfg(test)]\n#[path = \"../independent/session_browser_review.rs\"]\nmod independent_session_browser_review;\n",
+  "compiled_tui": {
+    "bytes": 621835,
+    "sha256": "389be613eaecb96eee489d044342191751e6ea40b63b3e3ab5594943082fe1e5"
+  },
+  "product_changed": false
+}

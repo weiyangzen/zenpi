@@ -1,0 +1,13 @@
+{"schema_version": 2, "type": "status", "id": "status"}
+{"schema_version": 2, "type": "command", "id": "inspect", "text": "/recovery inspect"}
+{"schema_version": 2, "type": "resume", "id": "resume", "from_sequence": 0}
+{"schema_version": 2, "type": "prompt", "id": "killed", "text": "begin interrupted response"}
+{"schema_version": 2, "type": "prompt", "id": "killed", "text": "conflicting payload"}
+{"schema_version": 2, "type": "prompt", "id": "blocked", "text": "fresh before decision"}
+{"schema_version": 2, "type": "command", "id": "retry", "text": "/recovery retry provider-turn-1789190499959-1 --yes"}
+{"schema_version": 2, "type": "command", "id": "retry-again", "text": "/recovery retry provider-turn-1789190499959-1 --yes"}
+{"schema_version": 2, "type": "command", "id": "abandon-conflict", "text": "/recovery abandon provider-turn-1789190499959-1 --yes"}
+{"schema_version": 2, "type": "prompt", "id": "killed", "text": "begin interrupted response"}
+{"schema_version": 2, "type": "prompt", "id": "fresh", "text": "continue after explicit recovery"}
+{"schema_version": 2, "type": "prompt", "id": "fresh", "text": "continue after explicit recovery"}
+{"schema_version": 2, "type": "prompt", "id": "fresh", "text": "different"}

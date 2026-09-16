@@ -1,0 +1,65 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md
+@@ -0,0 +1,60 @@
++# ZS1-089 — .github/workflows/ci.yml
++
++Worker candidate: [_]. learn_mode: understand. Main semantic review required. Authority3.1.16 / requirement digest `c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f`.
++
++source_path `.github/workflows/ci.yml`; original blueprint and current read-only main are both2480bytes/77lines, SHA256 `5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6`. All77lines were read sequentially, including every blank/comment, trigger, permission/concurrency field and each of16steps. The current bytes equal the frozen blueprint hash, so the original content is preserved identically rather than replaced by a newer CI description. No prior local/main report existed. Exact byte interval/capture time are in worker-owner-review/input-manifest.json. Main reports116 integrated/production checks passed;122 remains scratch-only. Workflow bytes do not change merely because other owners' code changes.
++
++## Triggers, execution boundary and every step
++
++Lines1–5 name the workflow zenpi CI and declare push and pull_request events without branch/path filters. There is no workflow_dispatch, schedule or other event in this file. Lines7–8 request contents:read. Lines10–12 group concurrency by the literal zenpi prefix, workflow name and github.ref, and enable cancel-in-progress. This is workflow-run concurrency, not a resource lock inside zenpi or cancellation semantics for its sessions. Lines14–19 contain one job, verify, displayed as Format, lint, test, and contract checks, on ubuntu-latest with a15-minute job timeout. There is no OS/version matrix, job dependency graph, container, custom shell or working-directory override here.
++
++| Lines | Step | Actual command/action and boundary |
++| --- | --- | --- |
++|20–21|Check out source|actions/checkout@v4, with no input overrides. This is runner checkout, not the worker's shared-main checkout.|
++|23–26|Install stable Rust|dtolnay/rust-toolchain@stable requests rustfmt and clippy. Stable is selected here; there is no explicit MSRV/nightly/version matrix.|
++|28–29|Cache Cargo artifacts|Swatinem/rust-cache@v2 with no explicit cache-key/path overrides. A cache action is not a correctness receipt.|
++|31–32|Formatting|cargo fmt --all -- --check; check-only rather than rewriting source.|
++|34–35|Clippy|cargo clippy --all-targets --all-features -- -D warnings. Warnings are errors. This command has no --locked flag, unlike the test command.|
++|37–41|Tests|cargo test --all-targets --all-features --locked -- --test-threads=1. The comment explains serial libtest scheduling for short-lived loopback fixture contention. It does not create an OS/toolchain matrix or prevent tests from internally creating threads/processes; ignored tests remain ignored unless explicitly invoked by a parent.|
++|43–44|Execution blueprint/Gantt|python3 tools/validate_blueprint.py, without arguments. Inspected script defaults target Docs/Zenpi_Execution_Blueprint.md, Execution_Spec and Execution_Gantt; this is the older validator, not the stage1 checker.|
++|46–47|v2 review draft|python3 tools/validate_blueprint_v2.py defaults to Docs/Zenpi_Execution_Blueprint_v2.md and calls it a non-authoritative review draft. It does not validate the current stage1 blueprint merely because this workflow runs on current source.|
++|49–50|Rust inventory|python3 tools/check_rust_loc.py reports physical Rust source inventory. Its inspected default is informational; no --max-lines argument is passed. Do not call it an aggregate LOC rejection gate.|
++|52–53|Runtime/size gate|python3 tools/bench_runtime.py --samples3 --output/tmp/zenpi-runtime-budget.json. Script context includes8limits, builds/measures and atomically writes its receipt, then returns failure when the report fails unless no-fail is selected (not selected here). Three samples are not p95 evidence.|
++|55–59|Receipt upload|actions/upload-artifact@v4 uploads that fixed/tmp JSON path as zenpi-runtime-budget-${github.run_id}. Only this receipt is configured for artifact upload; neither release archive nor alltestlogs are uploaded by another step here. There is no if:always condition to retain the receipt after a failed preceding budget step.|
++|61–62|Two-mode boundary|python3 tools/check_modes.py. Inspected context checks RunModeTui/Headless and builds/inspects the binary; it is not a prohibition on auxiliary core CLI commands.|
++|64–65|Debug JSONL smoke|cargo build --features dev-fixtures then, only if build succeeds via &&, ZENPI_BIN=target/debug/zenpi tools/headless_smoke.sh. Build has no --locked on this line. No allow-skip flag is passed.|
++|67–68|Installed release user paths|ZENPI_SMOKE_FEATURES=dev-fixtures python3 tools/user_smoke.py. This explicitly requests fixture-enabled user-path smoke. The script's isolated_env changes child HOME and removes CODEX_HOME before setting ZENPI_HOME; those legacy fixture choices cannot be represented as complying with this task's preserve-real-HOME/CODEX_HOME rule. This review does not execute it.|
++|70–71|Release JSONL smoke|cargo build --release --features dev-fixtures then ZENPI_BIN=target/release/zenpi tools/headless_smoke.sh --release. This build is fixture-enabled, and success does not alone prove the later production artifact excludes fixture functionality.|
++|73–77|Production package/checks|Run tools/release.sh; enter dist and verify every matching *.sha256; then negate tar-list piped to case-insensitive regex grep for auth.json/.codex/.zenpi/fixture/.env names. Actual shell/negative behavior is analyzed and exercised below.|
++
++All referenced local entry scripts exist in main at capture; path/byte/hash inventory and limited inspected excerpts are evidence, not a full sibling-script review. Action refs use major/stable labels, and ubuntu-latest/toolchainstable are not immutable version identities; no exact resolved image/toolchain/action commit or successful hosted workflow run is claimed. No deploy, release publish, push or notification step is present.
++
++## Failure, cancellation, shell and artifact boundaries
++
++GitHub documents unspecified Linux shell as `bash -e {0}`; explicit shell:bash additionally enables pipefail. This workflow supplies no shell override. Normal later steps depend on earlier success, so its receipt upload is not guaranteed after a budget failure. These shell/default-step statements were checked against [GitHub's workflow syntax reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax); the evidence records the source URL/access date. This is deliberately not an assumption that every run block starts with pipefail.
++
++The build&&smoke pairs stop before smoke when build fails. The multiline package step relies on shell error handling for release.sh and checksum failure, but the final `!` negates a pipeline status. That negated condition has its own semantics and is not guaranteed safe by general fail-fast behavior. Workflow timeout/cancel-in-progress can stop a run, but the file has no always-run cleanup, diagnostic upload or durable recovery procedure. It does not establish that host subprocess/session cancellation/reap invariants hold; those must be tested in zenpi owners. Re-running a workflow starts its commands again; a restored cache is not journal/session recovery.
++
++The fully inspected release.sh context stages only the built binary, README, LICENSE and SBOM, creates a tar.gz and SHA256 sidecar, and uses a --release --locked --target build without dev-fixtures. This separates production packaging from earlier fixture-enabled smoke. It is a local package build, not deployment. The source-package SBOM gathers Cargo metadata; no security audit or vulnerability verdict is inferred. The final workflow filename regex inspects archive entry names only, not file content or executable feature behavior. The checksum detects mismatch against its sidecar, not semantic validity when both bytes and checksum agree.
++
++## Actual bounded archive-gate counterexample
++
++Before proposing any workflow fix, the worker executed the exact captured lines76–77 using real bash-e, shasum, tar and grep on three temporary local fixtures. No release build/script, GitHub runner, Linux execution, real credentials or shared-main mutation was involved. HOME/CODEX_HOME were preserved. Results:
++
++| Actual input | Checksum | Independent tar listing | Exact final gate exit |
++| --- | --- | --- | --- |
++|Valid archive with harmless README|OK|0|0, accepted|
++|Valid archive with a harmless-byte file named .env|OK|0|1, rejected|
++|Malformed archive with a checksum matching those malformed bytes|OK|nonzero/error|0, incorrectly accepted|
++
++Successful probe receipt/log is worker-owner-review/archive-gate-counterexample.json/.log, log SHA256 `f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407`. It records actual GNUbash3.2 and BSDtar tool versions on local macOS. Three actual cases demonstrate the shell gate's pass/fail behavior; they are not three hosted CI passes. The malformed archive causes tar to fail and produce no names; grep has no match and exits1, so `!` returns success. This is a confirmed validation defect in the exact gate, not a claim that current release.sh normally generates malformed archives. Main was sent the counterexample/log and proposed owned correction path .github/workflows/ci.yml before any product work; this package changes only report/evidence and includes no correction. A future fix should require successful complete archive listing separately from forbidden-name rejection, then preserve both positive and negative cases; main owns that decision.
++
++## Stage1 coverage, source mapping and evidence limits
++
++The unchanged workflow explicitly calls v1/v2 validators but contains no validate_stage1_blueprint.py, G-STAGE--item or stage1_host_smoke invocation. It therefore does not directly enforce this current blueprint's per-item evidence/master-receipt gates through a named CI step. Cargo can run stage1 Rust tests through the all-targets invocation, but Rust test success is not the same as independently accepted learning reports or stage1 semantic receipts. The workflow's older contract naming must not be relabeled current-stage acceptance. It also does not explicitly run Python unit suites or an MSRV/macOS/Windows/default-only feature test matrix. These are exact scope observations, not claims those checks fail elsewhere.
++
++Existing local115 native-fixture/pipe packages have real Rust/productionJSONL/lint/budget evidence under their own toolchains and scopes. They are referenced only as local evidence, not as a hosted Ubuntu run of this77-line workflow. The budget implementation's eight limits are16normaldependencies/8MiBrelease/1000mscoldmax/96MiBRSS/2000usqueue/10000usrender/100uslayout/onecoalescedframe; those constants were read from the called script, and historical measurements are not rerun here. The new archive probe is the only089 behavior execution. No workflow run is triggered, no GitHub artifact is uploaded, and no dangerous release-script cleanup command is executed during review.
++
++Pi-mono source test/runtime reports supply behavior comparisons for target owners, not proof that this GitHub Actions workflow covers every source case. ZS1-092 workflow-directory integration remains separate; other file/root acceptance is not inherited. Main's116 status and future122 changes are context only. All77lines and every step are documented; the file is not substituted with a directory summary.
++
++G-FILE requires main's independent semantic review. G-STAGE is run separately against read-only main with bytecode writes disabled; missing master receipt/structural validity is not acceptance. Evidence verification covers current=original hash, full77-line interval, sixteenorderedsteps, copied script context/reference hashes and actual probe receipt. Candidate adds this report and089evidence only; rollback removes them and restores no product file because none was changed. No commits, newtasks/subagents, sharedroot edits or acceptance promotion.

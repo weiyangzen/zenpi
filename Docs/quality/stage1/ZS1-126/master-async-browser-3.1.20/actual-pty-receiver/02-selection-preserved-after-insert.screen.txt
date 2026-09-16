@@ -1,0 +1,40 @@
+ zenpi | projects: [initial]                                                                                                     [<] [>] [+]
+ zenpi    Ready | model fixture-126 | tokens — | history ~7/32768 | /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-brow
+┌ Sessions  ⋮ ──────────────────────────────────────────┐┌ Events  ⋮ ──────────────────────────────────────────────────────────────────────┐
+│A126  turns=1 events=0 next=2                          ││Active leaf: root                                                                │
+│B126  turns=1 events=0 next=2                          ││0 session                                                                        │
+│> C126  turns=1 events=0 next=2                        ││1 turn                                                                           │
+│                                                       ││2 extensions_selected                                                            │
+│                                                       ││3 model_selected                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+└───────────────────────────────────────────────────────┘│                                                                                 │
+┌ Conversation ─────────────────────────────────────────┐│                                                                                 │
+│  {"accepted":true,"action":"search","command":"session││                                                                                 │
+│  ","count":2,"matches":[{"matches":1,"session":{"creat││                                                                                 │
+│  ed_at_ms":1789171200000,"event_count":0,"handoff_coun││                                                                                 │
+│  t":0,"handoff_record_count":0,"next_seq":2,"path":"./││                                                                                 │
+│  l/b.jsonl","recovery_warnings":0,"runtime_intent_coun││                                                                                 │
+│  t":0,"session_id":"B126","turn_count":1},"snippets":[││                                                                                 │
+│  "needle126"]},{"matches":1,"session":{"created_at_ms"│└─────────────────────────────────────────────────────────────────────────────────┘
+│  :1789171200000,"event_count":0,"handoff_count":0,"han│┌ Gantt  ⋮ ───────────────────────────────────────────────────────────────────────┐
+│  doff_record_count":0,"next_seq":2,"path":"./l/c.jsonl││Blueprints 0  Goals 0  gen 0                                                     │
+│  ","recovery_warnings":0,"runtime_in                  ││No persisted Blueprint or Goal                                                   │
+└───────────────────────────────────────────────────────┘│                                                                                 │
+┌ Replay  ⋮ ────────────────────────────────────────────┐│                                                                                 │
+│Journal next sequence: 4                               ││                                                                                 │
+│Transport ACK: unavailable                             ││                                                                                 │
+│Reconnect: owner required                              ││                                                                                 │
+│Mailbox: owner required                                ││                                                                                 │
+│                                                       ││                                                                                 │
+│                                                       ││                                                                                 │
+└───────────────────────────────────────────────────────┘└─────────────────────────────────────────────────────────────────────────────────┘
+┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      

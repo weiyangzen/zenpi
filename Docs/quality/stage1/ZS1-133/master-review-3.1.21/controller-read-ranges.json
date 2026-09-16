@@ -1,0 +1,43 @@
+{
+  "baseline_reads": [
+    {
+      "lines": [
+        1,
+        95
+      ],
+      "bytes": [
+        0,
+        2885
+      ],
+      "sha256": "9f4bc1c10e6ef3cf4fe64fff5e51b6386e39306214bfa9e872b049d472b0bf14"
+    },
+    {
+      "lines": [
+        96,
+        335
+      ],
+      "bytes": [
+        2885,
+        12297
+      ],
+      "sha256": "9ed69f4baa3122860fb37426814645832ca1772826ca16012ae3d1f69d20996d"
+    },
+    {
+      "lines": [
+        336,
+        583
+      ],
+      "bytes": [
+        12297,
+        23349
+      ],
+      "sha256": "30d474d2d600e84e2b1be54db8a96e559f7883133a197f88906448a00d10be83"
+    }
+  ],
+  "current_added_lines": [
+    96,
+    499
+  ],
+  "current_full_file_sha256": "8375f8bab5042cd3a49a177fb5d933d03eb3eb3a615d40c22be45c28f023d313",
+  "original_helpers_and_tests_preserved": true
+}

@@ -1,0 +1,24 @@
+{
+  "item": "ZS1-123",
+  "increment": "unborn HEAD mixed changes",
+  "complete": false,
+  "integrated": true,
+  "root_top_level_rust_passed": 90,
+  "root_nested_child_cases_excluded": 2,
+  "worker_results_not_added": true,
+  "root_host_before_failed_checks": 24,
+  "root_host_after_passed_checks": 30,
+  "initial_positive_probe_screen_assertion_failed": true,
+  "initial_positive_probe_checks_before_error": 9,
+  "corrected_only_screen_tail_expectation": true,
+  "source_before_sha256": "7006078ff6a612b1d7a3cde59965e629919444ff0fb51034f5e86c7dca239831",
+  "source_after_sha256": "e8635a418ccd613ef0587695ee9318d05e679be202494c0f04eb04651c12184e",
+  "binary_sha256": "56db8f752cc7bab821cdd3aba853dbc07974c748e65c24f5c9b22aa4870bfc68",
+  "release_verified": false,
+  "remaining": [
+    "whole123 and owner087 acceptance",
+    "final exact release and budgets",
+    "unverified error/cancel/race/platform boundaries"
+  ],
+  "prescribed_whole_item_acceptance": false
+}

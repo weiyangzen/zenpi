@@ -1,0 +1,31 @@
+{
+  "name": "independent-tests-01",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--manifest-path",
+    ".ops/stage125-render-review320/context/.ops/work/harness/Cargo.toml",
+    "--offline",
+    "--locked",
+    "--test",
+    "independent_review",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "started_at": "2026-09-12T12:52:39.423722+00:00",
+  "ended_at": "2026-09-12T12:52:52.681693+00:00",
+  "elapsed_seconds": 13.257684833,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 459767808,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/stage125-render-review320/commands/independent-tests-01.log",
+  "bytes": 3833,
+  "sha256": "e6dd8e86a7fcb99462d9be1b2f1da288b8aaa3812aacc597159716647b4f4d91"
+}

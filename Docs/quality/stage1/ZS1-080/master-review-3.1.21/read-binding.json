@@ -1,0 +1,613 @@
+{
+  "current": {
+    "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/current-extensions.rs",
+    "bytes": 20742,
+    "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+  },
+  "current_ranges": [
+    [
+      1,
+      315
+    ],
+    [
+      316,
+      626
+    ]
+  ],
+  "current_tool_chunks": [
+    "2fb8d6",
+    "c793f1"
+  ],
+  "baseline": {
+    "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/baseline-extensions.rs",
+    "bytes": 23071,
+    "sha256": "9b1879edcfb70e711960092e12060a9137e2aacda6bdc547318e5ccb7510fe39"
+  },
+  "baseline_ranges": [
+    [
+      1,
+      345
+    ],
+    [
+      346,
+      685
+    ]
+  ],
+  "baseline_tool_chunks": [
+    "ff44d1",
+    "5a3922"
+  ],
+  "report": {
+    "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/worker-report.md",
+    "bytes": 31331,
+    "sha256": "ca553c741238339f613e87fc6a13af9a513516c702f93e740d60a72768ddbb16"
+  },
+  "report_ranges": [
+    [
+      1,
+      50
+    ],
+    [
+      51,
+      100
+    ],
+    [
+      101,
+      153
+    ]
+  ],
+  "report_tool_chunks": [
+    "2fb8d6",
+    "c793f1",
+    "40a2e7"
+  ],
+  "tests": {
+    "path": "Docs/quality/stage1/ZS1-080/master-review-3.1.21/extensions-tests.rs",
+    "bytes": 6302,
+    "sha256": "00a3873257e010a9fdd337d8b913fda3f2efe101710c45ae225975ab59c2237d"
+  },
+  "tests_range": [
+    1,
+    180
+  ],
+  "tests_tool_chunk": "40a2e7",
+  "runtime_prefix": {
+    "path": "src/extension_runtime.rs",
+    "identity": {
+      "bytes": 38357,
+      "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+    },
+    "ranges": [
+      [
+        1,
+        250
+      ],
+      [
+        251,
+        440
+      ],
+      [
+        441,
+        744
+      ]
+    ],
+    "tool_chunks": [
+      "4ec23e",
+      "ff44d1",
+      "5a3922"
+    ],
+    "full_file_acceptance": false
+  },
+  "context_archive_path": "worker-ready.tar.gz",
+  "context_worker_ledger": [
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/tests/extensions.rs",
+      "whole_identity": {
+        "bytes": 6302,
+        "sha256": "00a3873257e010a9fdd337d8b913fda3f2efe101710c45ae225975ab59c2237d"
+      },
+      "path": "context/tests_extensions.rs.L0001-0180.txt",
+      "line_start": 1,
+      "line_end": 180,
+      "bytes": 6302,
+      "sha256": "00a3873257e010a9fdd337d8b913fda3f2efe101710c45ae225975ab59c2237d",
+      "read": true,
+      "order": 1
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+      "whole_identity": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "path": "context/src_extension_runtime.rs.L0001-0240.txt",
+      "line_start": 1,
+      "line_end": 240,
+      "bytes": 7558,
+      "sha256": "8793e73b2504b454b176f2dafbe41be3d3e5ab26e658ddd6e4834a553d01a667",
+      "read": true,
+      "order": 2
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+      "whole_identity": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "path": "context/src_extension_runtime.rs.L0241-0440.txt",
+      "line_start": 241,
+      "line_end": 440,
+      "bytes": 6981,
+      "sha256": "428cef6be369237356179e9aceba01e9791e6b29cc4d66a4eda286f7ce73a515",
+      "read": true,
+      "order": 3
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+      "whole_identity": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "path": "context/src_extension_runtime.rs.L0441-0647.txt",
+      "line_start": 441,
+      "line_end": 647,
+      "bytes": 7044,
+      "sha256": "d048d8c397d7b9e9d3e24fb5c23a1ff068f2133462a6d734aae3240c94ecca18",
+      "read": true,
+      "order": 4
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/extension_runtime.rs",
+      "whole_identity": {
+        "bytes": 38357,
+        "sha256": "002169d07e9d41a3f4f2526c5bbc3b2ecb63e4f6a648e37adefb7f98edf727aa"
+      },
+      "path": "context/src_extension_runtime.rs.L0648-0744.txt",
+      "line_start": 648,
+      "line_end": 744,
+      "bytes": 3503,
+      "sha256": "aee6b192b7095cf5eef60398a5cfd298c0531eab77f012e0591adda1a3f5fd22",
+      "read": true,
+      "order": 5
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L0646-0677.txt",
+      "line_start": 646,
+      "line_end": 677,
+      "bytes": 1568,
+      "sha256": "1ef355c3d2b7ff5a442590c545175218878d9dcd3e378585f222db4285e2ad9e",
+      "read": true,
+      "order": 6
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L1237-1261.txt",
+      "line_start": 1237,
+      "line_end": 1261,
+      "bytes": 850,
+      "sha256": "3ceccc1d2f93d5face09c4fb52f4b37f4d07c370c491262be6bbe428c8729d75",
+      "read": true,
+      "order": 7
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L2104-2210.txt",
+      "line_start": 2104,
+      "line_end": 2210,
+      "bytes": 3759,
+      "sha256": "94688b0e6220713802c164ac655a9791a673806971f3578fb6dc6d927b5903cc",
+      "read": true,
+      "order": 8
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L2211-2272.txt",
+      "line_start": 2211,
+      "line_end": 2272,
+      "bytes": 2591,
+      "sha256": "db2db4279e92ffd89894a29fd6a59d8d32f215b541cf493e132c66a030cd7096",
+      "read": true,
+      "order": 9
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L3353-3388.txt",
+      "line_start": 3353,
+      "line_end": 3388,
+      "bytes": 1324,
+      "sha256": "7516b1191488e9ae09df4bc17f5e90ce5dbd958cee099599fb11959f2dd52580",
+      "read": true,
+      "order": 10
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L3549-3615.txt",
+      "line_start": 3549,
+      "line_end": 3615,
+      "bytes": 2498,
+      "sha256": "c08bdc49f9cd6708a4919b34e1921f13bc31993c4dbd702b8a87bb8b736638db",
+      "read": true,
+      "order": 11
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L3660-3731.txt",
+      "line_start": 3660,
+      "line_end": 3731,
+      "bytes": 3399,
+      "sha256": "1f22cad7c5db87e87a5a79c4a972023263600585cbf9cf041882f4bfbe3427b5",
+      "read": true,
+      "order": 12
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L3980-4026.txt",
+      "line_start": 3980,
+      "line_end": 4026,
+      "bytes": 1738,
+      "sha256": "85344abb09e80bf6032df86a30a8d1f4dea6ae3465f7e7186280135912e1eba3",
+      "read": true,
+      "order": 13
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L4500-4585.txt",
+      "line_start": 4500,
+      "line_end": 4585,
+      "bytes": 3839,
+      "sha256": "0a45bcc51ca0aad576ad2123f24b2fe7ca191a92cc28a1b5be6bd1b5f570e02f",
+      "read": true,
+      "order": 14
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L4650-4717.txt",
+      "line_start": 4650,
+      "line_end": 4717,
+      "bytes": 2788,
+      "sha256": "f343b5146f38c32ebcec9cc49bed8ae64491c4af661e888052ba5591e3097bce",
+      "read": true,
+      "order": 15
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L5170-5247.txt",
+      "line_start": 5170,
+      "line_end": 5247,
+      "bytes": 3406,
+      "sha256": "3a279e6fc9b2c69c0afeed5ea5194381b0d406b283a2904dfda607647cccbf94",
+      "read": true,
+      "order": 16
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L5850-5877.txt",
+      "line_start": 5850,
+      "line_end": 5877,
+      "bytes": 1237,
+      "sha256": "30450c2b0f3ad6ee30950bed68b7b48f24158756e452ec08d0adc3a3da9e5f3b",
+      "read": true,
+      "order": 17
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/src_core.rs.L6009-6171.txt",
+      "line_start": 6009,
+      "line_end": 6171,
+      "bytes": 6803,
+      "sha256": "1ef0b18956d60418093107bf29cbc089359203adb2262d05f544fdb06e23703b",
+      "read": true,
+      "order": 18
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/security.rs",
+      "whole_identity": {
+        "bytes": 16606,
+        "sha256": "b733d0e4fe890be481acc82de39e23f01e689c9121b3343a1863bae56ceb5cc5"
+      },
+      "path": "context/src_security.rs.L0410-0440.txt",
+      "line_start": 410,
+      "line_end": 440,
+      "bytes": 1119,
+      "sha256": "078e8f749ab7343a80717f863a5dfafbc088110bbedc8dbbae84a8bd26bc36f8",
+      "read": true,
+      "order": 19
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/main.rs",
+      "whole_identity": {
+        "bytes": 234,
+        "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b"
+      },
+      "path": "context/src_main.rs.L0001-0011.txt",
+      "line_start": 1,
+      "line_end": 11,
+      "bytes": 234,
+      "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b",
+      "read": true,
+      "order": 20
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/runner.ts",
+      "whole_identity": {
+        "bytes": 39774,
+        "sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084"
+      },
+      "path": "context/packages_coding-agent_src_core_extensions_runner.ts.L0927-1070.txt",
+      "line_start": 927,
+      "line_end": 1070,
+      "bytes": 4030,
+      "sha256": "232223c9857b989adfa5543b12bae560ce9350a4fd6174ef9c5b433564d54605",
+      "read": true,
+      "order": 21
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/runner.ts",
+      "whole_identity": {
+        "bytes": 39774,
+        "sha256": "6d5101ab0551c2ddd904a8089cc221b3c448fcfe36c27e36da02cdacc869c084"
+      },
+      "path": "context/packages_coding-agent_src_core_extensions_runner.ts.L1246-1286.txt",
+      "line_start": 1246,
+      "line_end": 1286,
+      "bytes": 1204,
+      "sha256": "9badb475ff8d5ef7bc7b783ab145698735e2904ca11884a781925abd26ca3255",
+      "read": true,
+      "order": 22
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "whole_identity": {
+        "bytes": 669221,
+        "sha256": "801bffa879a211fc8b1fe3f43463dd38584f7f570b870d91f0c5ba2258d79c02"
+      },
+      "path": "context/additional/tui.rs.L11668-11766.txt",
+      "line_start": 11668,
+      "line_end": 11766,
+      "bytes": 5160,
+      "sha256": "8b525f7d0f06eaa2179861c2517c7505425f3604ee69b7ef41393d013f4b3329",
+      "read": true,
+      "order": 23
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/tui.rs",
+      "whole_identity": {
+        "bytes": 669221,
+        "sha256": "801bffa879a211fc8b1fe3f43463dd38584f7f570b870d91f0c5ba2258d79c02"
+      },
+      "path": "context/additional/tui.rs.L13315-13370.txt",
+      "line_start": 13315,
+      "line_end": 13370,
+      "bytes": 2386,
+      "sha256": "f27f4bb0408ff3197950099899e1d20e15e771bef11e1a68a203f9292103cc7b",
+      "read": true,
+      "order": 24
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/headless.rs",
+      "whole_identity": {
+        "bytes": 370207,
+        "sha256": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
+      },
+      "path": "context/additional/headless.rs.L0774-0788.txt",
+      "line_start": 774,
+      "line_end": 788,
+      "bytes": 547,
+      "sha256": "13df1e7bd903f6af0fdce10b87ebb1dc98f19ef5ff050de6ce5e0dbafa06d531",
+      "read": true,
+      "order": 25
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/headless.rs",
+      "whole_identity": {
+        "bytes": 370207,
+        "sha256": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
+      },
+      "path": "context/additional/headless.rs.L4272-4292.txt",
+      "line_start": 4272,
+      "line_end": 4292,
+      "bytes": 846,
+      "sha256": "6f3720e54247ee58b253027a28c8f88723c04270ef34bb8a15c9cc6614391190",
+      "read": true,
+      "order": 26
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/headless.rs",
+      "whole_identity": {
+        "bytes": 370207,
+        "sha256": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
+      },
+      "path": "context/additional/headless.rs.L4333-4508.txt",
+      "line_start": 4333,
+      "line_end": 4508,
+      "bytes": 8854,
+      "sha256": "e5fee0f6728a3905b9c6386c9ac16da6e3a42d5438dacfe2dd745453f7a53a38",
+      "read": true,
+      "order": 27
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/headless.rs",
+      "whole_identity": {
+        "bytes": 370207,
+        "sha256": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
+      },
+      "path": "context/additional/headless.rs.L4770-4815.txt",
+      "line_start": 4770,
+      "line_end": 4815,
+      "bytes": 1870,
+      "sha256": "547ae2b8a5ac88c0f72f598ea9634a166a5f398f7ea69d38b3db10a3b342c4d7",
+      "read": true,
+      "order": 28
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "whole_identity": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "path": "context/additional/core.rs.L5248-5270.txt",
+      "line_start": 5248,
+      "line_end": 5270,
+      "bytes": 894,
+      "sha256": "87a8bc597cd74e74315a2bde212cf277b6a72a6f1d257bf3efcab4aed0671bc0",
+      "read": true,
+      "order": 29
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/tools.rs",
+      "whole_identity": {
+        "bytes": 119778,
+        "sha256": "c3149b926933e5800cd41a2e8d3fcf6f109f8a455f2ef6ed8e2d48d696dbe33c"
+      },
+      "path": "context/additional/tools.rs.L1000-1067.txt",
+      "line_start": 1000,
+      "line_end": 1067,
+      "bytes": 1859,
+      "sha256": "f8383b0a63a623d33b243570e10206e1bfe8033db4b5d13f0f0a90d6e1f51838",
+      "read": true,
+      "order": 30
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/tools.rs",
+      "whole_identity": {
+        "bytes": 119778,
+        "sha256": "c3149b926933e5800cd41a2e8d3fcf6f109f8a455f2ef6ed8e2d48d696dbe33c"
+      },
+      "path": "context/additional/tools.rs.L1125-1201.txt",
+      "line_start": 1125,
+      "line_end": 1201,
+      "bytes": 2579,
+      "sha256": "07a95573be509e0edf46af2a31546fe77feb111a89be38c9d8a78bb41fe29273",
+      "read": true,
+      "order": 31
+    },
+    {
+      "original": "/Users/wangweiyang/GitHub/zenpi/src/tools.rs",
+      "whole_identity": {
+        "bytes": 119778,
+        "sha256": "c3149b926933e5800cd41a2e8d3fcf6f109f8a455f2ef6ed8e2d48d696dbe33c"
+      },
+      "path": "context/additional/tools.rs.L1202-1408.txt",
+      "line_start": 1202,
+      "line_end": 1408,
+      "bytes": 7785,
+      "sha256": "c0178876e2a9437206d1a6a2d1f82931318b70aa5f3bc3fdbac7499cfb283667",
+      "read": true,
+      "order": 32
+    }
+  ],
+  "root_exact_archived_context_indices_zero_based": [
+    5,
+    6,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    29
+  ],
+  "root_context_tool_chunks": [
+    "c2bab8",
+    "758e99"
+  ],
+  "extra_current_context": {
+    "tool_chunk": "cb471d",
+    "ranges": {
+      "src/core.rs": [
+        [
+          2108,
+          2285
+        ],
+        [
+          5234,
+          5278
+        ]
+      ],
+      "src/tools.rs": [
+        [
+          1118,
+          1207
+        ],
+        [
+          1336,
+          1417
+        ]
+      ],
+      "src/security.rs": [
+        [
+          410,
+          430
+        ]
+      ]
+    }
+  },
+  "new_product_executions": 0,
+  "root_auditor_static_read": "43ff9d",
+  "root_auditor_single_run": "cf07d4"
+}

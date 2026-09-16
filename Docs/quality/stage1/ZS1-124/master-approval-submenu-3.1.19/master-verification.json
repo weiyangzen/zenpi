@@ -1,0 +1,27 @@
+{
+  "complete": false,
+  "repair_passed": true,
+  "whole_requirement_open": true,
+  "changed_paths": [
+    "src/tui.rs",
+    "tests/tui_command_palette.rs",
+    "tools/tui_approval_smoke.py"
+  ],
+  "rust_cases": 24,
+  "selector_checks": 26,
+  "legacy_approval_checks": 14,
+  "before_expected_failed_checks": 12,
+  "after_actual_http_requests": 20,
+  "current_source_inputs_verified": 51,
+  "legacy_main_ast_unchanged": true,
+  "binaries": {
+    "before": {
+      "bytes": 50308232,
+      "sha256": "24721d51a33955057380e20126cbc569706ac17b82c3ce8c370a059a19674c77"
+    },
+    "after": {
+      "bytes": 50308232,
+      "sha256": "b32c8b132e3d2bc72059e396066403f52eaa31c15c731c420f50cb1a59391c38"
+    }
+  }
+}

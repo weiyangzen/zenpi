@@ -1,0 +1,31 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-57-82.txt b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-57-82.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/user_smoke-57-82.txt
+@@ -0,0 +1,26 @@
++
++_ZENPI_ENV_KEYS = {
++    "CODEX_HOME",
++    "OPENAI_API_KEY",
++    "OPENAI_BASE_URL",
++    "ZENPI_API_KEY",
++    "ZENPI_BACKEND",
++    "ZENPI_BASE_URL",
++    "ZENPI_DOMAIN_STORE",
++    "ZENPI_EXECUTION_STORE",
++    "ZENPI_HOME",
++    "ZENPI_MODEL",
++    "ZENPI_PROFILE",
++    "ZENPI_SESSION",
++    "ZENPI_WIRE_API",
++}
++
++
++def isolated_env(home: Path, **overrides: str) -> dict[str, str]:
++    """Retain toolchain variables while excluding host agent credentials/config."""
++    env = {key: value for key, value in os.environ.items() if key not in _ZENPI_ENV_KEYS}
++    env.update({"HOME": str(home), "ZENPI_HOME": str(home / ".zenpi"), **overrides})
++    home.mkdir(parents=True, exist_ok=True)
++    return env
++
++

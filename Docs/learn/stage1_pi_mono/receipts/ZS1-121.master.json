@@ -1,0 +1,136 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-121",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "integrated_tree_sha256": "ab1bdd48ccc7799db6e67baa8e7d5da943201aeaad816d456762d6d758dfc3c5",
+  "validators": "G-CODE、G-HOST；cargo test --locked --test tui_project_workspace --test stage1_project_config；python3 tools/tui_project_workspace_smoke.py --binary target/release/zenpi",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "tui_project_workspace",
+        "--test",
+        "stage1_project_config"
+      ],
+      "cwd": ".",
+      "ended_at": "2026-09-13T16:59:06.331221+00:00",
+      "env_names": [],
+      "executed_by": "controller",
+      "exit_code": 0,
+      "started_at": "2026-09-13T16:59:06.331221+00:00",
+      "stdout": {
+        "path": "Docs/quality/stage1/ZS1-121/master-review-current/tui_project_workspace.test.txt",
+        "bytes": 2724,
+        "sha256": "e27436469923a35355da1003ac613d18e3ab6b71fa26bb8cd3c19a1429935fd8"
+      },
+      "stderr": {
+        "path": "Docs/quality/stage1/ZS1-121/master-review-current/pty-smoke.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tests_run": 18
+    },
+    {
+      "argv": [
+        "python3",
+        "tools/tui_project_workspace_smoke.py",
+        "--binary",
+        "target/release/zenpi"
+      ],
+      "cwd": ".",
+      "ended_at": "2026-09-13T16:59:06.331221+00:00",
+      "env_names": [],
+      "executed_by": "controller",
+      "exit_code": 0,
+      "started_at": "2026-09-13T16:59:06.331221+00:00",
+      "stdout": {
+        "path": "Docs/quality/stage1/ZS1-121/master-review-current/pty-smoke.stdout",
+        "bytes": 623,
+        "sha256": "63140d84d44610f584252a0fefadb66968323fc1433585c759f8049ab177a3ea"
+      },
+      "stderr": {
+        "path": "Docs/quality/stage1/ZS1-121/master-review-current/pty-smoke.stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "scenarios": {
+    "positive": {
+      "expected": "Top + opens picker; confirming a directory binds label/cwd/session/tool root and real shell output stays in selected roots.",
+      "actual": "PTY smoke passed top-row plus, picker confirmation, duplicate basename isolation, real shell writes, cwd/session headers, and owner switching.",
+      "evidence": "Docs/quality/stage1/ZS1-121/master-review-current/pty-evidence"
+    },
+    "negative": {
+      "expected": "Esc, invalid paths, and workspace mismatches create no placeholder and preserve active state.",
+      "actual": "PTY smoke passed cancellation/invalid path and mismatch assertions.",
+      "evidence": "Docs/quality/stage1/ZS1-121/master-review-current/pty-evidence"
+    },
+    "cancel": {
+      "expected": "Picker cancellation leaves existing tab/draft unchanged.",
+      "actual": "PTY smoke passed cancellation assertion.",
+      "evidence": "Docs/quality/stage1/ZS1-121/master-review-current/pty-evidence"
+    },
+    "restart": {
+      "expected": "Restart restores selected runtime and draft owner.",
+      "actual": "PTY smoke passed restart restore assertion.",
+      "evidence": "Docs/quality/stage1/ZS1-121/master-review-current/pty-evidence"
+    }
+  },
+  "binary": {
+    "path": "target/release/zenpi",
+    "bytes": 6094160,
+    "sha256": "972e9cb6049353034941708a930705b9dcdc3bcc53aead4b2cd08f390bd2ecc5"
+  },
+  "resource_peaks": {
+    "processes": "bounded by smoke harness; no live worker remains"
+  },
+  "rollback": "PTY harness terminates child process and restores terminal; failed/cancelled picker performs no checkpoint write.",
+  "artifacts": [
+    {
+      "path": "Docs/quality/stage1/ZS1-121/master-review-current/review.md",
+      "bytes": 556,
+      "sha256": "d9812545aa1b9e5a604f104a79eda0c01ec6daf1c43b1b9c199d298b22bcbde8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-121/master-review-current/tui_project_workspace.test.txt",
+      "bytes": 2724,
+      "sha256": "e27436469923a35355da1003ac613d18e3ab6b71fa26bb8cd3c19a1429935fd8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-121/master-review-current/pty-evidence",
+      "bytes": 689,
+      "sha256": "a4592036c1ba3f4ed0e85aadaa6aad5710320be7b88b62cb82f2f1bb4757c549"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-121/master-review-current/pty-smoke.stdout",
+      "bytes": 623,
+      "sha256": "63140d84d44610f584252a0fefadb66968323fc1433585c759f8049ab177a3ea"
+    },
+    {
+      "path": "target/release/zenpi",
+      "bytes": 6094160,
+      "sha256": "972e9cb6049353034941708a930705b9dcdc3bcc53aead4b2cd08f390bd2ecc5"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-121/master-review-current/review.md",
+      "bytes": 556,
+      "sha256": "d9812545aa1b9e5a604f104a79eda0c01ec6daf1c43b1b9c199d298b22bcbde8"
+    },
+    "findings": "真实 PTY smoke 与定向 Rust tests 共同证明顶部加号目录 picker、项目分页、cwd/session/tool-root owner 绑定、负例取消、重启恢复与跨目录 shell 隔离。"
+  }
+}

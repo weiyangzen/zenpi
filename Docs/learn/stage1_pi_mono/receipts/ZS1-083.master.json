@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-083",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-083",
+  "source_path": "src/governance.rs",
+  "source_hash": "4d80ffb9f29bb987e488bad93bc35546a6994065e793bd645fc3d73802930552",
+  "read_ranges": [
+    [
+      0,
+      44516
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/governance.rs_learn.md",
+      "bytes": 1979,
+      "sha256": "d0bd51013ce928a2cd687c4067e49aa2343d443950f484a3b8b1bfe77db49ee8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-083/master-review-current/review.md",
+      "bytes": 442,
+      "sha256": "8870021f3f5a1664f393cfcd85c38ea18e73729475392abc1173ff9374e067b3"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-083/master-review-current/review.md",
+      "bytes": 442,
+      "sha256": "8870021f3f5a1664f393cfcd85c38ea18e73729475392abc1173ff9374e067b3"
+    },
+    "findings": "完整读取 governance.rs，覆盖有界领域校验、规范化 blueprint 与 DAG、lease/goal 生命周期预算、learn evidence 及非执行边界。"
+  }
+}

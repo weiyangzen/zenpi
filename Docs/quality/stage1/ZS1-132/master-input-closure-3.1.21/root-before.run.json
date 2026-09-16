@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "2",
+    "--test",
+    "headless_input_shutdown",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T18:04:46.696927+00:00",
+  "ended_at": "2026-09-12T18:04:57.091124+00:00",
+  "exit_code": 101,
+  "pid": 41456,
+  "reaped": true,
+  "timed_out": false,
+  "log": {
+    "bytes": 7126,
+    "sha256": "c7288dde71b8fe32e9fe443ceed1dd39b92aaf851d188bdd9360761b84278c92"
+  }
+}

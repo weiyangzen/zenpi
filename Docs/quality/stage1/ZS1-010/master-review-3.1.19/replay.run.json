@@ -1,0 +1,24 @@
+{
+  "name": "replay",
+  "argv": [
+    "env",
+    "NODE_BIN=/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "sh",
+    ".ops/stage1_execution/source010-integration/work/run.sh"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:14:14.136391+00:00",
+  "ended_at": "2026-09-12T05:14:14.142867+00:00",
+  "elapsed_seconds": 0.00634175,
+  "exit_code": 127,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1998848,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source010-integration/replay.log",
+  "bytes": 87,
+  "sha256": "4801d05e2f8f66da18987350cb53ff66998381c255a9905afa762260461c7399"
+}

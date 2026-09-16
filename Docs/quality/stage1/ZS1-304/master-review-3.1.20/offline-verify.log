@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "manifest_sha256": "0f45c4db1bc94d7efa8be1ead4dfaf66102803ada90bf7e378cb8d28d011c579",
+  "artifacts": 63,
+  "source_tests_read": 3,
+  "source_tests_executed": 0,
+  "capability_groups": 10,
+  "patch_operations": [
+    {
+      "delta": "master",
+      "phase": "forward_check",
+      "passed": true
+    },
+    {
+      "delta": "master",
+      "phase": "forward",
+      "passed": true
+    },
+    {
+      "delta": "master",
+      "phase": "reverse_check",
+      "passed": true
+    },
+    {
+      "delta": "master",
+      "phase": "reverse",
+      "passed": true
+    },
+    {
+      "delta": "worker",
+      "phase": "forward_check",
+      "passed": true
+    },
+    {
+      "delta": "worker",
+      "phase": "forward",
+      "passed": true
+    },
+    {
+      "delta": "worker",
+      "phase": "reverse_check",
+      "passed": true
+    },
+    {
+      "delta": "worker",
+      "phase": "reverse",
+      "passed": true
+    }
+  ],
+  "exact_report_bytes": true,
+  "unrelated_sentinel_preserved": true,
+  "scope": "offline package integrity only; semantic G-FILE pending",
+  "cargo_runs": 0,
+  "pty_runs": 0,
+  "http_runs": 0
+}

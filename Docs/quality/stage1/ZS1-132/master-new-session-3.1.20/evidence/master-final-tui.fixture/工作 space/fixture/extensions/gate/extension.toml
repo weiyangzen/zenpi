@@ -1,0 +1,6 @@
+name='gate'
+version='1.0.0'
+api_version=2
+executable='plugin'
+hook_timeout_ms=1000
+hooks=['session_start']

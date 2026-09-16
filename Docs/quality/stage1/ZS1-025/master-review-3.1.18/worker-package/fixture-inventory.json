@@ -1,0 +1,128 @@
+[
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/abort/grand-ready",
+    "bytes": 5,
+    "sha256": "8e0609bf73b705bf23f9ba979df1837440604312ab67628c4b1003fd1b12934b",
+    "compressed_file": "fixtures/000.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/abort/pids.json",
+    "bytes": 35,
+    "sha256": "448dfe1d94070aaa7ecdde0613d6ac399268d2a3ed2c2332c6f46fb95d567232",
+    "compressed_file": "fixtures/001.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/active-descendant/pids.json",
+    "bytes": 35,
+    "sha256": "bd932020b8c6a9d5e75b556e09a0b0c950bb3baa5faf1ec591b7b6b2079479bd",
+    "compressed_file": "fixtures/002.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/quiet-descendant/pids.json",
+    "bytes": 35,
+    "sha256": "d25b52a5f29243a59a25362639937fe70229ffd2672f5b3a88c78aec92b1694b",
+    "compressed_file": "fixtures/003.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/stream/release",
+    "bytes": 2,
+    "sha256": "4cd0e21a9a0795a14ec9aa5f0e7d1abff0492565770e43eafdf1e3e8afed1f33",
+    "compressed_file": "fixtures/004.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/stream/stream-ready",
+    "bytes": 5,
+    "sha256": "b24d6d33736ecd5604a4b17bc9c6481039fac362bb7df044ef1c10a2bfd21db6",
+    "compressed_file": "fixtures/005.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/timeout/grand-ready",
+    "bytes": 5,
+    "sha256": "3d47608310ae3f29f0aec329596898b39e2b29f0952ab395963094602aaac150",
+    "compressed_file": "fixtures/006.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/timeout/heartbeat",
+    "bytes": 2,
+    "sha256": "35135aaa6cc23891b40cb3f378c53a17a1127210ce60e125ccf03efcfdaec458",
+    "compressed_file": "fixtures/007.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/artifacts/fs-7Qb8um/timeout/pids.json",
+    "bytes": 35,
+    "sha256": "c64bd1b04c27417504aa9a13da144711e5a1600895c392c0443be7d19dfbc6e0",
+    "compressed_file": "fixtures/008.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-1c5c60d93767a6a9.log",
+    "bytes": 19890,
+    "sha256": "73e887b433e9113d0e8c61bc80c9f55b3ee6c3b11e748a1ebbe6fdeac223b184",
+    "compressed_file": "fixtures/009.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-22b3e7b596fcb5cb.log",
+    "bytes": 60012,
+    "sha256": "15ce5d51f3c06592ca4b940bd9732f1094eef42ddd5c44c6e210a1193f42fce6",
+    "compressed_file": "fixtures/010.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-33156a6e556d9781.log",
+    "bytes": 60012,
+    "sha256": "15ce5d51f3c06592ca4b940bd9732f1094eef42ddd5c44c6e210a1193f42fce6",
+    "compressed_file": "fixtures/011.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-4ddbf7cb3a8bb38d.log",
+    "bytes": 55004,
+    "sha256": "159fb5a24770f42f8d685fc16cb6d801cc85c2291ba6a75cc3633b361434f32c",
+    "compressed_file": "fixtures/012.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-558075379973546c.log",
+    "bytes": 60012,
+    "sha256": "15ce5d51f3c06592ca4b940bd9732f1094eef42ddd5c44c6e210a1193f42fce6",
+    "compressed_file": "fixtures/013.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-5b1b80d1699b954d.log",
+    "bytes": 19890,
+    "sha256": "73e887b433e9113d0e8c61bc80c9f55b3ee6c3b11e748a1ebbe6fdeac223b184",
+    "compressed_file": "fixtures/014.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-62d82e605388278a.log",
+    "bytes": 60012,
+    "sha256": "15ce5d51f3c06592ca4b940bd9732f1094eef42ddd5c44c6e210a1193f42fce6",
+    "compressed_file": "fixtures/015.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-7b4dbeabde719074.log",
+    "bytes": 55004,
+    "sha256": "159fb5a24770f42f8d685fc16cb6d801cc85c2291ba6a75cc3633b361434f32c",
+    "compressed_file": "fixtures/016.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-7e195b07dd8148cc.log",
+    "bytes": 154000,
+    "sha256": "77e431d55479e9e7af0bfaa9ef9c9b94fec996bfd103f3e264fc113f72afb664",
+    "compressed_file": "fixtures/017.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-858b54b27e6f9f4c.log",
+    "bytes": 120526,
+    "sha256": "d78175f56be2fa82df33c9abc1a49191e0b96af7a85b02fc2af9d3c9bd9b42a8",
+    "compressed_file": "fixtures/018.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-d31bb9e2d95e2448.log",
+    "bytes": 120526,
+    "sha256": "d78175f56be2fa82df33c9abc1a49191e0b96af7a85b02fc2af9d3c9bd9b42a8",
+    "compressed_file": "fixtures/019.gz"
+  },
+  {
+    "original_path": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source025/tmp/pi-bash-ed9182cd6bd5422f.log",
+    "bytes": 154000,
+    "sha256": "77e431d55479e9e7af0bfaa9ef9c9b94fec996bfd103f3e264fc113f72afb664",
+    "compressed_file": "fixtures/020.gz"
+  }
+]

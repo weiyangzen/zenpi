@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-079",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-079",
+  "source_path": "src/slash.rs",
+  "source_hash": "d0702d86e3cf8087dbc09a3fe68c9067dd6bed9f37f499abcdb7e0131927a1c9",
+  "read_ranges": [
+    [
+      0,
+      81726
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/slash.rs_learn.md",
+      "bytes": 2305,
+      "sha256": "6bde31587e8b473ac6fd175aeb30916ad64fd92a964a3c3cc6673d7e0832fd5e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/master-review-current/review.md",
+      "bytes": 369,
+      "sha256": "494274e1bee822f9e0b0769deea55b17d17b3ba092c392815ab0bdd7a60b7785"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-079/master-review-current/review.md",
+      "bytes": 369,
+      "sha256": "494274e1bee822f9e0b0769deea55b17d17b3ba092c392815ab0bdd7a60b7785"
+    },
+    "findings": "完整读取 slash.rs，覆盖 typed grammar、fail-closed route/parse、completion/help、project/session/layout/queue/tree/output parsers 与 host boundary。"
+  }
+}

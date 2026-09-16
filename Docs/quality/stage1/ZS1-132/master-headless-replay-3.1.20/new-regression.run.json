@@ -1,0 +1,26 @@
+{
+  "name": "new-regression",
+  "argv": [
+    "python3",
+    "tools/tui_session_new_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/headless-new-replay-integration/zenpi",
+    "--evidence",
+    ".ops/stage1_execution/headless-new-replay-integration/new-regression.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T11:05:52.924154+00:00",
+  "ended_at": "2026-09-12T11:06:05.144009+00:00",
+  "elapsed_seconds": 12.219588292,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 74530816,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/new-regression.log",
+  "bytes": 852,
+  "sha256": "6e847f3566fedc5327dec1c9fce2e4d7743ba6046736a71ed766cdadb0dffc1c"
+}

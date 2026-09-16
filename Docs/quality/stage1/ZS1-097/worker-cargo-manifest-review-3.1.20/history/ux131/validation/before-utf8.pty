@@ -1,0 +1,5 @@
+READY
+FIRST=Key(KeyEvent { code: Char('g'), modifiers: KeyModifiers(CONTROL), kind: Press, state: KeyEventState(0x0) })
+DRAINED=[]
+FLUSHED
+AFTER=Key(KeyEvent { code: Char('界'), modifiers: KeyModifiers(0x0), kind: Press, state: KeyEventState(0x0) })

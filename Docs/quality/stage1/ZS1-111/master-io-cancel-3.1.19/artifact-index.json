@@ -1,0 +1,1614 @@
+{
+  "artifacts": [
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/actual-review.json",
+      "bytes": 475,
+      "sha256": "f439d46074039106348c1b29b7b304a4c0af563705211cd3e977cd6f4ee9adcc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/after.log",
+      "bytes": 12343,
+      "sha256": "740cfdc4e0207b46d8aa2125f5af826660a67db60bcba67d12d926794331a3a7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/after.run.json",
+      "bytes": 969,
+      "sha256": "7c9cad34963c108a208015b44a06538991007daed865e4c68034ddacb6cc64f1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/audit-correction.md",
+      "bytes": 254,
+      "sha256": "466850917d1578c39a180caed3a6d53289c7ca20cf8bb0da504389aca434f7f6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/before.log",
+      "bytes": 1611,
+      "sha256": "d3acd06c54e3fce09f7a9127644dc57dce777bb396228800ce472393fd553183"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/before.run.json",
+      "bytes": 956,
+      "sha256": "1c80fa5cb86ac21d41c3ac7ef2b78b3063c14733ebc8f80e39349dd239ad82ba"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/binary-binding.json",
+      "bytes": 232,
+      "sha256": "e536b48805cacae2c3faf6feb6e5e2c4e59ebeb64a91b572b2e330c1d54b3400"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/build-cli.log",
+      "bytes": 819,
+      "sha256": "6d211c93d8163765b0e248e24fe870339be4a9c66fd6957fb9cf8ee27594199c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/build-cli.run.json",
+      "bytes": 832,
+      "sha256": "a66149ab72f90ccf53595cf1841f3d17b39f169acb6ea9994da60df0ded10374"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill-output/1595bb65a036ec26ef6ac996e621f90e3744be2d571070b2b8a8585b5db84f54.json",
+      "bytes": 374,
+      "sha256": "6189a033804af2feff86251a3111e90e86cfe9c5a5cc064324b8336b6f8e67b1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill-output/1595bb65a036ec26ef6ac996e621f90e3744be2d571070b2b8a8585b5db84f54.raw",
+      "bytes": 4114,
+      "sha256": "5e606f2c0f402dbf6d3ce9ed1c717f3d5b3a8ba1aed48747674827d70d9b85ae"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill-output/79121c6ff453ffd811dd9b0dcbbecbfe9fcaecd657af4c8e6e10db72a44cd2ed.json",
+      "bytes": 374,
+      "sha256": "3c5b8f2bb276669244febe017e6c885ce8e112c8e143081937b72755f67ff871"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill-output/79121c6ff453ffd811dd9b0dcbbecbfe9fcaecd657af4c8e6e10db72a44cd2ed.raw",
+      "bytes": 17,
+      "sha256": "b46364a98da1ee27c29169f6ed616271b1a21c882203a0784bb0de7a186d9f11"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill.session.jsonl",
+      "bytes": 2305,
+      "sha256": "626432345bb69e00778103da876a06d89ddd43014581c1a3ef939ea897dd2a27"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/after-kill.session.jsonl.reconnect",
+      "bytes": 21058,
+      "sha256": "51575b551acf8cfbb5792a5dbae1abc5a4c790788f2a9c07dc852dd62b35edad"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/artifact-index.json",
+      "bytes": 5132,
+      "sha256": "f1c9c384022bfcf9fba37c84d715bb7075b718a2ca7ff9f5e0277ebae1bb4b8f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/child-done",
+      "bytes": 29,
+      "sha256": "ab29ba40a7671c21306b8a4d9a1130e82c4503569b07843e7454319fc4d58433"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/child-pid.txt",
+      "bytes": 5,
+      "sha256": "1f37f3e44260e472ba7eb29d8cd01e85837ee34882e03da5071ef7f163127c82"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/cleanup-result.json",
+      "bytes": 505,
+      "sha256": "4566868bf35319715b9ce0b3c15084415e4cd776ad68534794a6bceea6bb26d2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/effect.py",
+      "bytes": 444,
+      "sha256": "1d87f16ab26dda634fcac816a470151b41f01e910ae2b2b03e9278e2d63369e9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/effects.txt",
+      "bytes": 6,
+      "sha256": "c89d6966e9327382a8a6cbafabc0c5c74e288f4fbf09baf4cd5362160d442f71"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/http-server-result.json",
+      "bytes": 71,
+      "sha256": "fe7432e0afa344a96b594a0e8de88607ef1e4be1008d6f5db01fb6e13af204d0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/orphan-read-result.json",
+      "bytes": 538,
+      "sha256": "345abb61d02e819dcfb8fdfd80abb38cb15af2fff9c5f5a8716495febc875fa4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-one.exit.json",
+      "bytes": 68,
+      "sha256": "53b2d962bcc8894a49ea8049b65b80701de39bad43a5de3bc849a42cb15b8251"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-one.process.json",
+      "bytes": 677,
+      "sha256": "27722cc330c593db852662bdc739d4a7ad174647e2ea738061996b64bac5e705"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-one.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-one.stdin.jsonl",
+      "bytes": 343,
+      "sha256": "f15ab7c8a0568fd101a0ad8852a7eb79dcb6260b403705c663911100e2a551d8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-one.stdout.jsonl",
+      "bytes": 18169,
+      "sha256": "8bcb041ea84b356036b69994c82b34ee8cc239c646added3f0442a211c25c4d7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-three.exit.json",
+      "bytes": 68,
+      "sha256": "69d994cbce3cae0077ff41f117830626626624091289c915eef3ceaae3384ab9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-three.process.json",
+      "bytes": 677,
+      "sha256": "fa5706eee386b728ec47688cd2738a94d241bc700563ba8524572ab1004215a7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-three.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-three.stdin.jsonl",
+      "bytes": 247,
+      "sha256": "0ad5f4e31b943911bee49f0ef9ca5f6834e6e3a430a6b2db1784899fb7a3b3b0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-three.stdout.jsonl",
+      "bytes": 859,
+      "sha256": "b3b7f40e0ed5fd9bf64d077c12d7b2125f7c1ad2d55e6bbc1c3dc582920a6f2d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-two.exit.json",
+      "bytes": 68,
+      "sha256": "a319511f54f0e854ed4f3874bbf1e4b130cf105d07618becbc50340760a35821"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-two.process.json",
+      "bytes": 677,
+      "sha256": "ec7a5402ad0950f357d6a96f4e606547ec00686bcfb7972b1dc5a75f1b9f0aa2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-two.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-two.stdin.jsonl",
+      "bytes": 1361,
+      "sha256": "a01da3d7f284adebb71d0ddd23478f476c30fbf04fe597df8202b132b7beed10"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/owner-two.stdout.jsonl",
+      "bytes": 26847,
+      "sha256": "8f00163f334b8a1fad1467ff39477263ffa36c0f6309d9fa96f18aba578812bd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/recovery-inspect.json",
+      "bytes": 1328,
+      "sha256": "d4443a52c714479a29d00c0b34cf7fb3c708a4ff57c0de80ff0fac7245245dd3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/release-child",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/result.json",
+      "bytes": 647,
+      "sha256": "583b5b526dedbc06e01a46a5b75240e514f1fb1324b5b7fb3e85712e06d5edfc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/session.jsonl",
+      "bytes": 5697,
+      "sha256": "0a380d0c02e388587d8019cdb3ed0bd6550698e399dd809f4a854c2259d697c4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/session.jsonl.reconnect",
+      "bytes": 35421,
+      "sha256": "979c57f94a341c01c04b2e20f81a2c4d6b966f880870113d853c96e7771a8438"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill-master/user/config.toml",
+      "bytes": 95,
+      "sha256": "ce601206e2fba208826a3d2a62bccc54e56445871b2fe8a01b4e06794c908913"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill.log",
+      "bytes": 45,
+      "sha256": "294f35971ce1d71fbc8245d21e4f79eb618693efbe04f2f290b8c564839884ce"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command-kill.run.json",
+      "bytes": 819,
+      "sha256": "7aea4780825a46a324874d465264572641d54bcb48cf22bf385d956046ff560f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/command_kill_probe.py",
+      "bytes": 7004,
+      "sha256": "6dde62c3d423aae2159cb4650aa3eecf098affe879dd06f98181b46f495decce"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/current-inputs.json",
+      "bytes": 13608,
+      "sha256": "3f0b498d9ab18ef8ea1bf49cb271d0e42c34aa68e12eda705410a21e3f4a3f5d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/fmt.run.json",
+      "bytes": 793,
+      "sha256": "0d57b76a1e1653dd8e67cb268936d1d2e1e2623534abaf002a52ba9859df7cef"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/actual-kernel-io.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/actual-kernel-io.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/added-tests.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/binary-binding.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/build-cli.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/build-cli.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/candidate/src/tool_output.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/candidate/tests/stage1_tool_output.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/candidate-inputs.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/captured-main-inputs.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/effect.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.process.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stdin.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stdout.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/release-child",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/user/config.toml",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.raw",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.raw",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill.session.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill.session.jsonl.reconnect",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/child-done",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/child-pid.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/cleanup-result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/effect.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/effects.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/http-server-result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/orphan-read-result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.exit.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.process.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stdin.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stdout.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.exit.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.process.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stdin.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stdout.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.exit.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.process.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdin.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdout.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/recovery-inspect.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/release-child",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/session.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/session.jsonl.reconnect",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/user/config.toml",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command_kill_probe-v1.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/command_kill_probe.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/fmt.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/g-stage-main.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/g-stage-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-after-fix.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-after-fix.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-before-fix.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-before-fix.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-build-failed.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-corrected.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-corrected.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-only.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/scoped-clippy.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/scoped-clippy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/selector-at-capture.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/stage1_tool_output.baseline.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/tool_output.baseline.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/Docs/quality/stage1/ZS1-111/worker-io319/verify_evidence.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/src/tool_output.rs",
+      "bytes": 61670,
+      "sha256": "6b24c89dbc8b49a5721fea0e74de00db0c3f9826614b4de65a76e4c8fe007327"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/base/tests/stage1_tool_output.rs",
+      "bytes": 88654,
+      "sha256": "cd740ed370f053a4a87ff791dd28276213e8744ab3320ba8b1ae49d61f939ef4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/candidate.patch",
+      "bytes": 804265,
+      "sha256": "d3f11f86a903923c3e56fec91de3ef18b2fbeb131a3501cff85e2e64bff74ee3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/README.md",
+      "bytes": 7330,
+      "sha256": "be00d97f543964f15b802ff9eb4bd7b6213d51e0080e0be0284404a6505603fc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/actual-kernel-io.json",
+      "bytes": 1033,
+      "sha256": "847c79af14004c85231049e3c99fdd0532a8c3030818cb8b640a8c37e5518372"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/actual-kernel-io.log",
+      "bytes": 2156,
+      "sha256": "ac28ca69a2d3be3f2e78b754326b7b1285f8be6db70543e573883473533a5c4c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/added-tests.rs",
+      "bytes": 8001,
+      "sha256": "0bb5854013813dc6774c6373c98b7bd9a7c6a527c1d2d2bb2b24d1558e0b95d0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/artifact-index.json",
+      "bytes": 16903,
+      "sha256": "3882322350262dba31fa3f83d24fd67ad74b98b363c35d10751bf03c0d71b414"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/binary-binding.json",
+      "bytes": 360,
+      "sha256": "f4343b2303e1d95bcb26e8941a817b351cd71d23c5e50d5b33ac2903822c0694"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/build-cli.json",
+      "bytes": 968,
+      "sha256": "6e1732dcb5aa7db42262104a6debab3f03b824c5f74e587551bca47b204973e6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/build-cli.log",
+      "bytes": 1057,
+      "sha256": "4a8192d0dda0048835032e5c8361022044152705ad09b818aa9f049671003a00"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/candidate/src/tool_output.rs",
+      "bytes": 62012,
+      "sha256": "f18513b3b55754b34a21fa879f8405d1e59979b85274b7081f4d02e9eda379cd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/candidate/tests/stage1_tool_output.rs",
+      "bytes": 96655,
+      "sha256": "613f447e823baa5068fc107b72627e6ed4efdab486f3aa170234a288d39f29a4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/candidate-inputs.json",
+      "bytes": 300,
+      "sha256": "e01ae3610bbc99b62293674e53281abea1d31f69ac67e7e7e5ac95862a83158f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/captured-main-inputs.json",
+      "bytes": 21874,
+      "sha256": "be2eab2c624ce335b250408e14bcb453c2982d1854a1cd84e8accda9be06a6e1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/artifact-index.json",
+      "bytes": 1120,
+      "sha256": "3f81b7f54d5a878a0837b4d12edebf881949c32ccf5efacafccad5d20a445083"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/effect.py",
+      "bytes": 444,
+      "sha256": "1d87f16ab26dda634fcac816a470151b41f01e910ae2b2b03e9278e2d63369e9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.process.json",
+      "bytes": 698,
+      "sha256": "6cfaf09e5d4cf21ecf6f35004a0cba8a162137c947d68083660bb45c00031e5e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr",
+      "bytes": 66,
+      "sha256": "ddddafd4d0aac37e2ed9094c461306ea295da11dd10c13df759c3cbbf031c0db"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stdin.jsonl",
+      "bytes": 154,
+      "sha256": "618808d4ac28eff02da1ccb4ebdaa63951bbf633809a4638f366e44b0cca167d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stdout.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/release-child",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/result.json",
+      "bytes": 1065,
+      "sha256": "c3ec5e56bdfcbcf14a288ccde2671bf8a2a1c6c391d636d436f07022ed47e892"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/user/config.toml",
+      "bytes": 15,
+      "sha256": "d46cb67a08ef25243d516df809955b8a5d56dcf959430839524775c112141313"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first.json",
+      "bytes": 848,
+      "sha256": "63a2bdf6659d1827f2e0cafbbcf45d09a9060b2d9b0a652ebde31d868815fd25"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first.log",
+      "bytes": 841,
+      "sha256": "c266609f667c0721cf989c940302384c70d617e7f5bddd02f6164128acc63197"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.json",
+      "bytes": 374,
+      "sha256": "cc2fd95ad713dc63416fc778faa95aba419f370139eb841fdb78aea9108a4934"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.raw",
+      "bytes": 4114,
+      "sha256": "5e606f2c0f402dbf6d3ce9ed1c717f3d5b3a8ba1aed48747674827d70d9b85ae"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.json",
+      "bytes": 374,
+      "sha256": "30a273f6f3ffa110581ab7a1409c9128ced219000078a15b1300576b0f0e33bc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill-output/fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.raw",
+      "bytes": 17,
+      "sha256": "b46364a98da1ee27c29169f6ed616271b1a21c882203a0784bb0de7a186d9f11"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill.session.jsonl",
+      "bytes": 2325,
+      "sha256": "7f38e73b5f7643771796f04daa1d6e6f07a496277ece9ed0eb782709e61e7f4e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/after-kill.session.jsonl.reconnect",
+      "bytes": 21198,
+      "sha256": "cbd75ea735d580a3069a66e51f5aff8556ad47782eec0e50f1fb8255e807b550"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/artifact-index.json",
+      "bytes": 5132,
+      "sha256": "9ac2a145480613aa400f46341ea784fbdc3a62f1bb1e7dc3b3796955295e1a60"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/child-done",
+      "bytes": 29,
+      "sha256": "ab29ba40a7671c21306b8a4d9a1130e82c4503569b07843e7454319fc4d58433"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/child-pid.txt",
+      "bytes": 5,
+      "sha256": "4c0338b6ea354d440b4c1204654f8a80afd81566bbfc63e774c7ac1df9af7d8b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/cleanup-result.json",
+      "bytes": 525,
+      "sha256": "90b67d28c880e231922ee8ca0eff8893e7e31efef14e13506969d6954c501b73"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/effect.py",
+      "bytes": 444,
+      "sha256": "1d87f16ab26dda634fcac816a470151b41f01e910ae2b2b03e9278e2d63369e9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/effects.txt",
+      "bytes": 6,
+      "sha256": "c89d6966e9327382a8a6cbafabc0c5c74e288f4fbf09baf4cd5362160d442f71"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/http-server-result.json",
+      "bytes": 71,
+      "sha256": "fe7432e0afa344a96b594a0e8de88607ef1e4be1008d6f5db01fb6e13af204d0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/orphan-read-result.json",
+      "bytes": 558,
+      "sha256": "bcfb4c365576b9d03109bb4991553680a37f98b5cb4620cfd058f89c9cafd305"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.exit.json",
+      "bytes": 68,
+      "sha256": "aa4874b623764c5b679e8f9acc857f1e8374102c4e5cefed949a4e9b956eca19"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.process.json",
+      "bytes": 734,
+      "sha256": "65051424f73bc54808ca9546d2f543d0cff6adb932e055742e31c4470618eb5a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stdin.jsonl",
+      "bytes": 343,
+      "sha256": "476f3208705d03977368e8fbf81a81c1d220406710615fff97c1b369b3c672a2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-one.stdout.jsonl",
+      "bytes": 18309,
+      "sha256": "d9938c8fcb55393eb0360758935f233bcce959b7d8bc78482c0f6f7c2461c19a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.exit.json",
+      "bytes": 68,
+      "sha256": "b726c242b4e38a1705f665422246e4cd8e25bb9920818e74c4f598876b16f0bb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.process.json",
+      "bytes": 734,
+      "sha256": "09fcebc96da03fd8e927388267173d9b0bcf26e1c01bef95e2ed509380dd6ca7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stdin.jsonl",
+      "bytes": 247,
+      "sha256": "0ad5f4e31b943911bee49f0ef9ca5f6834e6e3a430a6b2db1784899fb7a3b3b0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-three.stdout.jsonl",
+      "bytes": 879,
+      "sha256": "9f526ee793db544ed0626341d2616446512d782d6319a7a5832aed46788777e3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.exit.json",
+      "bytes": 68,
+      "sha256": "ed7a9502df9b6b4e5b2d2c67830730cc5f53802db42e22ed8e1b190573d009ff"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.process.json",
+      "bytes": 734,
+      "sha256": "1f847ca96c7b3d1f54deb4a404317e9d714409832bc24598c0bee3f8952f978b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdin.jsonl",
+      "bytes": 1361,
+      "sha256": "dba2bbc168bdcf6a97358665e79b8ac969b75df98486e47d16432427674fc0e7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/owner-two.stdout.jsonl",
+      "bytes": 27287,
+      "sha256": "cb0050d71f84d666d4eaf8e070911c61f9c7df0b5d9fb51bd62574faee09c312"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/recovery-inspect.json",
+      "bytes": 1348,
+      "sha256": "d021f96add7cb0e9efa72e0a5021b2190f2f8b1b64518135b5ffd2cd58a44031"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/release-child",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/result.json",
+      "bytes": 647,
+      "sha256": "70d790826e461e38201675d899a1b6432bab61dd213df0d3d7b06373f9ca1b47"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/session.jsonl",
+      "bytes": 5717,
+      "sha256": "410a9077a8ca7f0b4056e5fe0d46ca1baef324936f9fd9e13c69b70d86d7ec7d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/session.jsonl.reconnect",
+      "bytes": 35841,
+      "sha256": "909bc335a2e8e87d025271664dc5677a98838379146d0b9084da5f6eb0ec5bed"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/user/config.toml",
+      "bytes": 95,
+      "sha256": "6cfd7e65f4c9f7d5b3106469e7d56ddf8962016ccfa1e06b0f05ecfc592247fa"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.json",
+      "bytes": 883,
+      "sha256": "4ca7f445c907ea41620c35e9a70860f4be2478e2c795891361a6ba6df907ec3a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config.log",
+      "bytes": 45,
+      "sha256": "294f35971ce1d71fbc8245d21e4f79eb618693efbe04f2f290b8c564839884ce"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command_kill_probe-v1.py",
+      "bytes": 6828,
+      "sha256": "316d109eeef558b049c5142cc537d2b349d392f15a72a9b8cf8909ac266b79aa"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/command_kill_probe.py",
+      "bytes": 7039,
+      "sha256": "c7ae77df35d579681412e4ba99b8190112938cc7db5f8f4c898c4fb5ef612870"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.json",
+      "bytes": 839,
+      "sha256": "a90576452706d1297d83791d7a18d0c21366a9065dbd48dbf5c17a3f52ca8c30"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.log",
+      "bytes": 325,
+      "sha256": "aa8ed5bcd35db86b60eadfda185918465fd89001094e9744a64f95bec8855f58"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/fmt.json",
+      "bytes": 887,
+      "sha256": "3d41d05d7da23f9124f62751c0f272d9c0faa19ebeef7455dc3b0f072bd4d828"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/g-stage-main.json",
+      "bytes": 1086,
+      "sha256": "4800795fa25f34198d8b1079fe43c0d967bed1970a68d2fd6b30b09d83b3f99c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/g-stage-main.log",
+      "bytes": 408,
+      "sha256": "71b6d446a65e8d02af7112f0dbbf99db017ea3c7278818069537b0cc045de323"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.json",
+      "bytes": 1082,
+      "sha256": "a59df8fd8c574c9d60e1bd95ab34a2a8fdc643983fb209cc1787357fb31c0412"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/prescribed111.log",
+      "bytes": 9659,
+      "sha256": "3f34c72aa9b21e120dc8cde7573378fa516bc012642dcd4334b753b95f7d95ec"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-after-fix.json",
+      "bytes": 1112,
+      "sha256": "de04da800ba9381a798e34b3923608a6d2103fb50028f0eb6bfeff8412d3dd35"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-after-fix.log",
+      "bytes": 1242,
+      "sha256": "d181a526c4f3c71e3cc7be9d4ae6b5b5430a525cabd50e8a1c0383ed3da7ca20"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-before-fix.json",
+      "bytes": 1116,
+      "sha256": "0c088d93d0b8cd96dd566921c45ed27652888aba47b6918008b0830831bbcfd4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-before-fix.log",
+      "bytes": 1655,
+      "sha256": "10f6bc73edccd51f78b653e62b84a316a146299f8ec03bf0edaf3b6f49319d7c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-build-failed.rs",
+      "bytes": 96298,
+      "sha256": "78b97040ccb939538335f83e8c8920f9a2099784297eda5250a64e54d60adfe3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-corrected.json",
+      "bytes": 1136,
+      "sha256": "f56d2d5dbddc43c9ef111c48cff9e80f1353ea61ede54c785b880d1bf5f0ddff"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-corrected.log",
+      "bytes": 1249,
+      "sha256": "7d23c697a63a1f6b15a759b6727091d4bd4ef5ca9fefc02671ec21fd42c71da7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement-only.rs",
+      "bytes": 96343,
+      "sha256": "7c8c21b3ff89dd22848ec10bd154274884b2bb664beafe12b8c4e7bbf4efd5b9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement.json",
+      "bytes": 1125,
+      "sha256": "2e5a268136f1ef3878bf383d553ef0a1e4c04cbbf3636cf17f5c64a995a42f1f"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/read-cancel-measurement.log",
+      "bytes": 2170,
+      "sha256": "5025484efb0b0f2055953f9eeebe68370d03f4f4b7fa6ac68d840384e841f65a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/scoped-clippy.json",
+      "bytes": 1140,
+      "sha256": "97c94ef41fa48f543a866b06e4772c832c0d54e7ea93a6c20cdf57260039f8d5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/scoped-clippy.log",
+      "bytes": 1066,
+      "sha256": "16a09b1c7f8beb9f55fed82e3a1ed6f5c8be89193fde8f0990cb4ccfde6b26bb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/selector-at-capture.json",
+      "bytes": 9516,
+      "sha256": "034f156f11262060504965d7666f73c3cdae32247b2ccb7ffee8ddd1427da7d1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/stage1_tool_output.baseline.rs",
+      "bytes": 88654,
+      "sha256": "cd740ed370f053a4a87ff791dd28276213e8744ab3320ba8b1ae49d61f939ef4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/tool_output.baseline.rs",
+      "bytes": 61670,
+      "sha256": "6b24c89dbc8b49a5721fea0e74de00db0c3f9826614b4de65a76e4c8fe007327"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/Docs/quality/stage1/ZS1-111/worker-io319/verify_evidence.py",
+      "bytes": 2780,
+      "sha256": "c444d2474c2d947a98b39a0dfd7cb5add93dce6cce864686ce39e3b7bf1e0649"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/src/tool_output.rs",
+      "bytes": 62012,
+      "sha256": "f18513b3b55754b34a21fa879f8405d1e59979b85274b7081f4d02e9eda379cd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/files/tests/stage1_tool_output.rs",
+      "bytes": 96655,
+      "sha256": "613f447e823baa5068fc107b72627e6ed4efdab486f3aa170234a288d39f29a4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/manifest.json",
+      "bytes": 44467,
+      "sha256": "81a9f12d86db0e7e67ff235f1ce6160bbf3322e241e33c4d854c969f461488e5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__README.md.patch",
+      "bytes": 7596,
+      "sha256": "ec4d535df764f7de0c1eae0c47e71d99a71bc48819711a03f7db8f8ef8874b3e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__actual-kernel-io.json.patch",
+      "bytes": 1329,
+      "sha256": "4f8eaab56f5ca5cf849c8a5ab52733514e086f3c7d5ce5c0f57bb7c9ca38604c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__actual-kernel-io.log.patch",
+      "bytes": 2456,
+      "sha256": "27cf25f60df475664ec206aa61a37734db728a38b721f54d74cf0f7ba7d47455"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__added-tests.rs.patch",
+      "bytes": 8472,
+      "sha256": "9616cb66b76b99ac8ea32870fa96fe2862637f8fbf128b729e74229df8e15445"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__artifact-index.json.patch",
+      "bytes": 17577,
+      "sha256": "42d228090b7d636ad742af748323f957da3f97d2f3977e047dc5e64446df971b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__binary-binding.json.patch",
+      "bytes": 624,
+      "sha256": "c7b70d4fa8e2f1dfe5019089816c210c8c14fb3f8cbb8e6d25f848d43494218d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__build-cli.json.patch",
+      "bytes": 1240,
+      "sha256": "94d8e60ecc3cc079ffae0b455c9d7105550b1fc767fcf51407c2e068849c0846"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__build-cli.log.patch",
+      "bytes": 1314,
+      "sha256": "27c54b5fd5aa695550bc021fbfdaec9e68927474a2fdeb0eeea5c8dee3425edb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__candidate-inputs.json.patch",
+      "bytes": 574,
+      "sha256": "2be9a255a1da49cd57bc70451e93f0103f0c2182746288292acedd49b3c15d08"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__candidate__src__tool_output.rs.patch",
+      "bytes": 64030,
+      "sha256": "4633a38df1e22a6d1827c258e662945d8b5bdca28bcf6e51382e7a605428db40"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__candidate__tests__stage1_tool_output.rs.patch",
+      "bytes": 99580,
+      "sha256": "101b6006b83d02046ca02fdbb7a618f7fa5d666cd9c3633319232728d9934d34"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__captured-main-inputs.json.patch",
+      "bytes": 22814,
+      "sha256": "ea3279b807b7aa3d47ec6ba0b696199725c0263ee876eb01b6e643c92cca8187"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first.json.patch",
+      "bytes": 1139,
+      "sha256": "80870a0053f9333ef92ba706fcfeca8fcd675bca02bbbb6710f006eeb0a59a42"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first.log.patch",
+      "bytes": 1111,
+      "sha256": "3e669e53113efdb07bd1288d61822c54309ca101fde7cfce1f1145aed07d8eb4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__artifact-index.json.patch",
+      "bytes": 1475,
+      "sha256": "a14ad2e995890b865ec907b1f4e27c37841681a09cd9658e7dc18a6ea7e88e58"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__effect.py.patch",
+      "bytes": 737,
+      "sha256": "da75cc755949e8b4dfa1ec7b325c29444ddf1dbc44d3c697d490c409b50a68e2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__owner-one.process.json.patch",
+      "bytes": 1035,
+      "sha256": "3d82ae23a3cdd2450f46a4e921df54d0b13326633fa2c4c9a5d606cf576f6d02"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__owner-one.stderr.patch",
+      "bytes": 368,
+      "sha256": "c485a3ca932701d88d6f9d8f86cce03ed981449ea40570657e7e7a0c4836a4af"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__owner-one.stdin.jsonl.patch",
+      "bytes": 471,
+      "sha256": "15cf95687e16f140b82bdaf1506a585c6997143eb57b1504bdab657e873095ce"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__owner-one.stdout.jsonl.patch",
+      "bytes": 225,
+      "sha256": "8fa18081bf78d515beec3eb922f5de2ec821e211df5b4435d2a7ec785e1b818b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__release-child.patch",
+      "bytes": 207,
+      "sha256": "c7c14f015a08c692f00385ab06b1546803b37cf08b9598adb0c4d21f18eef1c4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__result.json.patch",
+      "bytes": 1359,
+      "sha256": "dc3485573cacebcde23a75c32d4476ccc8fcf2d1d662691a9e0dc5ff0d4f0f59"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-first__user__config.toml.patch",
+      "bytes": 317,
+      "sha256": "196241d4e6df4e99d0057a3eabc027ffd1a78c15fc974f880c7adb5334911027"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config.json.patch",
+      "bytes": 1210,
+      "sha256": "845cad294d5f88b8886ee2d6c1ea804bd32d31c04e8b2686f8dfe3ca99059d77"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config.log.patch",
+      "bytes": 344,
+      "sha256": "360e97195ffa76e1c25b07d04277fc8cfa0385046288b7429e29e7ac41a3a0c1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill-output__d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.json.patch",
+      "bytes": 954,
+      "sha256": "d0cdc71f08753ace27e4102fa30d45762b98c0c75cd25d90da86c0359662e5b0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill-output__d88111cc25ff04488f4a46d3673c2b0018f2a06ae9675954ddf94a6350e60dbb.raw.patch",
+      "bytes": 4694,
+      "sha256": "1c14254edf8eb831e674224a642be03ba0c6631df570f82233c97887fb1d9fab"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill-output__fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.json.patch",
+      "bytes": 954,
+      "sha256": "bbd5fdae854ee28f7e5a943316d8575deea683e4f36b64cfc77943d092c01fcc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill-output__fe7b414b5bcc94ad743b4d0fff38f2eb86bc524f0375a91e45201774d30f62cb.raw.patch",
+      "bytes": 565,
+      "sha256": "1584958768f124d0911f2b78b9f998b3096b879e58e9a0d292b33ebfa52779ff"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill.session.jsonl.patch",
+      "bytes": 2694,
+      "sha256": "78daf6b645ddbb167dc12683a93a944cda2be3edd61870ef9221c6c349c458e2"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__after-kill.session.jsonl.reconnect.patch",
+      "bytes": 21602,
+      "sha256": "37fd1a7df5cb4fb8c3c2e38f676aae841b98a34da39e5806210f578b3c052dcf"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__artifact-index.json.patch",
+      "bytes": 5654,
+      "sha256": "686eb52a20069786d04ee8eb94b9fc2c1de9e04e50273475a2890e3617e43009"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__child-done.patch",
+      "bytes": 349,
+      "sha256": "21fdda81a24623c09471bacfe8bddb78402a94cf07f514814cf288bc65e307d1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__child-pid.txt.patch",
+      "bytes": 363,
+      "sha256": "46f7df26bf1951231c56623ea6e2625fc9be9eb68e183a66f9a7a2d75cc4c598"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__cleanup-result.json.patch",
+      "bytes": 892,
+      "sha256": "564823e4b00d0b8124bbe6fed89ed2f891431d6b843959c80f567ffafa051bcd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__effect.py.patch",
+      "bytes": 773,
+      "sha256": "eb1e4f91585daf780ff8d8836a2fdcc8f073dea6c0c679c173011292c2488fc7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__effects.txt.patch",
+      "bytes": 329,
+      "sha256": "0133a84d648ee3fb62a8653c602f6034107e3be5b3c759b53410bfa52b8e63a7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__http-server-result.json.patch",
+      "bytes": 436,
+      "sha256": "6a392dd0344d0103b251497cee7a4248a77ce63ea988eec54293e708830293c4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__orphan-read-result.json.patch",
+      "bytes": 933,
+      "sha256": "408ca1ceb805039d2a1b41173061f4bda35a56c8ffc4bcb4bc062cb2e50d06c8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-one.exit.json.patch",
+      "bytes": 421,
+      "sha256": "40f602acfa8cdd939c615f1c6ffab4a11ba5238d5a2cc591bd8198cd69d06a96"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-one.process.json.patch",
+      "bytes": 1107,
+      "sha256": "02a32a1feb67d2ef3451038f792296b1cb1000248d8f99b8aae84782b59a08c7"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-one.stderr.patch",
+      "bytes": 237,
+      "sha256": "b0430586046305ca64e1919a57f3c6b349e47f9a67d4ee6995a4d37ee13a0b59"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-one.stdin.jsonl.patch",
+      "bytes": 699,
+      "sha256": "f1536ac096ef08ed30a91a447eb24a1064b5eb514fe3fc265109e052f7d99e1a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-one.stdout.jsonl.patch",
+      "bytes": 18673,
+      "sha256": "c8bce5b6484ab0dcab88a44c4c8c5d0918ca55f5936c93568e403621a97195c3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-three.exit.json.patch",
+      "bytes": 427,
+      "sha256": "a400c6356d1ae39a52a2837863c451bf2f4bd6c6b3a79ca8f21decf6999de0bc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-three.process.json.patch",
+      "bytes": 1113,
+      "sha256": "02e9824256c5e76ad620b333c52889f9b8de5b94a96e13e89bfce9407d72b183"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-three.stderr.patch",
+      "bytes": 241,
+      "sha256": "d7d02b53160984d792ae40d0c1e012cb6d832ad51272c4c368e9fe135c6d2059"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-three.stdin.jsonl.patch",
+      "bytes": 609,
+      "sha256": "17b6d7764ebad419eef9517308a46a8fa8e0beea5c9de9643743cde2ee102c28"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-three.stdout.jsonl.patch",
+      "bytes": 1244,
+      "sha256": "021aeb0fd6182744ab1a86d5c15c48336d1cc8e57dbf19720720b63a3ff8edc5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-two.exit.json.patch",
+      "bytes": 421,
+      "sha256": "988c411b011d282b588ff63364ef7f657e22322c4f7ce077d9025cc97f0eb601"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-two.process.json.patch",
+      "bytes": 1107,
+      "sha256": "82e191de9731925da6417d1bb3f1f8df3f0db78bbb67a8a5334c536f62314f30"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-two.stderr.patch",
+      "bytes": 237,
+      "sha256": "4897af4bb8f1e236a8e2e74b121ffeae31278d434657c078da1af2f9beb6bd40"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-two.stdin.jsonl.patch",
+      "bytes": 1726,
+      "sha256": "038e6dfc708b1e144869e5b4eebe362fcac9e20e976a844f800a95805e726739"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__owner-two.stdout.jsonl.patch",
+      "bytes": 27671,
+      "sha256": "14ff0b37cd1fa3bfad3fe47d10049f881a6c3edb88791edb432fd0c5c00d9ac1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__recovery-inspect.json.patch",
+      "bytes": 1749,
+      "sha256": "8456eba93f1112d26b1f4f6b88c39601a9c1615cf1e616075336a41a90d31f71"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__release-child.patch",
+      "bytes": 231,
+      "sha256": "01f9e7e6c69df6a90cb17e821ac9679f076d7ed363762d4cb0faf9ef4eb8a682"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__result.json.patch",
+      "bytes": 986,
+      "sha256": "06dd697ea3b5a416938a36f3757f3ccfa9e3fb015728aa5ebadb617f6e0a7448"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__session.jsonl.patch",
+      "bytes": 6061,
+      "sha256": "9392b8215dbb2b9766d7d680d58e72587120c881a327a680fbb23ddae95b2edb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__session.jsonl.reconnect.patch",
+      "bytes": 36237,
+      "sha256": "e8b4a9f3df87bad7f13e0c888d14fb189a36ff3c425d69833b4750ebb5feb6dd"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command-kill-production-config__user__config.toml.patch",
+      "bytes": 438,
+      "sha256": "32cb950d5339cfd4a659b71e7f96e9de226cc01dd731ed3f48807627e4da3eaa"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command_kill_probe-v1.py.patch",
+      "bytes": 7155,
+      "sha256": "10945a7ce9d49185364baacde1c5ed1ad751c6768fcc429b9421a9e261f0a9a6"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__command_kill_probe.py.patch",
+      "bytes": 7358,
+      "sha256": "96adac814b3f277041c2cc959498245f77464715dd6b216e07129be51ff3e3d9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__evidence-verified.json.patch",
+      "bytes": 1126,
+      "sha256": "4cdbcedd3573b22a56812e89fbac0141831f8cd1f455ee146d468985bcd767ee"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__evidence-verified.log.patch",
+      "bytes": 585,
+      "sha256": "7da5d5ac74cd4e1d24f6ac671f2bb4b15968a51671902f13b9280bf2781c747b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__fmt.json.patch",
+      "bytes": 1138,
+      "sha256": "49dfc7c58fa6036ab6e3f9d591469a9019bddb8afda05d7fa516f4c008173a9d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__fmt.log.patch",
+      "bytes": 157,
+      "sha256": "b1face2cb85c070d903f18a96070ca36455032b13cbd6527e1b09f640a8e9121"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__g-stage-main.json.patch",
+      "bytes": 1369,
+      "sha256": "9bad7284629f2c46b0fa963b02b936507c7d758cc1c98d8d3155064032a1d3ef"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__g-stage-main.log.patch",
+      "bytes": 669,
+      "sha256": "994a633b239c9f662abd12ef9bf07b60c85cc58560d7310ed86bea7e5168f5bb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__prescribed111.json.patch",
+      "bytes": 1372,
+      "sha256": "1038f349f6fd4989ac4b64c70b49e6bf4e1f378a3730f7574450008186d34525"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__prescribed111.log.patch",
+      "bytes": 10064,
+      "sha256": "4bd43e89c4ff395b84467ff31994da5b3518ec9eaf356d578b51811a9934e0fa"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-after-fix.json.patch",
+      "bytes": 1424,
+      "sha256": "5eeb467dc281a941347165aa7c8b0ea17cbbf6a67e51c65bb081ed94fac5239d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-after-fix.log.patch",
+      "bytes": 1540,
+      "sha256": "1bcac7ab95bf17e951fc7e40ce983eed7bd66e600d38faafe2e84f9ea9701936"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-before-fix.json.patch",
+      "bytes": 1431,
+      "sha256": "6d82c38522303dec8444c4d226bbb7a8c0b276fb7179a3c7fe25ebc297138af3"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-before-fix.log.patch",
+      "bytes": 1966,
+      "sha256": "c8466f04f9e749d9849a421bf0af633bd5c345d6e387af0107f77601a896226b"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-build-failed.rs.patch",
+      "bytes": 99186,
+      "sha256": "ddebdcac521517454bd6ddd43ddd89889c5cc074dcf2d7f1f884180cc4415c4a"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-measurement-corrected.json.patch",
+      "bytes": 1484,
+      "sha256": "830f2648ea9a4ff4a022bc66e1b4e45fda2fa960dee6fc68960db6e5cf8a9549"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-measurement-corrected.log.patch",
+      "bytes": 1583,
+      "sha256": "d0bd76b1b963f5046767df388051d322ca814082d66ae507c6c122d118ab4e7d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-measurement-only.rs.patch",
+      "bytes": 99244,
+      "sha256": "2eed62d045c97c47d7ecb74f09278a7317b3ac6edd42b393bf0947ff6fd3709d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-measurement.json.patch",
+      "bytes": 1443,
+      "sha256": "42324b45c1048435afc74a8e7abb0293a5cb09e0d1be7c5f5c09016bee10bc16"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__read-cancel-measurement.log.patch",
+      "bytes": 2491,
+      "sha256": "10941562eb6ab9cf67208259883586b8b73ce5e5b4e71849215e4956044b750c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__scoped-clippy.json.patch",
+      "bytes": 1434,
+      "sha256": "4003e1e94ed86bfbdb1b0ba813913f6667fe3d28de04102d326e9003a578b2a1"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__scoped-clippy.log.patch",
+      "bytes": 1335,
+      "sha256": "b2d183010e02c234d46bc07ab14c7072538e878b0950210fe8a645f225fbb1e4"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__selector-at-capture.json.patch",
+      "bytes": 9785,
+      "sha256": "cd68307a7a54336b338ed16dcab9b1ac41e9727de400eef21b71baf3c2a80e1c"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__stage1_tool_output.baseline.rs.patch",
+      "bytes": 91329,
+      "sha256": "64ca5a7ca9ca60c5cf18809e21fe545873c79d7ed519aca17701f640c11da54e"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__tool_output.baseline.rs.patch",
+      "bytes": 63665,
+      "sha256": "40e445c5cdc41f3f0d2802caac1ab6eef481a347f968d7978afd7a7bb36df045"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/Docs__quality__stage1__ZS1-111__worker-io319__verify_evidence.py.patch",
+      "bytes": 3059,
+      "sha256": "fac943925c4f7f1ddc09140018ae0629a5adb28d3590668712b4dbdeac9e7fef"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/src__tool_output.rs.patch",
+      "bytes": 2006,
+      "sha256": "25711a30fe9f0e03c631a0139b9addd06a28f2a9d7ee784a89516118cc3500d0"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/patches/tests__stage1_tool_output.rs.patch",
+      "bytes": 8436,
+      "sha256": "7cd7f443896ba648a3e9e361af7b5b57ff0b7c03dabc46fd32509d58fe773ece"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/frozen-input/run_candidate_probe.py",
+      "bytes": 1243,
+      "sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/lint.log",
+      "bytes": 829,
+      "sha256": "d0318c7480c856bce29c155c96c7df0224f0a79004c171b9a4bb49531820a240"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/lint.run.json",
+      "bytes": 986,
+      "sha256": "f7b435a8fb048483a544198f8a54df62db923aed7d69505a52db2aec17e817fc"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/patch-replay.log",
+      "bytes": 597,
+      "sha256": "295a6bb9b29c923dff6d22dfdb878e30919f4209c3977c22a450c6d3a9187f91"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/review.md",
+      "bytes": 3945,
+      "sha256": "8a6cb343dba869722b301e6ed23a5ccca11762787e9795b8c4d03b4e2eb651c5"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-111/master-io-cancel-3.1.19/verification.json",
+      "bytes": 188,
+      "sha256": "5294cbd291ead85457076c3ff6f6a34734cb55bced17775ad93fbdef6458c689"
+    }
+  ]
+}

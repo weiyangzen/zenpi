@@ -1,0 +1,3408 @@
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -789,7 +789,7 @@
+         .profile
+         .as_deref()
+         .or(environment_profile.as_deref());
+-    let environment = env::vars().collect::<BTreeMap<_, _>>();
++    let environment = text_environment();
+     let initial = resolve(overrides, &config, &auth, &environment)?;
+     if initial.backend == "openai"
+         && !initial.wire_api.as_deref().is_some_and(|v| {
+@@ -1434,7 +1434,7 @@
+     } else {
+         let config = load_config(paths)?;
+         let auth = load_auth(paths)?;
+-        let environment = env::vars().collect::<BTreeMap<_, _>>();
++        let environment = text_environment();
+         resolve(
+             &ConfigOverrides {
+                 profile: profile.map(str::to_owned),
+@@ -1904,3 +1904,210 @@
+         .unwrap_or_default()
+         .as_millis()
+ }
++
++/// A user-selected interactive editor, separate from provider configuration.
++/// Deliberately has no Debug implementation: argv/environment may be private.
++#[derive(Clone)]
++pub struct EditorCommand {
++    pub source: &'static str,
++    pub argv: Vec<String>,
++    pub environment: BTreeMap<std::ffi::OsString, std::ffi::OsString>,
++    pub timeout: std::time::Duration,
++}
++
++/// The complete allowlist for the explicitly requested local editor process.
++const EDITOR_ENVIRONMENT: &[&str] = &[
++    "PATH",
++    "HOME",
++    "USER",
++    "LOGNAME",
++    "SHELL",
++    "TERM",
++    "COLORTERM",
++    "LANG",
++    "TMPDIR",
++    "TERMINFO",
++    "TERMINFO_DIRS",
++    "DISPLAY",
++    "WAYLAND_DISPLAY",
++    "XDG_RUNTIME_DIR",
++    "XDG_CONFIG_HOME",
++    "XDG_DATA_HOME",
++    "XDG_CACHE_HOME",
++    "XDG_STATE_HOME",
++    "XDG_CONFIG_DIRS",
++    "XDG_DATA_DIRS",
++    "LC_ALL",
++    "LC_CTYPE",
++    "LC_NUMERIC",
++    "LC_TIME",
++    "LC_COLLATE",
++    "LC_MONETARY",
++    "LC_MESSAGES",
++    "LC_PAPER",
++    "LC_NAME",
++    "LC_ADDRESS",
++    "LC_TELEPHONE",
++    "LC_MEASUREMENT",
++    "LC_IDENTIFICATION",
++];
++
++/// Resolve only the startup environment, never a workspace/provider setting.
++/// Error strings describe the boundary without echoing user command arguments.
++pub fn resolve_editor_command(
++    environment: &BTreeMap<std::ffi::OsString, std::ffi::OsString>,
++) -> Result<EditorCommand, String> {
++    use std::ffi::OsStr;
++    let (source, raw) = environment
++        .get(OsStr::new("VISUAL"))
++        .map(|value| ("VISUAL", value))
++        .or_else(|| environment.get(OsStr::new("EDITOR")).map(|v| ("EDITOR", v)))
++        .ok_or("External editor unavailable: set VISUAL or EDITOR before starting Zenpi")?;
++    let raw = raw.to_str().ok_or("Editor command must be UTF-8")?;
++    if raw.len() > 4096 || raw.chars().any(|c| c.is_control() && c != '\t') {
++        return Err("Editor command exceeds 4096 bytes or contains a forbidden control".into());
++    }
++    let argv = parse_editor_argv(raw)?;
++    let timeout = match environment.get(OsStr::new("ZENPI_EDITOR_TIMEOUT_SECONDS")) {
++        None => 1800,
++        Some(value) => {
++            let value = value
++                .to_str()
++                .ok_or("Editor timeout must be UTF-8 decimal seconds")?;
++            if value.is_empty() || value.len() > 20 || !value.bytes().all(|b| b.is_ascii_digit()) {
++                return Err("Editor timeout must be an integer from 1 to 7200 seconds".into());
++            }
++            value
++                .parse::<u64>()
++                .ok()
++                .filter(|n| (1..=7200).contains(n))
++                .ok_or("Editor timeout must be an integer from 1 to 7200 seconds")?
++        }
++    };
++    let mut child_environment = BTreeMap::new();
++    let mut total = 0usize;
++    for key in EDITOR_ENVIRONMENT {
++        if let Some(value) = environment.get(OsStr::new(key)) {
++            let bytes = value.as_encoded_bytes();
++            total += key.len() + bytes.len() + 2;
++            if bytes.len() > 4096 || bytes.contains(&0) || total > 64 * 1024 {
++                return Err(
++                    "Editor environment exceeds its private allowlist budget or contains NUL"
++                        .into(),
++                );
++            }
++            child_environment.insert((*key).into(), value.clone());
++        }
++    }
++    Ok(EditorCommand {
++        source,
++        argv,
++        environment: child_environment,
++        timeout: std::time::Duration::from_secs(timeout),
++    })
++}
++
++fn parse_editor_argv(raw: &str) -> Result<Vec<String>, String> {
++    let mut chars = raw.chars().peekable();
++    let mut args = Vec::new();
++    let mut argument = String::new();
++    let mut quote = None;
++    let mut started = false;
++    let finish = |argument: &mut String, args: &mut Vec<String>| -> Result<(), String> {
++        if argument.len() > 2048 || args.len() >= 32 {
++            return Err("Editor command exceeds 32 arguments or 2048 bytes per argument".into());
++        }
++        args.push(std::mem::take(argument));
++        Ok(())
++    };
++    while let Some(ch) = chars.next() {
++        match (quote, ch) {
++            (Some('\''), '\'') | (Some('"'), '"') => quote = None,
++            (Some('\''), _) => argument.push(ch),
++            (Some('"'), '\\') => match chars.peek() {
++                Some('"' | '\\' | '$' | '`') => argument.push(chars.next().unwrap()),
++                _ => argument.push('\\'),
++            },
++            (Some(_), _) => argument.push(ch),
++            (None, '\'' | '"') => {
++                quote = Some(ch);
++                started = true;
++            }
++            (None, '\\') => {
++                argument.push(chars.next().ok_or("Editor command has a trailing escape")?);
++                started = true;
++            }
++            (None, ' ' | '\t') => {
++                if started {
++                    finish(&mut argument, &mut args)?;
++                    started = false;
++                }
++            }
++            (None, _) => {
++                argument.push(ch);
++                started = true;
++            }
++        }
++    }
++    if quote.is_some() {
++        return Err("Editor command has an unterminated quote".into());
++    }
++    if started {
++        finish(&mut argument, &mut args)?;
++    }
++    if args.first().is_none_or(String::is_empty) {
++        return Err("Editor command is empty".into());
++    }
++    Ok(args)
++}
++
++// Provider resolution consumes textual variables only. An unrelated non-UTF8
++// VISUAL/EDITOR must reach the separate OsString editor validator, not panic
++// while an earlier provider configuration snapshot iterates the environment.
++fn text_environment() -> BTreeMap<String, String> {
++    text_environment_values(env::vars_os())
++}
++
++fn text_environment_values(
++    values: impl IntoIterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
++) -> BTreeMap<String, String> {
++    values
++        .into_iter()
++        .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)))
++        .collect()
++}
++
++#[cfg(all(test, unix))]
++mod environment_snapshot_tests {
++    use super::*;
++    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
++
++    #[test]
++    fn valid_text_values_are_unchanged_and_editor_bytes_reach_separate_validator() {
++        let original: BTreeMap<OsString, OsString> = [
++            ("OPENAI_API_KEY".into(), "fixture token  ".into()),
++            ("ZENPI_MODEL".into(), "unicode-界".into()),
++            ("EDITOR".into(), "fallback --wait".into()),
++            ("VISUAL".into(), OsString::from_vec(vec![0xff])),
++            (
++                OsString::from_vec(vec![0xfe]),
++                "unrelated invalid key".into(),
++            ),
++        ]
++        .into_iter()
++        .collect();
++        assert_eq!(
++            text_environment_values(original.clone()),
++            BTreeMap::from([
++                ("OPENAI_API_KEY".into(), "fixture token  ".into()),
++                ("ZENPI_MODEL".into(), "unicode-界".into()),
++                ("EDITOR".into(), "fallback --wait".into()),
++            ])
++        );
++        assert!(resolve_editor_command(&original).is_err());
++        assert_eq!(
++            original.get(std::ffi::OsStr::new("VISUAL")).unwrap(),
++            &OsString::from_vec(vec![0xff])
++        );
++    }
++}
+--- /dev/null
++++ b/src/external_editor.rs
+@@ -0,0 +1,745 @@
++//! One explicitly requested Unix foreground editor and its private temporary file.
++//! This owner never routes prompts, reads provider credentials, or captures stdio.
++use crate::config::EditorCommand;
++use std::{
++    ffi::{CStr, CString, OsStr},
++    fs::{File, OpenOptions},
++    io::{self, Read, Write},
++    os::{
++        fd::{AsRawFd, FromRawFd, RawFd},
++        unix::{
++            ffi::OsStrExt,
++            fs::{MetadataExt, OpenOptionsExt},
++            process::{CommandExt, ExitStatusExt},
++        },
++    },
++    path::{Path, PathBuf},
++    process::{Child, Command, ExitStatus, Stdio},
++    sync::atomic::{AtomicU64, Ordering},
++    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
++};
++const MAX_BYTES: usize = 256 * 1024;
++static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
++
++fn cstring(value: &OsStr) -> io::Result<CString> {
++    CString::new(value.as_bytes())
++        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in editor path"))
++}
++fn open_at(directory: RawFd, name: &CStr, flags: i32, mode: libc::mode_t) -> io::Result<File> {
++    // The borrowed C string is terminated; a successful descriptor becomes owned once.
++    let fd = unsafe {
++        libc::openat(
++            directory,
++            name.as_ptr(),
++            flags | libc::O_CLOEXEC | libc::O_NOFOLLOW,
++            mode as libc::c_uint,
++        )
++    };
++    if fd < 0 {
++        Err(io::Error::last_os_error())
++    } else {
++        Ok(unsafe { File::from_raw_fd(fd) })
++    }
++}
++
++struct PrivateDirectory {
++    parent: File,
++    directory: File,
++    name: CString,
++    path: PathBuf,
++    cleanup_attempted: bool,
++}
++impl PrivateDirectory {
++    fn create(base: &Path, seed: &str) -> io::Result<Self> {
++        if seed.len() > MAX_BYTES {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidInput,
++                "Editor seed exceeds 256 KiB",
++            ));
++        }
++        let base = base.canonicalize()?;
++        let parent = OpenOptions::new()
++            .read(true)
++            .custom_flags(libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW)
++            .open(&base)?;
++        for _ in 0..16 {
++            let tick = SystemTime::now()
++                .duration_since(UNIX_EPOCH)
++                .unwrap_or_default()
++                .as_nanos();
++            let name = format!(
++                "zenpi-editor-{}-{tick:x}-{:x}",
++                std::process::id(),
++                NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed)
++            );
++            let encoded = cstring(OsStr::new(&name))?;
++            if unsafe { libc::mkdirat(parent.as_raw_fd(), encoded.as_ptr(), 0o700) } != 0 {
++                let error = io::Error::last_os_error();
++                if error.kind() == io::ErrorKind::AlreadyExists {
++                    continue;
++                }
++                return Err(error);
++            }
++            let directory = match open_at(
++                parent.as_raw_fd(),
++                &encoded,
++                libc::O_RDONLY | libc::O_DIRECTORY,
++                0,
++            ) {
++                Ok(value) => value,
++                Err(error) => {
++                    if unsafe {
++                        libc::unlinkat(parent.as_raw_fd(), encoded.as_ptr(), libc::AT_REMOVEDIR)
++                    } != 0
++                    {
++                        return Err(io::Error::other(format!(
++                            "{error}; editor cleanup failed; private files remain at {}: {}",
++                            base.join(&name).display(),
++                            io::Error::last_os_error()
++                        )));
++                    }
++                    return Err(error);
++                }
++            };
++            let mut owner = Self {
++                parent,
++                directory,
++                name: encoded,
++                path: base.join(name),
++                cleanup_attempted: false,
++            };
++            let write_result = (|| -> io::Result<()> {
++                let mut file = open_at(
++                    owner.directory.as_raw_fd(),
++                    c"draft.md",
++                    libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL,
++                    0o600,
++                )?;
++                file.write_all(seed.as_bytes())?;
++                file.flush()
++            })();
++            if let Err(error) = write_result {
++                return Err(io::Error::other(owner.cleanup_error(error.to_string())));
++            }
++            return Ok(owner);
++        }
++        Err(io::Error::new(
++            io::ErrorKind::AlreadyExists,
++            "Editor private directory creation exhausted 16 attempts",
++        ))
++    }
++    fn file_path(&self) -> PathBuf {
++        self.path.join("draft.md")
++    }
++    fn read(&self) -> io::Result<String> {
++        let directory = self.directory.metadata()?;
++        if directory.uid() != unsafe { libc::geteuid() } || directory.mode() & 0o077 != 0 {
++            return Err(io::Error::new(
++                io::ErrorKind::PermissionDenied,
++                "Editor directory is no longer private",
++            ));
++        }
++        let file = open_at(
++            self.directory.as_raw_fd(),
++            c"draft.md",
++            libc::O_RDONLY | libc::O_NONBLOCK,
++            0,
++        )?;
++        let metadata = file.metadata()?;
++        if !metadata.is_file()
++            || metadata.uid() != unsafe { libc::geteuid() }
++            || metadata.mode() & 0o077 != 0
++            || metadata.mode() & 0o400 == 0
++            || metadata.nlink() != 1
++        {
++            return Err(io::Error::new(
++                io::ErrorKind::PermissionDenied,
++                "Editor result must be a private current-user regular file with one link",
++            ));
++        }
++        if metadata.len() > MAX_BYTES as u64 {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidData,
++                "Editor result exceeds 256 KiB",
++            ));
++        }
++        let mut bytes = Vec::new();
++        file.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes)?;
++        if bytes.len() > MAX_BYTES {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidData,
++                "Editor result exceeds 256 KiB",
++            ));
++        }
++        String::from_utf8(bytes)
++            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Editor result is not UTF-8"))
++    }
++    fn oversized(&self) -> bool {
++        open_at(
++            self.directory.as_raw_fd(),
++            c"draft.md",
++            libc::O_RDONLY | libc::O_NONBLOCK,
++            0,
++        )
++        .and_then(|file| file.metadata())
++        .is_ok_and(|m| m.is_file() && m.len() > MAX_BYTES as u64)
++    }
++    fn cleanup_error(&mut self, cause: String) -> String {
++        match self.cleanup() {
++            Ok(()) => cause,
++            Err(error) => format!(
++                "{cause}; editor cleanup failed; private files remain at {}: {error}",
++                self.path.display()
++            ),
++        }
++    }
++    fn cleanup(&mut self) -> io::Result<()> {
++        self.cleanup_attempted = true;
++        clean_directory(self.directory.as_raw_fd(), 0, &mut 256)?;
++        // Do not remove a replacement entry at the same parent/name.
++        let current = open_at(
++            self.parent.as_raw_fd(),
++            &self.name,
++            libc::O_RDONLY | libc::O_DIRECTORY,
++            0,
++        )?;
++        let expected = self.directory.metadata()?;
++        let actual = current.metadata()?;
++        if expected.ino() != actual.ino() || expected.dev() != actual.dev() {
++            return Err(io::Error::other(
++                "Editor private directory identity changed",
++            ));
++        }
++        if unsafe {
++            libc::unlinkat(
++                self.parent.as_raw_fd(),
++                self.name.as_ptr(),
++                libc::AT_REMOVEDIR,
++            )
++        } != 0
++        {
++            return Err(io::Error::last_os_error());
++        }
++        Ok(())
++    }
++}
++impl Drop for PrivateDirectory {
++    fn drop(&mut self) {
++        if !self.cleanup_attempted {
++            let _ = self.cleanup();
++        }
++    }
++}
++
++fn clean_directory(fd: RawFd, depth: usize, remaining: &mut usize) -> io::Result<()> {
++    if depth > 4 {
++        return Err(io::Error::other("Editor cleanup exceeds depth 4"));
++    }
++    // fdopendir owns only this duplicate; traversal and unlink remain dirfd-relative.
++    let duplicate = unsafe { libc::dup(fd) };
++    if duplicate < 0 {
++        return Err(io::Error::last_os_error());
++    }
++    let stream = unsafe { libc::fdopendir(duplicate) };
++    if stream.is_null() {
++        unsafe {
++            libc::close(duplicate);
++        }
++        return Err(io::Error::last_os_error());
++    }
++    struct DirectoryStream(*mut libc::DIR);
++    impl Drop for DirectoryStream {
++        fn drop(&mut self) {
++            unsafe {
++                libc::closedir(self.0);
++            }
++        }
++    }
++    let stream = DirectoryStream(stream);
++    loop {
++        let entry = unsafe { libc::readdir(stream.0) };
++        if entry.is_null() {
++            break;
++        }
++        let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) };
++        if name.to_bytes() == b"." || name.to_bytes() == b".." {
++            continue;
++        }
++        if *remaining == 0 {
++            return Err(io::Error::other("Editor cleanup exceeds 256 entries"));
++        }
++        *remaining -= 1;
++        match open_at(
++            fd,
++            name,
++            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NONBLOCK,
++            0,
++        ) {
++            Ok(child) => {
++                clean_directory(child.as_raw_fd(), depth + 1, remaining)?;
++                if unsafe { libc::unlinkat(fd, name.as_ptr(), libc::AT_REMOVEDIR) } != 0 {
++                    return Err(io::Error::last_os_error());
++                }
++            }
++            Err(error) if matches!(error.raw_os_error(), Some(libc::ENOTDIR | libc::ELOOP)) => {
++                if unsafe { libc::unlinkat(fd, name.as_ptr(), 0) } != 0 {
++                    return Err(io::Error::last_os_error());
++                }
++            }
++            Err(error) => return Err(error),
++        }
++    }
++    Ok(())
++}
++
++pub(crate) struct PreparedEditor {
++    directory: PrivateDirectory,
++    command: EditorCommand,
++    program: PathBuf,
++    cwd: PathBuf,
++}
++impl PreparedEditor {
++    pub(crate) fn reject(mut self, reason: String) -> String {
++        self.directory.cleanup_error(reason)
++    }
++    pub(crate) fn new(seed: &str, command: &EditorCommand, cwd: &Path) -> Result<Self, String> {
++        let cwd = cwd
++            .canonicalize()
++            .map_err(|_| "Editor origin folder is unavailable")?;
++        let program = resolve_program(command, &cwd)?;
++        let base = command
++            .environment
++            .get(OsStr::new("TMPDIR"))
++            .map(PathBuf::from)
++            .unwrap_or_else(std::env::temp_dir);
++        let directory = PrivateDirectory::create(&base, seed)
++            .map_err(|error| format!("Editor temporary file failed: {error}"))?;
++        Ok(Self {
++            directory,
++            command: command.clone(),
++            program,
++            cwd,
++        })
++    }
++}
++fn resolve_program(command: &EditorCommand, cwd: &Path) -> Result<PathBuf, String> {
++    let name = Path::new(
++        command
++            .argv
++            .first()
++            .filter(|s| !s.is_empty())
++            .ok_or("Editor command has no program")?,
++    );
++    let executable = |path: &Path| {
++        path.is_file()
++            && cstring(path.as_os_str())
++                .is_ok_and(|p| unsafe { libc::access(p.as_ptr(), libc::X_OK) } == 0)
++    };
++    if name.is_absolute() || name.components().count() > 1 {
++        let path = if name.is_absolute() {
++            name.to_owned()
++        } else {
++            cwd.join(name)
++        };
++        return executable(&path)
++            .then_some(path)
++            .ok_or_else(|| "Editor program is missing or not executable".into());
++    }
++    if let Some(path) = command.environment.get(OsStr::new("PATH")) {
++        for directory in std::env::split_paths(path) {
++            let path = if directory.is_absolute() {
++                directory
++            } else {
++                cwd.join(directory)
++            }
++            .join(name);
++            if executable(&path) {
++                return Ok(path);
++            }
++        }
++    }
++    Err("Editor program was not found in the captured PATH".into())
++}
++
++pub(crate) fn set_foreground(fd: RawFd, group: libc::pid_t) -> io::Result<()> {
++    let mut blocked: libc::sigset_t = unsafe { std::mem::zeroed() };
++    let mut previous: libc::sigset_t = unsafe { std::mem::zeroed() };
++    unsafe {
++        libc::sigemptyset(&mut blocked);
++        libc::sigaddset(&mut blocked, libc::SIGTTOU);
++    }
++    let code = unsafe { libc::pthread_sigmask(libc::SIG_BLOCK, &blocked, &mut previous) };
++    if code != 0 {
++        return Err(io::Error::from_raw_os_error(code));
++    }
++    let result = if unsafe { libc::tcsetpgrp(fd, group) } == 0 {
++        Ok(())
++    } else {
++        Err(io::Error::last_os_error())
++    };
++    let restore =
++        unsafe { libc::pthread_sigmask(libc::SIG_SETMASK, &previous, std::ptr::null_mut()) };
++    result.and(if restore == 0 {
++        Ok(())
++    } else {
++        Err(io::Error::from_raw_os_error(restore))
++    })
++}
++
++/// Original controlling-terminal state, captured before crossterm enters raw mode.
++pub(crate) struct TerminalState {
++    attributes: libc::termios,
++    flags: libc::c_int,
++    foreground: libc::pid_t,
++}
++impl TerminalState {
++    pub(crate) fn capture() -> io::Result<Self> {
++        let mut attributes = unsafe { std::mem::zeroed() };
++        if unsafe { libc::tcgetattr(libc::STDIN_FILENO, &mut attributes) } != 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let flags = unsafe { libc::fcntl(libc::STDIN_FILENO, libc::F_GETFL) };
++        let foreground = unsafe { libc::tcgetpgrp(libc::STDIN_FILENO) };
++        if flags < 0 || foreground < 0 {
++            return Err(io::Error::last_os_error());
++        }
++        if foreground != unsafe { libc::getpgrp() } {
++            return Err(io::Error::other(
++                "Zenpi does not own the foreground terminal",
++            ));
++        }
++        Ok(Self {
++            attributes,
++            flags,
++            foreground,
++        })
++    }
++    pub(crate) fn reclaim(&self) -> io::Result<()> {
++        set_foreground(libc::STDIN_FILENO, self.foreground)
++    }
++    pub(crate) fn flush(&self) -> io::Result<()> {
++        if unsafe { libc::tcflush(libc::STDIN_FILENO, libc::TCIFLUSH) } == 0 {
++            Ok(())
++        } else {
++            Err(io::Error::last_os_error())
++        }
++    }
++    pub(crate) fn restore(&self, editor: bool) -> io::Result<()> {
++        let attributes =
++            if unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &self.attributes) } == 0
++            {
++                Ok(())
++            } else {
++                Err(io::Error::last_os_error())
++            };
++        let flags = if unsafe {
++            libc::fcntl(
++                libc::STDIN_FILENO,
++                libc::F_SETFL,
++                if editor {
++                    self.flags & !libc::O_NONBLOCK
++                } else {
++                    self.flags
++                },
++            )
++        } == 0
++        {
++            Ok(())
++        } else {
++            Err(io::Error::last_os_error())
++        };
++        attributes.and(flags)
++    }
++}
++
++pub(crate) struct EditorSession {
++    prepared: PreparedEditor,
++    child: Child,
++    group: libc::pid_t,
++    previous_foreground: libc::pid_t,
++    deadline: Instant,
++    exit: Option<ExitStatus>,
++    closing: Option<Instant>,
++    failure: Option<String>,
++    killed: bool,
++    done: bool,
++    fatal_failure: bool,
++}
++impl EditorSession {
++    pub(crate) fn fatal_failure(&self) -> bool {
++        self.fatal_failure
++    }
++    pub(crate) fn start(mut prepared: PreparedEditor) -> Result<Self, String> {
++        let previous = unsafe { libc::tcgetpgrp(libc::STDIN_FILENO) };
++        if previous < 0 || previous != unsafe { libc::getpgrp() } {
++            return Err(prepared
++                .directory
++                .cleanup_error("Zenpi does not own the foreground terminal".into()));
++        }
++        let child = Command::new(&prepared.program)
++            .args(&prepared.command.argv[1..])
++            .arg(prepared.directory.file_path())
++            .current_dir(&prepared.cwd)
++            .env_clear()
++            .envs(&prepared.command.environment)
++            .process_group(0)
++            .stdin(Stdio::inherit())
++            .stdout(Stdio::inherit())
++            .stderr(Stdio::inherit())
++            .spawn();
++        let child = match child {
++            Ok(child) => child,
++            Err(error) => {
++                return Err(prepared
++                    .directory
++                    .cleanup_error(format!("Editor could not start: {error}")));
++            }
++        };
++        let group = child.id() as libc::pid_t;
++        let deadline = Instant::now() + prepared.command.timeout;
++        let mut session = Self {
++            prepared,
++            child,
++            group,
++            previous_foreground: previous,
++            deadline,
++            exit: None,
++            closing: None,
++            failure: None,
++            killed: false,
++            done: false,
++            fatal_failure: false,
++        };
++        if let Err(error) = set_foreground(libc::STDIN_FILENO, group) {
++            session.cancel(&format!("Editor foreground handoff failed: {error}"));
++            return Err(session
++                .shutdown()
++                .err()
++                .unwrap_or_else(|| "Editor foreground handoff failed".into()));
++        }
++        // A fast editor may have reached read() before the foreground transfer.
++        unsafe {
++            libc::kill(-group, libc::SIGCONT);
++        }
++        Ok(session)
++    }
++    pub(crate) fn cancel(&mut self, reason: &str) {
++        self.failure.get_or_insert_with(|| reason.to_owned());
++        self.begin_close();
++    }
++    fn begin_close(&mut self) {
++        if self.closing.is_none() {
++            self.closing = Some(Instant::now());
++            unsafe {
++                libc::kill(-self.group, libc::SIGCONT);
++                libc::kill(-self.group, libc::SIGTERM);
++            }
++        }
++    }
++    fn group_exists(&self) -> bool {
++        (unsafe { libc::kill(-self.group, 0) }) == 0
++            || io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
++    }
++    fn observe_child(&mut self) -> io::Result<()> {
++        if self.exit.is_some() {
++            return Ok(());
++        }
++        if let Some(exit) = self.child.try_wait()? {
++            self.exit = Some(exit);
++            return Ok(());
++        }
++        let mut status = 0;
++        let pid =
++            unsafe { libc::waitpid(self.group, &mut status, libc::WNOHANG | libc::WUNTRACED) };
++        if pid < 0 {
++            return Err(io::Error::last_os_error());
++        }
++        if pid > 0 {
++            if libc::WIFSTOPPED(status) {
++                self.cancel("Editor stopped; external changes not applied");
++            } else if libc::WIFEXITED(status) || libc::WIFSIGNALED(status) {
++                self.exit = Some(ExitStatus::from_raw(status));
++            }
++        }
++        Ok(())
++    }
++    pub(crate) fn poll(&mut self) -> Option<Result<String, String>> {
++        if self.done {
++            return None;
++        }
++        if let Err(error) = self.observe_child() {
++            self.cancel(&format!("Editor child status failed: {error}"));
++        }
++        if Instant::now() >= self.deadline {
++            self.cancel("Editor deadline exceeded; external changes not applied");
++        }
++        if self.prepared.directory.oversized() {
++            self.cancel("Editor result exceeds 256 KiB; external changes not applied");
++        }
++        if let Some(exit) = self.exit {
++            if !exit.success() {
++                self.failure.get_or_insert_with(|| {
++                    format!("Editor exited with {exit}; external changes not applied")
++                });
++            }
++            if self.group_exists() {
++                self.begin_close();
++            }
++        }
++        if let Some(started) = self.closing {
++            if !self.killed && started.elapsed() >= Duration::from_millis(250) {
++                unsafe {
++                    libc::kill(-self.group, libc::SIGKILL);
++                }
++                self.killed = true;
++            }
++            if started.elapsed() >= Duration::from_millis(2250)
++                && (self.exit.is_none() || self.group_exists())
++            {
++                self.fatal_failure = true;
++                self.failure =
++                    Some("Editor process group did not finish within the cleanup deadline".into());
++                return Some(self.finish());
++            }
++        }
++        if self.exit.is_some() && !self.group_exists() {
++            return Some(self.finish());
++        }
++        None
++    }
++    fn finish(&mut self) -> Result<String, String> {
++        self.done = true;
++        let mut result = set_foreground(libc::STDIN_FILENO, self.previous_foreground)
++            .map_err(|error| format!("Editor foreground restore failed: {error}"))
++            .and_then(|()| match self.failure.take() {
++                Some(error) => Err(error),
++                None => self
++                    .prepared
++                    .directory
++                    .read()
++                    .map_err(|error| format!("Editor result rejected: {error}")),
++            });
++        if let Err(error) = self.prepared.directory.cleanup() {
++            result = Err(format!(
++                "Editor cleanup failed; private files remain at {}: {error}",
++                self.prepared.directory.path.display()
++            ));
++        }
++        result
++    }
++    pub(crate) fn shutdown(&mut self) -> Result<(), String> {
++        if self.done {
++            return Ok(());
++        }
++        self.cancel("Editor cancelled for terminal shutdown");
++        loop {
++            if let Some(result) = self.poll() {
++                return result.map(|_| ());
++            }
++            std::thread::sleep(Duration::from_millis(10));
++        }
++    }
++}
++impl Drop for EditorSession {
++    fn drop(&mut self) {
++        if !self.done {
++            let _ = self.shutdown();
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::os::unix::fs::{PermissionsExt, symlink};
++
++    #[test]
++    fn private_file_preserves_unicode_and_allows_private_atomic_replacement() {
++        let base = tempfile::tempdir().unwrap();
++        let seed = "head\n界e\u{301}👨‍👩‍👧‍👦  \n";
++        let mut owner = PrivateDirectory::create(base.path(), seed).unwrap();
++        assert_eq!(owner.directory.metadata().unwrap().mode() & 0o777, 0o700);
++        assert_eq!(
++            std::fs::metadata(owner.file_path()).unwrap().mode() & 0o777,
++            0o600
++        );
++        assert_eq!(owner.read().unwrap(), seed);
++        let replacement = owner.path.join("atomic.md");
++        std::fs::write(&replacement, "changed  \n").unwrap();
++        std::fs::set_permissions(&replacement, std::fs::Permissions::from_mode(0o600)).unwrap();
++        std::fs::rename(replacement, owner.file_path()).unwrap();
++        assert_eq!(owner.read().unwrap(), "changed  \n");
++        owner.cleanup().unwrap();
++        assert!(!owner.path.exists());
++    }
++
++    #[test]
++    fn bounded_read_rejects_large_invalid_or_non_private_results() {
++        let base = tempfile::tempdir().unwrap();
++        let mut owner = PrivateDirectory::create(base.path(), "seed").unwrap();
++        std::fs::write(owner.file_path(), vec![b'x'; MAX_BYTES]).unwrap();
++        assert_eq!(owner.read().unwrap().len(), MAX_BYTES);
++        std::fs::write(owner.file_path(), vec![b'x'; MAX_BYTES + 1]).unwrap();
++        assert!(owner.oversized());
++        assert!(owner.read().is_err());
++        std::fs::write(owner.file_path(), [0xff]).unwrap();
++        assert!(owner.read().is_err());
++        std::fs::write(owner.file_path(), "private").unwrap();
++        std::fs::set_permissions(owner.file_path(), std::fs::Permissions::from_mode(0o644))
++            .unwrap();
++        assert!(owner.read().is_err());
++        std::fs::set_permissions(owner.file_path(), std::fs::Permissions::from_mode(0o600))
++            .unwrap();
++        std::fs::hard_link(owner.file_path(), owner.path.join("other-link")).unwrap();
++        assert!(owner.read().is_err());
++        owner.cleanup().unwrap();
++    }
++
++    #[test]
++    fn symlink_fifo_directory_and_missing_result_never_block_or_follow() {
++        let base = tempfile::tempdir().unwrap();
++        let outside = base.path().join("outside");
++        std::fs::write(&outside, "unchanged").unwrap();
++        for kind in 0..4 {
++            let mut owner = PrivateDirectory::create(base.path(), "seed").unwrap();
++            let file = owner.file_path();
++            std::fs::remove_file(&file).unwrap();
++            match kind {
++                0 => symlink(&outside, &file).unwrap(),
++                1 => assert_eq!(
++                    unsafe { libc::mkfifo(cstring(file.as_os_str()).unwrap().as_ptr(), 0o600) },
++                    0
++                ),
++                2 => std::fs::create_dir(&file).unwrap(),
++                _ => {}
++            }
++            let before = Instant::now();
++            assert!(owner.read().is_err());
++            assert!(before.elapsed() < Duration::from_millis(500));
++            owner.cleanup().unwrap();
++            assert_eq!(std::fs::read_to_string(&outside).unwrap(), "unchanged");
++        }
++    }
++
++    #[test]
++    fn cleanup_is_dirfd_relative_and_reports_entry_and_depth_limits() {
++        let base = tempfile::tempdir().unwrap();
++        let outside = base.path().join("outside");
++        std::fs::create_dir(&outside).unwrap();
++        std::fs::write(outside.join("keep"), "private outside").unwrap();
++        let mut owner = PrivateDirectory::create(base.path(), "seed").unwrap();
++        symlink(&outside, owner.path.join("link")).unwrap();
++        owner.cleanup().unwrap();
++        assert!(outside.join("keep").exists());
++        let mut owner = PrivateDirectory::create(base.path(), "seed").unwrap();
++        for i in 0..257 {
++            std::fs::write(owner.path.join(i.to_string()), "").unwrap();
++        }
++        assert!(owner.cleanup().unwrap_err().to_string().contains("256"));
++        assert!(owner.path.exists());
++        let mut owner = PrivateDirectory::create(base.path(), "seed").unwrap();
++        std::fs::create_dir_all(owner.path.join("1/2/3/4/5")).unwrap();
++        assert!(owner.cleanup().unwrap_err().to_string().contains("depth"));
++        assert!(owner.path.exists());
++    }
++}
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -40,3 +40,6 @@
+ pub mod tools;
+ pub mod tui;
+ pub mod view_model;
++
++#[cfg(unix)]
++mod external_editor;
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -527,6 +527,7 @@
+         source_hash: String,
+     },
+     Copy(String),
++    OpenExternalEditor,
+     Quit,
+     Interrupt,
+     Redraw,
+@@ -1458,8 +1459,25 @@
+             .any(|(index, _)| index == offset)
+ }
+ 
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
++struct DraftEpoch {
++    generation: u64,
++    revision: Option<u64>,
++}
++
++/// Opaque, process-local identity for one explicit editor operation; no text payload.
++#[derive(Debug, Clone)]
++pub struct ExternalEditToken {
++    id: u64,
++    project: String,
++    metadata: Option<ProjectTabMetadata>,
++    session_id: Option<String>,
++    epoch: DraftEpoch,
++}
++
+ #[derive(Debug, Clone, Default)]
+ struct ProjectDraft {
++    draft_epoch: DraftEpoch,
+     kill_buffer: String,
+     paste: PasteMetadata,
+     submitted_pastes: VecDeque<SubmittedPaste>,
+@@ -1545,6 +1563,10 @@
+     input: String,
+     // One ephemeral editing buffer per project; never serialized or ticket-bound.
+     kill_buffer: String,
++    draft_epoch: DraftEpoch,
++    next_draft_generation: Option<u64>,
++    next_external_edit: Option<u64>,
++    external_edit_active: Option<u64>,
+     ordinary_paste: OrdinaryPasteBurst,
+     paste: PasteMetadata,
+     submitted_pastes: VecDeque<SubmittedPaste>,
+@@ -1671,6 +1693,13 @@
+             goal_messages: VecDeque::new(),
+             input: String::new(),
+             kill_buffer: String::new(),
++            draft_epoch: DraftEpoch {
++                generation: 1,
++                revision: Some(0),
++            },
++            next_draft_generation: Some(2),
++            next_external_edit: Some(1),
++            external_edit_active: None,
+             ordinary_paste: OrdinaryPasteBurst::default(),
+             paste: PasteMetadata::default(),
+             submitted_pastes: VecDeque::new(),
+@@ -1842,6 +1871,7 @@
+         {
+             return false;
+         }
++        self.touch_editor_draft();
+         self.project_tabs.push(name);
+         self.select_project_tab(self.project_tabs.len() - 1)
+     }
+@@ -1862,6 +1892,7 @@
+         self.project_drafts.insert(
+             old,
+             ProjectDraft {
++                draft_epoch: self.draft_epoch,
+                 kill_buffer: std::mem::take(&mut self.kill_buffer),
+                 paste: std::mem::take(&mut self.paste),
+                 submitted_pastes: std::mem::take(&mut self.submitted_pastes),
+@@ -1918,6 +1949,7 @@
+         self.command_resources = draft.command_resources;
+         self.transcript_ux = draft.ux;
+         self.transcript_browser = None;
++        self.draft_epoch = self.activate_draft_epoch(draft.draft_epoch);
+         self.input = draft.input;
+         self.kill_buffer = draft.kill_buffer;
+         self.paste = draft.paste;
+@@ -2029,6 +2061,9 @@
+         self.dirty = true;
+     }
+     fn request_project_select(&mut self, index: usize) {
++        if index < self.project_tabs.len() && index != self.active_project {
++            self.touch_editor_draft();
++        }
+         if self.project_workspace.is_some() {
+             self.pending_project = Some(ProjectIntent::Select(index));
+         } else {
+@@ -2153,6 +2188,7 @@
+         } else {
+             (self.active_project + 1) % self.project_tabs.len()
+         };
++        self.touch_editor_draft();
+         self.select_project_tab(next)
+     }
+ 
+@@ -2163,6 +2199,9 @@
+ 
+     /// Switch project and return the metadata the host must bind next.
+     pub fn project_switch_context(&mut self, index: usize) -> Option<ProjectTabMetadata> {
++        if index < self.project_tabs.len() && index != self.active_project {
++            self.touch_editor_draft();
++        }
+         if !self.select_project_tab(index) {
+             return None;
+         }
+@@ -2182,6 +2221,11 @@
+         let Some(index) = self.project_tabs.iter().position(|item| item == old) else {
+             return false;
+         };
++        if index == self.active_project {
++            self.touch_editor_draft();
++        } else if let Some(draft) = self.project_drafts.get_mut(old) {
++            draft.draft_epoch.revision = draft.draft_epoch.revision.and_then(|n| n.checked_add(1));
++        }
+         self.project_tabs[index] = new.clone();
+         for entry in &mut self.scheduled_inputs {
+             if entry.project == old {
+@@ -2360,6 +2404,7 @@
+                 }
+             }
+         }
++        self.touch_editor_draft();
+         self.project_workspace = workspace;
+         let active = value.get("active").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+         self.scheduled_inputs = value
+@@ -2515,6 +2560,7 @@
+         }
+         if let Some(draft) = self.project_drafts.remove(&self.project_name) {
+             self.transcript_ux = draft.ux;
++            self.draft_epoch = self.activate_draft_epoch(draft.draft_epoch);
+             self.input = draft.input;
+             self.paste = draft.paste;
+             self.submitted_pastes.clear();
+@@ -2587,6 +2633,12 @@
+         if self.project_tabs.iter().any(|item| item == &name)
+             && self.project_metadata.get(&name) != Some(&metadata)
+         {
++            if name == self.active_project() {
++                self.touch_editor_draft();
++            } else if let Some(draft) = self.project_drafts.get_mut(&name) {
++                draft.draft_epoch.revision =
++                    draft.draft_epoch.revision.and_then(|n| n.checked_add(1));
++            }
+             self.project_metadata.insert(name, metadata);
+             self.project_checkpoint_dirty = true;
+             self.dirty = true;
+@@ -2612,6 +2664,18 @@
+             && !session_id.is_empty()
+             && session_id.len() <= 128
+         {
++            if self
++                .project_session_cursors
++                .get(&name)
++                .is_none_or(|old| old.session_id != session_id)
++            {
++                if name == self.active_project() {
++                    self.touch_editor_draft();
++                } else if let Some(draft) = self.project_drafts.get_mut(&name) {
++                    draft.draft_epoch.revision =
++                        draft.draft_epoch.revision.and_then(|n| n.checked_add(1));
++                }
++            }
+             let cursor = ProjectSessionCursor {
+                 session_id,
+                 next_sequence,
+@@ -3778,7 +3842,112 @@
+         }
+     }
+ 
++    fn touch_editor_draft(&mut self) {
++        self.draft_epoch.revision = self.draft_epoch.revision.and_then(|n| n.checked_add(1));
++    }
++
++    fn activate_draft_epoch(&mut self, epoch: DraftEpoch) -> DraftEpoch {
++        if epoch.generation != 0 {
++            return epoch;
++        }
++        let generation = self.next_draft_generation;
++        self.next_draft_generation = generation.and_then(|n| n.checked_add(1));
++        DraftEpoch {
++            generation: generation.unwrap_or(0),
++            revision: generation.map(|_| 0),
++        }
++    }
++
++    /// Capture a metadata-only editor ticket. The canonical draft stays in its owner.
++    pub fn begin_external_edit(&mut self) -> Result<ExternalEditToken, String> {
++        self.finish_ordinary_paste();
++        if self.external_edit_active.is_some() {
++            return Err("An external editor already owns this terminal".into());
++        }
++        if self.pending_project.is_some()
++            || self.directory_picker.is_some()
++            || self.history_search.is_some()
++            || self.transcript_browser.is_some()
++            || !self.slash_choices().is_empty()
++            || self
++                .approval_views
++                .get(self.active_project())
++                .is_some_and(|v| v.focused && !v.requests.is_empty())
++        {
++            return Err(
++                "Close the active picker or pending project change before external editing".into(),
++            );
++        }
++        if self.draft_epoch.revision.is_none() || self.draft_epoch.generation == 0 {
++            return Err(
++                "Draft edit identifiers exhausted; restart the TUI before external editing".into(),
++            );
++        }
++        let id = self
++            .next_external_edit
++            .ok_or("External edit identifiers exhausted")?;
++        self.next_external_edit = id.checked_add(1);
++        self.external_edit_active = Some(id);
++        Ok(ExternalEditToken {
++            id,
++            project: self.active_project().to_owned(),
++            metadata: self.project_metadata(self.active_project()).cloned(),
++            session_id: self
++                .project_session_cursor(self.active_project())
++                .map(|(id, _)| id.to_owned()),
++            epoch: self.draft_epoch,
++        })
++    }
++
++    /// Apply only this still-current operation; failure never restores an old snapshot.
++    pub fn finish_external_edit(
++        &mut self,
++        token: ExternalEditToken,
++        result: Result<String, String>,
++    ) -> Result<bool, String> {
++        if self.external_edit_active != Some(token.id) {
++            return Err("Stale external editor result ignored; current draft retained".into());
++        }
++        self.external_edit_active = None;
++        let text = result?;
++        if self.active_project() != token.project
++            || self.draft_epoch != token.epoch
++            || self.project_metadata(self.active_project()) != token.metadata.as_ref()
++            || self
++                .project_session_cursor(self.active_project())
++                .map(|(id, _)| id)
++                != token.session_id.as_deref()
++            || self.pending_project.is_some()
++        {
++            return Err("External edit not applied: project, session or draft changed; current draft retained".into());
++        }
++        if text.len() > MAX_MESSAGE_BYTES {
++            return Err("External edit exceeds 256 KiB; draft unchanged".into());
++        }
++        let text = sanitize_input_with_limit(&text, MAX_MESSAGE_BYTES + 1);
++        if text.len() > MAX_MESSAGE_BYTES {
++            return Err("External edit exceeds 256 KiB; draft unchanged".into());
++        }
++        if text == self.input {
++            return Ok(false);
++        }
++        let paste = PasteMetadata {
++            folds: Vec::new(),
++            next_id: self.paste.next_id,
++        };
++        if !self.input_fits_checkpoint(&text, text.len(), &paste) {
++            return Err(
++                "External edit exceeds 4 MiB project checkpoint budget; draft unchanged".into(),
++            );
++        }
++        self.set_input(text);
++        self.palette_dismissed = true;
++        self.edited_input();
++        Ok(true)
++    }
++
+     pub fn set_input(&mut self, input: impl Into<String>) {
++        self.touch_editor_draft();
+         self.ordinary_paste = OrdinaryPasteBurst::default();
+         self.history_search = None;
+         self.history_draft = None;
+@@ -4809,6 +4978,7 @@
+         if key.kind == KeyEventKind::Release {
+             return TuiAction::None;
+         }
++        self.touch_editor_draft();
+         self.project_checkpoint_dirty = true;
+         if let Some(action) = self.approval_key(key) {
+             return action;
+@@ -4901,6 +5071,13 @@
+         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('t') {
+             self.open_directory_picker();
+             return TuiAction::Redraw;
++        }
++        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
++            return if self.slash_choices().is_empty() {
++                TuiAction::OpenExternalEditor
++            } else {
++                TuiAction::None
++            };
+         }
+         if matches!(
+             key.code,
+@@ -5383,6 +5560,7 @@
+     }
+ 
+     fn edited_input(&mut self) {
++        self.touch_editor_draft();
+         self.history_draft = None;
+         self.history_cursor = None;
+         self.preferred_column = None;
+@@ -5569,6 +5747,7 @@
+     }
+ 
+     fn cancel_history_preview(&mut self) {
++        self.touch_editor_draft();
+         if let Some(draft) = self.history_draft.take() {
+             self.input = draft.text;
+             self.cursor = draft.cursor;
+@@ -5582,6 +5761,7 @@
+     }
+ 
+     fn history_move(&mut self, direction: isize) {
++        self.touch_editor_draft();
+         if self.history.is_empty() || (direction > 0 && self.history_cursor.is_none()) {
+             return;
+         }
+@@ -5629,6 +5809,7 @@
+     }
+ 
+     fn search_history(&mut self) {
++        self.touch_editor_draft();
+         let search = self.history_search.as_mut().unwrap();
+         let before = search.before.unwrap_or(self.history.len());
+         search.matched = self
+@@ -5748,6 +5929,7 @@
+         }
+     }
+     fn move_word(&mut self, forward: bool) {
++        self.touch_editor_draft();
+         self.cursor = self.word_boundary(forward);
+         self.preferred_column = None;
+         self.dirty = true;
+@@ -5757,6 +5939,7 @@
+     /// display-cell column.  Every offset is derived from UTF-8 boundaries,
+     /// so a wide or multibyte glyph can never leave `cursor` mid-codepoint.
+     fn move_vertical(&mut self, direction: isize) {
++        self.touch_editor_draft();
+         let view = self.projection();
+         let cursor = view.display_cursor(self.cursor);
+         let current_start = line_start(&view.text, cursor);
+@@ -6141,7 +6324,7 @@
+             } else if area.width < 100 {
+                 " Enter send · Ctrl-J newline · Ctrl-R history · Ctrl-C stop · /help input "
+             } else {
+-                " Enter send · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
++                " Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+             },
+             usize::from(area.width),
+         );
+@@ -7222,7 +7405,7 @@
+             }
+         }
+         SlashCommand::Help { topic } => match if topic.as_deref() == Some("input") {
+-            Some("Input: Enter sends; Ctrl-J/Shift-Enter inserts newline. Left/Right move; Ctrl/Alt-Left/Right move words; Ctrl-W/Ctrl-Backspace deletes previous word; Ctrl-Delete deletes next word; Ctrl-A/E line start/end; Ctrl-K deletes to line end; Ctrl-U deletes to logical line start (at line start, deletes previous newline). Ctrl-Y restores the last nonempty Ctrl-U/K/W or word deletion as plain text; one buffer per project, process-only, at most 256 KiB, never the system clipboard. Repeated yank preserves the buffer; input/checkpoint limits reject atomically. Ctrl-P/N or Alt-Up/Down browse history and return to the saved draft; Ctrl-R searches, Ctrl-R again selects older matches, Enter accepts without sending, Esc restores. Paste inserts literal text, never executes keys; limits reject without replacing the draft. Esc keeps drafted input. /input list views runtime inputs; /input edit ID REVISION TEXT changes an accepted queued input; /input cancel ID withdraws it. Future jobs: /scheduled list, /scheduled edit ID REVISION TEXT, /scheduled cancel ID. Restarted scheduled jobs are interrupted/unconfirmed; inspect the session before /scheduled retry ID.".into())
++            Some("Input: Ctrl-G External editor · save and close to return. Enter sends; Ctrl-J/Shift-Enter inserts newline. Left/Right move; Ctrl/Alt-Left/Right move words; Ctrl-W/Ctrl-Backspace deletes previous word; Ctrl-Delete deletes next word; Ctrl-A/E line start/end; Ctrl-K deletes to line end; Ctrl-U deletes to logical line start (at line start, deletes previous newline). Ctrl-Y restores the last nonempty Ctrl-U/K/W or word deletion as plain text; one buffer per project, process-only, at most 256 KiB, never the system clipboard. Repeated yank preserves the buffer; input/checkpoint limits reject atomically. Ctrl-P/N or Alt-Up/Down browse history and return to the saved draft; Ctrl-R searches, Ctrl-R again selects older matches, Enter accepts without sending, Esc restores. Paste inserts literal text, never executes keys; limits reject without replacing the draft. Esc keeps drafted input. /input list views runtime inputs; /input edit ID REVISION TEXT changes an accepted queued input; /input cancel ID withdraws it. Future jobs: /scheduled list, /scheduled edit ID REVISION TEXT, /scheduled cancel ID. Restarted scheduled jobs are interrupted/unconfirmed; inspect the session before /scheduled retry ID.".into())
+         } else if topic.as_deref() == Some("reasoning") {
+             Some("/reasoning [default|advertised level] - select current model reasoning effort; default omits the field. Idle project required.".into())
+         } else {
+@@ -10072,6 +10255,7 @@
+     use crate::core::AgentError;
+     use crate::runtime::{BackgroundRunner, JobOutcome, RuntimeConfig, RuntimeEvent};
+ 
++    let mut editor = ExternalEditorHost::capture_startup();
+     let mut shared = Arc::new(Mutex::new(agent));
+     let mut approval = shared
+         .lock()
+@@ -10940,6 +11124,17 @@
+                 scheduler.request();
+                 last_checkpoint = Instant::now();
+             }
++            if editor
++                .poll(&mut state, &mut guard, &mut terminal, Some(&shared))
++                .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
++            {
++                scheduler.request();
++                resize_pending = false;
++            }
++            if editor.active() {
++                std::thread::sleep(poll_interval.min(Duration::from_millis(20)));
++                continue;
++            }
+             let now = Instant::now();
+             state.flush_ordinary_paste(now);
+             if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
+@@ -11031,6 +11226,15 @@
+                             state.set_status(error);
+                         }
+                         scheduler.request();
++                    }
++                    TuiAction::OpenExternalEditor => {
++                        editor
++                            .start(&mut state, &mut guard, &mut terminal, Some(&shared))
++                            .map_err(|error| {
++                                crate::error::ZenpiError::Message(error.to_string())
++                            })?;
++                        scheduler.request();
++                        continue 'outer;
+                     }
+                     TuiAction::Copy(text) => {
+                         state.transcript_ux.copy_notice = Some((
+@@ -11589,6 +11793,7 @@
+         }
+         Ok(())
+     })();
++    editor.shutdown(&mut state);
+     state.finish_ordinary_paste();
+     // Save any final layout mutation when the user quits before the next
+     // event-loop checkpoint. The operation is bounded and atomic; a failure
+@@ -11669,6 +11874,7 @@
+     F: FnMut(String, &mut TuiState) -> Result<(), E>,
+     E: Display,
+ {
++    let mut editor = ExternalEditorHost::capture_startup();
+     let mut guard = TerminalGuard::enter()?;
+     let backend = CrosstermBackend::new(io::stdout());
+     let mut terminal = Terminal::new(backend)?;
+@@ -11680,139 +11886,319 @@
+     let mut resize_pending = false;
+     let mut last_tick = Instant::now();
+ 
+-    'outer: loop {
+-        if guard.termination_requested() {
+-            break;
+-        }
+-        let now = Instant::now();
+-        state.flush_ordinary_paste(now);
+-        if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
+-            state.tick();
+-            scheduler.request();
+-            last_tick = now;
+-        }
+-        if state.take_dirty() {
+-            scheduler.request();
+-        }
+-        if scheduler.due(now) {
+-            if resize_pending {
+-                terminal.autoresize()?;
++    let loop_result = (|| -> Result<(), TuiError> {
++        'outer: loop {
++            if guard.termination_requested() {
++                break;
++            }
++            if editor.poll(&mut state, &mut guard, &mut terminal, None)? {
++                scheduler.request();
+                 resize_pending = false;
+             }
+-            terminal.draw(|frame| state.render(frame, &config.title))?;
+-            scheduler.rendered(Instant::now());
+-        }
+-
+-        let wait = if scheduler.is_dirty() {
+-            frame_interval
+-                .saturating_sub(Instant::now().saturating_duration_since(now))
+-                .min(poll_interval)
+-        } else {
+-            poll_interval
+-        };
+-        let wait = state.ordinary_paste_wait(Instant::now(), wait);
+-        if !event::poll(wait)? {
+-            continue;
+-        }
+-        let mut processed = 0usize;
+-        loop {
+-            let event = event::read()?;
+-            if matches!(event, Event::Resize(_, _)) {
+-                resize_pending = true;
+-            }
+-            match state.handle_event(event) {
+-                TuiAction::Copy(text) => {
+-                    state.transcript_ux.copy_notice = Some((
+-                        match write_terminal_clipboard(&text) {
+-                            Ok(()) => format!("Clipboard sent {} bytes", text.len()),
+-                            Err(error) => format!("Copy failed: {error}"),
+-                        },
+-                        Instant::now(),
+-                    ));
+-                    state.dirty = true;
+-                }
+-                TuiAction::RespondApproval { .. } => {
+-                    state.push_message(
+-                        MessageRole::Error,
+-                        "Approval requires the production owner host",
+-                    );
+-                }
+-                TuiAction::InspectResource { .. } => {
+-                    state.set_status(
+-                        "Resource source inspection requires the production owner host",
+-                    );
+-                }
+-                TuiAction::OpenSession(_) => {
+-                    state.push_message(
++            if editor.active() {
++                std::thread::sleep(poll_interval.min(Duration::from_millis(20)));
++                continue;
++            }
++            let now = Instant::now();
++            state.flush_ordinary_paste(now);
++            if state.is_busy() && now.saturating_duration_since(last_tick) >= poll_interval {
++                state.tick();
++                scheduler.request();
++                last_tick = now;
++            }
++            if state.take_dirty() {
++                scheduler.request();
++            }
++            if scheduler.due(now) {
++                if resize_pending {
++                    terminal.autoresize()?;
++                    resize_pending = false;
++                }
++                terminal.draw(|frame| state.render(frame, &config.title))?;
++                scheduler.rendered(Instant::now());
++            }
++
++            let wait = if scheduler.is_dirty() {
++                frame_interval
++                    .saturating_sub(Instant::now().saturating_duration_since(now))
++                    .min(poll_interval)
++            } else {
++                poll_interval
++            };
++            let wait = state.ordinary_paste_wait(Instant::now(), wait);
++            if !event::poll(wait)? {
++                continue;
++            }
++            let mut processed = 0usize;
++            loop {
++                let event = event::read()?;
++                if matches!(event, Event::Resize(_, _)) {
++                    resize_pending = true;
++                }
++                match state.handle_event(event) {
++                    TuiAction::OpenExternalEditor => {
++                        editor.start(&mut state, &mut guard, &mut terminal, None)?;
++                        scheduler.request();
++                        continue 'outer;
++                    }
++                    TuiAction::Copy(text) => {
++                        state.transcript_ux.copy_notice = Some((
++                            match write_terminal_clipboard(&text) {
++                                Ok(()) => format!("Clipboard sent {} bytes", text.len()),
++                                Err(error) => format!("Copy failed: {error}"),
++                            },
++                            Instant::now(),
++                        ));
++                        state.dirty = true;
++                    }
++                    TuiAction::RespondApproval { .. } => {
++                        state.push_message(
++                            MessageRole::Error,
++                            "Approval requires the production owner host",
++                        );
++                    }
++                    TuiAction::InspectResource { .. } => {
++                        state.set_status(
++                            "Resource source inspection requires the production owner host",
++                        );
++                    }
++                    TuiAction::OpenSession(_) => {
++                        state.push_message(
+                         MessageRole::Error,
+                         "session cannot be opened in the synchronous TUI host; use the production TUI",
+                     );
+-                    state.set_status("Session open unavailable");
+-                }
+-                TuiAction::Submit(text)
+-                    if input_controls && slash::input_queue_control(&text).is_some() =>
+-                {
+-                    state.push_message(MessageRole::User, &text);
+-                    if let Err(error) = on_submit(text, &mut state) {
+-                        state.push_message(MessageRole::Error, error.to_string());
+-                        state.set_status("Input control failed");
++                        state.set_status("Session open unavailable");
+                     }
+-                }
+-                TuiAction::Submit(text) => match slash::route_input(&text) {
+-                    Err(error) => {
++                    TuiAction::Submit(text)
++                        if input_controls && slash::input_queue_control(&text).is_some() =>
++                    {
+                         state.push_message(MessageRole::User, &text);
+-                        state.push_message(MessageRole::Error, error.to_string());
+-                        state.set_status("Command rejected");
+-                    }
+-                    Ok(InputRoute::Slash(command)) => {
+-                        state.push_message(MessageRole::User, &text);
+-                        match dispatch_slash_command(command, &mut state, None) {
+-                            SlashDispatchAction::Quit => break 'outer,
+-                            SlashDispatchAction::Interrupt => {
+-                                state.set_busy(false);
+-                                state.set_status("Interrupted");
+-                            }
+-                            SlashDispatchAction::Continue => {}
++                        if let Err(error) = on_submit(text, &mut state) {
++                            state.push_message(MessageRole::Error, error.to_string());
++                            state.set_status("Input control failed");
+                         }
+                     }
+-                    Ok(InputRoute::UserShell(_command)) => {
+-                        state.push_message(
++                    TuiAction::Submit(text) => match slash::route_input(&text) {
++                        Err(error) => {
++                            state.push_message(MessageRole::User, &text);
++                            state.push_message(MessageRole::Error, error.to_string());
++                            state.set_status("Command rejected");
++                        }
++                        Ok(InputRoute::Slash(command)) => {
++                            state.push_message(MessageRole::User, &text);
++                            match dispatch_slash_command(command, &mut state, None) {
++                                SlashDispatchAction::Quit => break 'outer,
++                                SlashDispatchAction::Interrupt => {
++                                    state.set_busy(false);
++                                    state.set_status("Interrupted");
++                                }
++                                SlashDispatchAction::Continue => {}
++                            }
++                        }
++                        Ok(InputRoute::UserShell(_command)) => {
++                            state.push_message(
+                             MessageRole::Error,
+                             "local shell is unavailable in the synchronous TUI host; use the production TUI",
+                         );
+-                        state.set_status("Local shell unavailable");
++                            state.set_status("Local shell unavailable");
++                        }
++                        Ok(InputRoute::Prompt(prompt)) => {
++                            state.push_message(MessageRole::User, &prompt);
++                            state.set_busy(true);
++                            state.set_status("Working");
++                            if let Err(error) = on_submit(prompt, &mut state) {
++                                state.push_message(MessageRole::Error, error.to_string());
++                                state.set_status("Request failed");
++                            }
++                            state.set_busy(false);
++                        }
++                    },
++                    TuiAction::Quit => break 'outer,
++                    TuiAction::Interrupt => {
++                        state.set_busy(false);
++                        state.set_status("Interrupted");
+                     }
+-                    Ok(InputRoute::Prompt(prompt)) => {
+-                        state.push_message(MessageRole::User, &prompt);
+-                        state.set_busy(true);
+-                        state.set_status("Working");
+-                        if let Err(error) = on_submit(prompt, &mut state) {
+-                            state.push_message(MessageRole::Error, error.to_string());
+-                            state.set_status("Request failed");
+-                        }
+-                        state.set_busy(false);
+-                    }
+-                },
+-                TuiAction::Quit => break 'outer,
+-                TuiAction::Interrupt => {
+-                    state.set_busy(false);
+-                    state.set_status("Interrupted");
+-                }
+-                TuiAction::Redraw | TuiAction::None => {}
+-            }
+-            scheduler.request();
+-            processed += 1;
+-            if processed >= 256 || !event::poll(Duration::ZERO)? {
+-                break;
+-            }
+-        }
+-    }
++                    TuiAction::Redraw | TuiAction::None => {}
++                }
++                scheduler.request();
++                processed += 1;
++                if processed >= 256 || !event::poll(Duration::ZERO)? {
++                    break;
++                }
++            }
++        }
++        Ok(())
++    })();
++    editor.shutdown(&mut state);
+     guard.leave();
+-    Ok(())
++    loop_result
++}
++
++struct ExternalEditorHost {
++    #[cfg(unix)]
++    command: Result<crate::config::EditorCommand, String>,
++    #[cfg(unix)]
++    current: Option<RunningExternalEditor>,
++}
++#[cfg(unix)]
++struct RunningExternalEditor {
++    token: ExternalEditToken,
++    owner: Option<Arc<Mutex<crate::core::Agent>>>,
++    session: crate::external_editor::EditorSession,
++}
++impl ExternalEditorHost {
++    fn capture_startup() -> Self {
++        Self {
++            #[cfg(unix)]
++            command: crate::config::resolve_editor_command(&std::env::vars_os().collect()),
++            #[cfg(unix)]
++            current: None,
++        }
++    }
++    fn active(&self) -> bool {
++        #[cfg(unix)]
++        {
++            self.current.is_some()
++        }
++        #[cfg(not(unix))]
++        {
++            false
++        }
++    }
++    fn start(
++        &mut self,
++        state: &mut TuiState,
++        guard: &mut TerminalGuard,
++        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
++        owner: Option<&Arc<Mutex<crate::core::Agent>>>,
++    ) -> Result<(), TuiError> {
++        #[cfg(not(unix))]
++        {
++            let _ = (guard, terminal, owner);
++            state.set_status("External editor is unavailable on this platform");
++        }
++        #[cfg(unix)]
++        {
++            if guard.original_terminal.is_none() {
++                state.set_status("External editor requires the foreground terminal on stdin");
++                return Ok(());
++            }
++            let token = match state.begin_external_edit() {
++                Ok(token) => token,
++                Err(error) => {
++                    state.set_status(error);
++                    return Ok(());
++                }
++            };
++            let prepared = self
++                .command
++                .as_ref()
++                .map_err(Clone::clone)
++                .and_then(|command| {
++                    crate::external_editor::PreparedEditor::new(
++                        state.input(),
++                        command,
++                        &state.project_cwd(),
++                    )
++                });
++            let prepared = match prepared {
++                Ok(prepared) => prepared,
++                Err(error) => {
++                    let error = state.finish_external_edit(token, Err(error)).unwrap_err();
++                    state.set_status(error);
++                    return Ok(());
++                }
++            };
++            if let Err(error) = guard.suspend_editor(event::reset_event_reader) {
++                let error = prepared.reject(format!("Editor terminal suspension failed: {error}"));
++                let _ = state.finish_external_edit(token, Err(error.clone()));
++                return Err(io::Error::other(error).into());
++            }
++            match crate::external_editor::EditorSession::start(prepared) {
++                Ok(session) => {
++                    self.current = Some(RunningExternalEditor {
++                        token,
++                        session,
++                        owner: owner.map(Arc::clone),
++                    });
++                }
++                Err(error) => {
++                    let error = state.finish_external_edit(token, Err(error)).unwrap_err();
++                    state.set_status(error);
++                    guard.resume_editor(event::reset_event_reader, terminal)?;
++                }
++            }
++        }
++        Ok(())
++    }
++    fn poll(
++        &mut self,
++        state: &mut TuiState,
++        guard: &mut TerminalGuard,
++        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
++        owner: Option<&Arc<Mutex<crate::core::Agent>>>,
++    ) -> Result<bool, TuiError> {
++        #[cfg(not(unix))]
++        {
++            let _ = (state, guard, terminal, owner);
++        }
++        #[cfg(unix)]
++        {
++            let Some(result) = self.current.as_mut().and_then(|edit| edit.session.poll()) else {
++                return Ok(false);
++            };
++            let edit = self.current.take().unwrap();
++            guard.resume_editor(event::reset_event_reader, terminal)?;
++            if edit.session.fatal_failure() {
++                let message = result
++                    .err()
++                    .unwrap_or_else(|| "Editor cleanup failed".into());
++                let _ = state.finish_external_edit(edit.token, Err(message.clone()));
++                return Err(io::Error::other(message).into());
++            }
++            let same_owner = match (edit.owner.as_ref(), owner) {
++                (Some(original), Some(current)) => Arc::ptr_eq(original, current),
++                (None, None) => true,
++                _ => false,
++            };
++            let result = if same_owner {
++                result
++            } else {
++                Err(
++                    "External edit not applied: session owner changed; current draft retained"
++                        .into(),
++                )
++            };
++            match state.finish_external_edit(edit.token, result) {
++                Ok(true) => state.set_status("External edit applied · Enter explicitly to send"),
++                Ok(false) => state.set_status("External edit unchanged · draft preserved"),
++                Err(error) => state.set_status(error),
++            }
++            return Ok(true);
++        }
++        #[allow(unreachable_code)]
++        Ok(false)
++    }
++    fn shutdown(&mut self, state: &mut TuiState) {
++        #[cfg(unix)]
++        if let Some(mut edit) = self.current.take() {
++            let error = edit
++                .session
++                .shutdown()
++                .err()
++                .unwrap_or_else(|| "External edit cancelled".into());
++            let _ = state.finish_external_edit(edit.token, Err(error.clone()));
++            eprintln!("{error}");
++        }
++        #[cfg(not(unix))]
++        let _ = state;
++    }
+ }
+ 
+ struct TerminalGuard {
+     active: bool,
++    #[cfg(unix)]
++    original_terminal: Option<crate::external_editor::TerminalState>,
+     #[cfg(unix)]
+     signals: Option<terminal_signals::SignalGuard>,
+ }
+@@ -11821,6 +12207,10 @@
+     fn enter() -> Result<Self, TuiError> {
+         #[cfg(unix)]
+         let signals = terminal_signals::SignalGuard::install()?;
++        #[cfg(unix)]
++        // A redirected stdin can still use crossterm's /dev/tty fallback.
++        // Only the explicit editor request requires actual foreground stdin.
++        let original_terminal = crate::external_editor::TerminalState::capture().ok();
+         enable_raw_mode()?;
+         let mut stdout = io::stdout();
+         if let Err(error) = execute!(
+@@ -11843,8 +12233,64 @@
+         Ok(Self {
+             active: true,
+             #[cfg(unix)]
++            original_terminal,
++            #[cfg(unix)]
+             signals: Some(signals),
+         })
++    }
++
++    // The caller has exclusive event ownership. The reset callback must clear
++    // both decoded events and partial parser bytes; tcflush alone is insufficient.
++    #[cfg(unix)]
++    fn suspend_editor(&mut self, reset_reader: fn() -> io::Result<()>) -> Result<(), TuiError> {
++        let original = self
++            .original_terminal
++            .as_ref()
++            .ok_or_else(|| io::Error::other("External editor requires foreground stdin"))?;
++        reset_reader()?;
++        original.flush()?;
++        self.active = false;
++        let screen = execute!(
++            io::stdout(),
++            Show,
++            DisableMouseCapture,
++            DisableBracketedPaste,
++            LeaveAlternateScreen
++        );
++        let raw = disable_raw_mode();
++        let original = original.restore(true);
++        screen.and(raw).and(original)?;
++        Ok(())
++    }
++
++    #[cfg(unix)]
++    fn resume_editor(
++        &mut self,
++        reset_reader: fn() -> io::Result<()>,
++        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
++    ) -> Result<(), TuiError> {
++        let original = self
++            .original_terminal
++            .as_ref()
++            .ok_or_else(|| io::Error::other("External editor requires foreground stdin"))?;
++        original.reclaim()?;
++        reset_reader()?;
++        original.flush()?;
++        original.restore(false)?;
++        enable_raw_mode()?;
++        // Mark active before writes so a partial output failure still runs leave.
++        self.active = true;
++        execute!(
++            io::stdout(),
++            EnterAlternateScreen,
++            EnableBracketedPaste,
++            EnableMouseCapture,
++            Hide
++        )?;
++        // Fullscreen resize invalidates both buffers without a cursor-position
++        // query (clear() queries the terminal and can consume handoff input).
++        terminal.resize(terminal.size()?.into())?;
++        Ok(())
+     }
+ 
+     fn termination_requested(&self) -> bool {
+@@ -11874,7 +12320,13 @@
+             self.active = false;
+         }
+         #[cfg(unix)]
+-        drop(self.signals.take());
++        {
++            if let Some(original) = &self.original_terminal {
++                let _ = original.reclaim();
++                let _ = original.restore(false);
++            }
++            drop(self.signals.take());
++        }
+     }
+ }
+ 
+--- a/tests/config.rs
++++ b/tests/config.rs
+@@ -474,3 +474,182 @@
+         );
+     }
+ }
++
++fn editor_environment(items: &[(&str, &str)]) -> BTreeMap<std::ffi::OsString, std::ffi::OsString> {
++    items
++        .iter()
++        .map(|(k, v)| ((*k).into(), (*v).into()))
++        .collect()
++}
++
++#[test]
++fn editor_selection_has_no_invalid_visual_fallback_or_provider_configuration() {
++    use zenpi::config::resolve_editor_command;
++    let mut env = editor_environment(&[("VISUAL", "visual --wait"), ("EDITOR", "fallback")]);
++    let result = resolve_editor_command(&env).unwrap();
++    assert_eq!(result.source, "VISUAL");
++    assert_eq!(result.argv, ["visual", "--wait"]);
++    assert_eq!(result.timeout.as_secs(), 1800);
++    for invalid in ["", "  \t", "'unfinished", "private-secret\nargument"] {
++        env.insert("VISUAL".into(), invalid.into());
++        let error = resolve_editor_command(&env).err().unwrap();
++        assert!(!error.contains("private-secret"));
++    }
++    env.remove(std::ffi::OsStr::new("VISUAL"));
++    assert_eq!(resolve_editor_command(&env).unwrap().source, "EDITOR");
++    env.remove(std::ffi::OsStr::new("EDITOR"));
++    assert!(resolve_editor_command(&env).is_err());
++}
++
++#[test]
++fn editor_argv_quotes_escapes_and_shell_syntax_are_literal() {
++    use zenpi::config::resolve_editor_command;
++    let cases = [
++        (
++            "'/path with 空格/editor' --wait '' a\"b\"'c'",
++            vec!["/path with 空格/editor", "--wait", "", "abc"],
++        ),
++        (
++            r#"ed a\ b 'C:\Users\name' "keep\q" "\$VAR" "\`id\`" "a\\b" "a\"b""#,
++            vec![
++                "ed",
++                "a b",
++                r"C:\Users\name",
++                r"keep\q",
++                "$VAR",
++                "`id`",
++                r"a\b",
++                "a\"b",
++            ],
++        ),
++        (
++            "ed $VAR ~ '*.rs' '$(touch sentinel)' ';' '|' '>'",
++            vec![
++                "ed",
++                "$VAR",
++                "~",
++                "*.rs",
++                "$(touch sentinel)",
++                ";",
++                "|",
++                ">",
++            ],
++        ),
++        ("ed 'quoted\ttab'", vec!["ed", "quoted\ttab"]),
++    ];
++    for (raw, expected) in cases {
++        let parsed = resolve_editor_command(&editor_environment(&[("EDITOR", raw)])).unwrap();
++        assert_eq!(parsed.argv, expected, "{raw}");
++    }
++    for raw in [
++        "ed \\",
++        "ed \"open",
++        "'' arg",
++        "ed\0arg",
++        "ed\rarg",
++        "ed\narg",
++        "ed\u{1b}arg",
++    ] {
++        assert!(resolve_editor_command(&editor_environment(&[("EDITOR", raw)])).is_err());
++    }
++}
++
++#[test]
++fn editor_argument_and_environment_budgets_reject_without_truncation() {
++    use zenpi::config::resolve_editor_command;
++    for raw in [
++        format!("ed {}", "a".repeat(2049)),
++        "a".repeat(4097),
++        format!("ed {}", "x ".repeat(32)),
++    ] {
++        assert!(resolve_editor_command(&editor_environment(&[("EDITOR", &raw)])).is_err());
++    }
++    let mut env = editor_environment(&[
++        ("EDITOR", "ed"),
++        ("PATH", "/usr/bin:/bin"),
++        ("HOME", "/private/user home"),
++        ("TERM", "xterm-256color"),
++        ("OPENAI_API_KEY", "must-not-pass"),
++        ("ZENPI_HOME", "/private/runtime"),
++        ("SSH_AUTH_SOCK", "must-not-pass"),
++        ("LC_NOT_REGISTERED", "must-not-pass"),
++    ]);
++    let before = env.clone();
++    let command = resolve_editor_command(&env).unwrap();
++    assert_eq!(
++        command.environment,
++        editor_environment(&[
++            ("PATH", "/usr/bin:/bin"),
++            ("HOME", "/private/user home"),
++            ("TERM", "xterm-256color")
++        ])
++    );
++    assert_eq!(env, before);
++    env.insert("TERM".into(), "t".repeat(4097).into());
++    assert!(resolve_editor_command(&env).is_err());
++    let mut crowded = editor_environment(&[("EDITOR", "ed")]);
++    for key in [
++        "PATH",
++        "HOME",
++        "USER",
++        "LOGNAME",
++        "SHELL",
++        "TERM",
++        "COLORTERM",
++        "LANG",
++        "TMPDIR",
++        "TERMINFO",
++        "TERMINFO_DIRS",
++        "DISPLAY",
++        "WAYLAND_DISPLAY",
++        "XDG_RUNTIME_DIR",
++        "XDG_CONFIG_HOME",
++        "XDG_DATA_HOME",
++        "XDG_CACHE_HOME",
++    ] {
++        crowded.insert(key.into(), "x".repeat(4096).into());
++    }
++    assert!(resolve_editor_command(&crowded).is_err());
++}
++
++#[test]
++fn editor_deadline_is_separate_bounded_and_never_forwarded() {
++    use zenpi::config::resolve_editor_command;
++    for value in ["1", "1800", "7200"] {
++        let env = editor_environment(&[("EDITOR", "ed"), ("ZENPI_EDITOR_TIMEOUT_SECONDS", value)]);
++        let command = resolve_editor_command(&env).unwrap();
++        assert_eq!(command.timeout.as_secs(), value.parse::<u64>().unwrap());
++        assert!(
++            !command
++                .environment
++                .contains_key(std::ffi::OsStr::new("ZENPI_EDITOR_TIMEOUT_SECONDS"))
++        );
++    }
++    for value in [
++        "0",
++        "7201",
++        "",
++        "-1",
++        "1.5",
++        " 2",
++        "+2",
++        "999999999999999999999999",
++    ] {
++        assert!(
++            resolve_editor_command(&editor_environment(&[
++                ("EDITOR", "ed"),
++                ("ZENPI_EDITOR_TIMEOUT_SECONDS", value)
++            ]))
++            .is_err()
++        );
++    }
++}
++
++#[cfg(unix)]
++#[test]
++fn non_utf8_visual_is_rejected_instead_of_using_editor() {
++    use std::os::unix::ffi::OsStringExt;
++    let mut env = editor_environment(&[("EDITOR", "fallback")]);
++    env.insert("VISUAL".into(), std::ffi::OsString::from_vec(vec![0xff]));
++    assert!(zenpi::config::resolve_editor_command(&env).is_err());
++}
+--- a/tests/tui_composer.rs
++++ b/tests/tui_composer.rs
+@@ -1026,3 +1026,177 @@
+     assert_eq!(s.input(), format!("head\n{payload}"));
+     assert_eq!(saved_draft(&s)["paste_folds"], serde_json::json!([]));
+ }
++
++#[test]
++fn external_edit_changes_are_plain_exact_and_keep_kill_buffer_and_ids() {
++    let mut s = TuiState::default();
++    s.set_input("kill");
++    ctrl(&mut s, 'u');
++    s.handle_event(Event::Paste("界".repeat(1001)));
++    let before = saved_draft(&s);
++    let token = s.begin_external_edit().unwrap();
++    assert!(s.begin_external_edit().is_err());
++    assert!(
++        s.finish_external_edit(token, Ok("/exit\n!touch never-run  \n".into()))
++            .unwrap()
++    );
++    assert_eq!(s.input(), "/exit\n!touch never-run  \n");
++    assert_eq!(saved_draft(&s)["paste_folds"], serde_json::json!([]));
++    assert_eq!(saved_draft(&s)["next_paste_id"], before["next_paste_id"]);
++    ctrl(&mut s, 'y');
++    assert!(s.input().ends_with("\nkill"));
++}
++
++#[test]
++fn external_edit_noop_cancel_empty_and_capacity_failure_are_atomic() {
++    let mut s = TuiState::default();
++    s.handle_event(Event::Paste("x".repeat(1001)));
++    key(&mut s, KeyCode::Left, KeyModifiers::NONE);
++    let before = saved_draft(&s);
++    let token = s.begin_external_edit().unwrap();
++    assert!(
++        !s.finish_external_edit(token.clone(), Ok("x".repeat(1001)))
++            .unwrap()
++    );
++    assert_eq!(saved_draft(&s), before);
++    assert!(
++        s.finish_external_edit(token, Ok("stale duplicate".into()))
++            .is_err()
++    );
++    for outcome in [
++        Err("cancelled".into()),
++        Ok("x".repeat(MAX_MESSAGE_BYTES + 1)),
++    ] {
++        let token = s.begin_external_edit().unwrap();
++        assert!(s.finish_external_edit(token, outcome).is_err());
++        assert_eq!(saved_draft(&s), before);
++    }
++    let token = s.begin_external_edit().unwrap();
++    assert!(s.finish_external_edit(token, Ok(String::new())).unwrap());
++    assert_eq!(s.input(), "");
++    for _ in 0..15 {
++        s.push_message(
++            zenpi::tui::MessageRole::System,
++            "m".repeat(MAX_MESSAGE_BYTES),
++        );
++    }
++    let before = saved_draft(&s);
++    let token = s.begin_external_edit().unwrap();
++    assert!(
++        s.finish_external_edit(token, Ok("x".repeat(MAX_MESSAGE_BYTES)))
++            .is_err()
++    );
++    assert_eq!(saved_draft(&s), before);
++}
++
++#[test]
++fn external_edit_revision_rejects_new_text_cursor_fold_history_and_project_instances() {
++    for change in 0..6 {
++        let mut s = TuiState::default();
++        seed(&mut s, "history");
++        s.handle_event(Event::Paste("界".repeat(1001)));
++        let token = s.begin_external_edit().unwrap();
++        match change {
++            0 => s.set_input("newer draft"),
++            1 => {
++                key(&mut s, KeyCode::Left, KeyModifiers::NONE);
++            }
++            2 => {
++                key(&mut s, KeyCode::Enter, KeyModifiers::ALT);
++            }
++            3 => {
++                ctrl(&mut s, 'p');
++                key(&mut s, KeyCode::Esc, KeyModifiers::NONE);
++            }
++            4 => {
++                s.set_project_session_cursor(s.active_project().to_owned(), "new-session", 1);
++            }
++            _ => {
++                let project = s.active_project().to_owned();
++                s.open_project_tab("other");
++                s.close_project_tab(&project);
++                s.open_project_tab(project);
++            }
++        }
++        let before = saved_draft(&s);
++        assert!(
++            s.finish_external_edit(token, Ok("old external result".into()))
++                .is_err()
++        );
++        assert_eq!(saved_draft(&s), before);
++    }
++}
++
++#[test]
++fn external_edit_owner_revision_survives_unrelated_background_projection() {
++    let mut s = TuiState::default();
++    s.open_project_tab("background");
++    s.select_project_tab(0);
++    s.set_input("original");
++    s.set_project_session_cursor(s.active_project().to_owned(), "session", 1);
++    let token = s.begin_external_edit().unwrap();
++    s.select_project_tab(1);
++    s.push_message(zenpi::tui::MessageRole::Assistant, "background reply");
++    s.select_project_tab(0);
++    s.set_project_session_cursor(s.active_project().to_owned(), "session", 2);
++    assert!(s.finish_external_edit(token, Ok("edited".into())).unwrap());
++    assert_eq!(s.input(), "edited");
++}
++
++#[test]
++fn external_edit_rejects_explicit_project_roundtrip_and_checkpoint_restore() {
++    for change in 0..4 {
++        let mut s = TuiState::default();
++        s.open_project_tab("other");
++        s.select_project_tab(0);
++        s.set_input("retained");
++        let origin = s.active_project().to_owned();
++        let token = s.begin_external_edit().unwrap();
++        match change {
++            0 => {
++                s.next_project_tab(false);
++                s.next_project_tab(true);
++            }
++            1 => {
++                s.project_switch_context(1);
++                s.project_switch_context(0);
++            }
++            2 => {
++                s.select_project_tab(1);
++                assert!(s.rename_project_tab(&origin, "temporary"));
++                assert!(s.rename_project_tab("temporary", &origin));
++                s.select_project_tab(0);
++            }
++            _ => {
++                let checkpoint = s.project_checkpoint();
++                assert!(s.restore_project_checkpoint(&checkpoint));
++            }
++        }
++        let before = saved_draft(&s);
++        assert!(
++            s.finish_external_edit(token, Ok("obsolete".into()))
++                .is_err()
++        );
++        assert_eq!(saved_draft(&s), before);
++    }
++}
++
++#[test]
++fn external_editor_shortcut_respects_focus_and_explicit_popup_dismissal() {
++    let mut s = TuiState::default();
++    s.set_input("/mo");
++    assert_ne!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++    key(&mut s, KeyCode::Esc, KeyModifiers::NONE);
++    assert_eq!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++    s.set_input("normal draft");
++    s.set_busy(true);
++    assert_eq!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++    ctrl(&mut s, 'r');
++    assert_ne!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++    key(&mut s, KeyCode::Esc, KeyModifiers::NONE);
++    s.open_directory_picker();
++    assert_ne!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++    key(&mut s, KeyCode::Esc, KeyModifiers::NONE);
++    s.open_transcript_browser();
++    assert_ne!(ctrl(&mut s, 'g'), TuiAction::OpenExternalEditor);
++}
+--- /dev/null
++++ b/tools/tui_external_editor_smoke.py
+@@ -0,0 +1,1094 @@
++#!/usr/bin/env python3
++"""Actual Unix PTY editor handoff evidence; each run binds a fixed release hash."""
++from __future__ import annotations
++
++import argparse
++import datetime
++import hashlib
++import json
++import os
++from pathlib import Path
++import sys
++import tempfile
++import threading
++import time
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++
++
++def digest(data):
++    return hashlib.sha256(data).hexdigest()
++
++
++def start_terminal(binary, root, env, terminals):
++    from tui_composer_smoke import Terminal
++    terminal = Terminal.__new__(Terminal)
++    terminals.append(terminal)
++    terminal.__init__(binary, root, env)
++    return terminal
++
++
++def cleanup_fixture_children(terminals, children):
++    """Only process groups recorded by this fixture or foreground on its own PTYs."""
++    import signal
++    groups = set()
++    for terminal in terminals:
++        if terminal.pid and terminal.fd is not None:
++            try:
++                group = os.tcgetpgrp(terminal.fd)
++                if group > 1 and group != terminal.pid and group != os.getpgrp():
++                    groups.add(group)
++            except OSError:
++                pass
++    for row in children:
++        if row['event'] not in ('started', 'descendant'):
++            continue
++        try:
++            if row['pgid'] > 1 and os.getpgid(row['pid']) == row['pgid'] and row['pgid'] != os.getpgrp():
++                groups.add(row['pgid'])
++        except ProcessLookupError:
++            pass
++    for group in groups:
++        try:
++            os.killpg(group, signal.SIGTERM)
++        except ProcessLookupError:
++            pass
++    if groups:
++        time.sleep(.25)
++    for group in groups:
++        try:
++            os.killpg(group, signal.SIGKILL)
++        except ProcessLookupError:
++            pass
++
++
++def editor_child():
++    """An actual foreground process, with an explicit save-and-close interaction."""
++    import termios
++    record, plan_path = map(Path, sys.argv[2:4])
++    path = Path(sys.argv[-1])
++    plan = json.loads(plan_path.read_text())
++    seed = path.read_bytes()
++    fd = os.open(record, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
++
++    def log(event, **values):
++        os.write(fd, (json.dumps(dict(event=event, **values), ensure_ascii=False) + '\n').encode())
++
++    import signal
++    action = plan.get('action', 'save')
++    if action == 'ignore-term':
++        signal.signal(signal.SIGTERM, signal.SIG_IGN)
++    attrs = termios.tcgetattr(0)
++    log('started', pid=os.getpid(), pgid=os.getpgrp(), foreground=os.tcgetpgrp(0),
++        cwd=os.getcwd(), argv=sys.argv[1:], tty=[os.isatty(i) for i in range(3)],
++        canonical=bool(attrs[3] & termios.ICANON), echo=bool(attrs[3] & termios.ECHO),
++        blocking=os.get_blocking(0), environment_keys=sorted(os.environ),
++        path=str(path), directory_mode=path.parent.stat().st_mode & 0o777,
++        mode=path.stat().st_mode & 0o777, seed_hex=seed.hex(), seed_sha256=digest(seed))
++    if plan.get('descendant'):
++        child = os.fork()
++        if child == 0:
++            if plan.get('detached'):
++                os.setsid()
++            if plan.get('child_ignore_term'):
++                signal.signal(signal.SIGTERM, signal.SIG_IGN)
++            log('descendant', pid=os.getpid(), pgid=os.getpgrp(), detached=bool(plan.get('detached')))
++            while True:
++                time.sleep(1)
++        log('fork', child=child)
++    if plan.get('write_before_wait'):
++        path.write_text('UNACCEPTED_PARTIAL_EDIT')
++    print('ZENPI_EDITOR_READY', flush=True)
++    line = sys.stdin.readline()
++    log('input', text=line)
++    if line != ('\x07save\n' if plan.get('second_shortcut') else 'save\n'):
++        log('exit', code=23)
++        os.close(fd)
++        raise SystemExit(23)
++    if action == 'nonzero':
++        log('exit', code=7)
++        raise SystemExit(7)
++    if action == 'signal':
++        os.kill(os.getpid(), signal.SIGTERM)
++    output = plan.get('text', seed.decode()).encode()
++    if action == 'invalid-utf8':
++        output = b'\xff'
++    if action == 'oversize':
++        output = b'x' * (256 * 1024 + 1)
++    if action == 'boundary':
++        output = b'x' * (256 * 1024)
++    if action in ('symlink', 'fifo', 'directory', 'missing'):
++        path.unlink()
++        if action == 'symlink':
++            path.symlink_to(plan['outside'])
++        elif action == 'fifo':
++            os.mkfifo(path, 0o600)
++        elif action == 'directory':
++            path.mkdir()
++    elif plan.get('atomic'):
++        replacement = path.with_name('saved.md')
++        out_fd = os.open(replacement, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++        with os.fdopen(out_fd, 'wb') as stream:
++            stream.write(output)
++        replacement.replace(path)
++    else:
++        path.write_bytes(output)
++    if action == 'permissions':
++        path.chmod(0o644)
++    if action == 'cleanup-entries':
++        for index in range(257):
++            (path.parent / f'backup-{index}').touch(mode=0o600)
++    if action == 'cleanup-depth':
++        (path.parent / '1/2/3/4/5').mkdir(parents=True)
++    log('exit', code=0, output_sha256=digest(output), output_bytes=len(output))
++    os.close(fd)
++
++
++def smoke(binary, evidence, before=False):
++    from tui_composer_smoke import Terminal
++    from tui_user_shell_smoke import drain
++    binary = binary.resolve()
++    requests, terminals, children = [], [], []
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  binary=str(binary), binary_sha256=digest(binary.read_bytes()),
++                  binary_bytes=binary.stat().st_size, platform=sys.platform,
++                  mode='before' if before else 'roundtrip', checks={})
++
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args):
++            pass
++
++        def do_POST(self):
++            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
++            requests.append(body)
++            self.send_response(200)
++            self.send_header('Content-Type', 'text/event-stream')
++            self.end_headers()
++            for kind, payload in [
++                ('response.output_text.delta', {'delta': 'EDITOR_EXPLICIT_REPLY'}),
++                ('response.completed', {'response': {'id': 'editor', 'model': 'gpt-4.1',
++                                                     'status': 'completed'}}),
++            ]:
++                try:
++                    self.wfile.write(('event: ' + kind + '\ndata: ' + json.dumps(
++                        {'type': kind, **payload}) + '\n\n').encode())
++                    self.wfile.flush()
++                except (BrokenPipeError, ConnectionResetError):
++                    return
++
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    server_thread = threading.Thread(target=server.serve_forever)
++    server_thread.start()
++    Path('.ops').mkdir(exist_ok=True)
++    fixture = tempfile.TemporaryDirectory(prefix='external-editor-pty-', dir=Path('.ops').resolve())
++    root = Path(fixture.name)
++    record = root / 'child.jsonl'
++    try:
++        config = root / 'fixture'
++        for path in [root / 'initial', root / 'sessions', root / 'temp', config]:
++            path.mkdir(mode=0o700)
++        (config / 'config.toml').write_text(
++            'backend="openai"\nmodel="gpt-4.1"\n'
++            f'base_url="http://127.0.0.1:{server.server_port}/v1"\n'
++            'wire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n')
++        (config / 'auth.json').write_text(json.dumps({'OPENAI_API_KEY': 'external-editor-fixture'}))
++        (config / 'auth.json').chmod(0o600)
++        plan = root / 'plan.json'
++        edited = '/exit\n!touch must-not-run\n界e\u0301👨‍👩‍👧‍👦  \n'
++        plan.write_text(json.dumps(dict(text=edited, atomic=True)))
++        program = root / '编辑器 with spaces'
++        program.symlink_to(sys.executable)
++        # Every path is generated by this fixture; quotes are explicit editor argv syntax.
++        visual = ' '.join('"' + str(arg).replace('\\', '\\\\').replace('"', '\\"') + '"'
++                          for arg in [program, Path(__file__).resolve(), '--editor-child', record,
++                                      plan, '--wait', '', '$(touch sentinel)', ';'])
++        env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        env.update(ZENPI_HOME=str(config), TERM='xterm-256color', VISUAL=visual,
++                   EDITOR='must-not-be-selected', TMPDIR=str(root / 'temp'),
++                   ZENPI_EDITOR_TIMEOUT_SECONDS='15', OPENAI_API_KEY='must-not-reach-editor')
++        t = start_terminal(binary, root, env, terminals)
++        left, middle, right = 'prefix ' + '界' * 1001, '\n[Pasted #1, 1001 chars]\n', 'R' * 1001 + '\nTAIL  \n'
++        seed = left + middle + right
++        t.write(b'\x1b[200~KILL_EDITOR\x1b[201~\x15')
++        t.wait(lambda: t.draft() == '')
++        for part in [left, middle, right]:
++            t.write(b'\x1b[200~' + part.encode() + b'\x1b[201~')
++        t.wait(lambda: t.draft() == seed)
++        def composer_snapshot():
++            saved = json.loads(t.checkpoint.read_text())
++            return next(row['draft'] for row in saved['project_state']
++                        if row['name'] == saved['projects'][saved['active']])
++        original = composer_snapshot()
++        assert len(original['paste_folds']) == 2
++        t.write(b'\x07')
++        if before:
++            until = time.monotonic() + 1.0
++            while time.monotonic() < until:
++                drain(t.fd, t.output, .05)
++            assert not record.exists(), 'before unexpectedly launched the editor'
++            assert t.draft() == seed and not requests
++            result['checks']['ctrl_g_does_not_start_editor_on_fixed_before'] = True
++        else:
++            t.wait(lambda: record.exists())
++            started = json.loads(record.read_text().splitlines()[0])
++            assert all(started['tty']) and started['pgid'] == started['foreground']
++            assert started['canonical'] and started['echo'] and started['blocking']
++            assert started['cwd'] == str((root / 'initial').resolve())
++            assert started['directory_mode'] == 0o700 and started['mode'] == 0o600
++            assert bytes.fromhex(started['seed_hex']) == seed.encode()
++            assert not any(k.startswith(('ZENPI_', 'OPENAI_')) for k in started['environment_keys'])
++            assert started['argv'][-5:-1] == ['--wait', '', '$(touch sentinel)', ';']
++            t.write(b'save\n\r')
++            t.wait(lambda: t.draft() == edited)
++            until = time.monotonic() + .4
++            while time.monotonic() < until:
++                drain(t.fd, t.output, .05)
++            assert not requests and not (root / 'initial/must-not-run').exists()
++            assert not (root / 'initial/sentinel').exists()
++            assert not Path(started['path']).parent.exists()
++            assert composer_snapshot()['paste_folds'] == []
++            assert composer_snapshot()['next_paste_id'] >= original['next_paste_id']
++            t.write(b'\x19')
++            t.wait(lambda: t.draft() == edited + 'KILL_EDITOR')
++            result['checks']['interactive_atomic_save_exact_text_no_implicit_submit'] = True
++            result['checks']['multiple_folds_become_plain_and_ids_and_kill_buffer_survive'] = True
++            explicit = 'EDITOR_EXPLICIT\n/exit\n!touch must-not-run\n界  \n'
++            plan.write_text(json.dumps(dict(text=explicit, atomic=True)))
++            count = len(record.read_text().splitlines())
++            t.write(b'\x07')
++            t.wait(lambda: len(record.read_text().splitlines()) > count)
++            t.write(b'save\n\r')
++            t.wait(lambda: t.draft() == explicit)
++            assert not requests
++            t.deliberate_enter()
++            t.expect(b'EDITOR_EXPLICIT_REPLY')
++            assert len(requests) == 1
++            content = next(item for item in reversed(requests[0]['input']) if item.get('role') == 'user')['content']
++            actual = content if isinstance(content, str) else ''.join(item.get('text', '') for item in content)
++            assert actual == explicit, (actual, explicit)
++            assert not (root/'initial/must-not-run').exists()
++            result['checks']['later_deliberate_enter_sends_exact_full_text_once'] = True
++        t.close(preserve_draft=True)
++        result.update(status='passed', http_requests=len(requests), tui_processes=len(terminals))
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        if record.exists():
++            children = [json.loads(line) for line in record.read_text().splitlines()]
++        cleanup_fixture_children(terminals, children)
++        for terminal in terminals:
++            terminal.cleanup()
++        server.shutdown()
++        server_thread.join(timeout=3)
++        server.server_close()
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.parent.mkdir(parents=True, exist_ok=True)
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.http.json').write_text(json.dumps(requests, ensure_ascii=False, indent=2) + '\n')
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2) + '\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
++        fixture.cleanup()
++    return result
++
++
++def failure_matrix(binary, evidence):
++    """Real child file replacements, cancellation, no-op and input boundaries."""
++    import signal
++    from tui_composer_smoke import Terminal
++    from tui_user_shell_smoke import drain
++    binary = binary.resolve()
++    calls, terminals, children = [], [], []
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  binary_sha256=digest(binary.read_bytes()), checks={})
++
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args):
++            pass
++        def do_POST(self):
++            calls.append(self.rfile.read(int(self.headers['Content-Length'])).decode())
++            self.send_response(503)
++            self.end_headers()
++
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    thread = threading.Thread(target=server.serve_forever)
++    thread.start()
++    fixture = tempfile.TemporaryDirectory(prefix='editor-negative-', dir=Path('.ops').resolve())
++    root = Path(fixture.name)
++    record = root / 'children.jsonl'
++    try:
++        config = root / 'fixture'
++        for path in [root / 'initial', root / 'sessions', root / 'temp', config]:
++            path.mkdir(mode=0o700)
++        (config / 'config.toml').write_text('backend="openai"\nmodel="gpt-4.1"\n'
++            f'base_url="http://127.0.0.1:{server.server_port}/v1"\nwire_api="responses"\n'
++            'requires_openai_auth=false\nmax_retries=0\n')
++        (config / 'auth.json').write_text('{"OPENAI_API_KEY":"editor-matrix-fixture"}')
++        (config / 'auth.json').chmod(0o600)
++        plan = root / 'plan.json'
++        outside = root / 'outside'
++        outside.write_text('OUTSIDE_UNCHANGED')
++        visual = ' '.join('"' + str(arg) + '"' for arg in
++                          [sys.executable, Path(__file__).resolve(), '--editor-child', record, plan])
++        env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        env.update(ZENPI_HOME=str(config), TERM='xterm-256color', VISUAL=visual,
++                   TMPDIR=str(root/'temp'), ZENPI_EDITOR_TIMEOUT_SECONDS='2')
++        t = start_terminal(binary, root, env, terminals)
++
++        def records():
++            return [json.loads(line) for line in record.read_text().splitlines()] if record.exists() else []
++
++        def draft():
++            value = json.loads((config/'project-tabs.json').read_text())
++            active = value['projects'][value['active']]
++            return next(row['draft'] for row in value['project_state'] if row['name'] == active)
++
++        for case in ['noop', 'empty', 'nonzero', 'signal', 'ctrl-c', 'ctrl-z', 'timeout',
++                     'ignore-term', 'symlink', 'fifo', 'directory', 'missing', 'permissions',
++                     'invalid-utf8', 'oversize', 'boundary', 'cleanup-entries', 'cleanup-depth',
++                     'prefetch-paste', 'prefetch-csi', 'prefetch-utf8']:
++            t.clear_input()
++            seed = 'SEED-' + '界' * 1001 + '\nend  \n'
++            t.write(b'\x1b[200~' + seed.encode() + b'\x1b[201~')
++            t.wait(lambda: t.draft() == seed)
++            # A no-op must preserve the original fold and non-end cursor.
++            if case == 'noop':
++                t.write(b'\x1b[D')
++                drain(t.fd, t.output, .3)
++            original = draft()
++            plan.write_text(json.dumps(dict(action=case, text='' if case == 'empty' else seed,
++                                             outside=str(outside))))
++            count = len(records())
++            mark = len(t.output)
++            suffix = {'prefetch-paste': b'\x1b[200~OLD', 'prefetch-csi': b'\x1b[',
++                      'prefetch-utf8': b'\xe7'}.get(case, b'')
++            t.write(b'\x07' + suffix)
++            t.wait(lambda: len(records()) > count)
++            started = records()[count]
++            assert started['event'] == 'started'
++            assert bytes.fromhex(started['seed_hex']) == seed.encode()
++            assert all(started['tty']) and started['foreground'] == started['pgid']
++            assert started['canonical'] and started['echo'] and started['blocking']
++            if case == 'ctrl-c':
++                t.write(b'\x03')
++            elif case == 'ctrl-z':
++                t.write(b'\x1a')
++            elif case not in ('timeout', 'ignore-term'):
++                t.write(b'save\n\r')
++            t.wait(lambda: os.tcgetpgrp(t.fd) == t.pid and b'\x1b[?1049h' in t.output[mark:], timeout=8)
++            drain(t.fd, t.output, .3)
++            expected = '' if case == 'empty' else ('x' * (256 * 1024) if case == 'boundary' else seed)
++            t.wait(lambda: t.draft() == expected)
++            assert not calls and outside.read_text() == 'OUTSIDE_UNCHANGED'
++            if case not in ('empty', 'boundary'):
++                assert draft() == original, (case, draft(), original)
++            private = Path(started['path']).parent
++            if case.startswith('cleanup-'):
++                from tui_project_workspace_smoke import screen_text
++                assert 'cleanup failed' in screen_text(bytes(t.output)).decode().lower()
++                assert private.exists()
++                result['checks'][case + '_reported_retained_private_directory'] = str(private)
++            else:
++                assert not private.exists(), case
++            try:
++                os.kill(started['pid'], 0)
++            except ProcessLookupError:
++                pass
++            else:
++                raise AssertionError((case, 'editor leader still present'))
++            if case.startswith('prefetch-'):
++                t.write(b'x')
++                t.wait(lambda: t.draft() == seed + 'x')
++                assert not calls
++            result['checks'][case] = True
++        t.close(preserve_draft=True)
++        saved = draft()['input']
++        t = start_terminal(binary, root, env, terminals)
++        t.wait(lambda: t.draft() == saved)
++        assert not calls
++        result['checks']['independent_restart_keeps_draft_without_resend'] = True
++        t.close(preserve_draft=True)
++        result.update(status='passed', tui_processes=len(terminals), http_requests=len(calls))
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        if record.exists():
++            children = records()
++        cleanup_fixture_children(terminals, children)
++        for terminal in terminals:
++            terminal.cleanup()
++        server.shutdown()
++        thread.join(timeout=3)
++        server.server_close()
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.parent.mkdir(parents=True, exist_ok=True)
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2)+'\n')
++        evidence.with_suffix('.http.json').write_text(json.dumps(calls, indent=2)+'\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++        fixture.cleanup()
++    return result
++
++
++def busy_matrix(binary, evidence):
++    """Real model completion while editor owns TTY, and stale failed-input recovery."""
++    from tui_composer_smoke import Terminal
++    from tui_user_shell_smoke import drain
++    binary = binary.resolve()
++    calls, terminals = [], []
++    gates = [dict(started=threading.Event(), release=threading.Event()) for _ in range(2)]
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  binary_sha256=digest(binary.read_bytes()), checks={})
++
++    class Handler(BaseHTTPRequestHandler):
++        def log_message(self, *args):
++            pass
++        def do_POST(self):
++            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
++            index = len(calls)
++            calls.append(body)
++            if index >= len(gates):
++                self.send_response(503)
++                self.end_headers()
++                return
++            gate = gates[index]
++            gate['started'].set()
++            if not gate['release'].wait(15):
++                self.send_response(503)
++                self.end_headers()
++                return
++            if index == 1:
++                self.send_response(503)
++                self.send_header('Content-Type', 'application/json')
++                self.end_headers()
++                self.wfile.write(b'{"error":{"message":"EDITOR_GATE_FAILURE"}}')
++                return
++            self.send_response(200)
++            self.send_header('Content-Type', 'text/event-stream')
++            self.end_headers()
++            for kind, payload in [
++                ('response.output_text.delta', {'delta': 'BACKGROUND_EDITOR_REPLY'}),
++                ('response.completed', {'response': {'id': 'editor-busy', 'model': 'gpt-4.1',
++                                                     'status': 'completed'}}),
++            ]:
++                try:
++                    self.wfile.write(('event: '+kind+'\ndata: '+json.dumps(
++                        {'type': kind, **payload})+'\n\n').encode())
++                    self.wfile.flush()
++                except (BrokenPipeError, ConnectionResetError):
++                    return
++
++    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
++    thread = threading.Thread(target=server.serve_forever)
++    thread.start()
++    fixture = tempfile.TemporaryDirectory(prefix='editor-busy-', dir=Path('.ops').resolve())
++    root = Path(fixture.name)
++    record = root/'children.jsonl'
++    try:
++        config = root/'fixture'
++        for path in [root/'initial', root/'sessions', root/'temp', config]:
++            path.mkdir(mode=0o700)
++        (config/'config.toml').write_text('backend="openai"\nmodel="gpt-4.1"\n'
++            f'base_url="http://127.0.0.1:{server.server_port}/v1"\nwire_api="responses"\n'
++            'requires_openai_auth=false\nmax_retries=0\n')
++        (config/'auth.json').write_text('{"OPENAI_API_KEY":"editor-busy-fixture"}')
++        (config/'auth.json').chmod(0o600)
++        plan = root/'plan.json'
++        visual = ' '.join('"'+str(arg)+'"' for arg in
++                          [sys.executable, Path(__file__).resolve(), '--editor-child', record, plan])
++        env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        env.update(ZENPI_HOME=str(config), TERM='xterm-256color', VISUAL=visual,
++                   TMPDIR=str(root/'temp'), ZENPI_EDITOR_TIMEOUT_SECONDS='10')
++        t = start_terminal(binary, root, env, terminals)
++
++        def records():
++            return [json.loads(line) for line in record.read_text().splitlines()] if record.exists() else []
++
++        def saved():
++            return json.loads((config/'project-tabs.json').read_text())
++
++        for index in range(2):
++            t.clear_input()
++            if index == 1:
++                t.write(b'\x1b[200~KEEP_KILL\x1b[201~\x15')
++                t.wait(lambda: t.draft() == '')
++            prompt = 'BUSY_EDITOR_GATE' if index == 0 else 'FAILED_EDITOR_GATE'
++            t.write(prompt.encode())
++            t.wait(lambda: t.draft() == prompt)
++            t.deliberate_enter()
++            t.wait(gates[index]['started'].is_set)
++            t.wait(lambda: t.draft() == '')
++            if index == 0:
++                t.write(b'\x1b[200~draft while busy\x1b[201~')
++                t.wait(lambda: t.draft() == 'draft while busy')
++            plan.write_text(json.dumps(dict(text='EDITED_DURING_BUSY' if index == 0 else 'STALE_EXTERNAL')))
++            count = len(records())
++            t.write(b'\x07')
++            t.wait(lambda: len(records()) > count)
++            started = records()[count]
++            t.wait(lambda: b'ZENPI_EDITOR_READY' in t.output)
++            mark = len(t.output)
++            assert bytes.fromhex(started['seed_hex']).decode() == ('draft while busy' if index == 0 else '')
++            gates[index]['release'].set()
++            if index == 0:
++                t.wait(lambda: 'BACKGROUND_EDITOR_REPLY' in json.dumps(saved()))
++            else:
++                t.wait(lambda: t.draft() == prompt)
++            assert b'\x1b' not in t.output[mark:], 'Zenpi drew while editor owned terminal'
++            assert len(calls) == index + 1
++            t.write(b'save\n\r')
++            expected = 'EDITED_DURING_BUSY' if index == 0 else prompt
++            t.wait(lambda: t.draft() == expected and os.tcgetpgrp(t.fd) == t.pid)
++            drain(t.fd, t.output, .3)
++            assert len(calls) == index + 1 and not Path(started['path']).parent.exists()
++            if index == 0:
++                result['checks']['busy_completion_checkpointed_without_drawing_or_reading_editor_keys'] = True
++            else:
++                t.write(b'\x19')
++                t.wait(lambda: t.draft() == prompt + 'KEEP_KILL')
++                result['checks']['failed_job_new_draft_rejects_stale_editor_and_preserves_kill_buffer'] = True
++        t.close(preserve_draft=True)
++        expected = t.draft()
++        t = start_terminal(binary, root, env, terminals)
++        t.wait(lambda: t.draft() == expected)
++        assert len(calls) == 2
++        t.close(preserve_draft=True)
++        result.update(status='passed', tui_processes=len(terminals), http_requests=len(calls))
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        for gate in gates:
++            gate['release'].set()
++        children = records() if record.exists() else []
++        cleanup_fixture_children(terminals, children)
++        for terminal in terminals:
++            terminal.cleanup()
++        server.shutdown()
++        thread.join(timeout=3)
++        server.server_close()
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.parent.mkdir(parents=True, exist_ok=True)
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2)+'\n')
++        evidence.with_suffix('.http.json').write_text(json.dumps(calls, ensure_ascii=False, indent=2)+'\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++        fixture.cleanup()
++    return result
++
++
++def lifecycle_matrix(binary, evidence):
++    import fcntl
++    import signal
++    import struct
++    import termios
++    from tui_composer_smoke import Terminal
++    from tui_user_shell_smoke import drain
++    from tui_project_workspace_smoke import screen_text
++    binary = binary.resolve()
++    terminals, detached = [], []
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  binary_sha256=digest(binary.read_bytes()), checks={})
++    fixture = tempfile.TemporaryDirectory(prefix='editor-lifecycle-', dir=Path('.ops').resolve())
++    root = Path(fixture.name)
++    record = root/'children.jsonl'
++    try:
++        config = root/'fixture'
++        for path in [root/'initial', root/'sessions', root/'temp', config]:
++            path.mkdir(mode=0o700)
++        (config/'config.toml').write_text('backend="openai"\nmodel="gpt-4.1"\n'
++            'base_url="http://127.0.0.1:9/v1"\nwire_api="responses"\n'
++            'requires_openai_auth=false\nmax_retries=0\n')
++        (config/'auth.json').write_text('{"OPENAI_API_KEY":"editor-lifecycle-fixture"}')
++        (config/'auth.json').chmod(0o600)
++        plan = root/'plan.json'
++        visual = ' '.join('"'+str(arg)+'"' for arg in
++                          [sys.executable, Path(__file__).resolve(), '--editor-child', record, plan])
++        env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        env.update(ZENPI_HOME=str(config), TERM='xterm-256color', VISUAL=visual,
++                   TMPDIR=str(root/'temp'), ZENPI_EDITOR_TIMEOUT_SECONDS='10')
++        def records():
++            return [json.loads(line) for line in record.read_text().splitlines()] if record.exists() else []
++        def gone(pid):
++            try:
++                os.kill(pid, 0)
++                return False
++            except ProcessLookupError:
++                return True
++        def new_tui():
++            terminal = start_terminal(binary, root, env, terminals)
++            return terminal
++        t = new_tui()
++        for case in ['resize', 'group-descendant', 'detached-boundary', 'parent-TERM', 'parent-HUP', 'parent-QUIT']:
++            t.clear_input()
++            seed = 'ORIGINAL_' + case
++            t.write(b'\x1b[200~' + seed.encode() + b'\x1b[201~')
++            t.wait(lambda: t.draft() == seed)
++            plan.write_text(json.dumps(dict(text='SAVED_' + case, descendant=case != 'resize',
++                detached=case == 'detached-boundary', child_ignore_term=case.startswith('parent-'),
++                write_before_wait=case.startswith('parent-'))))
++            count = len(records())
++            mark = len(t.output)
++            t.write(b'\x07')
++            t.wait(lambda: len(records()) > count)
++            started = records()[count]
++            t.wait(lambda: b'ZENPI_EDITOR_READY' in t.output[mark:])
++            descendants = []
++            if case != 'resize':
++                t.wait(lambda: any(row['event'] == 'descendant' for row in records()[count:]))
++                descendants = [row for row in records()[count:] if row['event'] == 'descendant']
++                assert len(descendants) == 1
++                assert (descendants[0]['pgid'] != started['pgid']) == (case == 'detached-boundary')
++            if case == 'resize':
++                fcntl.ioctl(t.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 1, 0, 0))
++                drain(t.fd, t.output, .15)
++                fcntl.ioctl(t.fd, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 140, 0, 0))
++            if case.startswith('parent-'):
++                sig = {'parent-TERM': signal.SIGTERM, 'parent-HUP': signal.SIGHUP,
++                       'parent-QUIT': signal.SIGQUIT}[case]
++                os.kill(t.pid, sig)
++                deadline = time.monotonic() + 8
++                while time.monotonic() < deadline:
++                    drain(t.fd, t.output, .05)
++                    pid, status = os.waitpid(t.pid, os.WNOHANG)
++                    if pid:
++                        t.pid = None
++                        assert os.waitstatus_to_exitcode(status) == 0
++                        attrs = termios.tcgetattr(t.fd)
++                        assert attrs[3] & termios.ICANON and attrs[3] & termios.ECHO
++                        os.close(t.fd)
++                        t.fd = None
++                        break
++                else:
++                    raise AssertionError('parent did not finish bounded shutdown')
++                assert t.draft() == seed
++                assert gone(started['pid']) and all(gone(row['pid']) for row in descendants)
++                assert not Path(started['path']).parent.exists()
++                t = new_tui()
++                t.wait(lambda: t.draft() == seed)
++                result['checks'][case + '_reaps_group_and_restarts_original_draft'] = True
++            else:
++                t.write(b'save\n\r')
++                t.wait(lambda: t.draft() == 'SAVED_' + case and os.tcgetpgrp(t.fd) == t.pid)
++                assert gone(started['pid']) and not Path(started['path']).parent.exists()
++                if case == 'detached-boundary':
++                    pid = descendants[0]['pid']
++                    detached.append(pid)
++                    assert not gone(pid), 'setsid process unexpectedly claimed by parent group cleanup'
++                    os.kill(pid, signal.SIGTERM)
++                    result['checks']['detached_service_outside_group_and_explicit_fixture_cleanup'] = True
++                elif descendants:
++                    t.wait(lambda: all(gone(row['pid']) for row in descendants))
++                    result['checks']['ordinary_same_group_descendant_reclaimed_after_leader_exit'] = True
++                else:
++                    assert 'Prompt' in screen_text(bytes(t.output)).decode()
++                    t.write(b'x')
++                    t.wait(lambda: t.draft() == 'SAVED_resize' + 'x')
++                    result['checks']['one_column_then_wide_resize_restores_bentobox_and_input'] = True
++        t.close(preserve_draft=True)
++        result.update(status='passed', tui_processes=len(terminals),
++                      network_scope='No Enter/HTTP assertions in this lifecycle-only fixture; HTTP checked in other suites')
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        children = records() if record.exists() else []
++        for pid in detached:
++            if not gone(pid):
++                os.kill(pid, signal.SIGKILL)
++        cleanup_fixture_children(terminals, children)
++        for terminal in terminals:
++            terminal.cleanup()
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.parent.mkdir(parents=True, exist_ok=True)
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2)+'\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++        fixture.cleanup()
++    return result
++
++
++def configuration_matrix(binary, evidence):
++    import termios
++    from tui_composer_smoke import Terminal
++    from tui_user_shell_smoke import drain
++    from tui_project_workspace_smoke import screen_text
++    binary = binary.resolve()
++    terminals = []
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  binary_sha256=digest(binary.read_bytes()), checks={})
++    fixture = tempfile.TemporaryDirectory(prefix='editor-configuration-', dir=Path('.ops').resolve())
++    root = Path(fixture.name)
++    record = root/'children.jsonl'
++    try:
++        config = root/'fixture'
++        for path in [root/'initial', root/'sessions', root/'temp', config]:
++            path.mkdir(mode=0o700)
++        (config/'config.toml').write_text('backend="openai"\nmodel="gpt-4.1"\n'
++            'base_url="http://127.0.0.1:9/v1"\nwire_api="responses"\n'
++            'requires_openai_auth=false\nmax_retries=0\n')
++        (config/'auth.json').write_text('{"OPENAI_API_KEY":"editor-config-fixture"}')
++        (config/'auth.json').chmod(0o600)
++        (root/'initial/fixture.txt').write_text('local file')
++        skill = root/'initial/.zenpi/skills/editor-source/SKILL.md'
++        skill.parent.mkdir(parents=True)
++        skill.write_text('---\nname: editor-source\ndescription: Editor source modal fixture\n---\nSOURCE_ONLY_FIXTURE\n')
++        plan = root/'plan.json'
++        plan.write_text(json.dumps(dict(text='CONFIGURATION_EDIT')))
++        visual = ' '.join('"'+str(arg)+'"' for arg in
++                          [sys.executable, Path(__file__).resolve(), '--editor-child', record, plan])
++        base_env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        base_env.update(ZENPI_HOME=str(config), TERM='xterm-256color', VISUAL=visual,
++                        EDITOR=visual, TMPDIR=str(root/'temp'), ZENPI_EDITOR_TIMEOUT_SECONDS='10')
++        noexec = root/'noexec'
++        noexec.write_text('#!/bin/sh\nexit 0\n')
++        noexec.chmod(0o600)
++        badinterp = root/'bad-interpreter'
++        badinterp.write_text('#!/nonexistent/zenpi-editor-interpreter\n')
++        badinterp.chmod(0o700)
++        (root/'initial/relative-editor').symlink_to(sys.executable)
++        (root/'initial/via-path').symlink_to(sys.executable)
++        invalid = [('missing', None), ('empty-visual', ''), ('nonutf8', os.fsdecode(b'\xff')),
++                   ('quote', "'private-secret-unclosed"), ('raw-budget', 'x'*4097),
++                   ('argument-budget', 'ed '+ 'x'*2049), ('argc-budget', 'ed '+ 'x '*32),
++                   ('missing-program', '/nonexistent/zenpi-editor'), ('no-execute', str(noexec)),
++                   ('spawn-error', str(badinterp)), ('environment-budget', visual), ('deadline', visual)]
++        def records():
++            return [json.loads(line) for line in record.read_text().splitlines()] if record.exists() else []
++        def new_tui(env):
++            t = start_terminal(binary, root, env, terminals)
++            t.clear_input()
++            return t
++        for name, value in invalid:
++            env = dict(base_env)
++            if value is None:
++                env.pop('VISUAL', None)
++                env.pop('EDITOR', None)
++            else:
++                env['VISUAL'] = value
++            if name == 'environment-budget':
++                env['LC_TIME'] = 'x'*4097
++            if name == 'deadline':
++                env['ZENPI_EDITOR_TIMEOUT_SECONDS'] = '0'
++            t = new_tui(env)
++            t.write(b'\x1b[200~KEEP\x1b[201~')
++            t.wait(lambda: t.draft() == 'KEEP')
++            count = len(records())
++            t.write(b'\x07')
++            t.wait(lambda: any(label in screen_text(bytes(t.output)).decode() for label in
++                ['External editor unavailable', 'Editor command', 'Editor program',
++                 'Editor could not start', 'Editor environment', 'Editor timeout']))
++            t.wait(lambda: os.tcgetpgrp(t.fd) == t.pid and not termios.tcgetattr(t.fd)[3] & termios.ICANON)
++            assert len(records()) == count and t.draft() == 'KEEP'
++            assert not list((root/'temp').iterdir()), name
++            assert b'private-secret-unclosed' not in t.output
++            t.write(b'x')
++            t.wait(lambda: t.draft() == 'KEEPx')
++            t.close(preserve_draft=True)
++            result['checks'][name + '_keeps_draft_and_terminal'] = True
++        for name in ['fallback', 'relative-program', 'captured-path', 'nonutf8-key']:
++            env = dict(base_env)
++            if name == 'fallback':
++                env.pop('VISUAL')
++            elif name == 'nonutf8-key':
++                env[os.fsdecode(b'\xfe')] = 'unrelated variable'
++            elif name == 'relative-program':
++                env['VISUAL'] = visual.replace('"'+sys.executable+'"', '"./relative-editor"', 1)
++            else:
++                env['VISUAL'] = visual.replace('"'+sys.executable+'"', '"via-path"', 1)
++                env['PATH'] = str(root/'initial') + os.pathsep + base_env.get('PATH', '')
++            t = new_tui(env)
++            count = len(records())
++            t.write(b'\x07')
++            t.wait(lambda: len(records()) > count)
++            t.write(b'save\n')
++            t.wait(lambda: t.draft() == 'CONFIGURATION_EDIT')
++            t.close(preserve_draft=True)
++            result['checks'][name] = True
++        t = new_tui(base_env)
++        for name, keys in [('history', b'\x12'), ('directory', b'\x14'), ('transcript', b'\x1bb')]:
++            count = len(records())
++            t.write(keys)
++            drain(t.fd, t.output, .1)
++            t.write(b'\x07')
++            drain(t.fd, t.output, .3)
++            assert len(records()) == count
++            t.write(b'\x1b')
++            drain(t.fd, t.output, .1)
++            result['checks'][name + '_focus_blocks_editor'] = True
++        for name, text in [('slash', '/mo'), ('model', '/model'), ('file', '/attach f')]:
++            t.clear_input()
++            t.type_text(text)
++            t.wait(lambda: t.draft() == text)
++            if name == 'file':
++                t.expect(b'fixture.txt')
++            count = len(records())
++            t.write(b'\x07')
++            drain(t.fd, t.output, .2)
++            assert len(records()) == count
++            t.write(b'\x1b')
++            drain(t.fd, t.output, .1)
++            t.write(b'\x07')
++            t.wait(lambda: len(records()) > count)
++            t.write(b'save\n')
++            t.wait(lambda: t.draft() == 'CONFIGURATION_EDIT')
++            result['checks'][name + '_popup_blocks_then_explicit_dismissal_allows_editor'] = True
++        t.clear_input()
++        t.type_text('/skill:editor-source')
++        t.expect(b'F2 source')
++        t.write(b'\x1bOQ')
++        t.expect(b'Resource source')
++        count = len(records())
++        t.write(b'\x07')
++        drain(t.fd, t.output, .3)
++        assert len(records()) == count
++        t.write(b'\x1b')
++        drain(t.fd, t.output, .1)
++        result['checks']['resource_source_inspector_focus_blocks_editor'] = True
++        t.clear_input()
++        plan.write_text(json.dumps(dict(text='SINGLE_SESSION', second_shortcut=True)))
++        count = len(records())
++        t.write(b'\x07')
++        t.wait(lambda: len(records()) > count)
++        t.write(b'\x07save\n')
++        t.wait(lambda: t.draft() == 'SINGLE_SESSION')
++        assert sum(row['event'] == 'started' for row in records()[count:]) == 1
++        assert next(row for row in records()[count:] if row['event'] == 'input')['text'] == '\x07save\n'
++        result['checks']['second_ctrl_g_reaches_only_current_editor'] = True
++        t.clear_input()
++        t.write(b'!printf approval-fixture')
++        t.wait(lambda: t.draft() == '!printf approval-fixture')
++        t.deliberate_enter()
++        t.expect(b'Approval required')
++        count = len(records())
++        t.write(b'\x07')
++        drain(t.fd, t.output, .3)
++        assert len(records()) == count
++        t.write(b'n\r')
++        t.wait(lambda: 'Approval decision submitted: deny once' in screen_text(bytes(t.output)).decode())
++        result['checks']['approval_focus_blocks_editor_and_requires_explicit_denial'] = True
++        t.close(preserve_draft=True)
++        # Seed a private, valid restart checkpoint with bounded history records.
++        # No live state or product metadata is mutated by a test-only control path.
++        checkpoint = config/'project-tabs.json'
++        value = json.loads(checkpoint.read_text())
++        active = value['projects'][value['active']]
++        draft = next(row['draft'] for row in value['project_state'] if row['name'] == active)
++        draft.update(input='NEAR_BUDGET', cursor=len('NEAR_BUDGET'), paste_folds=[], history=[])
++        target = 4 * 1024 * 1024 - 16384
++        encode = lambda: json.dumps(value, ensure_ascii=False, indent=2).encode()
++        while len(encode()) < target:
++            draft['history'].append('h' * min(250000, target - len(encode())))
++        overflow = len(encode()) - target
++        if overflow:
++            draft['history'][-1] = draft['history'][-1][:-overflow]
++        checkpoint.write_bytes(encode())
++        t = start_terminal(binary, root, base_env, terminals)
++        t.wait(lambda: t.draft() == 'NEAR_BUDGET')
++        drain(t.fd, t.output, .8)
++        assert checkpoint.stat().st_size > target - 4096
++        before_hash = digest(checkpoint.read_bytes())
++        before_bytes = checkpoint.stat().st_size
++        count = len(records())
++        mark = len(t.output)
++        plan.write_text(json.dumps(dict(action='boundary')))
++        t.write(b'\x07')
++        t.wait(lambda: len(records()) > count)
++        started = records()[count]
++        t.write(b'save\n\r')
++        t.wait(lambda: os.tcgetpgrp(t.fd) == t.pid and b'\x1b[?1049h' in t.output[mark:])
++        t.wait(lambda: '4 MiB' in screen_text(bytes(t.output)).decode())
++        assert t.draft() == 'NEAR_BUDGET'
++        assert digest(checkpoint.read_bytes()) == before_hash
++        assert not Path(started['path']).parent.exists()
++        result['checks']['near_4mib_checkpoint_rejects_editor_atomically'] = dict(
++            checkpoint_bytes=before_bytes, unchanged_sha256=before_hash, editor_bytes=256*1024)
++        t.close(preserve_draft=True)
++        result.update(status='passed', tui_processes=len(terminals))
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        children = records() if record.exists() else []
++        cleanup_fixture_children(terminals, children)
++        for terminal in terminals:
++            terminal.cleanup()
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.parent.mkdir(parents=True, exist_ok=True)
++        evidence.with_suffix('.pty.log').write_bytes(b'\nPROCESS\n'.join(bytes(t.output) for t in terminals))
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2)+'\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++        fixture.cleanup()
++    return result
++
++
++def synchronous_host(binary, evidence, workspace, toolchain):
++    """An independently linked caller of public run_with_state under a real PTY."""
++    import fcntl
++    import pty
++    import signal
++    import struct
++    import subprocess
++    import termios
++    from tui_user_shell_smoke import drain
++    workspace = workspace.resolve()
++    root = evidence.resolve().with_suffix('.sync-build')
++    root.mkdir(parents=True, mode=0o700, exist_ok=False)
++    (root/'src').mkdir()
++    (root/'initial').mkdir()
++    (root/'temp').mkdir()
++    (root/'src/main.rs').write_text(r'''
++use std::{fs, path::PathBuf};
++use zenpi::tui::{run_with_state, TuiConfig, TuiState};
++fn main() {
++    let destination = PathBuf::from(std::env::args_os().nth(1).unwrap());
++    let mut state = TuiState::default();
++    state.set_input("SYNC_SEED");
++    run_with_state(TuiConfig::default(), state, move |text, state| {
++        fs::write(&destination, text)?;
++        state.set_status("SYNC_SUBMITTED");
++        Ok::<(), std::io::Error>(())
++    }).unwrap();
++}
++''')
++    (root/'Cargo.toml').write_text('[package]\nname="editor-sync-probe"\nversion="0.0.0"\nedition="2024"\n'
++        '[dependencies]\nzenpi={path='+json.dumps(str(workspace))+'}\n'
++        '[patch.crates-io]\ncrossterm={path='+json.dumps(str(workspace/'vendor/crossterm'))+'}\n')
++    argv = ['cargo', '+'+toolchain, 'build', '--manifest-path', str(root/'Cargo.toml')]
++    result = dict(started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                  production_binary_sha256=digest(binary.read_bytes()), build_argv=argv,
++                  build_cwd=str(workspace), checks={})
++    raw = bytearray()
++    pid = fd = None
++    status = None
++    record, plan, submitted = root/'child.jsonl', root/'plan.json', root/'submitted.txt'
++    try:
++        with (root/'build.log').open('wb') as output:
++            build = subprocess.run(argv, cwd=workspace, stdout=output, stderr=subprocess.STDOUT, timeout=240)
++        result['build_exit'] = build.returncode
++        assert build.returncode == 0, (root/'build.log').read_text()[-2500:]
++        probe = root/'target/debug/editor-sync-probe'
++        result['probe_sha256'] = digest(probe.read_bytes())
++        edited = 'SYNC_EDITED\n界  \n'
++        plan.write_text(json.dumps(dict(text=edited, atomic=True)))
++        visual = ' '.join('"'+str(arg)+'"' for arg in
++                          [sys.executable, Path(__file__).resolve(), '--editor-child', record, plan])
++        env = {k: v for k, v in os.environ.items() if not k.startswith(('ZENPI_', 'OPENAI_'))}
++        env.update(VISUAL=visual, TMPDIR=str(root/'temp'), TERM='xterm-256color')
++        pid, fd = pty.fork()
++        if pid == 0:
++            os.chdir(root/'initial')
++            os.execve(str(probe), [str(probe), str(submitted)], env)
++        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 140, 0, 0))
++        def wait(predicate):
++            deadline = time.monotonic()+12
++            while time.monotonic() < deadline:
++                drain(fd, raw, .05)
++                if predicate():
++                    return
++            raise AssertionError(bytes(raw[-4000:]))
++        wait(lambda: b'SYNC_SEED' in raw)
++        os.write(fd, b'\x07')
++        wait(record.exists)
++        child = json.loads(record.read_text().splitlines()[0])
++        assert bytes.fromhex(child['seed_hex']) == b'SYNC_SEED'
++        assert all(child['tty']) and child['foreground'] == child['pgid']
++        mark = len(raw)
++        os.write(fd, b'save\n\r')
++        wait(lambda: os.tcgetpgrp(fd) == pid and b'\x1b[?1049h' in raw[mark:])
++        assert not submitted.exists()
++        os.write(fd, b'\r')
++        wait(submitted.exists)
++        assert submitted.read_bytes() == edited.encode()
++        result['checks']['public_sync_host_editor_roundtrip_then_explicit_submit_exact'] = True
++        os.kill(pid, signal.SIGTERM)
++        deadline = time.monotonic()+8
++        while time.monotonic() < deadline:
++            drain(fd, raw, .05)
++            child_pid, child_status = os.waitpid(pid, os.WNOHANG)
++            if child_pid:
++                status = child_status
++                break
++        assert status is not None and os.waitstatus_to_exitcode(status) == 0
++        result.update(status='passed', exit=0)
++    except Exception as error:
++        result.update(status='failed', error=str(error))
++        raise
++    finally:
++        if fd is not None:
++            os.close(fd)
++        if pid and status is None:
++            try:
++                os.kill(pid, signal.SIGKILL)
++                os.waitpid(pid, 0)
++            except ProcessLookupError:
++                pass
++        children = [json.loads(line) for line in record.read_text().splitlines()] if record.exists() else []
++        cleanup_fixture_children([], children)
++        result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++        evidence.with_suffix('.pty.log').write_bytes(raw)
++        evidence.with_suffix('.child.json').write_text(json.dumps(children, ensure_ascii=False, indent=2)+'\n')
++        evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++    return result
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--binary', type=Path, default=Path('target/release/zenpi'))
++    parser.add_argument('--evidence', type=Path, default=Path('.ops/tui-external-editor.json'))
++    parser.add_argument('--before', action='store_true')
++    parser.add_argument('--roundtrip-only', action='store_true')
++    parser.add_argument('--matrix', action='store_true')
++    parser.add_argument('--busy', action='store_true')
++    parser.add_argument('--lifecycle', action='store_true')
++    parser.add_argument('--configuration', action='store_true')
++    parser.add_argument('--sync', action='store_true')
++    parser.add_argument('--workspace', type=Path, default=Path(__file__).resolve().parents[1])
++    parser.add_argument('--toolchain', default=os.environ.get('RUSTUP_TOOLCHAIN', 'stable'))
++    args = parser.parse_args()
++    if args.sync:
++        result = synchronous_host(args.binary, args.evidence, args.workspace, args.toolchain)
++    elif args.configuration:
++        result = configuration_matrix(args.binary, args.evidence)
++    elif args.lifecycle:
++        result = lifecycle_matrix(args.binary, args.evidence)
++    elif args.busy:
++        result = busy_matrix(args.binary, args.evidence)
++    elif args.matrix:
++        result = failure_matrix(args.binary, args.evidence)
++    elif args.before or args.roundtrip_only:
++        result = smoke(args.binary, args.evidence, args.before)
++    else:
++        args.evidence = args.evidence.resolve()
++        args.evidence.parent.mkdir(parents=True, exist_ok=True)
++        result = dict(status='running', started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
++                      binary_sha256=digest(args.binary.read_bytes()),
++                      helper_sha256=digest(Path(__file__).read_bytes()),
++                      argv=sys.argv, cwd=str(Path.cwd()), suites={})
++        suites = [('roundtrip', smoke), ('files-cancel-prefetch', failure_matrix),
++                  ('busy', busy_matrix), ('lifecycle', lifecycle_matrix),
++                  ('configuration', configuration_matrix), ('sync', synchronous_host)]
++        try:
++            for name, suite in suites:
++                output = args.evidence.with_name(args.evidence.stem+'-'+name+'.json')
++                extra = (args.workspace, args.toolchain) if name == 'sync' else ()
++                try:
++                    detail = suite(args.binary, output, *extra)
++                    result['suites'][name] = dict(status=detail['status'], evidence=str(output),
++                                                 sha256=digest(output.read_bytes()))
++                except Exception as error:
++                    result['suites'][name] = dict(status='failed', evidence=str(output), error=str(error))
++            result['status'] = 'passed' if all(row['status'] == 'passed' for row in result['suites'].values()) else 'failed'
++        finally:
++            result['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
++            args.evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
++        if result['status'] != 'passed':
++            raise AssertionError(result)
++    print(json.dumps(result, ensure_ascii=False, indent=2))
++
++
++if __name__ == '__main__':
++    if len(sys.argv) > 1 and sys.argv[1] == '--editor-child':
++        editor_child()
++    else:
++        main()

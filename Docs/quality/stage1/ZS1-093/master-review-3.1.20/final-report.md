@@ -1,0 +1,81 @@
+# ZS1-093 · target .github 目录集成临时候选
+
+**Provisional：acceptance_eligible=false。** 直接依赖ZS1-092尚未主控`[x]`，其叶子依赖ZS1-089也尚未`[x]`。本报告完成的是主控授权准备的候选材料，不是目录验收；子项收到、冻结、hash通过或本报告存在，都不能代替G-DIR要求的已接受子项。
+
+## 正式范围、即时清单与闭包
+
+先核对主库3.1.20蓝图：ZS1-093对应`target:.github`，L2，仅Depends ZS1-092，唯一owned report为`Docs/learn/stage1_pi_mono/targets/zenpi/.github/current_folder_learn.md`。requirement digest `8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645`。G-DIR合同要求直属文件/直接子目录先`[x]`，单独整合调用、所有权、错误、取消、持久化和映射；此验收前提当前不满足，保留明确provisional状态。
+
+捕获时间2026-09-12T11:44:46.809411+00:00。只即时列举主库和原ff51工作树`.github`的直属项，未递归遍历zenpi根。两个位置都没有直属文件，只有一个真实目录workflows，没有其它直接子目录、symlink或特殊entry。
+
+| 直属项 | 正式范围 | 对应项 | 状态 |
+| --- | --- | --- | --- |
+|直属文件集合为空|实际与冻结均为空|无|不产生文件完成数|
+|workflows/|in-scope直接子目录|ZS1-092|provisional，主蓝图`[ ]`，未接受|
+|其它直属项|实际与冻结均无|无|无遗漏声明，不外推全仓覆盖|
+
+冻结目录边严格是`ZS1-093(.github) → ZS1-092(.github/workflows) → ZS1-089(ci.yml)`。093不直接依赖或重复接收089，不能跳过092。物理子树另含release.yml，092已把它标为context-only；上层整合仍保持这个标签，不能借“整合.github”把发布工作流提升为冻结范围。其它L1候选既不是093直属依赖，也不参与本项接受计数。
+
+范围结构闭包成立，只表示蓝图直属集合与本次清单一致；语义接受闭包不成立。根目录集成属于另一项，本单不读取或编写zenpi根报告，不顺带接受父级、产品或发布过程。若主控扩大冻结子集，应在新权威下重新核对边，不能由本候选自行追加owner。
+
+## 已完整核对的092报告与接受状态
+
+在编写093报告前，完整阅读092候选报告11196字节，包括其清单、089状态、工作流关系、错误/持久化和回退条款，没有只读manifest摘要。092 ready manifest SHA256 `1eaaba0aa72b5d4730830ff6bb7ae63d3cf5101cd422b7a25a4f1a276fa6eee3`；报告SHA256 `11936236d83981d4a54dd544287ec3160031d4d5492011c54ef22cabe7334224`。95个候选member和manifest完整复制到本项dependency092，逐文件校验，原包不改。
+
+092报告明确：089候选manifest `d82de0618e7c6aa00062a0df039ad4016473dcd5c9eba5cf798962245235674c`，其报告SHA256 `33e353712730db9dcb9335e8c16c8d9caa83c2488a0d7b851d3042a33dfa670f`；089已有完整源码报告但未主控接受。092自身也是acceptance_eligible=false，不能被093引用时转换成“下级目录已完成验收”。
+
+本轮重新读取主蓝图状态，089、092、093均`[ ]`。主库089/092报告和各自master receipt均不存在；093主库报告此前也不存在。候选只在worker工作树，并未由这些事实推导主库接收。092历史静态完整性live/frozen实际0；其G-STAGE实际1、缺092master。前者证明材料完整，后者不是忽略依赖错误的通行证；本093继续记录直接未闭合092和传递未闭合089。
+
+为确认引用没有脱离当前代码，只按092已冻结的两条文件身份复核当前主库/working字节，没有进行新的L1审计：ci.yml仍3104B，hash `b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd`；release.yml仍3779B，hash `caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd`。它们通过dependency092资料提供背景，不当作093直属文件，也不算新增两个文件接受。
+
+## 本层职责、调用关系和映射
+
+`.github`本层没有直属配置文件，因此没有新增脚本函数、独立入口、共享状态或本层执行器可与workflows组合。它在本冻结子集中的职责是承载并组织workflows直接子目录；报告必须保留该中间目录关系，而不能把根直接连到ci.yml并省略092。
+
+执行入口来自子目录而非文件夹本身。092已说明ci.yml按push/pull_request做验证，release.yml按手动/tag入口构建和发布，两者独立，无该源码中声明的跨workflow成功调用链。093只继承这个带身份的边界说明，未查询GitHub设置、分支保护或远端执行，也不声称目录本身阻止发布或保证CI先成功。
+
+目标映射只涉及zenpi冻结`.github/workflows/ci.yml`的验证编排及其祖先目录。pi-mono/Codex参考侧不因为目录同名而出现对等发布语义；也没有从源参考报告推导GitHub托管CI通过。父级zenpi根及其它工具实现是目录外上下文，本项不扩展其接受范围。
+
+## 数据所有权与跨目录不变量
+
+本层唯一in-scope直接子目录是workflows，实际权限由其中各workflow声明。不能把ci.yml的contents:read外推成`.github`全部只读，因为context-only release.yml声明contents:write并包含tag发布action。这个范围提示不是运行这些action的授权；本轮没有外部写入。
+
+Git保存workflow源配置；runner持有临时构建、缓存和诊断；Actions artifact及发布附件具有独立生命周期。`.github`没有定义这些存储之间的事务、自动回退或统一产品session所有权。repo路径相同不证明运行同一构建artifact；相邻workflow不能共享“已验收”的假设。092保留了production/fixture、预算receipt/发布包、普通CI/多OS发布matrix之间的区别，093不将它们合并成一个已通过流程。
+
+本层必须保持三项不变量：每个直属冻结子目录只引用一次且经过独立接受；子目录context-only后代不升级；证据完整性与主控接受状态分开。报告/manifest复制属于候选快照，不是接受计数翻倍。全局已有68份ready原字节都被保留，候选队列中其它owner没有借此被推进。
+
+## 错误、取消、持久化与恢复
+
+`.github`本层没有额外错误处理代码；错误传播、job timeout/concurrency、临时清单trap、artifact上传条件属于092所述具体workflow。不能因它们同处一个父目录就断言取消所有子进程、保全所有失败日志或完成目录事务。089的预算失败后诊断上传缺口仍在待处理状态，093报告不会修复或绕过它。
+
+父目录也不定义zenpi session恢复、approval撤销或持久重放，这些归产品owner。workflow重跑/重新构建与产品会话恢复不同；撤回文档patch不能撤回真实发布附件。这里没有执行发布动作，因此本次回退只涉及本报告/证据，不需要触碰任何用户会话或既有外部状态。
+
+源码以后改变时，主控需重核当前child snapshot、接受receipt及报告身份；单凭旧候选hash不能认可新目录状态。即使089随后接受，也应按089→092→093顺序独立验证，不自动将093变为合格；直接依赖092尚未接受是当前第一项阻断。
+
+## 临时结论、验证与接收
+
+本报告可供主控审阅，但G-DIR prerequisite_met=false、acceptance_eligible=false。直接未闭合集合`[ZS1-092]`，传递未闭合集合`[ZS1-089]`。没有在蓝图上打勾，没有宣称093或.github目录已验收。context-only release.yml及根目录仍在各自边界之外。
+
+本轮新增真实行为运行0：未运行Cargo、PTY、HTTP、Actions、产品测试或发布。只执行独立静态完整性检查和只读G-STAGE。checker的ok表示provisional材料身份/状态一致，不是G-DIR通过。G-STAGE因缺093master返回真实非零；receipt先缺失不代表它已经放行092/089状态，本证据独立记录两层依赖未闭合。
+
+证据包括主目录即时清单、正式直属集合及选定蓝图行、092完整95-member快照与manifest、依赖状态、后代身份连续性、68份旧ready摘要、独立live/frozen验证器、真实日志和本报告hash。主库与本地此前无093报告，接收基线absent；如接收前路径出现变化，应重新比对，不能force覆盖。
+
+新补丁只含本项报告及独立证据目录，正向apply/check、逐字节hash与逆向check/还原均在临时目录执行。回退只删这些新增路径，不动092、089、096及其它旧候选，不递归撤销子目录接受，也不改主库、产品、蓝图或其它owner。完成本单后交主控并停止，等待依赖闭合及下一单安排。
+
+## 3.1.20 主控当前父目录复核与接受（2026-09-12）
+
+以上8676字节/63行为原worker候选，精确前缀保留；“089/092未接受”“CI94行”和旧预算上传缺口只描述历史捕获时点。本节经独立父目录审查后提供当前结论，不回写或改造dependency092历史快照。
+
+主控已经完整阅读上述093报告、092原73行报告及其本轮完整追加节，并复核当前直接子目录092的标准报告和真实worker/master receipt。092已在089逐文件[x]之后独立通过G-DIR审查及实际 `python3 tools/validate_stage1_blueprint.py --item ZS1-092`（exit0），现为[x]；其最终报告SHA256为 `509c37c5de87f730f2ff4d98ce8e9089d40d8dd22e79398d84d4974ff9290171`，主控记录 `Docs/quality/stage1/ZS1-092/master-review-3.1.20/review.md`。这构成当前可接受直接子项，而不是引用旧候选存在来绕过092。
+
+本轮再次仅即时枚举 `.github` 直属项：零文件、唯一真实目录workflows，无symlink或特殊entry。蓝图target:.github直属文件集合空、直接子目录集合{092}、Depends{092}完全一致。保持 `093 → 092 → 089` 中间目录边；本项不重复接受089、不虚增文件完成数，也不接受父级ZS1-091。
+
+子目录当前ci.yml为113行/3973B、SHA256 `44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9`；release.yml仍87行/3779B、SHA256 `caaf9eb891dc6636229ed9a07e3474d6f3a8823f6670d2a3b4d2954cce0d9cbd`。这里仅核对已接受092的后代来源连续性，不进行或计数新的L1阅读。release.yml的context-only标签继续向上保留，不能因父目录完成就变成正式接受项。
+
+本层没有直属配置文件、函数或额外执行器。执行入口/权限/持久化来自workflows：CI与release独立触发、没有源码中显式跨workflow成功依赖；同revision及release.sh路径不等于同一被测/发布二进制。CI预算证据现在按run/attempt独立目录保留日志/退出码/已有诊断，并以always且非skipped条件上传；不再继承历史“只上传/tmp JSON、普通失败必跳过”结论。状态写入失败、旧目录复用、runner丢失/强制取消等边界仍适用。父目录没有新增失败恢复或跨平台事务，不能把该条件解读为保证远程上传成功。
+
+Git源配置、runner临时文件、Actions artifact和tag发布附件仍为不同持久层；CI contents:read不外推release contents:write；workflow取消不能替代产品子进程reap或会话恢复。发布matrix只是代码声明，不是托管平台可用性或实际执行证据。归档检查差异、生产/fixture身份、checksum与最终上传对象对应、当前Stage1 checker接入等问题继续由具体owner/产品门禁处理，父目录理解不会修复它们。
+
+本轮实际执行了原093完整114payload hash与历史frozen verifier（exit0）、当前父目录lstat与正式边核对、092及089现行receipt检查、092当前报告hash与其两个后代源hash绑定、新版唯一父目录报告在新临时Git中的正逆check/apply及sentinel。没有Cargo、PTY、HTTP、Actions、预算或发布运行，未将历史行为通过再次计数。原provisional/非零G-STAGE日志原样封存；当前独立master review与接受门禁另立证据。
+
+主控仅接受ZS1-093冻结父目录关系与已接受直接子目录的闭包。根目录091仍需其余src目录/Cargo文件完成后独立处理，release.yml及117没有随本项变为通过。回退只作用于本目录报告/本次证据与本项状态，不递归撤销092或089，不覆盖产品源码、旧ready或用户会话。requirement digest保持 `8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645`。

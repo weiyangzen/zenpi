@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "binary": {
+    "bytes": 50751592,
+    "sha256": "58bb7e5ffd95fe5db337ba2b86cecc0ec40ddf78843576b3c48938c3acd00b61"
+  },
+  "owned": {
+    "src/tui.rs": {
+      "bytes": 669038,
+      "sha256": "6459360343a260c6dfe7b403a81cd22a8fcac0bb3e10fcabed2bd3c0b8567254"
+    },
+    "tests/tui_project_workspace.rs": {
+      "bytes": 21523,
+      "sha256": "bc0fb82c644a18e98de9feaeacb42c2a8db910ca808d8ca5b8efdf92b2a45023"
+    }
+  },
+  "scope": "local session-list selection repair",
+  "item": "ZS1-126",
+  "master_verified": true,
+  "whole_item_accepted": false,
+  "rust_tests": 143,
+  "new_tests": 3,
+  "before_failed_tests": 2,
+  "new_pty_runs": 0,
+  "new_http_probe_runs": 0
+}

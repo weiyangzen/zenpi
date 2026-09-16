@@ -1,0 +1,34 @@
+| ZS1-096 | [src/render.rs](/Users/wangweiyang/GitHub/zenpi/src/render.rs) | 30217 | `6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7` |
+| ZS1-097 | [Cargo.toml](/Users/wangweiyang/GitHub/zenpi/Cargo.toml) | 1001 | `94c25405859cbec9d1a02e7c1a0a4e0dbbfd96e5c6bc476c23b9dc8be7229a65` |
+| ZS1-098 | [Cargo.lock](/Users/wangweiyang/GitHub/zenpi/Cargo.lock) | 42724 | `f822e2d73d49727fdb4898180d26ff75bf95a4f81b638b613cb457e3171a30e1` |
+
+源树最终产物：`Docs/learn/stage1_pi_mono/files/<source_path>_learn.md` 及 `Docs/learn/stage1_pi_mono/<source_dir>/current_folder_learn.md`。目标树最终产物：`Docs/learn/stage1_pi_mono/targets/zenpi/files/<target_path>_learn.md` 及 `Docs/learn/stage1_pi_mono/targets/zenpi/<target_dir>/current_folder_learn.md`。两个根目录独立验收，不能混树或复用同一个目录报告。
+
+每个 scope 用独立 manifest/index：源树 `source_manifest.tsv`、`file_learn_index.tsv`、`folder_learn_index.tsv`；目标树在 `targets/zenpi/` 下使用同名文件。源 manifest 保留 source_id/hash；目标 manifest 使用本清单 item_id 作 target-review-id。manifest 恰好覆盖表中路径，记录字节数、hash、artifact、对应 checklist ID 和状态。对两个清单逐行核对，严禁从旧 `[x]` 自动盖章。
+
+超过 256 KiB 的输入按不超过 256 KiB 的连续 byte ranges 建 `chunk_manifest.tsv`。当前 headless.rs / tui.rs 各须至少两块，所有块按顺序逐个复核，并合并为该文件唯一最终报告；用 byte-range union 检查无重叠、无遗漏，不能拿 chunk 报告代替 per-file 报告。每个目录都要独立整合，依赖直属文件和直接子目录；包括全部祖先及根目录。分区、批次和多 agent 只安排工作顺序，不能以一个主题总结跳过其中的文件。
+
+## 4. 执行与验收协议
+
+状态仅 `[ ] → [_] → [x]`：worker 逐项 claim、完整执行本项、保存证据后只能写 `[_]`；master 在 integration frontier 复查源码与行为、集成并重跑验收后写 `[x]`。用户要求最大利用3个独立session：worker按DAG顺序在各自worktree准备候选，依赖未集成的产物保持provisional；master仍只在依赖全 `[x]` 且冲突解决后接受；`[_]` 永远算未完成。claim frontier 与 integration frontier 分开记录。每日 `todos_YYYYMMDD.md` 由本清单生成，只选可领取项，不建立第二份状态真相。
+
+worker上限固定为3，不含主控，不得创建subagent或更多任务。共享文件可在隔离worktree准备provisional差异；主控集成按路径lease串行，禁止多个worker直接覆盖主checkout。src/core.rs、src/backend.rs、src/tools.rs、src/session.rs 等共享文件按路径 lease 集成串行。每 worker 在保留脏基线的隔离工作树工作，记录输入 hash；主控按项集成。`Estimated LOC < 5000` 为每项实现+测试增量预测，文档项为 0；接近上限时先拆项更新 DAG。资源上限来自 operator/ResourceLease；不得通过新线程、嵌套代理或后台服务绕过预算。送审 diff 默认不超过 256 KiB。
+
+`G-FILE`：本文件全部内容的复核记录，具体函数/接口/输入输出/状态机/错误/副作用/取消/恢复行为；每个功能结论对应源测试或可运行行为判据、zenpi owner 与已有实现、缺口/有意差异/不适用理由。目标 owner 项反向核对本文件全部分支的相关性；无关部分也给范围排除理由，不能遗漏。哈希、符号计数、纯摘要、Echo/MissingAdapter 或仅 compile 不能满足此门禁。结构 checker 只能验证 manifest/链接/范围，master 必须逐文件审阅语义证据。
+
+`G-DIR`：直属文件与直接子目录均已 `[x]` 后，单独写本目录在冻结子集中的调用关系、数据所有权、错误/取消/持久化路径、跨文件不变量及目标映射。记录 in-scope / context-only 清单，检查根到叶的闭包，无跳目录、重复接受或遗漏。目录报告不得宣称本目录未纳入文件已验收。
+
+`G-CODE`：正向、反向、取消、适用的重启场景通过，并走实际 owner。证据位于 `Docs/quality/stage1/<item-id>/<attempt-id>/`，包含 item/digest/source IDs、baseline 与 integrated revision、目标二进制 hash、固定输入、命令 argv/cwd/受控 env 名称、开始结束时间、退出码、stdout/stderr artifact 的 bytes/hash、预期与实际判据、资源峰值和回滚。重启/取消等不适用项必须逐项解释。外部 worker 的 command 字符串不能直接当作可信验收命令执行；master 运行本 Blueprint 预定的 validator。
+
+`G-HOST`：生产构建的真实 headless JSONL 与 TUI PTY 入口，连接本地可控 HTTP/子进程 fixtures；验证入口→运行→用户可见结果→durable evidence 的完整链路。fixture 可模拟上游网络，但 host 使用真实 provider/parser/tool/session owner，不能启用 Echo 等假执行路径。真实 provider 账号只用于另行配置的可选网络 smoke，本阶段的确定性门禁不能依赖外部账号。
+
+proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创建相应 integration tests；ZS1-117 创建 Stage 1 host smoke。下文命令是执行后的验收义务，不是在本次文档交付时已经通过的测试。validator 对缺少脚本、缺少 tests、零测试匹配、证据缺失或只满足 metadata 的行为必须报失败。
+
+### 验收命令目录
+
+- G-BASE（既有）：`python3 tools/validate_blueprint.py`；`python3 tools/validate_blueprint_v2.py`。只验证旧蓝图结构，不能冒称验证本文件的行为。
+- G-STAGE（由 ZS1-001 新建）：`python3 tools/validate_stage1_blueprint.py --blueprint Docs/stage_1_v3_pi_mono_blueprint.md --evidence-root Docs/learn/stage1_pi_mono`。支持 `--item ID`；默认草稿检查路径/状态/DAG/hash，文件验收还检查对应产物与主控 review receipt。必须分别报告 structural 与 semantic/manual gates。
+- G-RUST（代码变更后）：`cargo fmt --check`；`cargo check --locked`；`cargo test --locked`。各项再执行下列指定 test target；测试数量必须非零并有场景清单。全量仅在最终集成或跨模块变更需要时运行。
+- G-PROD（最终生产构建）：`cargo build --release --locked`；新建 smoke 命令 `python3 tools/stage1_host_smoke.py --binary target/release/zenpi --report-dir Docs/quality/stage1/ZS1-117`。必须检查 production feature set；命令/schema 由 ZS1-117 固定并加入 CI。
+
+## 5. 逐项执行清单

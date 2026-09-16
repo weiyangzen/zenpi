@@ -1,0 +1,66 @@
+[
+  {
+    "name": "production short TUI ready",
+    "pass_": true
+  },
+  {
+    "name": "Resources has no rendered row at180x7",
+    "pass_": true
+  },
+  {
+    "name": "first Tab durably focuses ProjectConversation",
+    "pass_": true
+  },
+  {
+    "name": "second Tab durably focuses visible Gantt",
+    "pass_": true
+  },
+  {
+    "name": "Ctrl-Left durably focuses visible conversation",
+    "pass_": true
+  },
+  {
+    "name": "Ctrl-Right durably focuses visible Gantt",
+    "pass_": true
+  },
+  {
+    "name": "BackTab skips zero-row panes",
+    "pass_": true
+  },
+  {
+    "name": "resize reveals Resources again",
+    "pass_": true
+  },
+  {
+    "name": "newly visible Resources becomes keyboard reachable",
+    "pass_": true
+  },
+  {
+    "name": "shrink removes Resources screen rows",
+    "pass_": true
+  },
+  {
+    "name": "shrink focus recovers to rendered conversation",
+    "pass_": true
+  },
+  {
+    "name": "narrow mode still cycles to Resources",
+    "pass_": true
+  },
+  {
+    "name": "selected narrow Resources is visibly drawn",
+    "pass_": true
+  },
+  {
+    "name": "narrow BackTab returns to conversation",
+    "pass_": true
+  },
+  {
+    "name": "narrow conversation is visibly drawn",
+    "pass_": true
+  },
+  {
+    "name": "normal exit and reap",
+    "pass_": true
+  }
+]

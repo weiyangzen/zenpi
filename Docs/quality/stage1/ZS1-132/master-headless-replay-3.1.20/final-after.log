@@ -1,0 +1,53 @@
+{
+  "binary_sha256": "bb82450f8de71a0a7a91d828e42f659566cae3c7e4e574dd68706bfa10b94172",
+  "checks": {
+    "new_b_committed_before_queued_a_terminal": true,
+    "inflight_retry_stays_reserved_after_other_project_new": true,
+    "changed_inflight_retry_does_not_replace_fingerprint": true,
+    "terminal_has_original_project_cwd_session": true,
+    "same_process_replay_and_conflict_keep_original_payload": true,
+    "independent_restart_replays_original_outcome_without_http": true
+  },
+  "initial_project": {
+    "project_id": "82768b49217b82eef5cc7b51a2b98248c67b686fed2e7e8125b3c3b425b641a4",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-after.fixture/initial",
+    "session_id": "session-1789211085864-7685-0"
+  },
+  "new_project": {
+    "project_id": "3d442e913d92ebac44f9086839cbb710a949eca46e2ddfe34fe530b6ab71791b",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-after.fixture/other",
+    "session_id": "session-1789211086107-7685-2"
+  },
+  "request_count": 2,
+  "terminal": {
+    "project": {
+      "project_id": "82768b49217b82eef5cc7b51a2b98248c67b686fed2e7e8125b3c3b425b641a4",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/headless-new-replay-integration/final-after.fixture/initial",
+      "session_id": "session-1789211085864-7685-0"
+    },
+    "schema_version": 2,
+    "id": "pending-a",
+    "type": "response",
+    "command": "prompt",
+    "success": true,
+    "data": {
+      "assistant": {
+        "content": "ONE_REPLY",
+        "created_at_ms": 1789211086237,
+        "id": "assistant-1789211086237-6",
+        "metadata": {
+          "response_id": "gate"
+        },
+        "parent_id": "turn-1789211086174-4",
+        "role": "assistant"
+      },
+      "submission": {
+        "status": "started",
+        "turn_id": "turn-1789211086174-4"
+      }
+    },
+    "code": "ok"
+  },
+  "jsonl_processes": 2,
+  "status": "passed"
+}

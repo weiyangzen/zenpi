@@ -1,0 +1,24 @@
+{
+  "product_changes": {
+    "src/tui.rs": {
+      "bytes": 639010,
+      "sha256": "b15661a160a855ef974e82dfb40a63c8d0c5777623cd553d1d4cf2069d8b59a1"
+    },
+    "tests/tui_composer.rs": {
+      "bytes": 52941,
+      "sha256": "30d9b19bc250409bac1e4254b7237f11cf8de625913d55b669a044665e89d7c1"
+    }
+  },
+  "binaries": {
+    "after-zenpi": {
+      "bytes": 50742696,
+      "sha256": "a4b24e76689e202dc009167e7c0b95612c98a287177c804c1ca35ff4207bff80"
+    },
+    "before-zenpi": {
+      "bytes": 50742152,
+      "sha256": "b40534cd42974396646f3cdc5c5470bafdb55078a14a7d484ce743b1daa66bdd"
+    }
+  },
+  "passed": true,
+  "scope": "Two local fixes only; current native debug builds and regression. No release or budget claim."
+}

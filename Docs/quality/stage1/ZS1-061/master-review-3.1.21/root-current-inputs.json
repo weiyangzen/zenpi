@@ -1,0 +1,1208 @@
+{
+  "inputs": [
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/CHANGELOG.md",
+      "bytes": 26895,
+      "sha256": "2eec658c8b1f4e329c372b14a26848051830e769c978bbd2befba6bfb5781f0e",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/README.md",
+      "bytes": 17606,
+      "sha256": "04e44bb21db2894ed77b13c0fb63a5e9f619df633abd1b8f9fe4a04472040c3b",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/README.md",
+      "bytes": 2443,
+      "sha256": "eccbaea04d574880b788495309230a952b1622bd6167b4e7cf2d5d8bfd6788c8",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/allocation-profile-worker.ts",
+      "bytes": 2459,
+      "sha256": "ae39c81685df9c250a1a365780d68f64f0fc3363f5216b849c6209f316e96353",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/allocation-profile.ts",
+      "bytes": 1934,
+      "sha256": "b27dfcf90f98c9a4f79540c3b0db01811780daabd8f36795c8d4907361e5b12e",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/benchmark.ts",
+      "bytes": 5724,
+      "sha256": "0d99812c0ffa36932501cbef5118bccae24976aafce256fa8928a62eaaa96d0d",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/loaded-footprint-worker.ts",
+      "bytes": 1299,
+      "sha256": "6e97b524b61e855535b3d63bcfee96c473410d2e89c97a48c4c8a95fd26d3b21",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/loaded-footprint.ts",
+      "bytes": 1752,
+      "sha256": "6fbf973c4b45663e47c9d6b3122a707e2f8571222d5c6378445d817e2c9b338d",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/session-repo-targets.ts",
+      "bytes": 649,
+      "sha256": "61ad7facc5d482e1a2e2f49ef50a373fd81c0237184d8a8508abdf5170b84cdd",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/session-repo.bench.ts",
+      "bytes": 1869,
+      "sha256": "fe570e9acd6e43ed7bfe4fbd025fc2067f5dcfb1bb9a753a8cf61e2689f5ce94",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/storage-targets.ts",
+      "bytes": 542,
+      "sha256": "66d8521e23e46ab5dec801141443987811c81c19de7129ea6362a93de016f187",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/session/storage.bench.ts",
+      "bytes": 984,
+      "sha256": "150792e85b1635e4f4970ed31a8758d4c7b509781a859dbe9566bea8e7364b60",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/benchmark/tsconfig.json",
+      "bytes": 287,
+      "sha256": "de7f2233f731d3e242a27ff905e107429bdb46bfa4df526d899eddc6232cb7a6",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/package.json",
+      "bytes": 2685,
+      "sha256": "1799f039f5580fb1ef756b9e27352b4ccf21d27bfacfa19f3de86a8e3feac419",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/scripts/generate-telemetry-docs.ts",
+      "bytes": 5002,
+      "sha256": "4ed99d51446530cae8de500d4b90ad905f94346f062b386d7293d5e03e72afb6",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/agent.ts",
+      "bytes": 18767,
+      "sha256": "25b52fda7c8fa09d4d5cc8bcbb04db63e9d785b978c846d8c59a367ba91fe045",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/messages.ts",
+      "bytes": 4188,
+      "sha256": "3173a94aae9a1e064ddae8a9d3ecaf857e2a3b94e801cf844cc6f045d3bf307f",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/context.ts",
+      "bytes": 2200,
+      "sha256": "409078e31155a77bbfa1fff20ab81d55370fa379ad95c12933eecbf832efeaf1",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/index.ts",
+      "bytes": 4045,
+      "sha256": "f335c42e75a0ab39eab9d8a08a01cd8804b720ed89f1f0a25ea12239210132d3",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/node.ts",
+      "bytes": 88,
+      "sha256": "63d8dc9b22d93b3b1172ed1f1e83cc62bb370789f56f8dd31affb5c2a0a8dff3",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/stream-fn.ts",
+      "bytes": 683,
+      "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/test/e2e.test.ts",
+      "bytes": 12821,
+      "sha256": "d2b271070d22ff2bdace2135f1cb4709345515e7e63d0f05d7c8b435a1cc9361",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/tsconfig.build.json",
+      "bytes": 492,
+      "sha256": "ccdc6c20a858b66ddf2eb4971790d44a4c830f8017d670b8450af9a5d32dff77",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/vitest.benchmark.config.ts",
+      "bytes": 771,
+      "sha256": "134c32d8ff7dd71230a4b32fb57a9b4ac97769800c9033f0c5089068f1023312",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/vitest.config.ts",
+      "bytes": 1077,
+      "sha256": "fd2d498e6160353f09f843aed1dfede67e242a51b7d6577898390a0f25bd3388",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/vitest.harness.config.ts",
+      "bytes": 1231,
+      "sha256": "5e4fdbd86f1ac0aaaaebac50fcd60648ef1f3290dc8e7f07af1741d7852b6565",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/tsconfig.base.json",
+      "bytes": 625,
+      "sha256": "2db314b2e40a37a94e7b1da0af3883b7dd0ef2a8abc4b22138ae1ceb7cc2375f",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/package.json",
+      "bytes": 4937,
+      "sha256": "fad7121f20f9c01e2573e582a4908a7d22b92041000ed71e62528403416f55c0",
+      "evidence": "reading-ledger.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/agent-loop.ts",
+      "bytes": 22796,
+      "sha256": "1e16404a231912fbd7643d8317b15ec4cc6245ed8cedc37582a31d430a1cc6ac",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/agent.ts",
+      "bytes": 18767,
+      "sha256": "25b52fda7c8fa09d4d5cc8bcbb04db63e9d785b978c846d8c59a367ba91fe045",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/branch-summarization.ts",
+      "bytes": 9537,
+      "sha256": "38fed20de82bad088ab0a49c7c46e8c801c0bf448dc8a86d7c0f8f225d43792e",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/compaction.ts",
+      "bytes": 27410,
+      "sha256": "6e7aec0d27cb566f8f85f7dd13850eda98f5ddf7e78f9a919fb3dd03c3ea3a8a",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/utils.ts",
+      "bytes": 4312,
+      "sha256": "85ea768b590e683727aecaf6ac72cf4218806e66313bc3ed2e1593867592d6c0",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/context.ts",
+      "bytes": 1140,
+      "sha256": "de3e6afc553327d7fca456f06393039dce033c4c97508649063c285c968bca86",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/messages.ts",
+      "bytes": 4188,
+      "sha256": "3173a94aae9a1e064ddae8a9d3ecaf857e2a3b94e801cf844cc6f045d3bf307f",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/context.ts",
+      "bytes": 2200,
+      "sha256": "409078e31155a77bbfa1fff20ab81d55370fa379ad95c12933eecbf832efeaf1",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/types.ts",
+      "bytes": 17172,
+      "sha256": "ce92e0a00a6b5f7b95ef9f41e909d7a0e5c269956a782c83c65d885c50680770",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/utils/usage.ts",
+      "bytes": 1136,
+      "sha256": "4a0baab54475263a73fef362a8c15f2386a69c1e5d5c4b579b312c88291c7278",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/stream-fn.ts",
+      "bytes": 683,
+      "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/test/harness/branch-summarization.test.ts",
+      "bytes": 2604,
+      "sha256": "eb75b427ebac0495ea73e23486a3477bba8f43fa36e032102ac3410bfc9ed57b",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/test/harness/compaction.test.ts",
+      "bytes": 27680,
+      "sha256": "4f59e648f89d8751c7c325af74943d212bfecf5bb015a68c6bee9eb51be46390",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/lazy.ts",
+      "bytes": 3203,
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/context.ts",
+      "bytes": 1345,
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/credential-store.ts",
+      "bytes": 2353,
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/resolve.ts",
+      "bytes": 6779,
+      "sha256": "08dfcdcbd74dbae5b011b105b9b335321fea816ce262758729a2b29a630bd1b9",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/models-store.ts",
+      "bytes": 1662,
+      "sha256": "9b5b110a2cbd1b558f7facf4441b0b4b6824b033d34c9062add35e642a138fdf",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/models.ts",
+      "bytes": 34837,
+      "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/faux.ts",
+      "bytes": 21191,
+      "sha256": "83f09999c95c355b4befcb47019836a1b3636593cd72b96f540108db0b5f570a",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/abort.ts",
+      "bytes": 1374,
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/diagnostics.ts",
+      "bytes": 1377,
+      "sha256": "d22b4f96a00f032220ff0cc27458c7a525dcec948bdbd2bbb67b4d7598cb395d",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/event-stream.ts",
+      "bytes": 2878,
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/retry.ts",
+      "bytes": 8904,
+      "sha256": "951d8343bf5c67163135161a3af57191666d206da36cb85f956490c237b6f16c",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/text.ts",
+      "bytes": 470,
+      "sha256": "442d027929fa6db4aa19638d64b55838ccada6c07f350610c53a521cd620ddf3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/uuid.ts",
+      "bytes": 1880,
+      "sha256": "234a48d4b999e69188fdfa49173ccfa7887d947e443ef206cc30219515105a1f",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/validation.ts",
+      "bytes": 9902,
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/chord/src/context/index.ts",
+      "bytes": 3763,
+      "sha256": "0f0925a896cf1e506d9495d929157347639e90da343bf28d7472ea645897e7d3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/index.ts",
+      "bytes": 13363,
+      "sha256": "2f75b09f0e5b4bbb61f9ceae8411f9fccb1e08d7d94ed9ce2e4e296caac4047e",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/memory.ts",
+      "bytes": 6067,
+      "sha256": "d5d72e1a97ee1190c3a8e05ebff10a62568e3762ab8ace5095f966d50e0ef7e7",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/noop.ts",
+      "bytes": 645,
+      "sha256": "b75fb8d4dd0eff94c4641f51ce9e0c22bd992c582a947050068985d48628fad8",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/index.ts",
+      "bytes": 4045,
+      "sha256": "f335c42e75a0ab39eab9d8a08a01cd8804b720ed89f1f0a25ea12239210132d3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/node.ts",
+      "bytes": 88,
+      "sha256": "63d8dc9b22d93b3b1172ed1f1e83cc62bb370789f56f8dd31affb5c2a0a8dff3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/proxy.ts",
+      "bytes": 11673,
+      "sha256": "248730db4f1bdb84d435295523aa7c9da02c7e09052ce63f0f84d7f338d63878",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/stream-fn.ts",
+      "bytes": 683,
+      "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/types.ts",
+      "bytes": 17570,
+      "sha256": "640b6703badd73303f9c3c7e903a1269793493499d23e379894cbcb22338a4db",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/search/index.ts",
+      "bytes": 636,
+      "sha256": "ca385395c326d76c99dd42bcfd7bf4a0ca93368c5fe59f1ea00d288ec0603ea3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/package.json",
+      "bytes": 2685,
+      "sha256": "1799f039f5580fb1ef756b9e27352b4ccf21d27bfacfa19f3de86a8e3feac419",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/agent-harness.ts",
+      "bytes": 21541,
+      "sha256": "f00e89cdf1412e4193db0207c9358d89116e240fba1823c9db81eb6e8f1f85f5",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/branch-summarization.ts",
+      "bytes": 9537,
+      "sha256": "38fed20de82bad088ab0a49c7c46e8c801c0bf448dc8a86d7c0f8f225d43792e",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/compaction.ts",
+      "bytes": 27410,
+      "sha256": "6e7aec0d27cb566f8f85f7dd13850eda98f5ddf7e78f9a919fb3dd03c3ea3a8a",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/utils.ts",
+      "bytes": 4312,
+      "sha256": "85ea768b590e683727aecaf6ac72cf4218806e66313bc3ed2e1593867592d6c0",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/config.ts",
+      "bytes": 1450,
+      "sha256": "b95461edf229c73ab181a09a4dcc7ad609593e8422c6a5080529d2eff8fc8659",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/context.ts",
+      "bytes": 1140,
+      "sha256": "de3e6afc553327d7fca456f06393039dce033c4c97508649063c285c968bca86",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/events.ts",
+      "bytes": 9852,
+      "sha256": "8e69fd404703ff88d487b26323e2b8950500c16b4945e115d8a1ab2bedf38769",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/execution/assistant.ts",
+      "bytes": 5746,
+      "sha256": "b524fbb0019ae9153bd0b3b5e150a49836d5d761591572c685bb32379302614f",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/hooks.ts",
+      "bytes": 17258,
+      "sha256": "1f86b9da3ab1a80b6896bbc409eb020f947b296765e26aa8a3672f75bbbfe8a1",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/messages.ts",
+      "bytes": 4188,
+      "sha256": "3173a94aae9a1e064ddae8a9d3ecaf857e2a3b94e801cf844cc6f045d3bf307f",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/prompt-templates.ts",
+      "bytes": 9407,
+      "sha256": "edeed31ed4cea3353b47d1061356a898a52b131c9f50100f20bb21f1fca6b554",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/result.ts",
+      "bytes": 4055,
+      "sha256": "035a0e603043a1d598e49949936dda132dce1f098923f2b5722fbf09ffbebbd1",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/drive/generation.ts",
+      "bytes": 10090,
+      "sha256": "c0d6a0c61bdf573fe56f9919111ffef40b6654cc9f38dac4d6d16a1deebd3cf1",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/drive/structural.ts",
+      "bytes": 42118,
+      "sha256": "b5da9f9b8a6fe4bd8624eb2f833e02d955d229cbac3d0e8f9a2cda9a2c15154c",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/harness.ts",
+      "bytes": 14469,
+      "sha256": "0d92dcd8802e5de32d15f6aa2650c349c0df3c9da206449959941594d9e69b05",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/lane.ts",
+      "bytes": 67893,
+      "sha256": "00e66cd00a1912ae05615e3f2ba110ab40008c1570bf07f4d5476bbb4291ccde",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/restore.ts",
+      "bytes": 6522,
+      "sha256": "7bc8f2817707297ead81f29a30531c3c8a9cc99f747124e300e7d931b7cd7ec4",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/transcript.ts",
+      "bytes": 4326,
+      "sha256": "ebba52d98b71eb684610c24320321c5a580dc368835e6fc827810e1c217f5b64",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/context.ts",
+      "bytes": 2200,
+      "sha256": "409078e31155a77bbfa1fff20ab81d55370fa379ad95c12933eecbf832efeaf1",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/skills.ts",
+      "bytes": 13789,
+      "sha256": "b88025e1bcf65de30649aa15ca045caadff23ae46a147e1e078a998610ac253b",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/system-prompt.ts",
+      "bytes": 1179,
+      "sha256": "a3a8f4e2e343562277d348e99762447131632aea963c9ee4633369e5d1a9e9f4",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/telemetry.ts",
+      "bytes": 18212,
+      "sha256": "2a93a876ecea19b8d16609b8985c58540c93d12ef29bdac50496fce8208443ea",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/types.ts",
+      "bytes": 17172,
+      "sha256": "ce92e0a00a6b5f7b95ef9f41e909d7a0e5c269956a782c83c65d885c50680770",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/chord/src/context/index.ts",
+      "bytes": 3763,
+      "sha256": "0f0925a896cf1e506d9495d929157347639e90da343bf28d7472ea645897e7d3",
+      "evidence": "accepted057-current-inputs.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/README.md",
+      "bytes": 17606,
+      "sha256": "04e44bb21db2894ed77b13c0fb63a5e9f619df633abd1b8f9fe4a04472040c3b",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/package.json",
+      "bytes": 2685,
+      "sha256": "1799f039f5580fb1ef756b9e27352b4ccf21d27bfacfa19f3de86a8e3feac419",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/agent-loop.ts",
+      "bytes": 22796,
+      "sha256": "1e16404a231912fbd7643d8317b15ec4cc6245ed8cedc37582a31d430a1cc6ac",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/agent.ts",
+      "bytes": 18767,
+      "sha256": "25b52fda7c8fa09d4d5cc8bcbb04db63e9d785b978c846d8c59a367ba91fe045",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/branch-summarization.ts",
+      "bytes": 9537,
+      "sha256": "38fed20de82bad088ab0a49c7c46e8c801c0bf448dc8a86d7c0f8f225d43792e",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/compaction.ts",
+      "bytes": 27410,
+      "sha256": "6e7aec0d27cb566f8f85f7dd13850eda98f5ddf7e78f9a919fb3dd03c3ea3a8a",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/compaction/utils.ts",
+      "bytes": 4312,
+      "sha256": "85ea768b590e683727aecaf6ac72cf4218806e66313bc3ed2e1593867592d6c0",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/context.ts",
+      "bytes": 1140,
+      "sha256": "de3e6afc553327d7fca456f06393039dce033c4c97508649063c285c968bca86",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/messages.ts",
+      "bytes": 4188,
+      "sha256": "3173a94aae9a1e064ddae8a9d3ecaf857e2a3b94e801cf844cc6f045d3bf307f",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/context.ts",
+      "bytes": 2200,
+      "sha256": "409078e31155a77bbfa1fff20ab81d55370fa379ad95c12933eecbf832efeaf1",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/types.ts",
+      "bytes": 17172,
+      "sha256": "ce92e0a00a6b5f7b95ef9f41e909d7a0e5c269956a782c83c65d885c50680770",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/utils/usage.ts",
+      "bytes": 1136,
+      "sha256": "4a0baab54475263a73fef362a8c15f2386a69c1e5d5c4b579b312c88291c7278",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/index.ts",
+      "bytes": 4045,
+      "sha256": "f335c42e75a0ab39eab9d8a08a01cd8804b720ed89f1f0a25ea12239210132d3",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/stream-fn.ts",
+      "bytes": 683,
+      "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/test/harness/branch-summarization.test.ts",
+      "bytes": 2604,
+      "sha256": "eb75b427ebac0495ea73e23486a3477bba8f43fa36e032102ac3410bfc9ed57b",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/test/harness/compaction.test.ts",
+      "bytes": 27680,
+      "sha256": "4f59e648f89d8751c7c325af74943d212bfecf5bb015a68c6bee9eb51be46390",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/tsconfig.build.json",
+      "bytes": 492,
+      "sha256": "ccdc6c20a858b66ddf2eb4971790d44a4c830f8017d670b8450af9a5d32dff77",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/vitest.config.ts",
+      "bytes": 1077,
+      "sha256": "fd2d498e6160353f09f843aed1dfede67e242a51b7d6577898390a0f25bd3388",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/vitest.harness.config.ts",
+      "bytes": 1231,
+      "sha256": "5e4fdbd86f1ac0aaaaebac50fcd60648ef1f3290dc8e7f07af1741d7852b6565",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/lazy.ts",
+      "bytes": 3203,
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/context.ts",
+      "bytes": 1345,
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/credential-store.ts",
+      "bytes": 2353,
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/auth/resolve.ts",
+      "bytes": 6779,
+      "sha256": "08dfcdcbd74dbae5b011b105b9b335321fea816ce262758729a2b29a630bd1b9",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/models-store.ts",
+      "bytes": 1662,
+      "sha256": "9b5b110a2cbd1b558f7facf4441b0b4b6824b033d34c9062add35e642a138fdf",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/models.ts",
+      "bytes": 34837,
+      "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/faux.ts",
+      "bytes": 21191,
+      "sha256": "83f09999c95c355b4befcb47019836a1b3636593cd72b96f540108db0b5f570a",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/abort.ts",
+      "bytes": 1374,
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/diagnostics.ts",
+      "bytes": 1377,
+      "sha256": "d22b4f96a00f032220ff0cc27458c7a525dcec948bdbd2bbb67b4d7598cb395d",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/event-stream.ts",
+      "bytes": 2878,
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/retry.ts",
+      "bytes": 8904,
+      "sha256": "951d8343bf5c67163135161a3af57191666d206da36cb85f956490c237b6f16c",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/text.ts",
+      "bytes": 470,
+      "sha256": "442d027929fa6db4aa19638d64b55838ccada6c07f350610c53a521cd620ddf3",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/uuid.ts",
+      "bytes": 1880,
+      "sha256": "234a48d4b999e69188fdfa49173ccfa7887d947e443ef206cc30219515105a1f",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/validation.ts",
+      "bytes": 9902,
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/chord/src/context/index.ts",
+      "bytes": 3763,
+      "sha256": "0f0925a896cf1e506d9495d929157347639e90da343bf28d7472ea645897e7d3",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/index.ts",
+      "bytes": 13363,
+      "sha256": "2f75b09f0e5b4bbb61f9ceae8411f9fccb1e08d7d94ed9ce2e4e296caac4047e",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/memory.ts",
+      "bytes": 6067,
+      "sha256": "d5d72e1a97ee1190c3a8e05ebff10a62568e3762ab8ace5095f966d50e0ef7e7",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/telemetry/src/noop.ts",
+      "bytes": 645,
+      "sha256": "b75fb8d4dd0eff94c4641f51ce9e0c22bd992c582a947050068985d48628fad8",
+      "evidence": "historical061-source-reuse.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/index.ts",
+      "bytes": 4045,
+      "sha256": "f335c42e75a0ab39eab9d8a08a01cd8804b720ed89f1f0a25ea12239210132d3",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/node.ts",
+      "bytes": 88,
+      "sha256": "63d8dc9b22d93b3b1172ed1f1e83cc62bb370789f56f8dd31affb5c2a0a8dff3",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/context.ts",
+      "bytes": 1140,
+      "sha256": "de3e6afc553327d7fca456f06393039dce033c4c97508649063c285c968bca86",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/env/nodejs.ts",
+      "bytes": 29097,
+      "sha256": "8cdd46309bacc1e0bfed1fd09b1960fb495c557d07f457b09cc9837482d7ae0b",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/runtime/reducer.ts",
+      "bytes": 7359,
+      "sha256": "f3066a2c4710ecdba1a87befe175330a3f19b87e31d8a2b5be4b237eea16849d",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/index.ts",
+      "bytes": 1130,
+      "sha256": "8ff08ac3c9b7c43c31c62a6bd722f8e82df452fb87a811c0de859e310e8897ee",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/pi-mono/packages/agent/src/harness/session/testing/index.ts",
+      "bytes": 1462,
+      "sha256": "3cbf84599465bcad0888f6318a7f2d04422ec17c11baed29737d4b7367858834",
+      "evidence": "public-export-identities.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/src/core.rs",
+      "bytes": 278737,
+      "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869",
+      "evidence": "accepted058-target-drift.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/tests/core_session.rs",
+      "bytes": 47139,
+      "sha256": "e517fbb10658845ff8fee6c2cc8570ae9398f4effa8a7ab78fafcab2ccd65a43",
+      "evidence": "accepted058-target-drift.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/tests/runtime.rs",
+      "bytes": 19172,
+      "sha256": "ea811a89941921209a27f2cbd3d8a63aafa26a12f47529f1a2c2709112d5b79f",
+      "evidence": "accepted058-target-drift.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/tests/stage1_input_host.rs",
+      "bytes": 56599,
+      "sha256": "87726f7d1e9aadc411e3421fa80ecab0ef88b93dd7523220036136d079dbe143",
+      "evidence": "accepted058-target-drift.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/tests/stage1_input_queue.rs",
+      "bytes": 22941,
+      "sha256": "4a089e0fbb995189e5407db251f165e88ce386e141a679cd019f5504ffa32115",
+      "evidence": "accepted058-target-drift.json"
+    },
+    {
+      "path": "/Users/wangweiyang/GitHub/zenpi/tests/stage1_tool_batch.rs",
+      "bytes": 35892,
+      "sha256": "d9db142d2d167f9c22c24b3f46af95c2e66ec665de636247b732b3115f0c4b72",
+      "evidence": "accepted058-target-drift.json"
+    }
+  ],
+  "inventory": [
+    {
+      "name": "CHANGELOG.md",
+      "path": "packages/agent/CHANGELOG.md",
+      "kind": "file",
+      "bytes": 26895,
+      "sha256": "2eec658c8b1f4e329c372b14a26848051830e769c978bbd2befba6bfb5781f0e",
+      "lines": 709,
+      "formal_item": null
+    },
+    {
+      "name": "README.md",
+      "path": "packages/agent/README.md",
+      "kind": "file",
+      "bytes": 17606,
+      "sha256": "04e44bb21db2894ed77b13c0fb63a5e9f619df633abd1b8f9fe4a04472040c3b",
+      "lines": 517,
+      "formal_item": null
+    },
+    {
+      "name": "benchmark",
+      "path": "packages/agent/benchmark",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "session",
+          "path": "packages/agent/benchmark/session",
+          "kind": "directory"
+        },
+        {
+          "name": "tsconfig.json",
+          "path": "packages/agent/benchmark/tsconfig.json",
+          "kind": "file",
+          "bytes": 287,
+          "sha256": "de7f2233f731d3e242a27ff905e107429bdb46bfa4df526d899eddc6232cb7a6",
+          "lines": 12
+        }
+      ]
+    },
+    {
+      "name": "docs",
+      "path": "packages/agent/docs",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "assistant-durability.md",
+          "path": "packages/agent/docs/assistant-durability.md",
+          "kind": "file",
+          "bytes": 19500,
+          "sha256": "c07961d0fb7fb8416bf980544f952cf1491f8c1526822a8eb4b02b03490e164c",
+          "lines": 355
+        },
+        {
+          "name": "harness.md",
+          "path": "packages/agent/docs/harness.md",
+          "kind": "file",
+          "bytes": 211638,
+          "sha256": "8bb08ad97dcd0227a16a7ec29a563fd7c2ed7b64d474d89d9b53f4c61a053b1a",
+          "lines": 1468
+        },
+        {
+          "name": "mobile-handoff",
+          "path": "packages/agent/docs/mobile-handoff",
+          "kind": "directory"
+        },
+        {
+          "name": "pico",
+          "path": "packages/agent/docs/pico",
+          "kind": "directory"
+        },
+        {
+          "name": "pico-v3.md",
+          "path": "packages/agent/docs/pico-v3.md",
+          "kind": "file",
+          "bytes": 89196,
+          "sha256": "423ce3f63ec9d38b8900a4b88a81c07eca91722591dfa1e73c3f620c298484ac",
+          "lines": 2113
+        },
+        {
+          "name": "pico2.md",
+          "path": "packages/agent/docs/pico2.md",
+          "kind": "file",
+          "bytes": 139842,
+          "sha256": "f1b00124bab7598893e8ede1560602a1dc639e37d671305f51d8e7cfbd77e68c",
+          "lines": 2492
+        },
+        {
+          "name": "plugins.md",
+          "path": "packages/agent/docs/plugins.md",
+          "kind": "file",
+          "bytes": 73372,
+          "sha256": "56c3c9fd76e4389a85658ae853632dad48f621acef15dac1c9529f5a87ef9468",
+          "lines": 1158
+        },
+        {
+          "name": "post-wp05-roadmap.md",
+          "path": "packages/agent/docs/post-wp05-roadmap.md",
+          "kind": "file",
+          "bytes": 24796,
+          "sha256": "2dba08e6aaffc7e8317b1e1c8a35cf3f390cc1bdc7cb7634902c80f26ab72c36",
+          "lines": 254
+        },
+        {
+          "name": "rpc.md",
+          "path": "packages/agent/docs/rpc.md",
+          "kind": "file",
+          "bytes": 20068,
+          "sha256": "089e7c850c8772f8ba21533873bd05ef8f843bc94afa63b203fc1ac26d57e4ec",
+          "lines": 215
+        },
+        {
+          "name": "runtime-simplification.md",
+          "path": "packages/agent/docs/runtime-simplification.md",
+          "kind": "file",
+          "bytes": 18314,
+          "sha256": "1bf746b56adf8588ce348d0936c696737614fd88946e213a44b9fc19e8029238",
+          "lines": 391
+        },
+        {
+          "name": "telemetry-schema.md",
+          "path": "packages/agent/docs/telemetry-schema.md",
+          "kind": "file",
+          "bytes": 13342,
+          "sha256": "a8c7228e5c50b45501b3c6e3edf7f5a75433c98cf81d2d3b848b14e12cd9572a",
+          "lines": 383
+        },
+        {
+          "name": "telemetry.md",
+          "path": "packages/agent/docs/telemetry.md",
+          "kind": "file",
+          "bytes": 13867,
+          "sha256": "31cd30ed04222de36ae002768ffde85db0a0dcf57aea3be6aad6bd8b2b4723c9",
+          "lines": 251
+        },
+        {
+          "name": "tool-durability.md",
+          "path": "packages/agent/docs/tool-durability.md",
+          "kind": "file",
+          "bytes": 35450,
+          "sha256": "e42fc1900b7a80a6a525e31b6bd4b551b937a5e8f5cadc5cae7a7fe12a74d874",
+          "lines": 704
+        },
+        {
+          "name": "values.md",
+          "path": "packages/agent/docs/values.md",
+          "kind": "file",
+          "bytes": 34513,
+          "sha256": "ca2dfc2bd97d8e4f8eacddc9254b9077eb1403a20d5660ed844309b54c471c43",
+          "lines": 735
+        },
+        {
+          "name": "work-packages",
+          "path": "packages/agent/docs/work-packages",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "name": "package.json",
+      "path": "packages/agent/package.json",
+      "kind": "file",
+      "bytes": 2685,
+      "sha256": "1799f039f5580fb1ef756b9e27352b4ccf21d27bfacfa19f3de86a8e3feac419",
+      "lines": 89,
+      "formal_item": null
+    },
+    {
+      "name": "scripts",
+      "path": "packages/agent/scripts",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "generate-telemetry-docs.ts",
+          "path": "packages/agent/scripts/generate-telemetry-docs.ts",
+          "kind": "file",
+          "bytes": 5002,
+          "sha256": "4ed99d51446530cae8de500d4b90ad905f94346f062b386d7293d5e03e72afb6",
+          "lines": 117
+        }
+      ]
+    },
+    {
+      "name": "src",
+      "path": "packages/agent/src",
+      "kind": "directory",
+      "formal_item": "ZS1-057",
+      "direct_children": [
+        {
+          "name": "agent-loop.ts",
+          "path": "packages/agent/src/agent-loop.ts",
+          "kind": "file",
+          "bytes": 22796,
+          "sha256": "1e16404a231912fbd7643d8317b15ec4cc6245ed8cedc37582a31d430a1cc6ac",
+          "lines": 803
+        },
+        {
+          "name": "agent.ts",
+          "path": "packages/agent/src/agent.ts",
+          "kind": "file",
+          "bytes": 18767,
+          "sha256": "25b52fda7c8fa09d4d5cc8bcbb04db63e9d785b978c846d8c59a367ba91fe045",
+          "lines": 592
+        },
+        {
+          "name": "harness",
+          "path": "packages/agent/src/harness",
+          "kind": "directory"
+        },
+        {
+          "name": "index.ts",
+          "path": "packages/agent/src/index.ts",
+          "kind": "file",
+          "bytes": 4045,
+          "sha256": "f335c42e75a0ab39eab9d8a08a01cd8804b720ed89f1f0a25ea12239210132d3",
+          "lines": 152
+        },
+        {
+          "name": "node.ts",
+          "path": "packages/agent/src/node.ts",
+          "kind": "file",
+          "bytes": 88,
+          "sha256": "63d8dc9b22d93b3b1172ed1f1e83cc62bb370789f56f8dd31affb5c2a0a8dff3",
+          "lines": 2
+        },
+        {
+          "name": "proxy.ts",
+          "path": "packages/agent/src/proxy.ts",
+          "kind": "file",
+          "bytes": 11673,
+          "sha256": "248730db4f1bdb84d435295523aa7c9da02c7e09052ce63f0f84d7f338d63878",
+          "lines": 402
+        },
+        {
+          "name": "search",
+          "path": "packages/agent/src/search",
+          "kind": "directory"
+        },
+        {
+          "name": "stream-fn.ts",
+          "path": "packages/agent/src/stream-fn.ts",
+          "kind": "file",
+          "bytes": 683,
+          "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+          "lines": 20
+        },
+        {
+          "name": "types.ts",
+          "path": "packages/agent/src/types.ts",
+          "kind": "file",
+          "bytes": 17570,
+          "sha256": "640b6703badd73303f9c3c7e903a1269793493499d23e379894cbcb22338a4db",
+          "lines": 446
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "path": "packages/agent/test",
+      "kind": "directory",
+      "formal_item": "ZS1-058",
+      "direct_children": [
+        {
+          "name": "agent-loop.test.ts",
+          "path": "packages/agent/test/agent-loop.test.ts",
+          "kind": "file",
+          "bytes": 47809,
+          "sha256": "c359921a73525d67cf42481ad04210952fe36a9517d7b099f41710734438987d",
+          "lines": 1610
+        },
+        {
+          "name": "agent.test.ts",
+          "path": "packages/agent/test/agent.test.ts",
+          "kind": "file",
+          "bytes": 24309,
+          "sha256": "fccade703a6e1d1007ba2a57ed0125fa69a5c017c5f2c281d74b7b37d2d313cc",
+          "lines": 810
+        },
+        {
+          "name": "e2e.test.ts",
+          "path": "packages/agent/test/e2e.test.ts",
+          "kind": "file",
+          "bytes": 12821,
+          "sha256": "d2b271070d22ff2bdace2135f1cb4709345515e7e63d0f05d7c8b435a1cc9361",
+          "lines": 415
+        },
+        {
+          "name": "harness",
+          "path": "packages/agent/test/harness",
+          "kind": "directory"
+        },
+        {
+          "name": "proxy.test.ts",
+          "path": "packages/agent/test/proxy.test.ts",
+          "kind": "file",
+          "bytes": 3936,
+          "sha256": "034df1d6d76ae72ad86d02fe40177ce513b4255896d88ed37fea5c9ddd93aa79",
+          "lines": 129
+        },
+        {
+          "name": "utils",
+          "path": "packages/agent/test/utils",
+          "kind": "directory"
+        }
+      ]
+    },
+    {
+      "name": "tsconfig.build.json",
+      "path": "packages/agent/tsconfig.build.json",
+      "kind": "file",
+      "bytes": 492,
+      "sha256": "ccdc6c20a858b66ddf2eb4971790d44a4c830f8017d670b8450af9a5d32dff77",
+      "lines": 15,
+      "formal_item": null
+    },
+    {
+      "name": "vitest.benchmark.config.ts",
+      "path": "packages/agent/vitest.benchmark.config.ts",
+      "kind": "file",
+      "bytes": 771,
+      "sha256": "134c32d8ff7dd71230a4b32fb57a9b4ac97769800c9033f0c5089068f1023312",
+      "lines": 23,
+      "formal_item": null
+    },
+    {
+      "name": "vitest.config.ts",
+      "path": "packages/agent/vitest.config.ts",
+      "kind": "file",
+      "bytes": 1077,
+      "sha256": "fd2d498e6160353f09f843aed1dfede67e242a51b7d6577898390a0f25bd3388",
+      "lines": 27,
+      "formal_item": null
+    },
+    {
+      "name": "vitest.harness.config.ts",
+      "path": "packages/agent/vitest.harness.config.ts",
+      "kind": "file",
+      "bytes": 1231,
+      "sha256": "5e4fdbd86f1ac0aaaaebac50fcd60648ef1f3290dc8e7f07af1741d7852b6565",
+      "lines": 34,
+      "formal_item": null
+    }
+  ],
+  "dependencies": [
+    {
+      "item": "ZS1-057",
+      "receipt": {
+        "bytes": 3289,
+        "sha256": "13fc251d1f81ed9e0e2731a57bcc4a71cf95d9950c1c65225d495e45cbcebae4"
+      },
+      "artifacts": 12
+    },
+    {
+      "item": "ZS1-058",
+      "receipt": {
+        "bytes": 11953,
+        "sha256": "70004aa02dba4206d8dca3fa8afc97575b044eb1798c644467613dcdccd0bebc"
+      },
+      "artifacts": 59
+    }
+  ],
+  "snapshot": "b748e795fdb5b5449cf5a63bb4aae8afca4cc9c7f01fb2ffd0b6ccfa82f2d07d"
+}

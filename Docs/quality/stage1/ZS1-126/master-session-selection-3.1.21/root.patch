@@ -1,0 +1,204 @@
+--- a/src/tui.rs
++++ b/src/tui.rs
+@@ -5565,10 +5565,14 @@
+             if let Some(pane) = panes.iter().find(|pane| pane.rect.contains(position)) {
+                 self.focus_workspace_pane(pane.id);
+                 if pane.id == PaneId::SessionList
++                    && mouse.column > pane.rect.x
++                    && mouse.column < pane.rect.right().saturating_sub(1)
+                     && mouse.row > pane.rect.y
+                     && mouse.row < pane.rect.bottom().saturating_sub(1)
+                 {
+-                    let row = usize::from(mouse.row.saturating_sub(pane.rect.y + 1));
++                    let row = self
++                        .session_browser_scroll(pane.rect)
++                        .saturating_add(usize::from(mouse.row.saturating_sub(pane.rect.y + 1)));
+                     if row < self.session_browser.len().min(32) {
+                         self.session_browser_cursor = row;
+                         self.dirty = true;
+@@ -7492,22 +7496,31 @@
+             )
+             .title(title);
+         let scroll = if id == PaneId::SessionList {
+-            let visible = usize::from(area.height.saturating_sub(2)).max(1);
+-            let auto = self
+-                .session_browser_cursor
+-                .saturating_sub(visible.saturating_sub(1));
+-            auto.max(usize::from(*self.pane_scroll.get(&id).unwrap_or(&0)))
++            self.session_browser_scroll(area)
+         } else {
+             usize::from(*self.pane_scroll.get(&id).unwrap_or(&0))
+         };
+-        frame.render_widget(
+-            Paragraph::new(content)
+-                .style(Style::default().fg(Color::DarkGray))
+-                .block(block)
+-                .scroll((scroll.min(usize::from(u16::MAX)) as u16, 0))
+-                .wrap(Wrap { trim: true }),
+-            area,
+-        );
++        let paragraph = Paragraph::new(content)
++            .style(Style::default().fg(Color::DarkGray))
++            .block(block)
++            .scroll((scroll.min(usize::from(u16::MAX)) as u16, 0));
++        // Session selection and mouse hits address items, so every item must
++        // occupy one row even when the pane is too narrow for its full label.
++        let paragraph = if id == PaneId::SessionList {
++            paragraph
++        } else {
++            paragraph.wrap(Wrap { trim: true })
++        };
++        frame.render_widget(paragraph, area);
++    }
++
++    fn session_browser_scroll(&self, area: Rect) -> usize {
++        let visible = usize::from(area.height.saturating_sub(2)).max(1);
++        self.session_browser_cursor
++            .saturating_sub(visible.saturating_sub(1))
++            .max(usize::from(
++                *self.pane_scroll.get(&PaneId::SessionList).unwrap_or(&0),
++            ))
+     }
+ 
+     fn session_browser_content(&self) -> String {
+--- a/tests/tui_project_workspace.rs
++++ b/tests/tui_project_workspace.rs
+@@ -406,3 +406,138 @@
+     assert!(restored.restore_project_checkpoint(&legacy));
+     assert_eq!(restored.workspace_tab(), TabId::Project);
+ }
++
++fn session_selection_fixture() -> (
++    tempfile::TempDir,
++    TuiState,
++    Vec<zenpi::session::SessionSummary>,
++) {
++    let root = tempdir().unwrap();
++    for index in 0..20 {
++        drop(SessionStore::open(root.path().join(format!("session-{index:02}.jsonl"))).unwrap());
++    }
++    let owner = SessionStore::open(root.path().join("session-00.jsonl")).unwrap();
++    let mut state = TuiState::default();
++    state.refresh_session_snapshot(&owner);
++    state.set_workspace_tab(zenpi::layout::TabId::Session);
++    state.focus_workspace_pane(zenpi::layout::PaneId::SessionList);
++    let rows = zenpi::session::list_sessions(root.path()).unwrap();
++    assert_eq!(rows.len(), 20);
++    (root, state, rows)
++}
++
++fn draw_session_selection(
++    state: &mut TuiState,
++    terminal: &mut Terminal<TestBackend>,
++) -> ratatui::layout::Rect {
++    terminal
++        .draw(|frame| state.render_bentobox(frame, "test"))
++        .unwrap();
++    let area = terminal.backend().buffer().area;
++    // Top project row + header, single-line composer with borders, footer.
++    let workspace = ratatui::layout::Rect::new(0, 2, area.width, area.height - 6);
++    zenpi::tui::BentoBoxLayoutAdapter::new(state.workspace_layout(), workspace)
++        .visible_panes()
++        .find(|pane| pane.id == zenpi::layout::PaneId::SessionList)
++        .expect("visible session list")
++        .rect
++}
++
++#[test]
++fn session_list_click_tracks_the_visible_scrolled_row_and_open_path() {
++    let (_root, mut state, rows) = session_selection_fixture();
++    state.set_input("keep draft");
++    let layout = state.workspace_layout().clone();
++    state.move_session_browser_cursor(15);
++    let mut terminal = Terminal::new(TestBackend::new(300, 30)).unwrap();
++    let pane = draw_session_selection(&mut state, &mut terminal);
++    let visible = usize::from(pane.height - 2);
++    let first = 15 - (visible - 1);
++    assert!(first > 0 && first < rows.len());
++    let top: String = (pane.x + 1..pane.right() - 1)
++        .map(|x| terminal.backend().buffer()[(x, pane.y + 1)].symbol())
++        .collect();
++    assert!(top.contains(&rows[first].session_id), "{top:?}");
++    state.handle_mouse(MouseEvent {
++        kind: MouseEventKind::Down(MouseButton::Left),
++        column: pane.x + 5,
++        row: pane.y + 1,
++        modifiers: KeyModifiers::NONE,
++    });
++    assert_eq!(
++        state.selected_session_browser_path(),
++        Some(rows[first].path.as_str())
++    );
++    assert_eq!(state.input(), "keep draft");
++    assert_eq!(state.workspace_layout(), &layout);
++    state.set_input("");
++    assert_eq!(
++        state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
++        zenpi::tui::TuiAction::OpenSession(rows[first].path.clone())
++    );
++}
++
++#[test]
++fn session_list_narrow_resize_keeps_selected_row_visible_without_wrapping() {
++    let (_root, mut state, rows) = session_selection_fixture();
++    state.move_session_browser_cursor(15);
++    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
++    for (width, height) in [(120, 30), (120, 20), (300, 40)] {
++        terminal.backend_mut().resize(width, height);
++        terminal
++            .resize(ratatui::layout::Rect::new(0, 0, width, height))
++            .unwrap();
++        let pane = draw_session_selection(&mut state, &mut terminal);
++        let visible = usize::from(pane.height - 2);
++        let first = 15_usize.saturating_sub(visible - 1);
++        let selected_y = pane.y + 1 + (15 - first) as u16;
++        assert_eq!(
++            terminal.backend().buffer()[(pane.x + 1, selected_y)].symbol(),
++            ">",
++            "selected item must occupy one row at {width}x{height}"
++        );
++        state.handle_mouse(MouseEvent {
++            kind: MouseEventKind::Down(MouseButton::Left),
++            column: pane.x + 5,
++            row: selected_y,
++            modifiers: KeyModifiers::NONE,
++        });
++        assert_eq!(
++            state.selected_session_browser_path(),
++            Some(rows[15].path.as_str())
++        );
++    }
++}
++
++#[test]
++fn session_list_borders_and_empty_rows_do_not_change_selection() {
++    let (_root, mut state, rows) = session_selection_fixture();
++    state.move_session_browser_cursor(1);
++    let mut terminal = Terminal::new(TestBackend::new(300, 160)).unwrap();
++    let pane = draw_session_selection(&mut state, &mut terminal);
++    assert!(usize::from(pane.height - 2) > rows.len());
++    for (column, row) in [
++        (pane.x, pane.y + 3),
++        (pane.right() - 1, pane.y + 3),
++        (pane.x + 5, pane.y),
++        (pane.x + 5, pane.bottom() - 1),
++        (pane.x + 5, pane.y + 1 + rows.len() as u16),
++    ] {
++        state.handle_mouse(MouseEvent {
++            kind: MouseEventKind::Down(MouseButton::Left),
++            column,
++            row,
++            modifiers: KeyModifiers::NONE,
++        });
++        state.handle_mouse(MouseEvent {
++            kind: MouseEventKind::Up(MouseButton::Left),
++            column,
++            row,
++            modifiers: KeyModifiers::NONE,
++        });
++        assert_eq!(
++            state.selected_session_browser_path(),
++            Some(rows[1].path.as_str())
++        );
++    }
++}

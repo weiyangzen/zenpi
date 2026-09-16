@@ -1,0 +1,82 @@
+[
+  {
+    "source": "capture/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "source_bytes": 374943,
+    "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+    "lines": [
+      1,
+      2000
+    ],
+    "byte_range": [
+      0,
+      81960
+    ],
+    "path": "reads/001.txt",
+    "bytes": 81960,
+    "sha256": "443d6e5184154a9c3a3cb0ea83f5822d080c40045d8491e19ae344cf4802a152"
+  },
+  {
+    "source": "capture/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "source_bytes": 374943,
+    "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+    "lines": [
+      2001,
+      4000
+    ],
+    "byte_range": [
+      81960,
+      161958
+    ],
+    "path": "reads/002.txt",
+    "bytes": 79998,
+    "sha256": "40f9f534aa1d960d5c4d3156e3a6c92e4f386dca9e1d15d080d2cdc9fe590da2"
+  },
+  {
+    "source": "capture/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "source_bytes": 374943,
+    "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+    "lines": [
+      4001,
+      6000
+    ],
+    "byte_range": [
+      161958,
+      237475
+    ],
+    "path": "reads/003.txt",
+    "bytes": 75517,
+    "sha256": "8331454a1ce0130fecc508896583021d838695d8d05559b0c153b930aee16adb"
+  },
+  {
+    "source": "capture/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "source_bytes": 374943,
+    "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+    "lines": [
+      6001,
+      8000
+    ],
+    "byte_range": [
+      237475,
+      311502
+    ],
+    "path": "reads/004.txt",
+    "bytes": 74027,
+    "sha256": "e763b6fc0a624bb76c76aa4b7397ac9fdae0c39dca041386d7885f14da78f258"
+  },
+  {
+    "source": "capture/codex-rs/tui/src/bottom_pane/chat_composer.rs",
+    "source_bytes": 374943,
+    "source_sha256": "234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da",
+    "lines": [
+      8001,
+      9785
+    ],
+    "byte_range": [
+      311502,
+      374943
+    ],
+    "path": "reads/005.txt",
+    "bytes": 63441,
+    "sha256": "dda1d5d4dddeb66923046b371af665bac0b5c9b1d1e697977b077320a6e01f49"
+  }
+]

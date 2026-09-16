@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "fmt",
+    "--check"
+  ],
+  "exit_code": 0,
+  "start": "2026-09-12T22:45:24.566229+00:00",
+  "end": "2026-09-12T22:45:25.596076+00:00"
+}

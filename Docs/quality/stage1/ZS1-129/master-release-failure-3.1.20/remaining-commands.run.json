@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "tools/stage1_host_smoke.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+    "--case",
+    "commands",
+    "--report-dir",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-commands"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T15:17:18.502757+00:00",
+  "ended_at": "2026-09-12T15:17:50.391029+00:00",
+  "exit_code": 0,
+  "log_sha256": "13567217ebdc13adf009de6103f98c0a9b190dab3e73579b73c3249e2bfab025"
+}

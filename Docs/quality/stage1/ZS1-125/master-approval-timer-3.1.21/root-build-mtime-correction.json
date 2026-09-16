@@ -1,0 +1,16 @@
+{
+  "cause": "shutil.copy2 preserved candidate mtime from before the six-test build, so cargo reused the before binary: after log lists only 6 tests instead of 13 and no Compiling zenpi. This failed run does not test candidate semantics.",
+  "correction": "Preserve old failed log/binary; advance owned source mtimes without changing bytes, then invoke a newly named build verification. Future installation must write_bytes.",
+  "files": {
+    "src/tui.rs": {
+      "sha256": "9deac1fe3e76331c24bbf1b968bdcdc99adfa7f67c68ace7e49edae7b6d9e09e",
+      "mtime_ns_before": 1789260071452409747,
+      "mtime_ns_after": 1789260210218686000
+    },
+    "tests/tui_transcript_ux.rs": {
+      "sha256": "57a0d41b339c096b17f306c87004bdf9839ddbec0a07ee5821016f49f26b5254",
+      "mtime_ns_before": 1789260071451259813,
+      "mtime_ns_after": 1789260210218744000
+    }
+  }
+}

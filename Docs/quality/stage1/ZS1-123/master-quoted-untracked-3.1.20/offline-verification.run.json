@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/quoted-untracked-integration/worker/verify.py"
+  ],
+  "started_at": "2026-09-12T14:30:41.029596+00:00",
+  "exit_code": 0,
+  "log_sha256": "024228e33c3265c8e285e2c5ae4d3f35f4af6b2f4945721804f461fd28535424"
+}

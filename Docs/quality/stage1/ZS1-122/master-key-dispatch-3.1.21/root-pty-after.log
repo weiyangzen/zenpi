@@ -1,0 +1,26 @@
+{
+  "label": "after",
+  "argv": [
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-key-dispatch-integration-3.1.21/binaries/after-zenpi",
+    "--tui",
+    "--session",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-key-dispatch-integration-3.1.21/root-pty-after/sessions/initial.jsonl"
+  ],
+  "binary_sha256": "a4b24e76689e202dc009167e7c0b95612c98a287177c804c1ca35ff4207bff80",
+  "checks": {
+    "idle_hint": true,
+    "actual_command_palette_visible": true,
+    "menu_hint_present": false,
+    "menu_ctrl_g_preserves_draft_and_does_not_start_editor": true,
+    "dismissed_hint_restored": true,
+    "unicode_exact": true,
+    "kill_yank_exact": true,
+    "clean_exit": true,
+    "terminal_cleanup_sequences_observed": true,
+    "provider_requests_zero": true
+  },
+  "error": null,
+  "exit_code": 0,
+  "runtime_seconds": 5.029391667,
+  "scope": "Actual PTY bytes, wide footer, menu Ctrl-G, Escape, Unicode, Ctrl-U/Y/D. Super/Repeat/Release coverage is synthetic production Event dispatch only. Terminal cleanup bytes are observed; post-exit termios restore is not asserted on macOS (v1 ENOTTY)."
+}

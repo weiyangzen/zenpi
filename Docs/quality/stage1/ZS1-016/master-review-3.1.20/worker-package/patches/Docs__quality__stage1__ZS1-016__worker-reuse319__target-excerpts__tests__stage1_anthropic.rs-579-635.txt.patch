@@ -1,0 +1,62 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-579-635.txt b/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-579-635.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-579-635.txt
+@@ -0,0 +1,57 @@
++#[test]
++fn production_tool_continuation_and_restart_keep_signed_ordered_blocks() {
++    let temp = tempdir().unwrap();
++    let root = temp.path();
++    std::fs::create_dir(root.join("user")).unwrap();
++    std::fs::write(root.join("hello.txt"), "TOOL_FILE_BODY").unwrap();
++    let blocks = json!([thinking(),{"type":"redacted_thinking","data":"opaque-redacted"},text(),tool_block()]);
++    let (url, requests, h) = serve(vec![
++        (
++            "text/event-stream".into(),
++            sse(&events(blocks.as_array().unwrap().clone(), "tool_use")),
++        ),
++        (
++            "application/json".into(),
++            message(json!([text()]), "end_turn").to_string(),
++        ),
++        (
++            "application/json".into(),
++            message(json!([text()]), "end_turn").to_string(),
++        ),
++    ]);
++    std::fs::write(root.join("user/config.toml"),format!("backend='anthropic'\nbase_url='{url}'\nmodel='{MODEL}'\nmodel_reasoning_effort='high'\n")).unwrap();
++    {
++        let mut cli = Cli::start(root);
++        let r = cli
++            .send(json!({"type":"prompt","id":"one","text":"read hello","mode":"start_or_steer"}));
++        assert_eq!(r["success"], true, "{r}");
++    }
++    {
++        let mut cli = Cli::start(root);
++        let r =
++            cli.send(json!({"type":"prompt","id":"two","text":"continue","mode":"start_or_steer"}));
++        assert_eq!(r["success"], true, "{r}");
++    }
++    h.join().unwrap();
++    let requests = requests.lock().unwrap();
++    assert_eq!(requests.len(), 3);
++    for index in [1, 2] {
++        let m = requests[index].1["messages"].as_array().unwrap();
++        let a = m.iter().find(|m| m["role"] == "assistant").unwrap();
++        assert_eq!(a["content"], blocks);
++        assert!(m.iter().any(
++            |m| m["content"].as_array().is_some_and(|b| b.iter().any(|b| {
++                b["type"] == "tool_result"
++                    && b["content"]
++                        .as_str()
++                        .is_some_and(|s| s.contains("TOOL_FILE_BODY"))
++            }))
++        ));
++    }
++    let journal = std::fs::read_to_string(root.join("session.jsonl")).unwrap();
++    assert!(journal.contains("opaque-signature-fixture"));
++    assert!(journal.contains("opaque-redacted"));
++    assert!(!journal.contains("native-fixture-key"));
++}
++
++#[test]

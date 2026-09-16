@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/attachment-identity-integration/probe.py",
+    "--binary",
+    ".ops/stage1_execution/transcript-tail-integration/zenpi",
+    "--evidence",
+    ".ops/stage1_execution/attachment-identity-integration/before-entry.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:17:40.205406+00:00",
+  "elapsed_seconds": 0.661377708,
+  "exit_code": 1,
+  "log_sha256": "e685ad26efc54084357bf380aee91cce15693e787d30cc15fca5fa0ca30a454a",
+  "log_bytes": 662
+}

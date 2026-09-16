@@ -1,0 +1,860 @@
+{"label": "exact complete manifest", "passed": true}
+{"label": "readonly no symlinks", "passed": true}
+{"label": "formal current source", "passed": true}
+{"label": "version4 exact top level", "passed": true}
+{"label": "capture capture/zenpi/Cargo.lock", "passed": true}
+{"label": "capture capture/zenpi/Cargo.toml", "passed": true}
+{"label": "capture capture/zenpi/Docs/execution/active_requirement.json", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/file_learn_index.tsv", "passed": true}
+{"label": "capture capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/source_manifest.tsv", "passed": true}
+{"label": "capture capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md", "passed": true}
+{"label": "capture capture/zenpi/vendor/crossterm/Cargo.toml", "passed": true}
+{"label": "capture capture/zenpi/vendor/crossterm/Cargo.toml.orig", "passed": true}
+{"label": "10 read bindings", "passed": true}
+{"label": "read reads/001.txt", "passed": true}
+{"label": "read reads/002.txt", "passed": true}
+{"label": "read reads/003.txt", "passed": true}
+{"label": "read reads/004.txt", "passed": true}
+{"label": "read reads/005.txt", "passed": true}
+{"label": "read reads/006.txt", "passed": true}
+{"label": "read reads/007.txt", "passed": true}
+{"label": "read reads/008.txt", "passed": true}
+{"label": "read reads/009.txt", "passed": true}
+{"label": "read reads/010.txt", "passed": true}
+{"label": "full bound read capture/zenpi/Cargo.lock", "passed": true}
+{"label": "full bound read history/inherited-worker-report.md", "passed": true}
+{"label": "full bound read capture/zenpi/Cargo.toml", "passed": true}
+{"label": "full bound read capture/zenpi/vendor/crossterm/Cargo.toml", "passed": true}
+{"label": "full bound read capture/zenpi/vendor/crossterm/Cargo.toml.orig", "passed": true}
+{"label": "six current chunks", "passed": true}
+{"label": "196 exact package records", "passed": true}
+{"label": "197 continuous units", "passed": true}
+{"label": "unit header", "passed": true}
+{"label": "unit P001", "passed": true}
+{"label": "unit P002", "passed": true}
+{"label": "unit P003", "passed": true}
+{"label": "unit P004", "passed": true}
+{"label": "unit P005", "passed": true}
+{"label": "unit P006", "passed": true}
+{"label": "unit P007", "passed": true}
+{"label": "unit P008", "passed": true}
+{"label": "unit P009", "passed": true}
+{"label": "unit P010", "passed": true}
+{"label": "unit P011", "passed": true}
+{"label": "unit P012", "passed": true}
+{"label": "unit P013", "passed": true}
+{"label": "unit P014", "passed": true}
+{"label": "unit P015", "passed": true}
+{"label": "unit P016", "passed": true}
+{"label": "unit P017", "passed": true}
+{"label": "unit P018", "passed": true}
+{"label": "unit P019", "passed": true}
+{"label": "unit P020", "passed": true}
+{"label": "unit P021", "passed": true}
+{"label": "unit P022", "passed": true}
+{"label": "unit P023", "passed": true}
+{"label": "unit P024", "passed": true}
+{"label": "unit P025", "passed": true}
+{"label": "unit P026", "passed": true}
+{"label": "unit P027", "passed": true}
+{"label": "unit P028", "passed": true}
+{"label": "unit P029", "passed": true}
+{"label": "unit P030", "passed": true}
+{"label": "unit P031", "passed": true}
+{"label": "unit P032", "passed": true}
+{"label": "unit P033", "passed": true}
+{"label": "unit P034", "passed": true}
+{"label": "unit P035", "passed": true}
+{"label": "unit P036", "passed": true}
+{"label": "unit P037", "passed": true}
+{"label": "unit P038", "passed": true}
+{"label": "unit P039", "passed": true}
+{"label": "unit P040", "passed": true}
+{"label": "unit P041", "passed": true}
+{"label": "unit P042", "passed": true}
+{"label": "unit P043", "passed": true}
+{"label": "unit P044", "passed": true}
+{"label": "unit P045", "passed": true}
+{"label": "unit P046", "passed": true}
+{"label": "unit P047", "passed": true}
+{"label": "unit P048", "passed": true}
+{"label": "unit P049", "passed": true}
+{"label": "unit P050", "passed": true}
+{"label": "unit P051", "passed": true}
+{"label": "unit P052", "passed": true}
+{"label": "unit P053", "passed": true}
+{"label": "unit P054", "passed": true}
+{"label": "unit P055", "passed": true}
+{"label": "unit P056", "passed": true}
+{"label": "unit P057", "passed": true}
+{"label": "unit P058", "passed": true}
+{"label": "unit P059", "passed": true}
+{"label": "unit P060", "passed": true}
+{"label": "unit P061", "passed": true}
+{"label": "unit P062", "passed": true}
+{"label": "unit P063", "passed": true}
+{"label": "unit P064", "passed": true}
+{"label": "unit P065", "passed": true}
+{"label": "unit P066", "passed": true}
+{"label": "unit P067", "passed": true}
+{"label": "unit P068", "passed": true}
+{"label": "unit P069", "passed": true}
+{"label": "unit P070", "passed": true}
+{"label": "unit P071", "passed": true}
+{"label": "unit P072", "passed": true}
+{"label": "unit P073", "passed": true}
+{"label": "unit P074", "passed": true}
+{"label": "unit P075", "passed": true}
+{"label": "unit P076", "passed": true}
+{"label": "unit P077", "passed": true}
+{"label": "unit P078", "passed": true}
+{"label": "unit P079", "passed": true}
+{"label": "unit P080", "passed": true}
+{"label": "unit P081", "passed": true}
+{"label": "unit P082", "passed": true}
+{"label": "unit P083", "passed": true}
+{"label": "unit P084", "passed": true}
+{"label": "unit P085", "passed": true}
+{"label": "unit P086", "passed": true}
+{"label": "unit P087", "passed": true}
+{"label": "unit P088", "passed": true}
+{"label": "unit P089", "passed": true}
+{"label": "unit P090", "passed": true}
+{"label": "unit P091", "passed": true}
+{"label": "unit P092", "passed": true}
+{"label": "unit P093", "passed": true}
+{"label": "unit P094", "passed": true}
+{"label": "unit P095", "passed": true}
+{"label": "unit P096", "passed": true}
+{"label": "unit P097", "passed": true}
+{"label": "unit P098", "passed": true}
+{"label": "unit P099", "passed": true}
+{"label": "unit P100", "passed": true}
+{"label": "unit P101", "passed": true}
+{"label": "unit P102", "passed": true}
+{"label": "unit P103", "passed": true}
+{"label": "unit P104", "passed": true}
+{"label": "unit P105", "passed": true}
+{"label": "unit P106", "passed": true}
+{"label": "unit P107", "passed": true}
+{"label": "unit P108", "passed": true}
+{"label": "unit P109", "passed": true}
+{"label": "unit P110", "passed": true}
+{"label": "unit P111", "passed": true}
+{"label": "unit P112", "passed": true}
+{"label": "unit P113", "passed": true}
+{"label": "unit P114", "passed": true}
+{"label": "unit P115", "passed": true}
+{"label": "unit P116", "passed": true}
+{"label": "unit P117", "passed": true}
+{"label": "unit P118", "passed": true}
+{"label": "unit P119", "passed": true}
+{"label": "unit P120", "passed": true}
+{"label": "unit P121", "passed": true}
+{"label": "unit P122", "passed": true}
+{"label": "unit P123", "passed": true}
+{"label": "unit P124", "passed": true}
+{"label": "unit P125", "passed": true}
+{"label": "unit P126", "passed": true}
+{"label": "unit P127", "passed": true}
+{"label": "unit P128", "passed": true}
+{"label": "unit P129", "passed": true}
+{"label": "unit P130", "passed": true}
+{"label": "unit P131", "passed": true}
+{"label": "unit P132", "passed": true}
+{"label": "unit P133", "passed": true}
+{"label": "unit P134", "passed": true}
+{"label": "unit P135", "passed": true}
+{"label": "unit P136", "passed": true}
+{"label": "unit P137", "passed": true}
+{"label": "unit P138", "passed": true}
+{"label": "unit P139", "passed": true}
+{"label": "unit P140", "passed": true}
+{"label": "unit P141", "passed": true}
+{"label": "unit P142", "passed": true}
+{"label": "unit P143", "passed": true}
+{"label": "unit P144", "passed": true}
+{"label": "unit P145", "passed": true}
+{"label": "unit P146", "passed": true}
+{"label": "unit P147", "passed": true}
+{"label": "unit P148", "passed": true}
+{"label": "unit P149", "passed": true}
+{"label": "unit P150", "passed": true}
+{"label": "unit P151", "passed": true}
+{"label": "unit P152", "passed": true}
+{"label": "unit P153", "passed": true}
+{"label": "unit P154", "passed": true}
+{"label": "unit P155", "passed": true}
+{"label": "unit P156", "passed": true}
+{"label": "unit P157", "passed": true}
+{"label": "unit P158", "passed": true}
+{"label": "unit P159", "passed": true}
+{"label": "unit P160", "passed": true}
+{"label": "unit P161", "passed": true}
+{"label": "unit P162", "passed": true}
+{"label": "unit P163", "passed": true}
+{"label": "unit P164", "passed": true}
+{"label": "unit P165", "passed": true}
+{"label": "unit P166", "passed": true}
+{"label": "unit P167", "passed": true}
+{"label": "unit P168", "passed": true}
+{"label": "unit P169", "passed": true}
+{"label": "unit P170", "passed": true}
+{"label": "unit P171", "passed": true}
+{"label": "unit P172", "passed": true}
+{"label": "unit P173", "passed": true}
+{"label": "unit P174", "passed": true}
+{"label": "unit P175", "passed": true}
+{"label": "unit P176", "passed": true}
+{"label": "unit P177", "passed": true}
+{"label": "unit P178", "passed": true}
+{"label": "unit P179", "passed": true}
+{"label": "unit P180", "passed": true}
+{"label": "unit P181", "passed": true}
+{"label": "unit P182", "passed": true}
+{"label": "unit P183", "passed": true}
+{"label": "unit P184", "passed": true}
+{"label": "unit P185", "passed": true}
+{"label": "unit P186", "passed": true}
+{"label": "unit P187", "passed": true}
+{"label": "unit P188", "passed": true}
+{"label": "unit P189", "passed": true}
+{"label": "unit P190", "passed": true}
+{"label": "unit P191", "passed": true}
+{"label": "unit P192", "passed": true}
+{"label": "unit P193", "passed": true}
+{"label": "unit P194", "passed": true}
+{"label": "unit P195", "passed": true}
+{"label": "unit P196", "passed": true}
+{"label": "package binding P001", "passed": true}
+{"label": "package binding P002", "passed": true}
+{"label": "package binding P003", "passed": true}
+{"label": "package binding P004", "passed": true}
+{"label": "package binding P005", "passed": true}
+{"label": "package binding P006", "passed": true}
+{"label": "package binding P007", "passed": true}
+{"label": "package binding P008", "passed": true}
+{"label": "package binding P009", "passed": true}
+{"label": "package binding P010", "passed": true}
+{"label": "package binding P011", "passed": true}
+{"label": "package binding P012", "passed": true}
+{"label": "package binding P013", "passed": true}
+{"label": "package binding P014", "passed": true}
+{"label": "package binding P015", "passed": true}
+{"label": "package binding P016", "passed": true}
+{"label": "package binding P017", "passed": true}
+{"label": "package binding P018", "passed": true}
+{"label": "package binding P019", "passed": true}
+{"label": "package binding P020", "passed": true}
+{"label": "package binding P021", "passed": true}
+{"label": "package binding P022", "passed": true}
+{"label": "package binding P023", "passed": true}
+{"label": "package binding P024", "passed": true}
+{"label": "package binding P025", "passed": true}
+{"label": "package binding P026", "passed": true}
+{"label": "package binding P027", "passed": true}
+{"label": "package binding P028", "passed": true}
+{"label": "package binding P029", "passed": true}
+{"label": "package binding P030", "passed": true}
+{"label": "package binding P031", "passed": true}
+{"label": "package binding P032", "passed": true}
+{"label": "package binding P033", "passed": true}
+{"label": "package binding P034", "passed": true}
+{"label": "package binding P035", "passed": true}
+{"label": "package binding P036", "passed": true}
+{"label": "package binding P037", "passed": true}
+{"label": "package binding P038", "passed": true}
+{"label": "package binding P039", "passed": true}
+{"label": "package binding P040", "passed": true}
+{"label": "package binding P041", "passed": true}
+{"label": "package binding P042", "passed": true}
+{"label": "package binding P043", "passed": true}
+{"label": "package binding P044", "passed": true}
+{"label": "package binding P045", "passed": true}
+{"label": "package binding P046", "passed": true}
+{"label": "package binding P047", "passed": true}
+{"label": "package binding P048", "passed": true}
+{"label": "package binding P049", "passed": true}
+{"label": "package binding P050", "passed": true}
+{"label": "package binding P051", "passed": true}
+{"label": "package binding P052", "passed": true}
+{"label": "package binding P053", "passed": true}
+{"label": "package binding P054", "passed": true}
+{"label": "package binding P055", "passed": true}
+{"label": "package binding P056", "passed": true}
+{"label": "package binding P057", "passed": true}
+{"label": "package binding P058", "passed": true}
+{"label": "package binding P059", "passed": true}
+{"label": "package binding P060", "passed": true}
+{"label": "package binding P061", "passed": true}
+{"label": "package binding P062", "passed": true}
+{"label": "package binding P063", "passed": true}
+{"label": "package binding P064", "passed": true}
+{"label": "package binding P065", "passed": true}
+{"label": "package binding P066", "passed": true}
+{"label": "package binding P067", "passed": true}
+{"label": "package binding P068", "passed": true}
+{"label": "package binding P069", "passed": true}
+{"label": "package binding P070", "passed": true}
+{"label": "package binding P071", "passed": true}
+{"label": "package binding P072", "passed": true}
+{"label": "package binding P073", "passed": true}
+{"label": "package binding P074", "passed": true}
+{"label": "package binding P075", "passed": true}
+{"label": "package binding P076", "passed": true}
+{"label": "package binding P077", "passed": true}
+{"label": "package binding P078", "passed": true}
+{"label": "package binding P079", "passed": true}
+{"label": "package binding P080", "passed": true}
+{"label": "package binding P081", "passed": true}
+{"label": "package binding P082", "passed": true}
+{"label": "package binding P083", "passed": true}
+{"label": "package binding P084", "passed": true}
+{"label": "package binding P085", "passed": true}
+{"label": "package binding P086", "passed": true}
+{"label": "package binding P087", "passed": true}
+{"label": "package binding P088", "passed": true}
+{"label": "package binding P089", "passed": true}
+{"label": "package binding P090", "passed": true}
+{"label": "package binding P091", "passed": true}
+{"label": "package binding P092", "passed": true}
+{"label": "package binding P093", "passed": true}
+{"label": "package binding P094", "passed": true}
+{"label": "package binding P095", "passed": true}
+{"label": "package binding P096", "passed": true}
+{"label": "package binding P097", "passed": true}
+{"label": "package binding P098", "passed": true}
+{"label": "package binding P099", "passed": true}
+{"label": "package binding P100", "passed": true}
+{"label": "package binding P101", "passed": true}
+{"label": "package binding P102", "passed": true}
+{"label": "package binding P103", "passed": true}
+{"label": "package binding P104", "passed": true}
+{"label": "package binding P105", "passed": true}
+{"label": "package binding P106", "passed": true}
+{"label": "package binding P107", "passed": true}
+{"label": "package binding P108", "passed": true}
+{"label": "package binding P109", "passed": true}
+{"label": "package binding P110", "passed": true}
+{"label": "package binding P111", "passed": true}
+{"label": "package binding P112", "passed": true}
+{"label": "package binding P113", "passed": true}
+{"label": "package binding P114", "passed": true}
+{"label": "package binding P115", "passed": true}
+{"label": "package binding P116", "passed": true}
+{"label": "package binding P117", "passed": true}
+{"label": "package binding P118", "passed": true}
+{"label": "package binding P119", "passed": true}
+{"label": "package binding P120", "passed": true}
+{"label": "package binding P121", "passed": true}
+{"label": "package binding P122", "passed": true}
+{"label": "package binding P123", "passed": true}
+{"label": "package binding P124", "passed": true}
+{"label": "package binding P125", "passed": true}
+{"label": "package binding P126", "passed": true}
+{"label": "package binding P127", "passed": true}
+{"label": "package binding P128", "passed": true}
+{"label": "package binding P129", "passed": true}
+{"label": "package binding P130", "passed": true}
+{"label": "package binding P131", "passed": true}
+{"label": "package binding P132", "passed": true}
+{"label": "package binding P133", "passed": true}
+{"label": "package binding P134", "passed": true}
+{"label": "package binding P135", "passed": true}
+{"label": "package binding P136", "passed": true}
+{"label": "package binding P137", "passed": true}
+{"label": "package binding P138", "passed": true}
+{"label": "package binding P139", "passed": true}
+{"label": "package binding P140", "passed": true}
+{"label": "package binding P141", "passed": true}
+{"label": "package binding P142", "passed": true}
+{"label": "package binding P143", "passed": true}
+{"label": "package binding P144", "passed": true}
+{"label": "package binding P145", "passed": true}
+{"label": "package binding P146", "passed": true}
+{"label": "package binding P147", "passed": true}
+{"label": "package binding P148", "passed": true}
+{"label": "package binding P149", "passed": true}
+{"label": "package binding P150", "passed": true}
+{"label": "package binding P151", "passed": true}
+{"label": "package binding P152", "passed": true}
+{"label": "package binding P153", "passed": true}
+{"label": "package binding P154", "passed": true}
+{"label": "package binding P155", "passed": true}
+{"label": "package binding P156", "passed": true}
+{"label": "package binding P157", "passed": true}
+{"label": "package binding P158", "passed": true}
+{"label": "package binding P159", "passed": true}
+{"label": "package binding P160", "passed": true}
+{"label": "package binding P161", "passed": true}
+{"label": "package binding P162", "passed": true}
+{"label": "package binding P163", "passed": true}
+{"label": "package binding P164", "passed": true}
+{"label": "package binding P165", "passed": true}
+{"label": "package binding P166", "passed": true}
+{"label": "package binding P167", "passed": true}
+{"label": "package binding P168", "passed": true}
+{"label": "package binding P169", "passed": true}
+{"label": "package binding P170", "passed": true}
+{"label": "package binding P171", "passed": true}
+{"label": "package binding P172", "passed": true}
+{"label": "package binding P173", "passed": true}
+{"label": "package binding P174", "passed": true}
+{"label": "package binding P175", "passed": true}
+{"label": "package binding P176", "passed": true}
+{"label": "package binding P177", "passed": true}
+{"label": "package binding P178", "passed": true}
+{"label": "package binding P179", "passed": true}
+{"label": "package binding P180", "passed": true}
+{"label": "package binding P181", "passed": true}
+{"label": "package binding P182", "passed": true}
+{"label": "package binding P183", "passed": true}
+{"label": "package binding P184", "passed": true}
+{"label": "package binding P185", "passed": true}
+{"label": "package binding P186", "passed": true}
+{"label": "package binding P187", "passed": true}
+{"label": "package binding P188", "passed": true}
+{"label": "package binding P189", "passed": true}
+{"label": "package binding P190", "passed": true}
+{"label": "package binding P191", "passed": true}
+{"label": "package binding P192", "passed": true}
+{"label": "package binding P193", "passed": true}
+{"label": "package binding P194", "passed": true}
+{"label": "package binding P195", "passed": true}
+{"label": "package binding P196", "passed": true}
+{"label": "194 registry checksums syntax only", "passed": true}
+{"label": "two source-less entries", "passed": true}
+{"label": "191 names five duplicate groups", "passed": true}
+{"label": "resolve P002 memchr", "passed": true}
+{"label": "resolve P004 num-traits", "passed": true}
+{"label": "resolve P008 generic-array", "passed": true}
+{"label": "resolve P009 memchr", "passed": true}
+{"label": "resolve P009 serde_core", "passed": true}
+{"label": "resolve P012 rustversion", "passed": true}
+{"label": "resolve P013 find-msvc-tools", "passed": true}
+{"label": "resolve P013 shlex", "passed": true}
+{"label": "resolve P015 castaway", "passed": true}
+{"label": "resolve P015 cfg-if", "passed": true}
+{"label": "resolve P015 itoa", "passed": true}
+{"label": "resolve P015 rustversion", "passed": true}
+{"label": "resolve P015 ryu", "passed": true}
+{"label": "resolve P015 static_assertions", "passed": true}
+{"label": "resolve P016 unicode-segmentation", "passed": true}
+{"label": "resolve P017 percent-encoding", "passed": true}
+{"label": "resolve P017 time", "passed": true}
+{"label": "resolve P017 version_check", "passed": true}
+{"label": "resolve P018 cookie", "passed": true}
+{"label": "resolve P018 document-features", "passed": true}
+{"label": "resolve P018 idna", "passed": true}
+{"label": "resolve P018 indexmap", "passed": true}
+{"label": "resolve P018 log", "passed": true}
+{"label": "resolve P018 serde", "passed": true}
+{"label": "resolve P018 serde_derive", "passed": true}
+{"label": "resolve P018 serde_json", "passed": true}
+{"label": "resolve P018 time", "passed": true}
+{"label": "resolve P018 url", "passed": true}
+{"label": "resolve P019 libc", "passed": true}
+{"label": "resolve P020 cfg-if", "passed": true}
+{"label": "resolve P021 crossbeam-epoch", "passed": true}
+{"label": "resolve P021 crossbeam-utils", "passed": true}
+{"label": "resolve P022 crossbeam-utils", "passed": true}
+{"label": "resolve P024 bitflags", "passed": true}
+{"label": "resolve P024 crossterm_winapi", "passed": true}
+{"label": "resolve P024 derive_more", "passed": true}
+{"label": "resolve P024 document-features", "passed": true}
+{"label": "resolve P024 mio", "passed": true}
+{"label": "resolve P024 parking_lot", "passed": true}
+{"label": "resolve P024 rustix", "passed": true}
+{"label": "resolve P024 signal-hook", "passed": true}
+{"label": "resolve P024 signal-hook-mio", "passed": true}
+{"label": "resolve P024 winapi", "passed": true}
+{"label": "resolve P025 winapi", "passed": true}
+{"label": "resolve P026 generic-array", "passed": true}
+{"label": "resolve P026 typenum", "passed": true}
+{"label": "resolve P027 darling_core", "passed": true}
+{"label": "resolve P027 darling_macro", "passed": true}
+{"label": "resolve P028 fnv", "passed": true}
+{"label": "resolve P028 ident_case", "passed": true}
+{"label": "resolve P028 proc-macro2", "passed": true}
+{"label": "resolve P028 quote", "passed": true}
+{"label": "resolve P028 strsim", "passed": true}
+{"label": "resolve P028 syn 2.0.119", "passed": true}
+{"label": "resolve P029 darling_core", "passed": true}
+{"label": "resolve P029 quote", "passed": true}
+{"label": "resolve P029 syn 2.0.119", "passed": true}
+{"label": "resolve P031 derive_more-impl", "passed": true}
+{"label": "resolve P032 convert_case", "passed": true}
+{"label": "resolve P032 proc-macro2", "passed": true}
+{"label": "resolve P032 quote", "passed": true}
+{"label": "resolve P032 rustc_version", "passed": true}
+{"label": "resolve P032 syn 2.0.119", "passed": true}
+{"label": "resolve P033 block-buffer", "passed": true}
+{"label": "resolve P033 crypto-common", "passed": true}
+{"label": "resolve P034 proc-macro2", "passed": true}
+{"label": "resolve P034 quote", "passed": true}
+{"label": "resolve P034 syn 3.0.4", "passed": true}
+{"label": "resolve P035 litrs", "passed": true}
+{"label": "resolve P038 libc", "passed": true}
+{"label": "resolve P038 windows-sys 0.61.2", "passed": true}
+{"label": "resolve P041 crc32fast", "passed": true}
+{"label": "resolve P041 miniz_oxide", "passed": true}
+{"label": "resolve P041 zlib-rs", "passed": true}
+{"label": "resolve P044 percent-encoding", "passed": true}
+{"label": "resolve P045 typenum", "passed": true}
+{"label": "resolve P045 version_check", "passed": true}
+{"label": "resolve P046 cfg-if", "passed": true}
+{"label": "resolve P046 libc", "passed": true}
+{"label": "resolve P046 wasi", "passed": true}
+{"label": "resolve P047 cfg-if", "passed": true}
+{"label": "resolve P047 libc", "passed": true}
+{"label": "resolve P047 r-efi", "passed": true}
+{"label": "resolve P048 aho-corasick", "passed": true}
+{"label": "resolve P048 bstr", "passed": true}
+{"label": "resolve P048 log", "passed": true}
+{"label": "resolve P048 regex-automata", "passed": true}
+{"label": "resolve P048 regex-syntax", "passed": true}
+{"label": "resolve P049 allocator-api2", "passed": true}
+{"label": "resolve P049 equivalent", "passed": true}
+{"label": "resolve P049 foldhash", "passed": true}
+{"label": "resolve P050 allocator-api2", "passed": true}
+{"label": "resolve P050 equivalent", "passed": true}
+{"label": "resolve P050 foldhash", "passed": true}
+{"label": "resolve P052 bytes", "passed": true}
+{"label": "resolve P052 itoa", "passed": true}
+{"label": "resolve P055 displaydoc", "passed": true}
+{"label": "resolve P055 potential_utf", "passed": true}
+{"label": "resolve P055 yoke", "passed": true}
+{"label": "resolve P055 zerofrom", "passed": true}
+{"label": "resolve P055 zerovec", "passed": true}
+{"label": "resolve P056 displaydoc", "passed": true}
+{"label": "resolve P056 litemap", "passed": true}
+{"label": "resolve P056 tinystr", "passed": true}
+{"label": "resolve P056 writeable", "passed": true}
+{"label": "resolve P056 zerovec", "passed": true}
+{"label": "resolve P057 icu_collections", "passed": true}
+{"label": "resolve P057 icu_normalizer_data", "passed": true}
+{"label": "resolve P057 icu_properties", "passed": true}
+{"label": "resolve P057 icu_provider", "passed": true}
+{"label": "resolve P057 smallvec", "passed": true}
+{"label": "resolve P057 zerovec", "passed": true}
+{"label": "resolve P059 icu_collections", "passed": true}
+{"label": "resolve P059 icu_locale_core", "passed": true}
+{"label": "resolve P059 icu_properties_data", "passed": true}
+{"label": "resolve P059 icu_provider", "passed": true}
+{"label": "resolve P059 zerotrie", "passed": true}
+{"label": "resolve P059 zerovec", "passed": true}
+{"label": "resolve P061 displaydoc", "passed": true}
+{"label": "resolve P061 icu_locale_core", "passed": true}
+{"label": "resolve P061 writeable", "passed": true}
+{"label": "resolve P061 yoke", "passed": true}
+{"label": "resolve P061 zerofrom", "passed": true}
+{"label": "resolve P061 zerotrie", "passed": true}
+{"label": "resolve P061 zerovec", "passed": true}
+{"label": "resolve P063 idna_adapter", "passed": true}
+{"label": "resolve P063 smallvec", "passed": true}
+{"label": "resolve P063 utf8_iter", "passed": true}
+{"label": "resolve P064 icu_normalizer", "passed": true}
+{"label": "resolve P064 icu_properties", "passed": true}
+{"label": "resolve P065 crossbeam-deque", "passed": true}
+{"label": "resolve P065 globset", "passed": true}
+{"label": "resolve P065 log", "passed": true}
+{"label": "resolve P065 memchr", "passed": true}
+{"label": "resolve P065 regex-automata", "passed": true}
+{"label": "resolve P065 same-file", "passed": true}
+{"label": "resolve P065 walkdir", "passed": true}
+{"label": "resolve P065 winapi-util", "passed": true}
+{"label": "resolve P066 equivalent", "passed": true}
+{"label": "resolve P066 hashbrown 0.17.1", "passed": true}
+{"label": "resolve P067 rustversion", "passed": true}
+{"label": "resolve P068 darling", "passed": true}
+{"label": "resolve P068 indoc", "passed": true}
+{"label": "resolve P068 proc-macro2", "passed": true}
+{"label": "resolve P068 quote", "passed": true}
+{"label": "resolve P068 syn 2.0.119", "passed": true}
+{"label": "resolve P069 either", "passed": true}
+{"label": "resolve P071 hashbrown 0.16.1", "passed": true}
+{"label": "resolve P071 portable-atomic", "passed": true}
+{"label": "resolve P071 thiserror", "passed": true}
+{"label": "resolve P075 bitflags", "passed": true}
+{"label": "resolve P079 scopeguard", "passed": true}
+{"label": "resolve P081 hashbrown 0.17.1", "passed": true}
+{"label": "resolve P083 adler2", "passed": true}
+{"label": "resolve P083 simd-adler32", "passed": true}
+{"label": "resolve P084 libc", "passed": true}
+{"label": "resolve P084 log", "passed": true}
+{"label": "resolve P084 wasi", "passed": true}
+{"label": "resolve P084 windows-sys 0.61.2", "passed": true}
+{"label": "resolve P086 autocfg", "passed": true}
+{"label": "resolve P087 libc", "passed": true}
+{"label": "resolve P089 approx", "passed": true}
+{"label": "resolve P089 libm", "passed": true}
+{"label": "resolve P089 palette_derive", "passed": true}
+{"label": "resolve P089 palette_math", "passed": true}
+{"label": "resolve P090 by_address", "passed": true}
+{"label": "resolve P090 proc-macro2", "passed": true}
+{"label": "resolve P090 quote", "passed": true}
+{"label": "resolve P090 syn 2.0.119", "passed": true}
+{"label": "resolve P091 libm", "passed": true}
+{"label": "resolve P092 lock_api", "passed": true}
+{"label": "resolve P092 parking_lot_core", "passed": true}
+{"label": "resolve P093 cfg-if", "passed": true}
+{"label": "resolve P093 libc", "passed": true}
+{"label": "resolve P093 redox_syscall", "passed": true}
+{"label": "resolve P093 smallvec", "passed": true}
+{"label": "resolve P093 windows-link", "passed": true}
+{"label": "resolve P096 zerovec", "passed": true}
+{"label": "resolve P098 unicode-ident", "passed": true}
+{"label": "resolve P099 proc-macro2", "passed": true}
+{"label": "resolve P101 instability", "passed": true}
+{"label": "resolve P101 ratatui-core", "passed": true}
+{"label": "resolve P101 ratatui-crossterm", "passed": true}
+{"label": "resolve P101 ratatui-widgets", "passed": true}
+{"label": "resolve P101 serde", "passed": true}
+{"label": "resolve P102 bitflags", "passed": true}
+{"label": "resolve P102 compact_str", "passed": true}
+{"label": "resolve P102 hashbrown 0.17.1", "passed": true}
+{"label": "resolve P102 itertools", "passed": true}
+{"label": "resolve P102 kasuari", "passed": true}
+{"label": "resolve P102 lru", "passed": true}
+{"label": "resolve P102 palette", "passed": true}
+{"label": "resolve P102 serde", "passed": true}
+{"label": "resolve P102 strum", "passed": true}
+{"label": "resolve P102 thiserror", "passed": true}
+{"label": "resolve P102 unicode-segmentation", "passed": true}
+{"label": "resolve P102 unicode-truncate", "passed": true}
+{"label": "resolve P102 unicode-width", "passed": true}
+{"label": "resolve P103 cfg-if", "passed": true}
+{"label": "resolve P103 crossterm", "passed": true}
+{"label": "resolve P103 instability", "passed": true}
+{"label": "resolve P103 ratatui-core", "passed": true}
+{"label": "resolve P104 bitflags", "passed": true}
+{"label": "resolve P104 hashbrown 0.17.1", "passed": true}
+{"label": "resolve P104 indoc", "passed": true}
+{"label": "resolve P104 instability", "passed": true}
+{"label": "resolve P104 itertools", "passed": true}
+{"label": "resolve P104 line-clipping", "passed": true}
+{"label": "resolve P104 ratatui-core", "passed": true}
+{"label": "resolve P104 serde", "passed": true}
+{"label": "resolve P104 strum", "passed": true}
+{"label": "resolve P104 time", "passed": true}
+{"label": "resolve P104 unicode-segmentation", "passed": true}
+{"label": "resolve P104 unicode-width", "passed": true}
+{"label": "resolve P105 bitflags", "passed": true}
+{"label": "resolve P106 aho-corasick", "passed": true}
+{"label": "resolve P106 memchr", "passed": true}
+{"label": "resolve P106 regex-syntax", "passed": true}
+{"label": "resolve P108 cc", "passed": true}
+{"label": "resolve P108 cfg-if", "passed": true}
+{"label": "resolve P108 getrandom 0.2.17", "passed": true}
+{"label": "resolve P108 libc", "passed": true}
+{"label": "resolve P108 untrusted", "passed": true}
+{"label": "resolve P108 windows-sys 0.52.0", "passed": true}
+{"label": "resolve P109 semver", "passed": true}
+{"label": "resolve P110 bitflags", "passed": true}
+{"label": "resolve P110 errno", "passed": true}
+{"label": "resolve P110 libc", "passed": true}
+{"label": "resolve P110 linux-raw-sys", "passed": true}
+{"label": "resolve P110 windows-sys 0.61.2", "passed": true}
+{"label": "resolve P111 log", "passed": true}
+{"label": "resolve P111 once_cell", "passed": true}
+{"label": "resolve P111 ring", "passed": true}
+{"label": "resolve P111 rustls-pki-types", "passed": true}
+{"label": "resolve P111 rustls-webpki", "passed": true}
+{"label": "resolve P111 subtle", "passed": true}
+{"label": "resolve P111 zeroize", "passed": true}
+{"label": "resolve P112 zeroize", "passed": true}
+{"label": "resolve P113 ring", "passed": true}
+{"label": "resolve P113 rustls-pki-types", "passed": true}
+{"label": "resolve P113 untrusted", "passed": true}
+{"label": "resolve P116 winapi-util", "passed": true}
+{"label": "resolve P119 serde_core", "passed": true}
+{"label": "resolve P119 serde_derive", "passed": true}
+{"label": "resolve P120 serde_derive", "passed": true}
+{"label": "resolve P121 proc-macro2", "passed": true}
+{"label": "resolve P121 quote", "passed": true}
+{"label": "resolve P121 syn 3.0.4", "passed": true}
+{"label": "resolve P122 itoa", "passed": true}
+{"label": "resolve P122 memchr", "passed": true}
+{"label": "resolve P122 serde", "passed": true}
+{"label": "resolve P122 serde_core", "passed": true}
+{"label": "resolve P122 zmij", "passed": true}
+{"label": "resolve P123 serde_core", "passed": true}
+{"label": "resolve P124 cfg-if", "passed": true}
+{"label": "resolve P124 cpufeatures", "passed": true}
+{"label": "resolve P124 digest", "passed": true}
+{"label": "resolve P126 libc", "passed": true}
+{"label": "resolve P126 signal-hook-registry", "passed": true}
+{"label": "resolve P127 libc", "passed": true}
+{"label": "resolve P127 mio", "passed": true}
+{"label": "resolve P127 signal-hook", "passed": true}
+{"label": "resolve P128 errno", "passed": true}
+{"label": "resolve P128 libc", "passed": true}
+{"label": "resolve P134 strum_macros", "passed": true}
+{"label": "resolve P135 heck", "passed": true}
+{"label": "resolve P135 proc-macro2", "passed": true}
+{"label": "resolve P135 quote", "passed": true}
+{"label": "resolve P135 syn 2.0.119", "passed": true}
+{"label": "resolve P137 proc-macro2", "passed": true}
+{"label": "resolve P137 quote", "passed": true}
+{"label": "resolve P137 unicode-ident", "passed": true}
+{"label": "resolve P138 proc-macro2", "passed": true}
+{"label": "resolve P138 quote", "passed": true}
+{"label": "resolve P138 unicode-ident", "passed": true}
+{"label": "resolve P139 proc-macro2", "passed": true}
+{"label": "resolve P139 quote", "passed": true}
+{"label": "resolve P139 syn 2.0.119", "passed": true}
+{"label": "resolve P140 fastrand", "passed": true}
+{"label": "resolve P140 getrandom 0.4.3", "passed": true}
+{"label": "resolve P140 once_cell", "passed": true}
+{"label": "resolve P140 rustix", "passed": true}
+{"label": "resolve P140 windows-sys 0.61.2", "passed": true}
+{"label": "resolve P141 thiserror-impl", "passed": true}
+{"label": "resolve P142 proc-macro2", "passed": true}
+{"label": "resolve P142 quote", "passed": true}
+{"label": "resolve P142 syn 3.0.4", "passed": true}
+{"label": "resolve P143 deranged", "passed": true}
+{"label": "resolve P143 libc", "passed": true}
+{"label": "resolve P143 num-conv", "passed": true}
+{"label": "resolve P143 num_threads", "passed": true}
+{"label": "resolve P143 powerfmt", "passed": true}
+{"label": "resolve P143 serde_core", "passed": true}
+{"label": "resolve P143 time-core", "passed": true}
+{"label": "resolve P143 time-macros", "passed": true}
+{"label": "resolve P145 num-conv", "passed": true}
+{"label": "resolve P145 time-core", "passed": true}
+{"label": "resolve P146 displaydoc", "passed": true}
+{"label": "resolve P146 zerovec", "passed": true}
+{"label": "resolve P147 indexmap", "passed": true}
+{"label": "resolve P147 serde_core", "passed": true}
+{"label": "resolve P147 serde_spanned", "passed": true}
+{"label": "resolve P147 toml_datetime", "passed": true}
+{"label": "resolve P147 toml_parser", "passed": true}
+{"label": "resolve P147 toml_writer", "passed": true}
+{"label": "resolve P147 winnow 0.7.15", "passed": true}
+{"label": "resolve P148 serde_core", "passed": true}
+{"label": "resolve P149 winnow 1.0.4", "passed": true}
+{"label": "resolve P154 itertools", "passed": true}
+{"label": "resolve P154 unicode-segmentation", "passed": true}
+{"label": "resolve P154 unicode-width", "passed": true}
+{"label": "resolve P157 base64", "passed": true}
+{"label": "resolve P157 cookie_store", "passed": true}
+{"label": "resolve P157 flate2", "passed": true}
+{"label": "resolve P157 log", "passed": true}
+{"label": "resolve P157 percent-encoding", "passed": true}
+{"label": "resolve P157 rustls", "passed": true}
+{"label": "resolve P157 rustls-pki-types", "passed": true}
+{"label": "resolve P157 serde", "passed": true}
+{"label": "resolve P157 serde_json", "passed": true}
+{"label": "resolve P157 ureq-proto", "passed": true}
+{"label": "resolve P157 utf8-zero", "passed": true}
+{"label": "resolve P157 webpki-roots", "passed": true}
+{"label": "resolve P158 base64", "passed": true}
+{"label": "resolve P158 http", "passed": true}
+{"label": "resolve P158 httparse", "passed": true}
+{"label": "resolve P158 log", "passed": true}
+{"label": "resolve P159 form_urlencoded", "passed": true}
+{"label": "resolve P159 idna", "passed": true}
+{"label": "resolve P159 percent-encoding", "passed": true}
+{"label": "resolve P159 serde", "passed": true}
+{"label": "resolve P163 same-file", "passed": true}
+{"label": "resolve P163 winapi-util", "passed": true}
+{"label": "resolve P165 rustls-pki-types", "passed": true}
+{"label": "resolve P166 winapi-i686-pc-windows-gnu", "passed": true}
+{"label": "resolve P166 winapi-x86_64-pc-windows-gnu", "passed": true}
+{"label": "resolve P168 windows-sys 0.61.2", "passed": true}
+{"label": "resolve P171 windows-targets", "passed": true}
+{"label": "resolve P172 windows-link", "passed": true}
+{"label": "resolve P173 windows_aarch64_gnullvm", "passed": true}
+{"label": "resolve P173 windows_aarch64_msvc", "passed": true}
+{"label": "resolve P173 windows_i686_gnu", "passed": true}
+{"label": "resolve P173 windows_i686_gnullvm", "passed": true}
+{"label": "resolve P173 windows_i686_msvc", "passed": true}
+{"label": "resolve P173 windows_x86_64_gnu", "passed": true}
+{"label": "resolve P173 windows_x86_64_gnullvm", "passed": true}
+{"label": "resolve P173 windows_x86_64_msvc", "passed": true}
+{"label": "resolve P185 indexmap", "passed": true}
+{"label": "resolve P185 itoa", "passed": true}
+{"label": "resolve P185 libyaml-rs", "passed": true}
+{"label": "resolve P185 ryu", "passed": true}
+{"label": "resolve P185 serde", "passed": true}
+{"label": "resolve P186 stable_deref_trait", "passed": true}
+{"label": "resolve P186 yoke-derive", "passed": true}
+{"label": "resolve P186 zerofrom", "passed": true}
+{"label": "resolve P187 proc-macro2", "passed": true}
+{"label": "resolve P187 quote", "passed": true}
+{"label": "resolve P187 syn 2.0.119", "passed": true}
+{"label": "resolve P187 synstructure", "passed": true}
+{"label": "resolve P188 base64", "passed": true}
+{"label": "resolve P188 crossterm", "passed": true}
+{"label": "resolve P188 httpdate", "passed": true}
+{"label": "resolve P188 ignore", "passed": true}
+{"label": "resolve P188 libc", "passed": true}
+{"label": "resolve P188 ratatui", "passed": true}
+{"label": "resolve P188 serde", "passed": true}
+{"label": "resolve P188 serde_json", "passed": true}
+{"label": "resolve P188 sha2", "passed": true}
+{"label": "resolve P188 tempfile", "passed": true}
+{"label": "resolve P188 thiserror", "passed": true}
+{"label": "resolve P188 toml", "passed": true}
+{"label": "resolve P188 unicode-segmentation", "passed": true}
+{"label": "resolve P188 unicode-width", "passed": true}
+{"label": "resolve P188 ureq", "passed": true}
+{"label": "resolve P188 yaml_serde", "passed": true}
+{"label": "resolve P189 zerofrom-derive", "passed": true}
+{"label": "resolve P190 proc-macro2", "passed": true}
+{"label": "resolve P190 quote", "passed": true}
+{"label": "resolve P190 syn 2.0.119", "passed": true}
+{"label": "resolve P190 synstructure", "passed": true}
+{"label": "resolve P192 displaydoc", "passed": true}
+{"label": "resolve P192 yoke", "passed": true}
+{"label": "resolve P192 zerofrom", "passed": true}
+{"label": "resolve P193 yoke", "passed": true}
+{"label": "resolve P193 zerofrom", "passed": true}
+{"label": "resolve P193 zerovec-derive", "passed": true}
+{"label": "resolve P194 proc-macro2", "passed": true}
+{"label": "resolve P194 quote", "passed": true}
+{"label": "resolve P194 syn 3.0.4", "passed": true}
+{"label": "389 exact edges 28 versioned", "passed": true}
+{"label": "root graph reaches196", "passed": true}
+{"label": "identity baseline", "passed": true}
+{"label": "diff baseline", "passed": true}
+{"label": "record changes baseline", "passed": true}
+{"label": "identity worker", "passed": true}
+{"label": "diff worker", "passed": true}
+{"label": "record changes worker", "passed": true}
+{"label": "baseline14 added2 changed", "passed": true}
+{"label": "worker only source change", "passed": true}
+{"label": "local patch manifest binding", "passed": true}
+{"label": "16 direct mappings", "passed": true}
+{"label": "config absence scoped", "passed": true}
+{"label": "exact inherited report", "passed": true}
+{"label": "one owned path", "passed": true}
+{"label": "main absent worker exact preimages", "passed": true}
+{"label": "patch identity report.patch", "passed": true}
+{"label": "patch identity rollback.patch", "passed": true}
+{"label": "patch identity worker-report.patch", "passed": true}
+{"label": "patch identity worker-rollback.patch", "passed": true}
+{"label": "110ready33592regular145tracked", "passed": true}
+{"label": "preparation failure retained", "passed": true}
+{"label": "discovery exit2 retained", "passed": true}
+{"label": "formal source unchanged", "passed": true}
+{"label": "preserved context drift capture/zenpi/Docs/execution/active_requirement.json", "passed": true}
+{"label": "preserved context drift capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/file_learn_index.tsv", "passed": true}
+{"label": "preserved context drift capture/zenpi/Docs/learn/stage1_pi_mono/targets/zenpi/source_manifest.tsv", "passed": true}
+{"label": "preserved context drift capture/zenpi/Docs/stage_1_v3_pi_mono_blueprint.md", "passed": true}
+{"label": "authority and baseline", "passed": true}
+{"label": "zero product and network execution", "passed": true}
+{"label": "temporary main report.patch", "passed": true}
+{"label": "forward exact main", "passed": true}
+{"label": "sentinel main report.patch", "passed": true}
+{"label": "temporary main rollback.patch", "passed": true}
+{"label": "rollback exact main", "passed": true}
+{"label": "sentinel main rollback.patch", "passed": true}
+{"label": "temporary worker worker-report.patch", "passed": true}
+{"label": "forward exact worker", "passed": true}
+{"label": "sentinel worker worker-report.patch", "passed": true}
+{"label": "temporary worker worker-rollback.patch", "passed": true}
+{"label": "rollback exact worker", "passed": true}
+{"label": "sentinel worker worker-rollback.patch", "passed": true}
+{"label": "package unchanged", "passed": true}
+{"checks": 859, "failed": 0, "structural_only": true, "runtime_execution": false}

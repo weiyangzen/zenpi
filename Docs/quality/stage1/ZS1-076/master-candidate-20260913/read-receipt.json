@@ -1,0 +1,19 @@
+{
+  "item_id": "ZS1-076",
+  "source_path": "src/config.rs",
+  "bytes": 77782,
+  "source_hash": "f5691bd3818dcaf1481a88b63cc4f3874bc6b007234059e26124b74046325d12",
+  "read_ranges": [
+    {
+      "start": 0,
+      "end": 65536,
+      "sha256": "654c1861a1cf53ab18bd550e2332f5ffb8f9c4cf8c3d16c7be794980954cd61a"
+    },
+    {
+      "start": 65536,
+      "end": 77782,
+      "sha256": "837e1f286e399ab56fdb65f0dba963adb5c31c38c0a837a39720fa70a6efbcd8"
+    }
+  ],
+  "status": "candidate_only"
+}

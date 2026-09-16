@@ -1,0 +1,111 @@
+{
+  "hunks": [
+    {
+      "file": "src/tui.rs",
+      "hunk": 0,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 1,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 2,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 3,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 4,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 5,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 6,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 7,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 8,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 9,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 10,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 11,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 12,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 13,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 14,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 15,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 16,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 17,
+      "mode": "exact-context"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 18,
+      "mode": "tests-relocated-after-retained-123-tests"
+    },
+    {
+      "file": "src/tui.rs",
+      "hunk": 19,
+      "mode": "exact-context"
+    },
+    {
+      "file": "tests/tui_transcript_ux.rs",
+      "hunk": 0,
+      "mode": "exact-context"
+    }
+  ],
+  "git_apply_check": "failed at test insertion because current123 tests occupy its context; no product was changed by check",
+  "root_extra": "Do not retire pending approval on failed host response; authoritative stale reconciliation owns retirement"
+}

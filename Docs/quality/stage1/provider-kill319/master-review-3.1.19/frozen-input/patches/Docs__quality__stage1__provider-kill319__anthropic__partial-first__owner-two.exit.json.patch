@@ -1,0 +1,10 @@
+diff --git a/Docs/quality/stage1/provider-kill319/anthropic/partial-first/owner-two.exit.json b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/owner-two.exit.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/anthropic/partial-first/owner-two.exit.json
+@@ -0,0 +1,5 @@
++{
++  "pid": 56812,
++  "returncode": 0,
++  "requested_SIGKILL": false
++}

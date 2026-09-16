@@ -1,0 +1,37 @@
+{
+  "project": {
+    "project_id": "9fc4336504ae412e807f51a54672e99e9dfde0798571546ba03efa3d76eef34b",
+    "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/provider-kill-integration/actual/google/partial-master",
+    "session_id": "session-1789190520521-61910-0"
+  },
+  "schema_version": 2,
+  "id": "inspect",
+  "type": "response",
+  "command": "recovery",
+  "success": true,
+  "data": {
+    "accepted": true,
+    "action": {
+      "action": "inspect"
+    },
+    "automatic_retry": false,
+    "command": "recovery",
+    "execution_started": false,
+    "new_attempt_required": false,
+    "operations": [
+      {
+        "idempotency_key": "provider-ee1a193bc8f1de2032cec78000c6642837a91eeb061565b243ce0f43d4b77bd3",
+        "kind": "provider",
+        "operation_id": "provider-turn-1789190520545-1",
+        "retry_requires_confirmation": true,
+        "state": "unknown_outcome",
+        "turn_id": "turn-1789190520545-1"
+      }
+    ],
+    "pending_count": 1,
+    "route": "local",
+    "tools": [],
+    "truncated": false
+  },
+  "code": "ok"
+}

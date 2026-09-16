@@ -1,0 +1,65 @@
+{
+  "complete": false,
+  "artifacts": {
+    "inputs-after.json": {
+      "bytes": 31648,
+      "sha256": "2301dea8bb49220d83275225dff8a6f1ae1df58f46877eeec28b00bab1d665bc"
+    },
+    "root-tests.log": {
+      "bytes": 54539,
+      "sha256": "344f0fe9216fd00282535e51ecf8d5b3d243d1a150a0cd917dc855a1cd6c985a"
+    },
+    "embedding-binary.json": {
+      "bytes": 103,
+      "sha256": "2b60786569af3dd31f0480cbd7ff5aa4979f5f37ce29825ce6e3c4579f01a052"
+    },
+    "root-tests.run.json": {
+      "bytes": 705,
+      "sha256": "6ea2260a141ede93b3200a410b528d0d11cb03297512d9c4a06a02a1c22acd88"
+    },
+    "root-clippy.run.json": {
+      "bytes": 647,
+      "sha256": "c5b7a58a6697efba9480e4cbad6f83cd095f796c99bf50a332410a100c7c45e5"
+    },
+    "root-fmt.run.json": {
+      "bytes": 427,
+      "sha256": "4b4a928a6a550c8f63836399ce4c9ecd4528cb57aaca3ece211570d060f85eba"
+    },
+    "embedding-inputs.json": {
+      "bytes": 31783,
+      "sha256": "a0245cc76b3437d7e6de576e64542825e9d2bd7fb44673205237bc9d3f9a0be8"
+    },
+    "integrate.py": {
+      "bytes": 5108,
+      "sha256": "c5900245650a2375cb7cb351991488859c4916178355c8cf80aa9aa1f3af8cab"
+    },
+    "shell-before.run.json": {
+      "bytes": 747,
+      "sha256": "d01f048e7ebd06d6606b9aa224a093325c0041c76adabf2dac8ffcc3a5ce2130"
+    },
+    "inputs-before.json": {
+      "bytes": 31648,
+      "sha256": "82fe8d43f204c2a1422056ee41b087daeed8ae043253bd24f519105089af516e"
+    },
+    "master-verification.json": {
+      "bytes": 33834,
+      "sha256": "6580c7511b1549fccc3025ab574769dfa19412be6ba60f3dc6186a89c7ff7172"
+    },
+    "shell-after.run.json": {
+      "bytes": 720,
+      "sha256": "afe6f9523474260b2da9933598f25543585e1f2ceafe355b03b95b8c9c96536f"
+    },
+    "review.md": {
+      "bytes": 4523,
+      "sha256": "9713f6bc0ceeaeefde2c9d625e7df5a5a36c31cc59549b9d6c17417529668952"
+    },
+    "integration-evidence.tar.gz": {
+      "bytes": 103882793,
+      "sha256": "4a83e72147aadc78a36fe60b395b1ff121d4c7cf6d8a0acc2c0edd04dfbbc33f"
+    },
+    "publish_busy_test_shell_accept133_321.py": {
+      "bytes": 15005,
+      "sha256": "0419b818c6b39857b6faf3572d5753f4fe37d7a44e5d842b6ff2d377ba2081ce"
+    }
+  }
+}

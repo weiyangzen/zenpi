@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "fmt",
+    "--check"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T23:40:36.468258+00:00",
+  "ended_at": "2026-09-12T23:40:37.568789+00:00",
+  "exit_code": 0,
+  "log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,7 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-source-probe/install.log b/Docs/quality/stage1/ZS1-016/worker-source-probe/install.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-source-probe/install.log
+@@ -0,0 +1,2 @@
++
++added 8 packages in 1s

@@ -1,0 +1,36 @@
+diff --git a/Docs/quality/stage1/provider-kill319/build-cli.json b/Docs/quality/stage1/provider-kill319/build-cli.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/build-cli.json
+@@ -0,0 +1,31 @@
++{
++  "name": "build-cli",
++  "argv": [
++    "cargo",
++    "+stable-aarch64-apple-darwin",
++    "build",
++    "--offline",
++    "--locked",
++    "--manifest-path",
++    ".ops/provider-kill319-current/Cargo.toml",
++    "--target-dir",
++    "target",
++    "--bin",
++    "zenpi"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T05:00:08.154934+00:00",
++  "ended_at": "2026-09-12T05:00:25.611881+00:00",
++  "elapsed_seconds": 17.456975959,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 2095448064,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/build-cli.log",
++  "bytes": 1059,
++  "sha256": "0a6795505b9d5993eabc0e7c162c35073e484674c43a543feea010ab9db32691"
++}

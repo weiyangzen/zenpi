@@ -1,0 +1,6 @@
+diff --git a/Docs/quality/stage1/provider-kill319/google/partial-first/owner-one.stdin.jsonl b/Docs/quality/stage1/provider-kill319/google/partial-first/owner-one.stdin.jsonl
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/google/partial-first/owner-one.stdin.jsonl
+@@ -0,0 +1 @@
++{"schema_version": 2, "type": "prompt", "id": "killed", "text": "begin interrupted response"}

@@ -1,0 +1,190 @@
+--- a/src/slash_actions.rs
++++ b/src/slash_actions.rs
+@@ -517,7 +517,14 @@
+     let relative = resolved
+         .strip_prefix(&workspace)
+         .map_err(|_| SlashActionError::PathDenied(path.to_owned()))?;
+-    let relative = path_display(relative);
++    // This reference is reopened for hashing, staging, and turn admission.
++    // Keep the native path spelling: display normalization can turn a literal
++    // Unix backslash into a separator and select a different workspace file.
++    // Reject an unrepresentable path instead of creating a lossy I/O reference.
++    let relative = relative
++        .to_str()
++        .ok_or_else(|| SlashActionError::PathDenied(path.to_owned()))?
++        .to_owned();
+     let mime_type = mime_for_path(&resolved);
+     let kind = if mime_type.starts_with("image/") {
+         AttachmentKind::Image
+@@ -901,3 +908,171 @@
+         .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
+     Ok(Some(request))
+ }
++
++#[cfg(test)]
++mod attachment_identity_tests {
++    use super::*;
++    #[cfg(unix)]
++    use crate::{core::TurnInputRequest, session::SessionStore, tools::ToolContext};
++
++    #[test]
++    fn normalized_relative_attachment_remains_a_native_path() {
++        let directory = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        fs::create_dir(root.join("nested")).unwrap();
++        let expected = Path::new("nested").join("文件 name.txt");
++        fs::write(root.join(&expected), b"selected file").unwrap();
++        let attachment = attachment_for_path(root, "./nested/./文件 name.txt").unwrap();
++        let encoded = serde_json::to_string(&attachment).unwrap();
++        let decoded: InputAttachment = serde_json::from_str(&encoded).unwrap();
++        let path = decoded.path.as_deref().unwrap();
++        assert_eq!(Path::new(path), expected);
++        assert_eq!(fs::read(root.join(path)).unwrap(), b"selected file");
++        assert_eq!(attachment.kind, AttachmentKind::File);
++        assert_eq!(attachment.mime_type, "text/plain");
++    }
++
++    #[test]
++    fn attachment_path_and_file_limits_remain_enforced() {
++        let directory = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        fs::write(root.join("valid.txt"), b"valid").unwrap();
++        for denied in ["", " ", "../valid.txt", "valid.txt\n", ".", "missing.txt"] {
++            assert!(attachment_for_path(root, denied).is_err(), "{denied:?}");
++        }
++        assert!(attachment_for_path(root, &"a".repeat(MAX_WORKSPACE_PATH_BYTES + 1)).is_err());
++        assert!(attachment_for_path(root, root.join("valid.txt").to_str().unwrap()).is_err());
++        let large = fs::File::create(root.join("large.bin")).unwrap();
++        large.set_len(MAX_ATTACHMENT_BYTES as u64).unwrap();
++        assert!(attachment_for_path(root, "large.bin").is_ok());
++        large.set_len(MAX_ATTACHMENT_BYTES as u64 + 1).unwrap();
++        assert!(matches!(
++            attachment_for_path(root, "large.bin"),
++            Err(SlashActionError::FileTooLarge { .. })
++        ));
++        assert!(matches!(
++            file_digest(&canonical_workspace(root).unwrap(), "large.bin"),
++            Err(SlashActionError::FileTooLarge { .. })
++        ));
++    }
++
++    #[cfg(unix)]
++    #[test]
++    fn literal_backslash_attachment_needs_no_directory_counterpart() {
++        let directory = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        let path = r#"only\quoted"name.txt"#;
++        fs::write(root.join(path), b"literal only").unwrap();
++        let session = SessionStore::open(root.join("session.jsonl")).unwrap();
++        let mut agent = Agent::with_echo(session);
++        agent.set_attachment_workspace(ToolContext::new(root).unwrap());
++        let value = attach_value_at(&mut agent, root, path).unwrap();
++        assert_eq!(value["path"], path);
++        let encoded = serde_json::to_string(&value).unwrap();
++        assert_eq!(serde_json::from_str::<Value>(&encoded).unwrap(), value);
++        assert_eq!(agent.pending_attachments()[0].path.as_deref(), Some(path));
++    }
++
++    #[cfg(unix)]
++    #[test]
++    fn attachment_symlink_components_remain_denied() {
++        use std::os::unix::fs::symlink;
++        let directory = tempfile::tempdir().unwrap();
++        let outside = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        fs::create_dir(root.join("nested")).unwrap();
++        fs::write(root.join("nested/file.txt"), b"inside").unwrap();
++        fs::write(outside.path().join("file.txt"), b"outside").unwrap();
++        symlink(root.join("nested/file.txt"), root.join(r"linked\file.txt")).unwrap();
++        symlink(root.join("nested"), root.join("linked-dir")).unwrap();
++        symlink(outside.path(), root.join("outside-dir")).unwrap();
++        let session = SessionStore::open(root.join("session.jsonl")).unwrap();
++        let mut agent = Agent::with_echo(session);
++        agent.set_attachment_workspace(ToolContext::new(root).unwrap());
++        for denied in [
++            r"linked\file.txt",
++            "linked-dir/file.txt",
++            "outside-dir/file.txt",
++        ] {
++            assert!(matches!(
++                attach_value_at(&mut agent, root, denied),
++                Err(SlashActionError::PathDenied(_))
++            ));
++            assert!(agent.pending_attachments().is_empty());
++        }
++    }
++
++    #[cfg(windows)]
++    #[test]
++    fn windows_backslash_still_separates_path_components() {
++        let directory = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        fs::create_dir(root.join("nested")).unwrap();
++        fs::write(root.join(r"nested\file.txt"), b"windows native path").unwrap();
++        let attachment = attachment_for_path(root, r"nested\file.txt").unwrap();
++        let path = attachment.path.as_deref().unwrap();
++        assert_eq!(Path::new(path), Path::new("nested/file.txt"));
++        assert_eq!(fs::read(root.join(path)).unwrap(), b"windows native path");
++        assert!(attachment_for_path(root, r"nested\..\file.txt").is_err());
++        assert!(attachment_for_path(root, r"C:\outside.txt").is_err());
++    }
++
++    #[cfg(unix)]
++    #[test]
++    fn literal_backslash_and_directory_attachment_keep_distinct_identities() {
++        use std::os::unix::fs::MetadataExt;
++        let directory = tempfile::tempdir().unwrap();
++        let root = directory.path();
++        let literal = r"note\report.txt";
++        let nested = "note/report.txt";
++        let literal_bytes = b"literal backslash payload\n";
++        let nested_bytes = b"directory payload with a different size\n";
++        fs::create_dir(root.join("note")).unwrap();
++        fs::write(root.join(literal), literal_bytes).unwrap();
++        fs::write(root.join(nested), nested_bytes).unwrap();
++        assert_ne!(
++            fs::metadata(root.join(literal)).unwrap().ino(),
++            fs::metadata(root.join(nested)).unwrap().ino()
++        );
++        for (index, (path, expected)) in [
++            (literal, literal_bytes.as_slice()),
++            (nested, nested_bytes.as_slice()),
++        ]
++        .into_iter()
++        .enumerate()
++        {
++            let session = SessionStore::open(root.join(format!("session-{index}.jsonl"))).unwrap();
++            let mut agent = Agent::with_echo(session);
++            agent.set_attachment_workspace(ToolContext::new(root).unwrap());
++            let value = attach_value_at(&mut agent, root, path).unwrap();
++            let staged = agent.pending_attachments()[0].clone();
++            let (_, staged_bytes) = ToolContext::new(root)
++                .unwrap()
++                .read_attachment(staged.path.as_deref().unwrap(), MAX_ATTACHMENT_BYTES)
++                .unwrap();
++            agent
++                .submit(TurnInputRequest::new("inspect attachment"))
++                .unwrap();
++            let metadata = &agent.history()[0].metadata.as_ref().unwrap()["attachments"][0];
++            println!(
++                "requested={path:?} receipt={value} staged={staged:?} materialized={metadata}"
++            );
++            assert_eq!(value["path"], path);
++            assert_eq!(staged.path.as_deref(), Some(path));
++            assert_eq!(staged_bytes, expected);
++            assert_eq!(value["size_bytes"], expected.len());
++            assert_eq!(value["sha256"], format!("{:x}", Sha256::digest(expected)));
++            assert_eq!(metadata["path"], path);
++            assert_eq!(metadata["sha256"], value["sha256"]);
++            assert_eq!(metadata["size_bytes"], value["size_bytes"]);
++            let encoded = serde_json::to_string(&value).unwrap();
++            let decoded: Value = serde_json::from_str(&encoded).unwrap();
++            assert_eq!(decoded["path"], path);
++            if path == literal {
++                assert!(encoded.contains(r"note\\report.txt"));
++            }
++            let journal = fs::read_to_string(agent.session().path()).unwrap();
++            assert!(!journal.contains(std::str::from_utf8(expected).unwrap().trim()));
++        }
++    }
++}

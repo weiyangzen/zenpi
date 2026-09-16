@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/untracked-directories-integration/worker/verify.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T14:45:52.847930+00:00",
+  "ended_at": "2026-09-12T14:45:53.049828+00:00",
+  "exit_code": 0,
+  "log_sha256": "97033dab03bd1868b92bbab749156ea32b037a7ddaa07b28fd5d7d54f3dce0bb"
+}

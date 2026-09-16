@@ -1,0 +1,51 @@
+{
+  "status": "passed",
+  "started": "2026-09-12T05:51:34.957597+00:00",
+  "binary_sha256": "7a374a3b0764c7a4db9b3b53e36dc07d3d8b17b80f5711805a932a2090e60774",
+  "helper_sha256": "fd53a26ac4ec22bf3d5efbdd86e414778f8e7e53f172955943784937e362a51f",
+  "argv": [
+    "tools/tui_external_editor_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/external-editor-integration/bin/after",
+    "--workspace",
+    "/Users/wangweiyang/GitHub/zenpi",
+    "--toolchain",
+    "stable-aarch64-apple-darwin",
+    "--evidence",
+    ".ops/stage1_execution/external-editor-integration/actual-after.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "suites": {
+    "roundtrip": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-roundtrip.json",
+      "sha256": "d6b0cfe94f21c08af0b35e5ea5a211d0047d1313d014f6c8215bd269fa79dbdd"
+    },
+    "files-cancel-prefetch": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-files-cancel-prefetch.json",
+      "sha256": "5c15c4ab0a6cbe1759d8ef9ea6beeaf09836c36736f8daeb793964de1bf39ae8"
+    },
+    "busy": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-busy.json",
+      "sha256": "9189463e0952c9cf5b1bf9042ba4faedc53b62f1e5ae5fbe33faf2f2ba1c4289"
+    },
+    "lifecycle": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-lifecycle.json",
+      "sha256": "1d51df80b737c5a71c72ac6297dd0ce4e73a87bf66ef06f80b0ac25f1f1812ed"
+    },
+    "configuration": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-configuration.json",
+      "sha256": "4039bbbab15564871489144ef60470d132caf93d135dd9315ee56f5f7128352e"
+    },
+    "sync": {
+      "status": "passed",
+      "evidence": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-after-sync.json",
+      "sha256": "fb9212834626853c3ff4530f0818dfcac264aefba0646dd2890721ff141f1e4b"
+    }
+  },
+  "ended": "2026-09-12T05:53:00.127946+00:00"
+}

@@ -1,0 +1,91 @@
+[
+  {
+    "name": "render",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "test",
+      "--locked",
+      "--lib",
+      "render::tests",
+      "--",
+      "--nocapture"
+    ],
+    "started_at": "2026-09-13T02:39:10.490795+00:00",
+    "ended_at": "2026-09-13T02:39:18.270955+00:00",
+    "exit_code": 0,
+    "inputs_unchanged": true
+  },
+  {
+    "name": "tui",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "test",
+      "--locked",
+      "--test",
+      "tui_preview_graphemes",
+      "--test",
+      "tui_transcript_ux",
+      "--test",
+      "tui_approval_focus",
+      "--test",
+      "tui_bentobox",
+      "--test",
+      "view_model",
+      "--",
+      "--nocapture"
+    ],
+    "started_at": "2026-09-13T02:39:18.284149+00:00",
+    "ended_at": "2026-09-13T02:39:37.451949+00:00",
+    "exit_code": 0,
+    "inputs_unchanged": true
+  },
+  {
+    "name": "fmt",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "started_at": "2026-09-13T02:39:37.474462+00:00",
+    "ended_at": "2026-09-13T02:39:38.542859+00:00",
+    "exit_code": 0,
+    "inputs_unchanged": true
+  },
+  {
+    "name": "clippy",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "clippy",
+      "--locked",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "started_at": "2026-09-13T02:39:38.555327+00:00",
+    "ended_at": "2026-09-13T02:40:12.436469+00:00",
+    "exit_code": 0,
+    "inputs_unchanged": true
+  },
+  {
+    "name": "debug",
+    "argv": [
+      "cargo",
+      "+stable-aarch64-apple-darwin",
+      "build",
+      "--locked",
+      "--bin",
+      "zenpi"
+    ],
+    "started_at": "2026-09-13T02:40:12.450201+00:00",
+    "ended_at": "2026-09-13T02:40:17.281763+00:00",
+    "exit_code": 0,
+    "inputs_unchanged": true
+  }
+]

@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "source_bytes": 48616,
+  "source_lines": 1490,
+  "read_ranges": [
+    [
+      0,
+      10223
+    ],
+    [
+      10223,
+      18033
+    ],
+    [
+      18033,
+      30114
+    ],
+    [
+      30114,
+      39526
+    ],
+    [
+      39526,
+      48616
+    ]
+  ],
+  "reused_manifest_sha256": "f52b12aaea01cf39c2e9705f81cce2560d427064d9a269259379f07e409c2d8d",
+  "reused_artifacts": 14,
+  "historical_source_cases": 23,
+  "historical_http_requests": 24,
+  "historical_target_tests": 17,
+  "new_runtime_tests": 0,
+  "target_excerpts": 10,
+  "report_bytes": 20790,
+  "report_sha256": "7310c31680d6fe50790ad1b0ad9a103ebbc4055bef06fda14122083c816f1208",
+  "checks": "G-FILE source/range/artifact; preserved report prefix; historical immutable evidence and receipts; current target hashes",
+  "not_claimed": "Remote model execution, rerun of historical tests, whole dependency graph frozen, or master/directory acceptance"
+}

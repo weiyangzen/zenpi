@@ -1,0 +1,24 @@
+{
+  "name": "sync-input-pty",
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/sync-input-integration/frozen-input/probe.py",
+    ".ops/stage1_execution/external-editor-integration/bin/sync-input-host",
+    ".ops/stage1_execution/external-editor-integration/actual-sync-input"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:53:15.543004+00:00",
+  "ended_at": "2026-09-12T05:53:19.174546+00:00",
+  "elapsed_seconds": 3.6313544170000003,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 66191360,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/sync-input-pty.log",
+  "bytes": 1632,
+  "sha256": "d9135849195f21976f08c4803e327055a8840596bfb44b4294c6875546aeebd0"
+}

@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--test",
+    "tui_command_palette",
+    "--test",
+    "tui_approval_focus",
+    "--test",
+    "tui_resize",
+    "--test",
+    "project_workspace"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T11:33:07.784470+00:00",
+  "elapsed_seconds": 20.573530457999997,
+  "exit_code": 0,
+  "log_sha256": "11c60d126e3c656e06d5d5388acb1eaedb1529388af86e08a044bcf285418cfb",
+  "log_bytes": 5280
+}

@@ -1,0 +1,262 @@
+{
+  "captured_at": "2026-09-10T21:52:10.724622+00:00",
+  "snapshot": ".ops/target079-main-snapshot",
+  "boundary": "Actual main source copied read-only into local scratch; no mocks. Context is not additional owner acceptance. Initial local dependency failed compilation because main-only output/tree types were absent.",
+  "files": [
+    {
+      "path": "Cargo.toml",
+      "bytes": 1087,
+      "sha256": "3ea3fcf70b4b0140f8f123ae86604bf60e0202d3203dca07eaebf76bcdfb24e9"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 46164,
+      "sha256": "d266eb5b8f61d08ea1d8e3aeca0987f97a28384ecb21558a279d0d7d84d80f12"
+    },
+    {
+      "path": "src/approval.rs",
+      "bytes": 29396,
+      "sha256": "5488ad365670e515eba5e7d82a91dbf935be854b848c20fd99725f102e1f185f"
+    },
+    {
+      "path": "src/b3.rs",
+      "bytes": 47958,
+      "sha256": "8c98d80c998b3d0dc3f52ae88ba73103c0d6e2c71c59d0caecf9f9ed3dcbc157"
+    },
+    {
+      "path": "src/backend/chat_stream.rs",
+      "bytes": 25042,
+      "sha256": "8a515569a0813830a7f8217fbcf137af68070407dcf6f43a05e1c681326d5fe8"
+    },
+    {
+      "path": "src/backend/transport.rs",
+      "bytes": 21483,
+      "sha256": "d166d173c77aec88ccee1c248b74424a20c9783b6f4cada95fc762cbf3fe1cfd"
+    },
+    {
+      "path": "src/backend.rs",
+      "bytes": 98741,
+      "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357"
+    },
+    {
+      "path": "src/config.rs",
+      "bytes": 70640,
+      "sha256": "521b6bdd8e7d2dc3f45096757f9a0afd89378c3a76175bbee3998eda69ffe92c"
+    },
+    {
+      "path": "src/context.rs",
+      "bytes": 30013,
+      "sha256": "256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229"
+    },
+    {
+      "path": "src/core.rs",
+      "bytes": 259914,
+      "sha256": "6f29deba565130c389ee9872685b93bce97182bef3f6a3500de3b8059f865b11"
+    },
+    {
+      "path": "src/diagnostics.rs",
+      "bytes": 4459,
+      "sha256": "b538501715cd7d16f2da46b72961514f0718afb22c57144e4ef6b8558eb31d3b"
+    },
+    {
+      "path": "src/directory_picker.rs",
+      "bytes": 10550,
+      "sha256": "1104ae833bca842f74cbc1635234309e33f7af5aa8a3a0765b8d2c40632d092f"
+    },
+    {
+      "path": "src/domain_execution.rs",
+      "bytes": 69219,
+      "sha256": "f46237f1ef60d830ddf7f33edb064b3843917e861702e92add3b7aa6fe56a180"
+    },
+    {
+      "path": "src/domain_store.rs",
+      "bytes": 34183,
+      "sha256": "55258b05dadbb61c2060ac094c562ede0b656fbf31eb6119197510ac44e5a1c7"
+    },
+    {
+      "path": "src/domains.rs",
+      "bytes": 24622,
+      "sha256": "c11e10d02a21ed3412e731acd269080053b18f649935bb1f9486b128ee7c79ac"
+    },
+    {
+      "path": "src/error.rs",
+      "bytes": 919,
+      "sha256": "333c7e9d1e3efe71672ee1fcf2d1d3d5e16c569e88ba9dbd9de1aceba815f32c"
+    },
+    {
+      "path": "src/extension_runtime.rs",
+      "bytes": 35676,
+      "sha256": "aee2484dc19a8f3064c3813d2b2890a72690cd9aa42ab956702a11aa6671843f"
+    },
+    {
+      "path": "src/extensions.rs",
+      "bytes": 20742,
+      "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+    },
+    {
+      "path": "src/governance.rs",
+      "bytes": 42244,
+      "sha256": "a698c7f15758c872b723ecd4cff1b5ca544175eefbb956ff632bc2e6f1bfe06e"
+    },
+    {
+      "path": "src/headless.rs",
+      "bytes": 345710,
+      "sha256": "89cca3542fd8ebfee38bb9bcc858ac672c63c7f10fdaac6364a333511259c9a3"
+    },
+    {
+      "path": "src/input_queue.rs",
+      "bytes": 29652,
+      "sha256": "ff1ab18e485d1145803e3e10ce1d974658a882f703de5bdfdd94daa767155533"
+    },
+    {
+      "path": "src/layout.rs",
+      "bytes": 54632,
+      "sha256": "218c1b1cb7853da8f5c03b51e09d552f0634efb82284e029cbcfaeb434dac05a"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 844,
+      "sha256": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8"
+    },
+    {
+      "path": "src/main.rs",
+      "bytes": 234,
+      "sha256": "9501abc92cf4c1a4a02250f175f4867cbf8052223c589b2a0e1b00f51113d81b"
+    },
+    {
+      "path": "src/persona.rs",
+      "bytes": 2975,
+      "sha256": "a7dc0ea2080c2e2ef944ba5042209c0aa40453ad8aa7feded603a161392399e2"
+    },
+    {
+      "path": "src/project_workspace.rs",
+      "bytes": 25373,
+      "sha256": "645614426113ba7516c17de47446b33cb6845b2b7bf64e187ac0493ca490813b"
+    },
+    {
+      "path": "src/prompt_templates.rs",
+      "bytes": 17406,
+      "sha256": "1b3f2531d6f292a0d1ab24b9b4c69f3780cefb528437102bea316ec5e8197a06"
+    },
+    {
+      "path": "src/protocol.rs",
+      "bytes": 45394,
+      "sha256": "b092559d0ad56fc3d0eff6875914be755e2801bb991b07a88bda21f941bfefea"
+    },
+    {
+      "path": "src/providers/anthropic.rs",
+      "bytes": 33395,
+      "sha256": "f2d1518520d02984c21b09e5fc0895d0a627331da5bd022c0ceb27968035a2f0"
+    },
+    {
+      "path": "src/providers/google.rs",
+      "bytes": 29036,
+      "sha256": "cfe567a41e3efb3cbba65f55eb11fd66618bb83310f0511c2728222cd375c071"
+    },
+    {
+      "path": "src/providers/mod.rs",
+      "bytes": 129,
+      "sha256": "0c723015cd66bb637cd7d9d25a04200aa3af5708c4bb9c7747bc3f7f34027cdd"
+    },
+    {
+      "path": "src/providers/registry.rs",
+      "bytes": 15905,
+      "sha256": "cf229a62681933e7c1b4058c4d2fada41dff4fcd05c4cd300e18accfe245b944"
+    },
+    {
+      "path": "src/render.rs",
+      "bytes": 30217,
+      "sha256": "6eaaa712745659ae48f429217c5eb8961dd12e71789f8a2bc70867ee71ba25a7"
+    },
+    {
+      "path": "src/resource_loader.rs",
+      "bytes": 9204,
+      "sha256": "121d3b6ea7760d137e0e074e7d9b269023ddc6ca2ecca199f23072890bd06858"
+    },
+    {
+      "path": "src/resources.rs",
+      "bytes": 15263,
+      "sha256": "c6e8dcf6385ccbbf3cbbd9e1f3c6ec5318664c0afc9a3740c4c3588fe0f57c65"
+    },
+    {
+      "path": "src/runtime.rs",
+      "bytes": 33333,
+      "sha256": "7a42c428083f8f3edb0019311296b479004ff562b548d7cdc504729f7cbd1f21"
+    },
+    {
+      "path": "src/runtime_intent.rs",
+      "bytes": 18942,
+      "sha256": "b6d06cb79ec0827875738f8120d3d075abc43d35a6de2d518c99336f5ea42ca6"
+    },
+    {
+      "path": "src/search.rs",
+      "bytes": 21220,
+      "sha256": "556db8458cce78326c2b8a191b39975ae1ff209e5f5d2a9f917a92efe4fae2b4"
+    },
+    {
+      "path": "src/security.rs",
+      "bytes": 16606,
+      "sha256": "b733d0e4fe890be481acc82de39e23f01e689c9121b3343a1863bae56ceb5cc5"
+    },
+    {
+      "path": "src/session.rs",
+      "bytes": 136997,
+      "sha256": "49c638663b8cd9bfb97558cba648fcd4ecc053601dde6b8d890c621b2e529b12"
+    },
+    {
+      "path": "src/session_tree.rs",
+      "bytes": 20618,
+      "sha256": "43c95903866e4aa24cc2c20d0f0fcc1d25cd4d206a2e6ec8ec877304563a35fc"
+    },
+    {
+      "path": "src/skills.rs",
+      "bytes": 40533,
+      "sha256": "a6d0a2f671febdef2e631ca53d2788ab869ab7b86db6c0cb1feaf24d128f83e8"
+    },
+    {
+      "path": "src/slash.rs",
+      "bytes": 80013,
+      "sha256": "414c3ca5518c5f4cbc3df08dc724d44cccc9d17767fd0be0b69164b4757808d4"
+    },
+    {
+      "path": "src/slash_actions.rs",
+      "bytes": 32985,
+      "sha256": "826536a1a7296b292be759610db1140dc8081821b22f7c488e17ae072e7d2f47"
+    },
+    {
+      "path": "src/tool_output/redaction.rs",
+      "bytes": 10758,
+      "sha256": "698dab6dbae5f477ba47844872143fd75a80836fe9ac1d800e24b164a4d10d78"
+    },
+    {
+      "path": "src/tool_output.rs",
+      "bytes": 53663,
+      "sha256": "5a77edb5371fcda1da2c29beb331c349dde9efa5389c44ddd87b5a9b1d735dcd"
+    },
+    {
+      "path": "src/tool_runtime.rs",
+      "bytes": 13977,
+      "sha256": "95a30b514109fe8585aa7abb39727b4a4cf89075c007d272298ac3885134217b"
+    },
+    {
+      "path": "src/tools.rs",
+      "bytes": 118647,
+      "sha256": "af444116cd072268cfed5baabb0e7f6844976589db4dc68a67106fbbb6ecf82a"
+    },
+    {
+      "path": "src/tui.rs",
+      "bytes": 500534,
+      "sha256": "8f1648ecf9eeeffc94ac3f8f1b7dd09e6d39595b7a8ddd737a9f5c7428ff986b"
+    },
+    {
+      "path": "src/view_model.rs",
+      "bytes": 42009,
+      "sha256": "094833f051ab66d30ce3f6cc74fcc0334ed938e79f5fd8e9269341b62bed08fe"
+    },
+    {
+      "path": "tools/runtime_budget_probe.rs",
+      "bytes": 3594,
+      "sha256": "b482152a711bcfbc56f9c6451d5aa5eb0f996f0219496701b3492dcffb1378b6"
+    }
+  ]
+}

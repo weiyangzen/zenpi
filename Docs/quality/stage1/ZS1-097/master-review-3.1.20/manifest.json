@@ -1,0 +1,83 @@
+{
+  "item": "ZS1-097",
+  "mode": "single-file-understand",
+  "complete": true,
+  "product_scope_complete": false,
+  "files": [
+    {
+      "path": "after-promotion.json",
+      "bytes": 4451,
+      "sha256": "915ad0cdaad9003add41af81f7404ae96eaff2d9aeefb3876e694bf70a5fa0ba"
+    },
+    {
+      "path": "before-promotion.json",
+      "bytes": 4472,
+      "sha256": "5dba5af9b0ebada2e5131623a0607430ca9ced05656bdf9a76ebb4b4d78db845"
+    },
+    {
+      "path": "cargo-metadata.log",
+      "bytes": 18293,
+      "sha256": "277b75c884dab4d8d3c1c344b711640215d96471a57d60f287483ef2a963ea4f"
+    },
+    {
+      "path": "cargo-metadata.run.json",
+      "bytes": 430,
+      "sha256": "d22df4264c7a8c1f4b1b20909d8d08f753a57e8c3f9829db9fb2065b4881a1d2"
+    },
+    {
+      "path": "final-gstage.log",
+      "bytes": 3561,
+      "sha256": "8d5b2f523311712453d6548dbc9e7d579b54ab2d69fd8620fa0d523caf41643c"
+    },
+    {
+      "path": "final-gstage.run.json",
+      "bytes": 366,
+      "sha256": "41c0c287238a91c5a87ecadadd33588f29ecfd4bf9634285566ebf8b1a3f772f"
+    },
+    {
+      "path": "offline-verification.log",
+      "bytes": 1204,
+      "sha256": "ef30b3f7f82eb453e27fcb453794f685715523495386b8ba7afaff2f4a1597be"
+    },
+    {
+      "path": "offline-verification.run.json",
+      "bytes": 418,
+      "sha256": "ceb4d26587b6336ca8cee2992c3e3e8ef13b2dae73979872ca1fb3a1820cc0ed"
+    },
+    {
+      "path": "read-coverage.json",
+      "bytes": 715,
+      "sha256": "d99615695fc1725463c758d9dac5f9effed6109c76000368e45dbdf39e579c45"
+    },
+    {
+      "path": "review.md",
+      "bytes": 4503,
+      "sha256": "33e6b2d5d074bf0800829f3ce6c50758d7677b0e218da3ef0a41b3c57d7f90e5"
+    },
+    {
+      "path": "semantic-current.log",
+      "bytes": 8729,
+      "sha256": "eb6e557f363c7cbfeb2f48b886599079882c91a771634da60de05aaece4a6816"
+    },
+    {
+      "path": "semantic-current.run.json",
+      "bytes": 437,
+      "sha256": "cd5402c0fc8218774fe3f25567eb4dc62ee2a55a5ad79459c2c8ee801bc6533b"
+    },
+    {
+      "path": "verify_current.py",
+      "bytes": 3906,
+      "sha256": "65d664235a755fcb76d59f7569f832dde22a8297eb6418deaf2010e8a1bb6a91"
+    },
+    {
+      "path": "worker-manifest.json",
+      "bytes": 17069,
+      "sha256": "4c032718962a1f28681a42bfb54a17b381cba562e55dfb875ba5e6814732e192"
+    },
+    {
+      "path": "worker-ready.tar.gz",
+      "bytes": 153266,
+      "sha256": "bea4a0d2d5cc192b0f787f37b2e35a746c61fe5fb66a8952572eb8a3ab7f0e08"
+    }
+  ]
+}

@@ -1,0 +1,1220 @@
+--- worker-captured/src/tui.rs
++++ current/src/tui.rs
+@@ -573,6 +573,54 @@
+     directory: bool,
+ }
+ 
++/// A capped scan cannot establish that unvisited files are absent.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum FileCompletionScan {
++    Complete,
++    EntryLimit,
++    TimeLimit,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct FileCompletionResult {
++    pub entries: Vec<FileCompletion>,
++    pub scan: FileCompletionScan,
++    pub display_limited: bool,
++}
++
++impl FileCompletionResult {
++    fn notice(&self) -> Option<(&'static str, &'static str)> {
++        let status = match (self.scan, self.display_limited) {
++            (FileCompletionScan::EntryLimit, true) => {
++                "Partial results · scan and display limits reached"
++            }
++            (FileCompletionScan::TimeLimit, true) => {
++                "Partial results · time and display limits reached"
++            }
++            (FileCompletionScan::EntryLimit, false) => {
++                "Partial results · directory scan limit reached"
++            }
++            (FileCompletionScan::TimeLimit, false) => "Partial results · search time limit reached",
++            (FileCompletionScan::Complete, true) => "Partial results · 128-match display limit",
++            (FileCompletionScan::Complete, false) if self.entries.is_empty() => {
++                return Some((
++                    "No matching files in this directory",
++                    "Check the path or filename prefix.",
++                ));
++            }
++            (FileCompletionScan::Complete, false) => return None,
++        };
++        Some((
++            status,
++            if self.entries.is_empty() {
++                "No matches in scanned entries. Narrow the path or filename prefix."
++            } else {
++                "Narrow the path or filename prefix."
++            },
++        ))
++    }
++}
++
+ fn quote_input_path(path: &str) -> String {
+     format!("\"{}\"", path.replace('\\', "\\\\").replace('"', "\\\""))
+ }
+@@ -639,7 +687,15 @@
+ pub fn complete_file_query(
+     query: &FileCompletionQuery,
+     cancelled: impl Fn() -> bool,
+-) -> Result<Vec<FileCompletion>, String> {
++) -> Result<FileCompletionResult, String> {
++    complete_file_query_with_clock(query, cancelled, |start| start.elapsed())
++}
++
++fn complete_file_query_with_clock(
++    query: &FileCompletionQuery,
++    cancelled: impl Fn() -> bool,
++    elapsed: impl Fn(Instant) -> Duration,
++) -> Result<FileCompletionResult, String> {
+     use std::path::{Component, Path};
+     if query.path.len() > 4096 || query.path.chars().any(char::is_control) {
+         return Err("Invalid completion path".into());
+@@ -674,6 +730,8 @@
+     }
+     let start = Instant::now();
+     let mut entries = Vec::new();
++    let mut scanned = 0;
++    let mut scan = FileCompletionScan::Complete;
+     for entry in std::fs::read_dir(&directory)
+         .map_err(|e| e.to_string())?
+         .take(2048)
+@@ -681,9 +739,11 @@
+         if cancelled() {
+             return Err("File completion cancelled".into());
+         }
+-        if start.elapsed() > Duration::from_millis(150) {
++        if elapsed(start) > Duration::from_millis(150) {
++            scan = FileCompletionScan::TimeLimit;
+             break;
+         }
++        scanned += 1;
+         let entry = entry.map_err(|e| e.to_string())?;
+         let Ok(name) = entry.file_name().into_string() else {
+             continue;
+@@ -713,13 +773,25 @@
+             directory: kind.is_dir(),
+         });
+     }
++    if cancelled() {
++        return Err("File completion cancelled".into());
++    }
++    // No extra read past the cap: at exactly2048 we cannot prove exhaustion.
++    if scan == FileCompletionScan::Complete && scanned == 2048 {
++        scan = FileCompletionScan::EntryLimit;
++    }
+     entries.sort_by(|a, b| {
+         b.directory
+             .cmp(&a.directory)
+             .then_with(|| a.input.cmp(&b.input))
+     });
++    let display_limited = entries.len() > 128;
+     entries.truncate(128);
+-    Ok(entries)
++    Ok(FileCompletionResult {
++        entries,
++        scan,
++        display_limited,
++    })
+ }
+ 
+ /// Immutable metadata copied from the current project's resource owner.
+@@ -756,6 +828,11 @@
+     context_limit: Option<u64>,
+     elapsed: Duration,
+     started: Option<Instant>,
++    // Canonical approvals supplement coordinator-backed ApprovalView requests.
++    // Both travel with this project's draft; status text and modal focus do not.
++    canonical_approvals: Vec<String>,
++    approval_tracking_saturated: bool,
++    activity_ended: bool,
+     copy_notice: Option<(String, Instant)>,
+ }
+ impl Default for TranscriptUx {
+@@ -776,6 +853,9 @@
+             context_limit: None,
+             elapsed: Duration::ZERO,
+             started: None,
++            canonical_approvals: Vec::new(),
++            approval_tracking_saturated: false,
++            activity_ended: false,
+             copy_notice: None,
+         }
+     }
+@@ -976,12 +1056,14 @@
+         let can_focus = self.directory_picker.is_none() && self.transcript_browser.is_none();
+         let project = self.active_project().to_owned();
+         let view = self.approval_views.entry(project).or_default();
+-        if view.requests.len() < 128
+-            && !view
+-                .requests
+-                .iter()
+-                .any(|r| r.request_id == request.request_id)
++        if view
++            .requests
++            .iter()
++            .any(|r| r.request_id == request.request_id)
+         {
++            return;
++        }
++        if view.requests.len() < 128 {
+             let first = view.requests.is_empty();
+             view.requests.push(request);
+             if first {
+@@ -992,6 +1074,12 @@
+                 view.remember = false;
+             }
+             self.dirty = true;
++            self.sync_activity_timer();
++        } else {
++            // Keep the existing request cap without timing an unseen approval
++            // as active work. Only a lifecycle clear can disambiguate overflow.
++            self.transcript_ux.approval_tracking_saturated = true;
++            self.sync_activity_timer();
+         }
+     }
+     pub fn approval_count(&self) -> usize {
+@@ -1038,7 +1126,11 @@
+     pub fn retire_approval(&mut self, id: &str) {
+         let project = self.active_project().to_owned();
+         if let Some(view) = self.approval_views.get_mut(&project) {
++            let previous = view.requests.len();
+             view.requests.retain(|r| r.request_id != id);
++            if view.requests.len() == previous {
++                return;
++            }
+             view.index = view.index.min(view.requests.len().saturating_sub(1));
+             view.allow = false;
+             view.remember = false;
+@@ -1047,8 +1139,41 @@
+                 view.focused = false;
+             }
+             self.dirty = true;
+-        }
+-    }
++            // A real coordinator retirement also retires its canonical mirror.
++            self.transcript_ux
++                .canonical_approvals
++                .retain(|pending| pending != id);
++            self.sync_activity_timer();
++        }
++    }
++
++    fn sync_activity_timer(&mut self) {
++        let waiting = self.approval_count() > 0
++            || !self.transcript_ux.canonical_approvals.is_empty()
++            || self.transcript_ux.approval_tracking_saturated;
++        if !self.busy || self.transcript_ux.activity_ended || waiting {
++            self.transcript_ux.pause();
++        } else if self.transcript_ux.started.is_none() {
++            self.transcript_ux.started = Some(Instant::now());
++        }
++    }
++
++    // Clear waiting on cancellation admission, terminal, or job replacement.
++    // A cancellation request clears waiting, but work may still be winding down.
++    fn clear_activity_approvals(&mut self) {
++        self.approval_views
++            .remove(&self.project_tabs[self.active_project]);
++        self.transcript_ux.canonical_approvals.clear();
++        self.transcript_ux.approval_tracking_saturated = false;
++        self.sync_activity_timer();
++        self.dirty = true;
++    }
++
++    fn end_activity_timer(&mut self) {
++        self.transcript_ux.activity_ended = true;
++        self.clear_activity_approvals();
++    }
++
+     fn approval_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+         if self.directory_picker.is_some() {
+             return None;
+@@ -1139,16 +1264,8 @@
+         }
+         let area = frame.area();
+         if !view.focused {
+-            if area.height > 0 {
+-                frame.render_widget(
+-                    Paragraph::new(format!(
+-                        " {} approvals pending · Alt-A review",
+-                        view.requests.len()
+-                    ))
+-                    .style(Style::default().fg(Color::Yellow)),
+-                    Rect::new(area.x, area.bottom() - 1, area.width, 1),
+-                );
+-            }
++            // The footer owns the pending hint and its priority relative to
++            // save failures; drawing it here would overwrite existing text.
+             return;
+         }
+         if area.width < 4 || area.height < 5 {
+@@ -2165,7 +2282,7 @@
+     approval_views: BTreeMap<String, ApprovalView>,
+     queued_inputs: Vec<crate::input_queue::QueuedInput>,
+     scheduled_inputs: Vec<TuiScheduledInput>,
+-    file_completion: Option<(FileCompletionQuery, Vec<FileCompletion>)>,
++    file_completion: Option<(FileCompletionQuery, FileCompletionResult)>,
+     command_resources: Vec<CommandResource>,
+     transcript_ux: TranscriptUx,
+     transcript_browser: Option<TranscriptBrowser>,
+@@ -3787,11 +3904,6 @@
+     pub fn set_status(&mut self, status: impl Into<String>) {
+         let status = bound_text(status.into());
+         if self.status != status {
+-            if status.contains("Approval") {
+-                self.transcript_ux.pause();
+-            } else if self.busy && self.transcript_ux.started.is_none() {
+-                self.transcript_ux.started = Some(Instant::now());
+-            }
+             self.status = status;
+             self.dirty = true;
+         }
+@@ -3802,9 +3914,10 @@
+             self.busy = busy;
+             if busy {
+                 self.transcript_ux.elapsed = Duration::ZERO;
+-                self.transcript_ux.started = Some(Instant::now());
++                self.transcript_ux.activity_ended = false;
++                self.sync_activity_timer();
+             } else {
+-                self.transcript_ux.pause();
++                self.end_activity_timer();
+             }
+             if !busy && self.status == "Working" {
+                 self.status = "Ready".into();
+@@ -3939,6 +4052,16 @@
+     /// role; this prevents a replacement turn from being merged into a prior
+     /// answer while an interrupted provider is still winding down.
+     pub fn begin_stream_for_job(&mut self, job_id: u64) {
++        if self.streaming_job_id != Some(job_id) {
++            if self.streaming_job_id.is_some() {
++                self.clear_activity_approvals();
++            }
++            self.transcript_ux.canonical_approvals.clear();
++            self.transcript_ux.activity_ended = false;
++            self.transcript_ux.elapsed = Duration::ZERO;
++            self.transcript_ux.started = None;
++            self.sync_activity_timer();
++        }
+         self.transcript_ux.reasoning_job = None;
+         self.streaming_role = None;
+         self.streaming_job_id = Some(job_id);
+@@ -4077,6 +4200,18 @@
+     /// TUI behavior aligned with headless `ViewEvent` envelopes.
+     pub fn apply_view_event_for_job(&mut self, job_id: u64, event: &crate::view_model::ViewEvent) {
+         use crate::view_model::ViewEventKind;
++        if self.streaming_job_id != Some(job_id) {
++            return;
++        }
++        if matches!(
++            event.event,
++            ViewEventKind::TurnCompleted { .. }
++                | ViewEventKind::TurnFailed { .. }
++                | ViewEventKind::TurnCancelled { .. }
++                | ViewEventKind::Closed
++        ) {
++            self.end_activity_timer();
++        }
+         match &event.event {
+             ViewEventKind::ReasoningDelta { delta } => self.append_reasoning_for_job(job_id, delta),
+             ViewEventKind::Usage {
+@@ -4200,6 +4335,20 @@
+                 tool,
+                 arguments,
+             } => {
++                if event.validate().is_err() || self.transcript_ux.activity_ended {
++                    return;
++                }
++                let pending = &mut self.transcript_ux.canonical_approvals;
++                if !pending.contains(approval_id) {
++                    if pending.len() < 128 {
++                        pending.push(approval_id.clone());
++                    } else {
++                        // Do not resume early when an untracked request remains.
++                        // Saturation is cleared by cancellation/end/new job only.
++                        self.transcript_ux.approval_tracking_saturated = true;
++                    }
++                }
++                self.sync_activity_timer();
+                 self.push_message_block(
+                     MessageRole::System,
+                     format!("Approval required: {tool}\nRequest: {approval_id}"),
+@@ -4213,6 +4362,17 @@
+                 self.set_status("Approval required");
+             }
+             ViewEventKind::ApprovalResolved { approval_id, state } => {
++                if event.validate().is_err() || self.transcript_ux.activity_ended {
++                    return;
++                }
++                if *state != crate::view_model::ApprovalState::Pending {
++                    let pending = &mut self.transcript_ux.canonical_approvals;
++                    let previous = pending.len();
++                    pending.retain(|id| id != approval_id);
++                    if pending.len() != previous {
++                        self.sync_activity_timer();
++                    }
++                }
+                 self.push_message(
+                     MessageRole::System,
+                     format!("Approval {approval_id}: {state:?}"),
+@@ -4227,7 +4387,7 @@
+                     ),
+                 );
+             }
+-            ViewEventKind::TurnCancelled { .. } => self.discard_stream(),
++            ViewEventKind::TurnCancelled { .. } | ViewEventKind::Closed => self.discard_stream(),
+             ViewEventKind::TurnCompleted { .. } => {
+                 self.complete_stream_for_job(job_id, MessageRole::Assistant);
+             }
+@@ -4721,16 +4881,21 @@
+     pub fn apply_file_completion(
+         &mut self,
+         query: FileCompletionQuery,
+-        entries: Vec<FileCompletion>,
++        result: FileCompletionResult,
+     ) -> bool {
+         if self.file_completion_query().as_ref() != Some(&query) {
+             return false;
+         }
+-        self.file_completion = Some((query, entries));
++        self.file_completion = Some((query, result));
+         self.palette_index = 0;
+         self.palette_rows = 0;
+         self.dirty = true;
+         true
++    }
++    fn current_file_completion(&self) -> Option<&FileCompletionResult> {
++        self.file_completion.as_ref().and_then(|(query, result)| {
++            (self.file_completion_query().as_ref() == Some(query)).then_some(result)
++        })
+     }
+     pub fn command_available(&self, command: &str) -> bool {
+         if !self.busy || (!command.starts_with('/') && slash::spec(command).is_none()) {
+@@ -4872,10 +5037,8 @@
+     }
+ 
+     pub fn slash_choices(&self) -> Vec<String> {
+-        if let Some((query, entries)) = &self.file_completion
+-            && self.file_completion_query().as_ref() == Some(query)
+-        {
+-            return entries.iter().map(|e| e.input.clone()).collect();
++        if let Some(result) = self.current_file_completion() {
++            return result.entries.iter().map(|e| e.input.clone()).collect();
+         }
+         if !self.paste.folds.is_empty()
+             || self.palette_dismissed
+@@ -5020,9 +5183,8 @@
+     fn choose_slash(&mut self, choices: &[String]) {
+         if let Some(choice) = choices.get(self.palette_index % choices.len()) {
+             if let Some(entry) = self
+-                .file_completion
+-                .as_ref()
+-                .and_then(|(_, entries)| entries.iter().find(|e| e.input == *choice))
++                .current_file_completion()
++                .and_then(|result| result.entries.iter().find(|e| e.input == *choice))
+                 .cloned()
+             {
+                 self.set_completed_input(if entry.directory {
+@@ -5068,18 +5230,43 @@
+         self.palette_area = Rect::default();
+         self.palette_rows = 0;
+         let choices = self.slash_choices();
++        let notice = self
++            .current_file_completion()
++            .and_then(FileCompletionResult::notice);
++        let available = prompt.y.saturating_sub(frame.area().y);
+         if choices.is_empty() {
++            if let Some((status, guidance)) = notice
++                && available >= 4
++            {
++                let area = Rect::new(prompt.x, prompt.y - 4, prompt.width.min(112), 4);
++                self.palette_area = area;
++                let width = usize::from(area.width.saturating_sub(2));
++                let lines = [status, guidance].map(|text| Line::from(menu_prefix(text, width)));
++                frame.render_widget(Clear, area);
++                frame.render_widget(
++                    Paragraph::new(lines.to_vec())
++                        .block(Block::default().borders(Borders::ALL).title(" Files ")),
++                    area,
++                );
++            }
+             return;
+         }
+-        let available = prompt.y.saturating_sub(frame.area().y);
+-        let height = (choices.len().min(8) as u16 + 4).min(available);
+-        if height < 5 {
++        // Preserve the existing minimum space for one selectable candidate.
++        // Explanations use spare rows; the title still marks partial results.
++        let notice_rows = if notice.is_some() {
++            available.saturating_sub(5).min(2)
++        } else {
++            0
++        };
++        let footer = 4 + notice_rows;
++        let height = (choices.len().min(8) as u16 + footer).min(available);
++        if height < footer + 1 {
+             return;
+         }
+         let area = Rect::new(prompt.x, prompt.y - height, prompt.width.min(112), height);
+         self.palette_area = area;
+         let selected = self.palette_index.min(choices.len() - 1);
+-        self.palette_rows = usize::from(height - 4).min(choices.len());
++        self.palette_rows = usize::from(height - footer).min(choices.len());
+         self.palette_start = selected.saturating_sub(self.palette_rows.saturating_sub(1));
+         let mut lines = choices
+             .iter()
+@@ -5136,9 +5323,8 @@
+                 }
+             })
+         } else if let Some(file) = self
+-            .file_completion
+-            .as_ref()
+-            .and_then(|(_, files)| files.iter().find(|f| f.input == *choice))
++            .current_file_completion()
++            .and_then(|result| result.entries.iter().find(|f| f.input == *choice))
+         {
+             (
+                 if file.directory {
+@@ -5169,12 +5355,24 @@
+                 Style::default().fg(Color::DarkGray),
+             )));
+         }
++        if let Some((status, guidance)) = notice {
++            for text in [status, guidance]
++                .into_iter()
++                .take(usize::from(notice_rows))
++            {
++                lines.push(Line::from(Span::styled(
++                    menu_prefix(text, source_width),
++                    Style::default().fg(Color::Yellow),
++                )));
++            }
++        }
+         frame.render_widget(Clear, area);
+         frame.render_widget(
+             Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title(format!(
+-                " Commands / files {}/{}{} ",
++                " Commands / files {}/{}{}{} ",
+                 selected + 1,
+                 choices.len(),
++                if notice.is_some() { " · partial" } else { "" },
+                 if self.command_resources.iter().any(|r| r.command == *choice) {
+                     " · F2 source"
+                 } else {
+@@ -5741,7 +5939,7 @@
+             return TuiAction::Redraw;
+         }
+         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
+-            return if self.slash_choices().is_empty() {
++            return if self.external_editor_shortcut_available() {
+                 TuiAction::OpenExternalEditor
+             } else {
+                 TuiAction::None
+@@ -5986,7 +6184,9 @@
+             // into the prompt. For example, Ctrl-D on a non-empty draft used
+             // to append `d`, and Ctrl-A appended `a` instead of being inert.
+             KeyCode::Char(character)
+-                if !modifiers.intersects(KeyModifiers::ALT | KeyModifiers::CONTROL) =>
++                if !modifiers.intersects(
++                    KeyModifiers::ALT | KeyModifiers::CONTROL | KeyModifiers::SUPER,
++                ) =>
+             {
+                 self.insert_text(&character.to_string())
+             }
+@@ -7018,6 +7218,17 @@
+         frame.set_cursor_position(Position::new(x, y));
+     }
+ 
++    fn external_editor_shortcut_available(&self) -> bool {
++        self.directory_picker.is_none()
++            && self.transcript_browser.is_none()
++            && self.history_search.is_none()
++            && !self
++                .approval_views
++                .get(self.active_project())
++                .is_some_and(|view| view.focused && !view.requests.is_empty())
++            && self.slash_choices().is_empty()
++    }
++
+     fn render_footer(&self, frame: &mut Frame<'_>, area: Rect) {
+         if area.width == 0 || area.height == 0 {
+             return;
+@@ -7026,29 +7237,42 @@
+             .checkpoint_error
+             .as_ref()
+             .map(|error| format!(" Draft not saved · {error}"));
++        let pending_approval = self
++            .approval_views
++            .get(self.active_project())
++            .filter(|view| !view.focused && !view.requests.is_empty())
++            .map(|view| format!(" {} approvals pending · Alt-A review", view.requests.len()));
+         let background_approval = self.background_approval_hint();
+         let text = truncate_to_width(
+             if let Some(warning) = unsaved.as_deref() {
+                 warning
++            } else if let Some(hint) = pending_approval.as_deref() {
++                hint
+             } else if let Some(hint) = background_approval.as_deref() {
+                 hint
+             } else if self.adjacent_paste().is_some() {
+                 " Alt-Enter expand paste · Left/Right move · Backspace/Delete remove · Enter send "
+             } else if area.width < 100 {
+                 " Enter send · Ctrl-J newline · Ctrl-R history · Ctrl-C stop · /help input "
++            } else if self.external_editor_shortcut_available() {
++                " Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+             } else {
+-                " Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
++                " Enter send · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+             },
+             usize::from(area.width),
+         );
+         frame.render_widget(
+             Paragraph::new(Span::styled(
+                 text,
+-                Style::default().fg(if unsaved.is_none() && background_approval.is_some() {
+-                    Color::Yellow
+-                } else {
+-                    Color::DarkGray
+-                }),
++                Style::default().fg(
++                    if unsaved.is_none()
++                        && (pending_approval.is_some() || background_approval.is_some())
++                    {
++                        Color::Yellow
++                    } else {
++                        Color::DarkGray
++                    },
++                ),
+             )),
+             area,
+         );
+@@ -11547,7 +11771,7 @@
+     let completion_runner = BackgroundRunner::spawn(
+         |query: FileCompletionQuery,
+          token|
+-         -> Result<(FileCompletionQuery, Vec<FileCompletion>), String> {
++         -> Result<(FileCompletionQuery, FileCompletionResult), String> {
+             let entries = complete_file_query(&query, || token.is_cancelled())?;
+             token.mark_completed();
+             Ok((query, entries))
+@@ -12084,9 +12308,7 @@
+                         // next normal user message would be consumed as a
+                         // stale y/n response.
+                         pending_approvals.clear();
+-                        state
+-                            .approval_views
+-                            .remove(&state.project_tabs[state.active_project]);
++                        state.clear_activity_approvals();
+                         active_job = None;
+                         active_job_kind = None;
+                         state.set_busy(false);
+@@ -12196,9 +12418,7 @@
+                         // approval response. Do not let its prompt swallow
+                         // the next user turn.
+                         pending_approvals.clear();
+-                        state
+-                            .approval_views
+-                            .remove(&state.project_tabs[state.active_project]);
++                        state.clear_activity_approvals();
+                         active_job = None;
+                         active_job_kind = None;
+                         state.discard_stream();
+@@ -12216,9 +12436,7 @@
+                         // that acknowledgement as the terminal boundary for
+                         // any approval prompt belonging to this turn.
+                         pending_approvals.clear();
+-                        state
+-                            .approval_views
+-                            .remove(&state.project_tabs[state.active_project]);
++                        state.clear_activity_approvals();
+                         state.set_status("Interrupt requested");
+                         scheduler.request();
+                     }
+@@ -12406,7 +12624,9 @@
+                         match result {
+                             Ok(()) => pending_approvals.retain(|r| r.request_id != request_id),
+                             Err(error) => {
+-                                state.retire_approval(&request_id);
++                                // A failed response is not a decision. The coordinator
++                                // reconciliation above retires requests only after
++                                // they are no longer pending.
+                                 state.push_message(
+                                     MessageRole::Error,
+                                     format!("Approval unavailable: {error}"),
+@@ -12869,9 +13089,7 @@
+                                                     approval.emergency_cancel();
+                                                 }
+                                                 pending_approvals.clear();
+-                                                state.approval_views.remove(
+-                                                    &state.project_tabs[state.active_project],
+-                                                );
++                                                state.clear_activity_approvals();
+                                             }
+                                             state.set_status("Interrupt requested");
+                                         } else {
+@@ -13066,9 +13284,7 @@
+                                     approval.emergency_cancel();
+                                 }
+                                 pending_approvals.clear();
+-                                state
+-                                    .approval_views
+-                                    .remove(&state.project_tabs[state.active_project]);
++                                state.clear_activity_approvals();
+                             }
+                             state.set_status("Interrupt requested");
+                         } else {
+@@ -14325,6 +14541,543 @@
+     use std::path::PathBuf;
+ 
+     #[test]
++    fn file_completion_scan_limits_and_cancel_are_deterministic() {
++        use std::cell::Cell;
++        let root = tempfile::tempdir().unwrap();
++        for index in 0..2049 {
++            std::fs::write(root.path().join(format!("file-{index:04}")), "").unwrap();
++        }
++        let mut query = FileCompletionQuery {
++            root: root.path().into(),
++            input: "/attach file-".into(),
++            prefix: "/attach ".into(),
++            path: "file-".into(),
++            raw_selection: false,
++        };
++        let polls = Cell::new(0);
++        let capped = complete_file_query_with_clock(
++            &query,
++            || false,
++            |_| {
++                polls.set(polls.get() + 1);
++                Duration::ZERO
++            },
++        )
++        .unwrap();
++        assert_eq!(polls.get(), 2048, "never scan beyond the existing cap");
++        assert_eq!(capped.scan, FileCompletionScan::EntryLimit);
++        assert!(capped.display_limited);
++        assert_eq!(capped.entries.len(), 128);
++        std::fs::remove_file(root.path().join("file-2048")).unwrap();
++        let exact_cap =
++            complete_file_query_with_clock(&query, || false, |_| Duration::ZERO).unwrap();
++        assert_eq!(
++            exact_cap.scan,
++            FileCompletionScan::EntryLimit,
++            "at exactly the cap, exhaustion has not been established"
++        );
++        query.path = "not-scanned-match".into();
++        let empty = complete_file_query_with_clock(&query, || false, |_| Duration::ZERO).unwrap();
++        assert_eq!(empty.scan, FileCompletionScan::EntryLimit);
++        assert!(!empty.display_limited);
++        assert!(empty.entries.is_empty());
++        assert!(
++            empty
++                .notice()
++                .unwrap()
++                .1
++                .contains("No matches in scanned entries")
++        );
++        assert!(
++            !empty
++                .notice()
++                .unwrap()
++                .0
++                .contains("No matching files in this directory")
++        );
++
++        query.path = "file-".into();
++        let ticks = Cell::new(0);
++        let timed = complete_file_query_with_clock(
++            &query,
++            || false,
++            |_| {
++                ticks.set(ticks.get() + 1);
++                Duration::from_millis(if ticks.get() == 1 { 150 } else { 151 })
++            },
++        )
++        .unwrap();
++        assert_eq!(timed.scan, FileCompletionScan::TimeLimit);
++        assert_eq!(timed.entries.len(), 1, "150ms stays allowed;151ms stops");
++        let timed_empty =
++            complete_file_query_with_clock(&query, || false, |_| Duration::from_millis(151))
++                .unwrap();
++        assert!(timed_empty.entries.is_empty());
++        assert_eq!(timed_empty.scan, FileCompletionScan::TimeLimit);
++        assert!(complete_file_query_with_clock(&query, || true, |_| Duration::ZERO).is_err());
++        let cancels = Cell::new(0);
++        let late = complete_file_query_with_clock(
++            &query,
++            || {
++                cancels.set(cancels.get() + 1);
++                cancels.get() > 2049
++            },
++            |_| Duration::ZERO,
++        );
++        assert_eq!(cancels.get(), 2050);
++        assert_eq!(late.unwrap_err(), "File completion cancelled");
++    }
++
++    #[test]
++    fn file_completion_exhaustion_and_display_limit_are_separate() {
++        let root = tempfile::tempdir().unwrap();
++        let query = FileCompletionQuery {
++            root: root.path().into(),
++            input: "@".into(),
++            prefix: "@".into(),
++            path: String::new(),
++            raw_selection: false,
++        };
++        let empty = complete_file_query_with_clock(&query, || false, |_| Duration::ZERO).unwrap();
++        assert_eq!(empty.scan, FileCompletionScan::Complete);
++        assert!(!empty.display_limited);
++        assert_eq!(
++            empty.notice().unwrap().0,
++            "No matching files in this directory"
++        );
++        for index in 0..128 {
++            std::fs::write(root.path().join(format!("file-{index:03}")), "").unwrap();
++        }
++        let exact = complete_file_query_with_clock(&query, || false, |_| Duration::ZERO).unwrap();
++        assert_eq!(exact.scan, FileCompletionScan::Complete);
++        assert_eq!(exact.entries.len(), 128);
++        assert!(!exact.display_limited);
++        assert!(exact.notice().is_none());
++        std::fs::write(root.path().join("file-128"), "").unwrap();
++        let clipped = complete_file_query_with_clock(&query, || false, |_| Duration::ZERO).unwrap();
++        assert_eq!(clipped.scan, FileCompletionScan::Complete);
++        assert!(clipped.display_limited);
++        assert_eq!(clipped.entries.len(), 128);
++        assert!(clipped.notice().unwrap().0.contains("display limit"));
++    }
++
++    fn approval_timer_request(id: &str) -> crate::approval::ApprovalRequest {
++        crate::approval::ApprovalRequest {
++            request_id: id.into(),
++            turn_id: "timer-turn".into(),
++            call_id: format!("call-{id}"),
++            tool: "write_file".into(),
++            side_effect: crate::tools::ToolSideEffect::WorkspaceWrite,
++            arguments: serde_json::json!({"path":"unused.txt"}),
++            preview: None,
++            origin: crate::tools::ToolOrigin::AgentTool,
++            policy_digest: None,
++            lease_id: None,
++        }
++    }
++
++    #[test]
++    fn approval_timer_pending_request_pauses_without_status_text() {
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        s.transcript_ux.started = Some(Instant::now() - Duration::from_secs(5));
++        s.present_approval(approval_timer_request("one"));
++        assert!(s.transcript_ux.started.is_none());
++        assert!(s.transcript_ux.elapsed >= Duration::from_secs(5));
++    }
++
++    #[test]
++    fn approval_timer_pending_survives_status_and_hidden_modal() {
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        s.present_approval(approval_timer_request("one"));
++        s.set_status("Approval required");
++        s.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
++        let elapsed = s.transcript_ux.elapsed;
++        s.set_status("Draft kept");
++        assert!(s.transcript_ux.started.is_none());
++        assert_eq!(s.transcript_ux.elapsed, elapsed);
++        assert_eq!(s.approval_count(), 1);
++    }
++
++    #[test]
++    fn approval_timer_last_retire_resumes_without_tool_or_text_event() {
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        s.present_approval(approval_timer_request("one"));
++        s.set_status("Approval required");
++        let elapsed = s.transcript_ux.elapsed;
++        s.retire_approval("one");
++        assert!(s.transcript_ux.started.is_some());
++        assert_eq!(s.transcript_ux.elapsed, elapsed);
++    }
++
++    #[test]
++    fn approval_timer_approval_before_busy_stays_paused() {
++        let mut s = TuiState::default();
++        s.present_approval(approval_timer_request("one"));
++        s.set_busy(true);
++        assert!(s.transcript_ux.started.is_none());
++    }
++
++    #[test]
++    fn approval_timer_status_words_alone_cannot_pause() {
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        let started = s.transcript_ux.started;
++        s.set_status("Approval history copied");
++        assert_eq!(s.transcript_ux.started, started);
++    }
++
++    #[test]
++    fn approval_timer_unknown_and_partial_retire_control() {
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        s.present_approval(approval_timer_request("one"));
++        s.present_approval(approval_timer_request("two"));
++        s.set_status("Approval required");
++        s.retire_approval("unknown");
++        s.retire_approval("one");
++        assert!(s.transcript_ux.started.is_none());
++        assert_eq!(s.approval_count(), 1);
++    }
++
++    fn approval_timer_event(s: &mut TuiState, job: u64, kind: crate::view_model::ViewEventKind) {
++        let event = crate::view_model::ViewEvent::with_context(
++            0,
++            None,
++            Some("timer-turn".into()),
++            None,
++            kind,
++        )
++        .unwrap();
++        s.apply_view_event_for_job(job, &event);
++    }
++
++    fn approval_timer_required(id: &str) -> crate::view_model::ViewEventKind {
++        crate::view_model::ViewEventKind::ApprovalRequired {
++            approval_id: id.into(),
++            tool: "write_file".into(),
++            arguments: "{}".into(),
++        }
++    }
++
++    fn approval_timer_resolved(id: &str) -> crate::view_model::ViewEventKind {
++        crate::view_model::ViewEventKind::ApprovalResolved {
++            approval_id: id.into(),
++            state: crate::view_model::ApprovalState::Allowed,
++        }
++    }
++
++    #[test]
++    fn approval_timer_canonical_multiple_unknown_pending_and_real_mirror() {
++        let mut s = TuiState::default();
++        s.begin_stream_for_job(1);
++        s.set_busy(true);
++        approval_timer_event(&mut s, 1, approval_timer_required("one"));
++        approval_timer_event(&mut s, 1, approval_timer_required("one"));
++        approval_timer_event(&mut s, 1, approval_timer_required("two"));
++        assert_eq!(s.transcript_ux.canonical_approvals.len(), 2);
++        assert!(s.transcript_ux.started.is_none());
++        approval_timer_event(&mut s, 1, approval_timer_resolved("unknown"));
++        approval_timer_event(
++            &mut s,
++            1,
++            crate::view_model::ViewEventKind::ApprovalResolved {
++                approval_id: "one".into(),
++                state: crate::view_model::ApprovalState::Pending,
++            },
++        );
++        assert_eq!(s.transcript_ux.canonical_approvals.len(), 2);
++        approval_timer_event(&mut s, 1, approval_timer_resolved("one"));
++        assert!(s.transcript_ux.started.is_none());
++        s.present_approval(approval_timer_request("two"));
++        approval_timer_event(&mut s, 1, approval_timer_resolved("two"));
++        assert!(
++            s.transcript_ux.started.is_none(),
++            "canonical resolution cannot retire coordinator request"
++        );
++        s.retire_approval("two");
++        assert!(s.transcript_ux.started.is_some());
++        s.present_approval(approval_timer_request("three"));
++        approval_timer_event(&mut s, 1, approval_timer_required("three"));
++        s.retire_approval("three");
++        assert!(
++            s.transcript_ux.started.is_some(),
++            "real retirement clears its mirror without another event"
++        );
++        approval_timer_event(&mut s, 1, approval_timer_required("four"));
++        approval_timer_event(&mut s, 1, approval_timer_resolved("four"));
++        assert!(
++            s.transcript_ux.started.is_some(),
++            "canonical-only last resolution resumes"
++        );
++    }
++
++    #[test]
++    fn approval_timer_stale_jobs_cannot_pause_resume_or_cancel_replacement() {
++        let mut s = TuiState::default();
++        s.begin_stream_for_job(1);
++        s.set_busy(true);
++        s.present_approval(approval_timer_request("old"));
++        approval_timer_event(&mut s, 1, approval_timer_required("old"));
++        s.begin_stream_for_job(2);
++        assert_eq!(s.approval_count(), 0);
++        assert!(s.transcript_ux.started.is_some());
++        assert_eq!(s.transcript_ux.elapsed, Duration::ZERO);
++        let started = s.transcript_ux.started;
++        approval_timer_event(&mut s, 1, approval_timer_required("late"));
++        approval_timer_event(
++            &mut s,
++            1,
++            crate::view_model::ViewEventKind::TurnCancelled { reason: None },
++        );
++        assert_eq!(s.transcript_ux.started, started);
++        assert_eq!(s.streaming_job_id, Some(2));
++        approval_timer_event(&mut s, 2, approval_timer_required("current"));
++        approval_timer_event(&mut s, 1, approval_timer_resolved("current"));
++        assert!(s.transcript_ux.started.is_none());
++        assert_eq!(s.transcript_ux.canonical_approvals, ["current"]);
++    }
++
++    #[test]
++    fn approval_timer_terminal_events_stop_and_next_turn_resets() {
++        use crate::view_model::ViewEventKind as V;
++        for terminal in [
++            V::TurnCancelled { reason: None },
++            V::TurnCompleted {
++                response_id: None,
++                model: None,
++            },
++            V::TurnFailed {
++                code: None,
++                message: "fixture".into(),
++                retryable: false,
++            },
++            V::Closed,
++        ] {
++            let mut s = TuiState::default();
++            s.begin_stream_for_job(1);
++            s.set_busy(true);
++            s.transcript_ux.started = Some(Instant::now() - Duration::from_secs(7));
++            s.present_approval(approval_timer_request("one"));
++            approval_timer_event(&mut s, 1, approval_timer_required("one"));
++            let elapsed = s.transcript_ux.elapsed;
++            approval_timer_event(&mut s, 1, terminal);
++            assert!(s.transcript_ux.started.is_none());
++            assert_eq!(s.approval_count(), 0);
++            assert!(s.transcript_ux.canonical_approvals.is_empty());
++            s.retire_approval("one");
++            s.set_status("Working");
++            assert_eq!(s.transcript_ux.elapsed, elapsed);
++            assert!(s.transcript_ux.started.is_none());
++            s.set_busy(false);
++            s.begin_stream_for_job(2);
++            s.set_busy(true);
++            assert!(s.transcript_ux.started.is_some());
++            assert_eq!(s.transcript_ux.elapsed, Duration::ZERO);
++        }
++    }
++
++    #[test]
++    fn approval_timer_admitted_cancel_clears_wait_but_only_terminal_stops_work() {
++        let mut s = TuiState::default();
++        s.begin_stream_for_job(1);
++        s.set_busy(true);
++        s.present_approval(approval_timer_request("one"));
++        approval_timer_event(&mut s, 1, approval_timer_required("one"));
++        s.set_status("Interrupt requested");
++        assert!(
++            s.transcript_ux.started.is_none(),
++            "text alone also covers a rejected/queue-full request"
++        );
++        s.clear_activity_approvals();
++        assert_eq!(s.approval_count(), 0);
++        assert!(
++            s.transcript_ux.started.is_some(),
++            "admission is not provider completion"
++        );
++        s.set_busy(false);
++        assert!(s.transcript_ux.started.is_none());
++        s.retire_approval("one");
++        assert!(s.transcript_ux.started.is_none());
++    }
++
++    #[test]
++    fn approval_timer_projects_keep_independent_running_and_waiting_intervals() {
++        let mut s = TuiState::default();
++        s.begin_stream_for_job(1);
++        s.set_busy(true);
++        s.transcript_ux.started = Some(Instant::now() - Duration::from_secs(9));
++        s.present_approval(approval_timer_request("one"));
++        approval_timer_event(&mut s, 1, approval_timer_required("one"));
++        let first_elapsed = s.transcript_ux.elapsed;
++        s.open_project_tab("second");
++        s.begin_stream_for_job(2);
++        s.set_busy(true);
++        let second_started = s.transcript_ux.started;
++        s.retire_approval("one");
++        assert_eq!(s.transcript_ux.started, second_started);
++        s.select_project_tab(0);
++        assert_eq!(s.transcript_ux.elapsed, first_elapsed);
++        assert!(s.transcript_ux.started.is_none());
++        s.retire_approval("one");
++        assert!(s.transcript_ux.started.is_some());
++        let first_started = s.transcript_ux.started;
++        s.select_project_tab(1);
++        assert_eq!(
++            s.transcript_ux.started, second_started,
++            "hiding a running project must not restart its interval"
++        );
++        s.set_busy(false);
++        s.select_project_tab(0);
++        assert_eq!(s.transcript_ux.started, first_started);
++        assert_eq!(s.transcript_ux.elapsed, first_elapsed);
++    }
++
++    #[test]
++    fn approval_timer_bounded_tracking_never_resumes_with_untracked_waits() {
++        for canonical in [false, true] {
++            let mut s = TuiState::default();
++            s.begin_stream_for_job(1);
++            s.set_busy(true);
++            for i in 0..129 {
++                let id = format!("pending-{i}");
++                if canonical {
++                    approval_timer_event(&mut s, 1, approval_timer_required(&id));
++                } else {
++                    s.present_approval(approval_timer_request(&id));
++                }
++            }
++            assert_eq!(
++                if canonical {
++                    s.transcript_ux.canonical_approvals.len()
++                } else {
++                    s.approval_count()
++                },
++                128
++            );
++            assert!(s.transcript_ux.approval_tracking_saturated);
++            for i in 0..129 {
++                let id = format!("pending-{i}");
++                if canonical {
++                    approval_timer_event(&mut s, 1, approval_timer_resolved(&id));
++                } else {
++                    s.retire_approval(&id);
++                }
++            }
++            assert!(s.transcript_ux.started.is_none());
++            s.set_busy(false);
++            s.begin_stream_for_job(2);
++            s.set_busy(true);
++            assert!(!s.transcript_ux.approval_tracking_saturated);
++            assert!(s.transcript_ux.started.is_some());
++        }
++    }
++
++    #[test]
++    fn approval_timer_real_coordinator_response_checks_identity_before_resuming() {
++        use crate::approval::{ApprovalCoordinator, ApprovalDecision, ApprovalPolicy};
++        let owner = ApprovalCoordinator::default();
++        let worker_owner = owner.clone();
++        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
++        let worker = std::thread::spawn(move || {
++            worker_owner.request_response(
++                approval_timer_request("real"),
++                &mut ApprovalPolicy::default(),
++                &|| {
++                    let _ = ready_tx.try_send(());
++                    false
++                },
++            )
++        });
++        // The cancellation predicate runs after pending registration. This is
++        // a channel handshake, not a sleep intended to cross a timer second.
++        ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
++        let mut s = TuiState::default();
++        s.set_busy(true);
++        s.present_approval(owner.drain_pending().pop().unwrap());
++        assert!(s.transcript_ux.started.is_none());
++        let project = s.active_project().to_owned();
++        let wrong = respond_tui_approval(
++            &mut s,
++            &owner,
++            Some(&project),
++            (&project, "real", "timer-turn", "wrong-call"),
++            (true, false),
++        );
++        assert!(wrong.is_err());
++        assert!(s.transcript_ux.started.is_none());
++        respond_tui_approval(
++            &mut s,
++            &owner,
++            Some(&project),
++            (&project, "real", "timer-turn", "call-real"),
++            (false, false),
++        )
++        .unwrap();
++        assert!(s.transcript_ux.started.is_some());
++        assert_eq!(
++            worker.join().unwrap().unwrap().decision,
++            ApprovalDecision::Deny
++        );
++        let started = s.transcript_ux.started;
++        assert!(
++            respond_tui_approval(
++                &mut s,
++                &owner,
++                Some(&project),
++                (&project, "real", "timer-turn", "call-real"),
++                (true, false)
++            )
++            .is_err()
++        );
++        assert_eq!(s.transcript_ux.started, started);
++    }
++
++    #[test]
++    fn approval_timer_hidden_footer_replaces_shortcut_text_after_resize() {
++        let mut state = TuiState::default();
++        state.set_input("keep this draft");
++        state.present_approval(approval_timer_request("footer"));
++        state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
++        for width in [180, 40, 80, 180] {
++            let mut terminal =
++                Terminal::new(ratatui::backend::TestBackend::new(width, 40)).unwrap();
++            terminal
++                .draw(|frame| state.render_bentobox(frame, "zenpi"))
++                .unwrap();
++            let footer: String = (0..width)
++                .map(|x| terminal.backend().buffer()[(x, 39)].symbol())
++                .collect();
++            assert_eq!(
++                footer.trim(),
++                "1 approvals pending · Alt-A review",
++                "width={width}"
++            );
++            assert_eq!(state.input(), "keep this draft");
++            assert_eq!(state.approval_count(), 1);
++        }
++    }
++
++    #[test]
++    fn approval_timer_hidden_footer_preserves_unsaved_draft_warning() {
++        let mut state = TuiState::default();
++        state.present_approval(approval_timer_request("footer"));
++        state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
++        state.checkpoint_result(Err("disk full".into()));
++        let mut terminal = Terminal::new(ratatui::backend::TestBackend::new(180, 40)).unwrap();
++        terminal
++            .draw(|frame| state.render_bentobox(frame, "zenpi"))
++            .unwrap();
++        let footer: String = (0..180)
++            .map(|x| terminal.backend().buffer()[(x, 39)].symbol())
++            .collect();
++        assert_eq!(footer.trim(), "Draft not saved · disk full");
++        assert_eq!(state.approval_count(), 1);
++    }
++
++    #[test]
+     fn normal_unicode_typing_reopens_file_completion_after_escape() {
+         let root = tempfile::tempdir().unwrap();
+         std::fs::write(root.path().join("工作.txt"), "file").unwrap();
+@@ -14566,6 +15319,7 @@
+     #[test]
+     fn canonical_approval_and_drop_events_are_visible() {
+         let mut state = TuiState::default();
++        state.begin_stream_for_job(1);
+         let approval = crate::view_model::ViewEvent::with_context(
+             0,
+             None,

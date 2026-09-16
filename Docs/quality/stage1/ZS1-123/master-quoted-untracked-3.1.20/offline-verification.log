@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "kind": "offline structural checks only",
+  "manifest_verified": true,
+  "before_sha256": "811bde9af190b2e439542c0a89dd8e8a1f76bbcf8eb6aa3ad3b16143447ec30b",
+  "after_sha256": "eb8cd91d6f84ea977454fe69a2304a2ff56ef714b8356e90e51526f5ce1dfcc3",
+  "patch_sha256": "b2ec218d48f5159915dc17dcaf943ac4ac2721aac1b2c634d289be07c7eb8646",
+  "patch_exact_apply_reverse": "passed",
+  "only_product_path": "src/slash_actions.rs",
+  "final_build_inputs": 225,
+  "unchanged_initial_inputs": 222,
+  "run_receipts_verified": 18,
+  "negative_missing_checks": 24,
+  "final_top_level_tests": 33,
+  "nested_environment_children_excluded_from_total": 4,
+  "deferred_gap_observation_tests_in_total": 1,
+  "native_non_utf8_inode_case": "EILSEQ unavailable on this filesystem; raw-byte decoder rejection tested",
+  "new_runtime_runs_by_verifier": 0,
+  "whole_item_123_acceptance": false
+}

@@ -1,0 +1,25 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-501-520.txt b/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-501-520.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-reuse319/target-excerpts/tests__stage1_anthropic.rs-501-520.txt
+@@ -0,0 +1,20 @@
++struct Cli {
++    child: Child,
++    input: ChildStdin,
++    lines: mpsc::Receiver<Value>,
++}
++impl Cli {
++    fn start(root: &Path) -> Self {
++        let mut c = Command::new(env!("CARGO_BIN_EXE_zenpi"));
++        c.current_dir(root)
++            .args(["--mode", "headless", "--session"])
++            .arg(root.join("session.jsonl"))
++            .env("ZENPI_HOME", root.join("user"))
++            .env("ZENPI_API_KEY", "native-fixture-key")
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::inherit());
++        for key in [
++            "ZENPI_PROFILE",
++            "ZENPI_BACKEND",
++            "ZENPI_PROVIDER",

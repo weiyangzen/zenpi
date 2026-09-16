@@ -1,0 +1,29 @@
+{
+  "manifest_sha256": "212bf81cdc5c6e6ef6ae9a706cadaf894673c3597ba859467ab52fc0760ebdb4",
+  "files_verified": 28,
+  "full_patch_forward_reverse": true,
+  "product_paths": [
+    {
+      "path": "src/providers/anthropic.rs",
+      "base_exists": true,
+      "base_sha256": "f2d1518520d02984c21b09e5fc0895d0a627331da5bd022c0ceb27968035a2f0",
+      "base_bytes": 33395,
+      "sha256": "92b9b1f36fdfc37d6a1d1f260ed972e7e3bacd61c319ff6ba4ef757b825b4906",
+      "bytes": 33692,
+      "lines": 887,
+      "patch_sha256": "72d5053c7ba1631edbfe7de93ef897b80a7fc455b2bf551c691663f3474361b6",
+      "status": "[_]"
+    },
+    {
+      "path": "tests/stage1_anthropic.rs",
+      "base_exists": true,
+      "base_sha256": "a8741a815dba2496a3fb3b874e090c3e6b112f0c5ee69ee8183e11cd8afca31a",
+      "base_bytes": 33840,
+      "sha256": "bab4b7d3e846d2dadc5e8b7083ad5713acbe23e3315742c675f7ac5f79b02550",
+      "bytes": 36677,
+      "lines": 1041,
+      "patch_sha256": "9fe45e4f9622665d9b50450bab960696411417f6571a552b32357070b72557b2",
+      "status": "[_]"
+    }
+  ]
+}

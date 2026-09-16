@@ -1,0 +1,71 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-133",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "file133-current-integration-3.1.21",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-133",
+  "source_path": "tests/headless_project_workspace.rs",
+  "source_hash": "6e87b7649b0e61c8fded9ec1b7bab953a479d6442020868a3e76d408d411248d",
+  "read_ranges": [
+    [
+      0,
+      2885
+    ],
+    [
+      2885,
+      12297
+    ],
+    [
+      12297,
+      23349
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/tests/headless_project_workspace.rs_learn.md",
+      "bytes": 19814,
+      "sha256": "1db4d25d44079d366b99be474069f2190ebf0345571b69a7f1d01bb3851d175d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-133/master-review-3.1.21/review.md",
+      "bytes": 1861,
+      "sha256": "00bb930b7931c1acdff5b4acc25570bb55064c2b04cbecf76d3749ae97bd7158"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-133/master-review-3.1.21/worker-report.md",
+      "bytes": 17951,
+      "sha256": "a4aa8813d781394d36cd230c4222cfd869433ffbaf39b885e7ae60e098707ff9"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-133/master-review-3.1.21/worker-manifest.json",
+      "bytes": 130917,
+      "sha256": "daaf4c1342bb86115a2420add98dcf92622cb5fd180f501d30c3d75180746bfb"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-133/master-review-3.1.21/controller-read-ranges.json",
+      "bytes": 819,
+      "sha256": "193754871f810a8508f7ecf582b2c24a4ce9f59a405cf2a13cef8fae4c064e9d"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-132/master-busy-test-shell-3.1.21/review.md",
+      "bytes": 4523,
+      "sha256": "9713f6bc0ceeaeefde2c9d625e7df5a5a36c31cc59549b9d6c17417529668952"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-132/master-busy-test-shell-3.1.21/master-verification.json",
+      "bytes": 33834,
+      "sha256": "6580c7511b1549fccc3025ab574769dfa19412be6ba60f3dc6186a89c7ff7172"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-132/master-busy-test-shell-3.1.21/integration-evidence.tar.gz",
+      "bytes": 103882793,
+      "sha256": "4a83e72147aadc78a36fe60b395b1ff121d4c7cf6d8a0acc2c0edd04dfbbc33f"
+    }
+  ],
+  "role": "worker",
+  "reviewer": "worker B with controller current qualification"
+}

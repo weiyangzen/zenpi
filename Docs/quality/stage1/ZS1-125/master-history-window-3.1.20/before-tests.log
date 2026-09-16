@@ -1,0 +1,49 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running tests/tui_transcript_ux.rs (target/debug/deps/tui_transcript_ux-e6a9ce05a2386905)
+
+running 11 tests
+test clipboard_control_encoding_is_bounded_and_never_inlines_source_escape_sequences ... ok
+test actual_usage_is_visible_and_stale_usage_does_not_replace_current_job ... ok
+test directory_picker_owns_transcript_shortcuts_until_closed ... ok
+test block_browser_copies_code_payload_and_escape_preserves_draft ... ok
+test reasoning_is_independent_foldable_and_never_part_of_answer_copy ... ok
+test reasoning_preference_survives_project_switch_and_checkpoint ... ok
+test scroll_anchor_stays_on_history_when_new_messages_arrive_and_end_resumes_following ... ok
+
+thread 'newest_reply_remains_visible_beyond_the_transcript_line_budget' (28913526) panicked at tests/tui_transcript_ux.rs:126:5:
+assertion failed: render(&mut state, 140, 40).contains("LATEST_REPLY_AFTER_18000_ROWS")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test newest_reply_remains_visible_beyond_the_transcript_line_budget ... FAILED
+test error_details_are_readable_in_scrollable_inspector_and_interrupt_still_works ... ok
+
+thread 'rolling_render_window_keeps_the_reading_position_when_new_rows_arrive' (28913529) panicked at tests/tui_transcript_ux.rs:144:5:
+assertion `left == right` failed
+  left: "│  history-398-05                                      ││Waiting for Blueprint/Goal snapshot                                               │"
+ right: "│  history-398-04                                      ││Waiting for Blueprint/Goal snapshot                                               │"
+test rolling_render_window_keeps_the_reading_position_when_new_rows_arrive ... FAILED
+test narrow_project_arrows_remain_visible_and_mouse_navigates_hidden_previous_tabs ... ok
+
+failures:
+
+failures:
+    newest_reply_remains_visible_beyond_the_transcript_line_budget
+    rolling_render_window_keeps_the_reading_position_when_new_rows_arrive
+
+test result: FAILED. 9 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `--test tui_transcript_ux`

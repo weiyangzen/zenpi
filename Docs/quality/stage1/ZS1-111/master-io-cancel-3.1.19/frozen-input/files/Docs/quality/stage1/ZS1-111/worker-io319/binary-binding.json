@@ -1,0 +1,9 @@
+{
+  "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/output111-io319-current/bin/zenpi",
+  "bytes": 50080024,
+  "sha256": "c1f4f0e9478665ade1b3c69709ce7939a6d461330d863ed3085d19ee3014f18e",
+  "build_receipt": "build-cli.json",
+  "source_overlay": {
+    "src/tool_output.rs": "f18513b3b55754b34a21fa879f8405d1e59979b85274b7081f4d02e9eda379cd"
+  }
+}

@@ -16,6 +16,7 @@ fn mouse(kind: MouseEventKind, x: u16, y: u16) -> MouseEvent {
         modifiers: KeyModifiers::NONE,
     }
 }
+
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
@@ -35,7 +36,7 @@ fn palette_has_two_levels_and_never_submits_while_selecting() {
     assert!(
         matches!(state.handle_key(key(KeyCode::Enter)), TuiAction::Submit(text) if text == "/persona INTP ")
     );
-    for (command, option) in [("/goal ", "/goal status"), ("/learn ", "/learn evidence")] {
+    for (command, option) in [("/goal ", "/goal run"), ("/learn ", "/learn evidence")] {
         state.set_input(command);
         assert!(state.slash_choices().contains(&option.into()));
     }
@@ -391,6 +392,39 @@ fn project_checkpoint_is_independent_from_feature_layouts() {
     assert!(restored.restore_project_checkpoint(&checkpoint));
     assert_eq!(restored.project_tabs(), &["default", "api"]);
     assert_eq!(restored.active_project(), "api");
+}
+
+#[test]
+fn project_checkpoint_restores_isolated_transcript_and_layout() {
+    let mut state = TuiState::default();
+    state.push_message(zenpi::tui::MessageRole::User, "default message");
+    assert!(state.open_project_tab("api"));
+    state.push_message(zenpi::tui::MessageRole::Assistant, "api message");
+    state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
+        approval_mode: Default::default(),
+        cwd: "/work/api".into(),
+        session_path: Some("/work/api/session.jsonl".into()),
+    });
+    state.set_project_session_cursor("api", "session-api", 42);
+    let checkpoint = state.project_checkpoint();
+
+    let mut restored = TuiState::default();
+    assert!(restored.restore_project_checkpoint(&checkpoint));
+    assert_eq!(restored.active_project(), "api");
+    assert_eq!(restored.message_count(), 1);
+    assert_eq!(restored.messages().next().unwrap().text, "api message");
+    assert_eq!(restored.project_metadata("api").unwrap().cwd, "/work/api");
+    assert_eq!(
+        restored.project_session_cursor("api"),
+        Some(("session-api", 42))
+    );
+    assert!(
+        checkpoint["project_state"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| { item["name"] == "api" && item["messages"][0]["text"] == "api message" })
+    );
 }
 
 #[test]

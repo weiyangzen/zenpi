@@ -1,0 +1,8 @@
+{
+  "payload_files": 20,
+  "source_files": 5,
+  "typebox_files": 1385,
+  "node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+  "manifest_sha256": "4fb226c125105f11337fd5b5f338f248216e2c5b06bcefc3976db25539ce725d",
+  "dependencies": "Private copy of independently installed010 TypeBox tree; identical integrity lock and complete1385-file inventory verified before copying"
+}

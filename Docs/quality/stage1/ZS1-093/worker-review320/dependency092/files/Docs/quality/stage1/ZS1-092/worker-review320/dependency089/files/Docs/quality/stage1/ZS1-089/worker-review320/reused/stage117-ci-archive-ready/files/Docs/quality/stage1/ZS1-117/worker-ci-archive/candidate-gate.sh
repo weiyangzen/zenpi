@@ -1,0 +1,19 @@
+(cd dist && shasum -a 256 -c *.sha256)
+contents=$(mktemp)
+trap 'rm -f "$contents"' EXIT
+for archive in dist/*.tar.gz; do
+  if ! tar -tzf "$archive" > "$contents"; then
+    echo "Unable to read production archive: $archive" >&2
+    exit 1
+  fi
+  if grep -Eiq '(auth\.json|\.codex|\.zenpi|fixture|\.env)' "$contents"; then
+    echo "Forbidden entry in production archive: $archive" >&2
+    exit 1
+  else
+    match_status=$?
+    if [ "$match_status" -ne 1 ]; then
+      echo "Unable to check production archive entries: $archive" >&2
+      exit "$match_status"
+    fi
+  fi
+done

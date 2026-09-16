@@ -1,0 +1,52 @@
+--- capture/src/tui.rs
++++ current/src/tui.rs
+@@ -5741,7 +5741,7 @@
+             return TuiAction::Redraw;
+         }
+         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
+-            return if self.slash_choices().is_empty() {
++            return if self.external_editor_shortcut_available() {
+                 TuiAction::OpenExternalEditor
+             } else {
+                 TuiAction::None
+@@ -5986,7 +5986,9 @@
+             // into the prompt. For example, Ctrl-D on a non-empty draft used
+             // to append `d`, and Ctrl-A appended `a` instead of being inert.
+             KeyCode::Char(character)
+-                if !modifiers.intersects(KeyModifiers::ALT | KeyModifiers::CONTROL) =>
++                if !modifiers.intersects(
++                    KeyModifiers::ALT | KeyModifiers::CONTROL | KeyModifiers::SUPER,
++                ) =>
+             {
+                 self.insert_text(&character.to_string())
+             }
+@@ -7018,6 +7020,17 @@
+         frame.set_cursor_position(Position::new(x, y));
+     }
+ 
++    fn external_editor_shortcut_available(&self) -> bool {
++        self.directory_picker.is_none()
++            && self.transcript_browser.is_none()
++            && self.history_search.is_none()
++            && !self
++                .approval_views
++                .get(self.active_project())
++                .is_some_and(|view| view.focused && !view.requests.is_empty())
++            && self.slash_choices().is_empty()
++    }
++
+     fn render_footer(&self, frame: &mut Frame<'_>, area: Rect) {
+         if area.width == 0 || area.height == 0 {
+             return;
+@@ -7036,8 +7049,10 @@
+                 " Alt-Enter expand paste · Left/Right move · Backspace/Delete remove · Enter send "
+             } else if area.width < 100 {
+                 " Enter send · Ctrl-J newline · Ctrl-R history · Ctrl-C stop · /help input "
++            } else if self.external_editor_shortcut_available() {
++                " Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+             } else {
+-                " Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
++                " Enter send · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+             },
+             usize::from(area.width),
+         );

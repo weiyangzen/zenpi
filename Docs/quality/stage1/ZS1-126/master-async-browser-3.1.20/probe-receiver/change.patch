@@ -1,0 +1,122 @@
+--- a/probe.py
++++ b/probe.py
+@@ -178,6 +178,8 @@
+         self.root, self.paths, self.evidence = evidence/'fixture', paths, evidence
+         self.output = bytearray()
+         self.pid = self.fd = self.slave = None
++        self.lifetime = None
++        self.app_exit = evidence/'app-exit.json'
+         self.status = None
+         self.started = False
+         self.checkpoint = paths['home']/'project-tabs.json'
+@@ -205,9 +207,12 @@
+         self.started = True
+         fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 140, 0, 0))
+         self.attrs_before = termios.tcgetattr(self.slave)
++        lifetime_read, lifetime_write = os.pipe()
+         pid = os.fork()
+         if pid == 0:
++            app = None
+             try:
++                os.close(lifetime_write)
+                 os.close(self.fd)
+                 os.setsid()
+                 fcntl.ioctl(self.slave, termios.TIOCSCTTY, 0)
+@@ -216,10 +221,42 @@
+                 if self.slave > 2:
+                     os.close(self.slave)
+                 os.chdir(self.paths['cwd'])
+-                os.execve(self.argv[0], self.argv, fixture_env(self.paths))
++                # Keep a shell-like controlling-session owner alive while the
++                # actual sandboxed application exits. macOS hangs up this PTY
++                # if its session leader exits before the parent reads termios.
++                stopping = [False]
++                def stop(_signal, _frame):
++                    stopping[0] = True
++                signal.signal(signal.SIGTERM, stop)
++                app = subprocess.Popen(self.argv, env=fixture_env(self.paths))
++                save(self.evidence/'app-process.json', dict(pid=app.pid, supervisor=os.getpid()))
++                sent_term = None
++                while app.poll() is None:
++                    if select.select([lifetime_read], [], [], .02)[0]:
++                        os.read(lifetime_read, 1)
++                        stopping[0] = True
++                    if stopping[0] and sent_term is None:
++                        app.terminate()
++                        sent_term = time.monotonic()
++                    if sent_term is not None and time.monotonic()-sent_term > 2:
++                        app.kill()
++                save(self.app_exit, dict(pid=app.pid, returncode=app.returncode))
++                # The parent checks original slave attributes after app wait,
++                # then releases us. EOF also releases us if the parent fails.
++                while not stopping[0]:
++                    if select.select([lifetime_read], [], [], .1)[0]:
++                        os.read(lifetime_read, 1)
++                        break
++                os.close(lifetime_read)
++                os._exit(app.returncode if app.returncode >= 0 else 128-app.returncode)
+             except BaseException:
+                 traceback.print_exc()
++                if app is not None and app.poll() is None:
++                    app.kill()
++                    app.wait(timeout=3)
+                 os._exit(127)
++        os.close(lifetime_read)
++        self.lifetime = lifetime_write
+         self.pid = pid
+         self.event('spawn', pid=pid)
+         self.wait(lambda: self.checkpoint.exists() and b'Prompt' in self.screen())
+@@ -313,6 +350,20 @@
+     def close(self):
+         self.clear()
+         self.command('/quit')
++        app_exit = self.wait(lambda: json.loads(self.app_exit.read_text()), timeout=12)
++        while select.select([self.fd], [], [], .01)[0]:
++            self.pump(0)
++        attrs_after = termios.tcgetattr(self.slave)
++        result = dict(app_exit=app_exit,
++                      clean_exit=app_exit['returncode'] == 0,
++                      entered_alternate=b'\x1b[?1049h' in self.output,
++                      left_alternate=b'\x1b[?1049l' in self.output,
++                      termios_restored=self.attrs_before == attrs_after,
++                      termios_before=repr(self.attrs_before), termios_after=repr(attrs_after))
++        save(self.evidence/'terminal-restoration.json', result)
++        os.write(self.lifetime, b'x')
++        os.close(self.lifetime)
++        self.lifetime = None
+         deadline = time.monotonic()+12
+         while self.pid is not None and time.monotonic() < deadline:
+             self.pump()
+@@ -321,26 +372,24 @@
+                 self.pid, self.status = None, status
+         assert self.pid is None, 'TUI did not exit before deadline'
+         self.pump(.01)
+-        attrs_after = termios.tcgetattr(self.slave)
+-        result = dict(exit_status=self.status,
+-                      clean_exit=os.WIFEXITED(self.status) and os.WEXITSTATUS(self.status)==0,
+-                      entered_alternate=b'\x1b[?1049h' in self.output,
+-                      left_alternate=b'\x1b[?1049l' in self.output,
+-                      termios_restored=self.attrs_before == attrs_after,
+-                      termios_before=repr(self.attrs_before), termios_after=repr(attrs_after))
++        result['supervisor_exit_status'] = self.status
+         save(self.evidence/'terminal-restoration.json', result)
++        assert os.WIFEXITED(self.status) and os.WEXITSTATUS(self.status) == 0
+         assert all(result[k] for k in ('clean_exit', 'entered_alternate', 'left_alternate', 'termios_restored'))
+ 
+     def cleanup(self):
+         # Only the directly spawned child PID is signalled/reaped. No process
+         # names, ports, process-group guesses, global pkill or fixture deletion.
++        if self.lifetime is not None:
++            os.close(self.lifetime)
++            self.lifetime = None
+         if self.pid is not None:
+             self.event('cleanup_sigterm', pid=self.pid)
+             try:
+                 os.kill(self.pid, signal.SIGTERM)
+             except ProcessLookupError:
+                 pass
+-            deadline = time.monotonic()+2
++            deadline = time.monotonic()+4
+             while self.pid is not None and time.monotonic() < deadline:
+                 self.pump()
+                 waited, status = os.waitpid(self.pid, os.WNOHANG)

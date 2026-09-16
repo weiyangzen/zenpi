@@ -1,0 +1,1 @@
+PASS: six current-main native SSE SIGKILL/recovery scenarios;18 independent CLI processes; byte-exact WAL/replays and native tool identities checked

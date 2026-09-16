@@ -1,0 +1,15 @@
+
+running 3 tests
+test plain_preview_wraps_indivisible_graphemes_with_cell_exact_rows ... FAILED
+test transcript_inspector_keeps_character_after_wide_emoji_visible_and_copy_exact ... FAILED
+test approval_preview_keeps_character_after_wide_emoji_visible_without_allowing ... FAILED
+
+failures:
+
+failures:
+    approval_preview_keeps_character_after_wide_emoji_visible_without_allowing
+    plain_preview_wraps_indivisible_graphemes_with_cell_exact_rows
+    transcript_inspector_keeps_character_after_wide_emoji_visible_and_copy_exact
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

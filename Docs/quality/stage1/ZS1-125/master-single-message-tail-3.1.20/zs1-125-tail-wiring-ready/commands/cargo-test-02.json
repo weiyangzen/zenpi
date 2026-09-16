@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--offline",
+    "--locked",
+    "--test",
+    "tui_transcript_ux"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/checkout",
+  "started_at": "2026-09-12T12:25:04.065751+00:00",
+  "ended_at": "2026-09-12T12:25:06.589128+00:00",
+  "elapsed_seconds": 2.523232208,
+  "exit_code": 0,
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/target",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "inputs_file": "cargo-test-02-inputs.json",
+  "inputs_sha256": "a62a6c52cea68685cc36f7cf0b6e180c02745d51030e741ee912754aa606e4d2",
+  "inputs_unchanged": true,
+  "changed_inputs": {},
+  "log": "cargo-test-02.log",
+  "log_bytes": 2453,
+  "log_sha256": "6fad8b8964357ff2f7ec7cfc8d731ab54ce6209a2701183f3ebfd019d0f38aba"
+}

@@ -1,0 +1,299 @@
+{
+  "item": "ZS1-079",
+  "status": "[_]",
+  "authority_version": "3.1.16",
+  "authority_digest": "c0262492bc6e3b4d5f56b35bedc7c1d1658854df11c4a975eb612a514cceef8f",
+  "observed_authority_file_sha256": "fb1521f0835eabcfd8991871f6bbfb8509d14e106d1e56d0168897a1fae4930f",
+  "worktree": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "scope": "Full owner review of captured pre116 current-main slash.rs, preserved historical baseline/report and 2 actual parser counterexamples; report/new evidence only, no product fixes.",
+  "source": {
+    "path": "src/slash.rs",
+    "sha256": "414c3ca5518c5f4cbc3df08dc724d44cccc9d17767fd0be0b69164b4757808d4",
+    "bytes": 80013,
+    "lines": 2237,
+    "temporal_boundary": "115+pipe integrated;116not at capture; later116live change explicitly excluded by main"
+  },
+  "files": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/slash.rs_learn.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "2960358ba6617949145a73fdb330f90b0c9684c59cb21544a54cc455aaf44158",
+      "bytes": 26033,
+      "lines": 91,
+      "patch_sha256": "256d8073e94bdfcb0e7733d49773efd5fbe3c6134c4d35917c083dc7d128c353",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/README.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "345000e02c132a7f33ec0581aa38531bed9830c42e05315e727273e81daf374f",
+      "bytes": 2365,
+      "lines": 11,
+      "patch_sha256": "49011520ba02125b3fbc0a819180009ad9156280632952616c4fef4327029496",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/artifact-index.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "37f21333acc8af90ec7c711e3929e037225246427861237af872c9a9ccafecdc",
+      "bytes": 4329,
+      "lines": 112,
+      "patch_sha256": "91705ad64b92a786736135f96d64074e7927cf7c90f55a57d3b8bc51ff18f273",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/compile-context.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "272a1c8de909b63fe19ac7d4a5282ccffb9ba931a6d6e461ac5a3dbfd6fdebd8",
+      "bytes": 8142,
+      "lines": 262,
+      "patch_sha256": "d6844a285c620839f495122e07622fae7cfd5d4f19dfa45c344e994e00eda020",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/current-slash.rs",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "414c3ca5518c5f4cbc3df08dc724d44cccc9d17767fd0be0b69164b4757808d4",
+      "bytes": 80013,
+      "lines": 2237,
+      "patch_sha256": "1e05bad8a70041f06773bf8899804322e1fcc3d1109634239507c2177cbce8a8",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/g-stage-main-before-integration.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "1e9bce4304faf89180398ef7aab8459dea65cb4da9d0082c9e2c147612af2127",
+      "bytes": 1140,
+      "lines": 33,
+      "patch_sha256": "7f989b6f9079f5a2fe829da4a29d562b6f3a78055e1831644f1a4e3f3802a1e1",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/g-stage-main-before-integration.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "d8b120bf6029722524f293fb6d406aee15f4709e7642e63dab888cf5c2097828",
+      "bytes": 408,
+      "lines": 14,
+      "patch_sha256": "3ab5b79a9b58539e09e1a9dc4f1e566c43fa5158137335c5e371d45b2f422964",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/input-manifest.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "17e9165fd1c8ccc17c2d307cc1054a6e1848bd332c710a228fbbd6260233ebbc",
+      "bytes": 2682,
+      "lines": 77,
+      "patch_sha256": "898c7b5a4b0ff805130b7cc27742765502baa5b645a567db28020d29bcc3b590",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/main-advance.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "7a82e9544cb0e73b295b1f7e9f1899b3b0f75e44694b8077f8fe2f727c2b8157",
+      "bytes": 488,
+      "lines": 8,
+      "patch_sha256": "38c82c53a5a75c566d5a84e911ac093838d6ca2e0fe8b1a5e61d26d0d4df5dab",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/member-index.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "32e8defcfc1e9efbfd0c3869d185190b835f741180504aa8d9c6537d68c0d437",
+      "bytes": 7044,
+      "lines": 286,
+      "patch_sha256": "ac3944523827492942e9d7ab710c8edf3e1323f8b12f6480ce00da65a1164081",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples-main-snapshot.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "bd52822ac61a4af1af5148f2dd7c7541ac104c8c628e7966143b276432760785",
+      "bytes": 1007,
+      "lines": 29,
+      "patch_sha256": "d79f13a9b4d19edbc0bdfde142fc2261f6d60d71117624cb1e1aef8976f474fe",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples-main-snapshot.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "c2c5b150d68f51a5f5737b2eebf481133dbc47256556747c0e2a53c149de4480",
+      "bytes": 392,
+      "lines": 3,
+      "patch_sha256": "2edcd79d1a288467ff27b3c8fe50d9c8b65488e80e90550bcde6f72c9f1cf209",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "d54d7b7cc615fba902e9ade1e78ca17c85620a2b0b51cf345bee360ab0371268",
+      "bytes": 960,
+      "lines": 29,
+      "patch_sha256": "4f6421c5249230d7310cf93c9a3ae7f9616037d5cd18ddfcee3bc6768c9d1097",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/parser-counterexamples.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "3584d41d0f0141b8313b6eca52d48fb02ea04dfc6833b26a87e3e3451a0bce6e",
+      "bytes": 2599,
+      "lines": 55,
+      "patch_sha256": "e47703c72565f808672df5d78f6d28e7efd54b263d7f25d1fd51a3794a29fe63",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/prior-report.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "e4ed880d93105fe0c782357339593cee9c952abcdb5a122c4695a3e27f4fc092",
+      "bytes": 7028,
+      "lines": 35,
+      "patch_sha256": "887de4e9b3612f91f91f72ad710301baed2895101e044be77f4da13b449ee286",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/probe-Cargo.lock",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "c203c017f2cce5d0dc9bb1db7e461a0fea46a784e2099efe1ef5b41bbcd81eb3",
+      "bytes": 45358,
+      "lines": 1777,
+      "patch_sha256": "517d2df53943dda89271f91270d1f1dec1a1f90a6671557b98b0fa394103cecf",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/probe-Cargo.toml",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "096fd63f39784473c89c3396614623aecbcbc2cfcef2088105a3ffa19119546a",
+      "bytes": 283,
+      "lines": 12,
+      "patch_sha256": "bf53c7fc001740691a5a5fe99420d8bf1503a31b1c82d4b401885b444cc44dd3",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/probe-main.rs",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "b52288a4ffb2bb1c61cf64b72e487619d15900040aa56ca14eaba9d000c16bed",
+      "bytes": 807,
+      "lines": 13,
+      "patch_sha256": "1742f0873057b26e7543f6c42b7ff0c8f64a7af912785afb286e5349e096f93b",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/references-verified-captured-snapshot.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "32555a85726fe2555ceaea92cf8c5bdc3e5e2887515e01f4590563a9efc6ebfd",
+      "bytes": 896,
+      "lines": 22,
+      "patch_sha256": "bfd250677c23884afa43b75efbb3d30f4ac17bd53ba28cd03eb954c0979548c1",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/references-verified-captured-snapshot.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "c0aa11341b29241b4d538e997ca8f437a42a187dae17cea3644e36f395ed6381",
+      "bytes": 293,
+      "lines": 11,
+      "patch_sha256": "7451d406677020ffee0d5f99992a12809d7e76197c972fc98866835e1246391d",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/references-verified.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "f472df28d778fcd0cf98189a7f791dc8fe6249ec2884b8f051e3560935da5ff6",
+      "bytes": 850,
+      "lines": 22,
+      "patch_sha256": "b9f9754f01f3cc0cd7bda7b607f737a0f56e807d01e9d379b58d7da6897e9126",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/references-verified.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "f77692ce42f28cc29745dbcf025e41b139e0a99d10f1e9692ee594d828456ab2",
+      "bytes": 275,
+      "lines": 4,
+      "patch_sha256": "9a9d730396ba7f4dae059187bfa6389202ebdd9036aaaba98567781deeb76a4b",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/references.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "f55fe3a02862b4c43ac488352da6225225a27ce9e71491887a91c6a403066c83",
+      "bytes": 3307,
+      "lines": 74,
+      "patch_sha256": "07ca6a7f9b3a51d56af2a1e685c96e7bd187a035f8546331ca303508e0e3e26e",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-079/worker-owner-review/verify_references.py",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "fb0cda98f34d2907801a69f7217af39e51996b65d940931830581643c2abc9a4",
+      "bytes": 1907,
+      "lines": 21,
+      "patch_sha256": "d4dbf0e038e037a60d97a0c7aafc6aa6db0d3616e5b3d1bf9205fdd1251503db",
+      "status": "[_]"
+    }
+  ],
+  "validators": [
+    "references-verified-captured-snapshot",
+    "parser-counterexamples-main-snapshot"
+  ],
+  "evidence_directory": "Docs/quality/stage1/ZS1-079/worker-owner-review",
+  "patch_sha256": "e47b658e2945d6c07b5dd2c9fe1d28fbfa890076f8183ea05b6d2a9b5f2d40f6",
+  "patch_bytes": 210826,
+  "runner_sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8",
+  "verification": "git apply --check, forward full-byte hash verification, reverse --check and exact base restoration; new evidence paths removed by reverse",
+  "immutable_prior_manifest_hashes": {
+    "extension115-ready": "300d3a1cb9c7c58ecee77a459e6846637bc9354bfdedf2996f10fb1f6bf6a2f4",
+    "transport-ready": "4d717a16524918b80d06eeb44ecb6c95f17b94e5f522d978f89fd72d7b06799d",
+    "anthropic-ready": "6e931d64d957735fd624792d83b7c83a5e62258fb40f9a39dd00db218f62295a",
+    "gemini-ready": "a3f4c6b9ab250885ac15bcf04a0b5bb326f35286702c294dbac4059c66e83e26"
+  },
+  "frozen_at": "2026-09-10T21:56:32.156286+00:00",
+  "integration": "Main reviews and integrates only this candidate delta; shared main repository was read-only. No acceptance mark or commit."
+}

@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/usr/sbin/dtrace",
+    "-l",
+    "-n",
+    "syscall::execve:entry"
+  ],
+  "returncode": 1,
+  "elapsed_ms": 5.284458
+}

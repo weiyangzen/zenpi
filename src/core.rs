@@ -117,7 +117,13 @@ enum ToolInvocationOutcome {
     UnknownOutcome,
 }
 
+enum PreparedTool {
+    Execute(crate::tool_runtime::ToolBatchDecision),
+    Rejected(ToolInvocation),
+}
+
 struct ToolInvocation {
+    output_capture: Option<crate::tool_output::CaptureReport>,
     result: crate::tools::ToolResult,
     outcome: ToolInvocationOutcome,
 }
@@ -295,6 +301,10 @@ pub enum AgentEvent {
         call_id: String,
         tool: String,
     },
+    ToolProgress {
+        turn_id: String,
+        progress: crate::tool_output::OutputProgress,
+    },
     ToolResult {
         turn_id: String,
         call_id: String,
@@ -321,7 +331,7 @@ pub struct AgentSnapshot {
 
 /// Result of an explicit `/compact` owner operation.  The checkpoint is
 /// persisted in the session journal and is reused when preparing future
-/// provider requests; no provider/model call is made by this operation.
+/// provider requests; a summary request uses the selected backend.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompactionReport {
     pub compacted: bool,
@@ -332,6 +342,8 @@ pub struct CompactionReport {
     pub estimated_tokens_after: u64,
     pub marker_sequence: u64,
     pub checkpoint: Option<crate::context::CompactionCheckpoint>,
+    #[serde(default)]
+    pub semantic_checkpoint: Option<crate::context::SemanticCheckpoint>,
 }
 
 #[derive(Debug, Error)]
@@ -384,6 +396,9 @@ impl AgentError {
 
 /// Shared state machine used by both runtime modes.
 pub struct Agent {
+    output_store: crate::tool_output::SessionOutputStore,
+    input_port: crate::input_queue::InputPort,
+    project_overrides: crate::config::ConfigOverrides,
     backend: Box<dyn Backend>,
     session: SessionStore,
     phase: AgentPhase,
@@ -392,23 +407,35 @@ pub struct Agent {
     model: Option<String>,
     last_error: Option<String>,
     events: Vec<AgentEvent>,
+    live_tool_sink: Option<LiveToolEventSink>,
     tools: Option<ToolRuntime>,
     context_budget: crate::context::ContextBudget,
     skills: crate::skills::SkillSet,
+    resource_loader: Option<crate::resource_loader::ResourceLoader>,
+    active_resources: Option<std::sync::Arc<crate::resource_loader::ResourceSnapshot>>,
+    active_resource_inputs: BTreeMap<String, String>,
+    stale_resource_skills: BTreeSet<String>,
+    model_skill_tools: crate::skills::ModelSkillTools,
+    extensions: Option<crate::extension_runtime::ExtensionRuntime>,
     active_attachments: Vec<crate::backend::RequestAttachment>,
     /// Workspace references staged by `/attach`.  They remain outside the
     /// durable journal until the next turn is admitted, then are materialized
     /// and recorded as bounded metadata alongside that user turn.
     pending_attachments: Vec<crate::backend::InputAttachment>,
     governance: Option<crate::governance::BudgetLedger>,
+    worker_budget: Option<crate::governance::WorkerBudgetLedger>,
+    worker_admission_operation: Option<String>,
+    live_owners: crate::session::LiveSessionRegistry,
 }
 
 struct ToolRuntime {
-    registry: ToolRegistry,
+    registry: std::sync::Arc<ToolRegistry>,
+    sequential: bool,
     context: ToolContext,
     policy: SideEffectPolicy,
     approval: ApprovalCoordinator,
     approval_policy: ApprovalPolicy,
+    configured_approval_policy: ApprovalPolicy,
     worker_binding: Option<WorkerExecutionBinding>,
 }
 
@@ -425,11 +452,69 @@ impl std::fmt::Debug for Agent {
     }
 }
 
+type LiveToolEventSink = std::sync::Arc<dyn Fn(AgentEvent) + Send + Sync>;
+
+fn emit_tool_event(
+    events: &mut Vec<AgentEvent>,
+    sink: Option<&LiveToolEventSink>,
+    event: AgentEvent,
+) {
+    if let Some(sink) = sink {
+        sink(event);
+    } else {
+        events.push(event);
+    }
+}
+
+fn publish_output_progress(
+    sink: Option<&LiveToolEventSink>,
+    turn_id: &str,
+    queue: &crate::tool_output::OutputProgressQueue,
+) {
+    // A host owns the bounded mailbox. Embedders without a live consumer keep
+    // the existing lifecycle queue, never an unbounded history of snapshots.
+    for progress in queue.drain() {
+        if let Some(sink) = sink {
+            sink(AgentEvent::ToolProgress {
+                turn_id: turn_id.to_owned(),
+                progress,
+            });
+        }
+    }
+}
+
 impl Agent {
+    /// Install a request-scoped live tool consumer. Restoration also occurs on
+    /// errors and unwinding, so a subsequent job cannot inherit an old mailbox.
+    pub fn with_live_tool_events<R>(
+        &mut self,
+        sink: std::sync::Arc<dyn Fn(AgentEvent) + Send + Sync>,
+        run: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        struct Restore<'a> {
+            agent: &'a mut Agent,
+            previous: Option<LiveToolEventSink>,
+        }
+        impl Drop for Restore<'_> {
+            fn drop(&mut self) {
+                self.agent.live_tool_sink = self.previous.take();
+            }
+        }
+        let previous = self.live_tool_sink.replace(sink);
+        let guard = Restore {
+            agent: self,
+            previous,
+        };
+        run(guard.agent)
+    }
+
     pub fn new(session: SessionStore, backend: Box<dyn Backend>) -> Self {
         let model = backend.model().map(str::to_owned);
         let recovered = session.interrupted_operations();
         let mut agent = Self {
+            output_store: crate::tool_output::SessionOutputStore::default(),
+            input_port: crate::input_queue::InputPort::new(session.session_id()),
+            project_overrides: crate::config::ConfigOverrides::default(),
             backend,
             session,
             phase: AgentPhase::Idle,
@@ -438,12 +523,22 @@ impl Agent {
             model,
             last_error: None,
             events: Vec::new(),
+            live_tool_sink: None,
             tools: None,
             context_budget: crate::context::ContextBudget::default(),
             skills: crate::skills::SkillSet::default(),
+            resource_loader: None,
+            active_resources: None,
+            active_resource_inputs: BTreeMap::new(),
+            stale_resource_skills: BTreeSet::new(),
+            model_skill_tools: crate::skills::ModelSkillTools::default(),
+            extensions: None,
             active_attachments: Vec::new(),
             pending_attachments: Vec::new(),
             governance: None,
+            worker_budget: None,
+            worker_admission_operation: None,
+            live_owners: crate::session::LiveSessionRegistry::default(),
         };
         for operation in recovered {
             agent.events.push(AgentEvent::Error {
@@ -467,8 +562,120 @@ impl Agent {
             .map_err(AgentError::from)
     }
 
+    /// Shared headless/TUI contract. Busy hosts submit bounded tickets; idle
+    /// hosts execute directly. Receipt is returned only after journal append.
+    pub fn input_port(&self) -> crate::input_queue::InputPort {
+        self.input_port.clone()
+    }
+
+    pub fn input_queue_request(
+        &mut self,
+        request: crate::protocol::InputQueueRequest,
+    ) -> Result<crate::input_queue::InputQueueReply, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        let mut queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        queue
+            .execute_request(&mut self.session, request)
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()))
+    }
+
+    fn repair_input_projections(&mut self) -> Result<(), AgentError> {
+        crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .and_then(|queue| queue.repair_projections(&mut self.session))
+            .map_err(|e| AgentError::Recovery(e.to_string()))
+    }
+
+    fn input_boundary(
+        &mut self,
+        gate: &crate::runtime::InputBoundaryGate,
+        would_stop: bool,
+        cancelled: bool,
+    ) -> Result<bool, AgentError> {
+        let parent = self
+            .active_turn_id
+            .clone()
+            .ok_or(AgentError::NoActiveTurn)?;
+        self.input_port
+            .service(&mut self.session, &parent, cancelled)
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        if cancelled {
+            gate.cancel();
+            return Err(BackendError::Cancelled.into());
+        }
+        let mut queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        let boundary = gate
+            .boundary(would_stop)
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        let inputs = queue
+            .apply_boundary(&mut self.session, &boundary)
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        queue
+            .repair_projections(&mut self.session)
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+        Ok(!inputs.is_empty())
+    }
+
     pub fn with_echo(session: SessionStore) -> Self {
         Self::new(session, Box::new(EchoBackend))
+    }
+
+    /// Prepare an independent project runtime. All fallible config, skills,
+    /// tools and journal checks happen before callers publish the replacement.
+    /// The current runtime can continue executing while the host retains it.
+    pub fn prepare_project(
+        &self,
+        session_path: impl AsRef<Path>,
+        cwd: impl AsRef<Path>,
+    ) -> Result<Self, ZenpiError> {
+        Self::prepare_project_with_options(
+            session_path.as_ref(),
+            cwd.as_ref(),
+            self.project_overrides.clone(),
+            self.backend_name() == "echo",
+        )
+    }
+
+    pub fn project_overrides(&self) -> crate::config::ConfigOverrides {
+        self.project_overrides.clone()
+    }
+
+    pub fn prepare_project_with_options(
+        session_path: &Path,
+        cwd: &Path,
+        overrides: crate::config::ConfigOverrides,
+        echo_fixture: bool,
+    ) -> Result<Self, ZenpiError> {
+        let cwd = cwd.canonicalize()?;
+        let context = ToolContext::new(&cwd).map_err(|e| ZenpiError::Message(e.to_string()))?;
+        // Validate project configuration even for the explicit fixture backend.
+        let effective = crate::config::resolve_workspace(&overrides, Some(&cwd))?;
+        let backend: Box<dyn Backend> = if echo_fixture {
+            Box::new(EchoBackend)
+        } else {
+            backend_from_effective(effective)?
+        };
+        let paths = crate::config::ConfigPaths::discover()?;
+        let resource_paths = default_resource_paths(&paths, &cwd);
+        let registry =
+            ToolRegistry::with_all_builtins().map_err(|e| ZenpiError::Message(e.to_string()))?;
+        let session = SessionStore::open_in_workspace(session_path, &cwd)?;
+        let mut agent = Self::new(session, backend);
+        if overrides.model.is_none() {
+            agent.restore_model_selection()?;
+        }
+        agent.project_overrides = overrides;
+        agent.set_tools_with_resources(registry, context, SideEffectPolicy::all_builtins())?;
+        agent.restore_resources(resource_paths, || false)?;
+        agent.configure_extensions(&paths.extensions, || false)?;
+        agent.set_approval_policy(ApprovalPolicy {
+            mode: crate::approval::ApprovalMode::ReadOnly,
+            ..ApprovalPolicy::default()
+        });
+        Ok(agent)
     }
 
     pub fn backend_name(&self) -> &str {
@@ -481,6 +688,354 @@ impl Agent {
 
     pub fn session_mut(&mut self) -> &mut SessionStore {
         &mut self.session
+    }
+
+    /// Register this host as the live owner of its session. Registration is
+    /// explicit and in-memory; it never starts a scheduler or provider turn.
+    pub fn register_live_owner(
+        &mut self,
+        owner_epoch: u64,
+        workspace: impl Into<String>,
+        now_ms: u64,
+    ) -> Result<(), AgentError> {
+        self.live_owners.register(
+            self.session.session_id().to_owned(),
+            owner_epoch,
+            workspace,
+            now_ms,
+        )?;
+        Ok(())
+    }
+
+    pub fn heartbeat_live_owner(&mut self, owner_epoch: u64, now_ms: u64) -> bool {
+        self.live_owners
+            .heartbeat(self.session.session_id(), owner_epoch, now_ms)
+    }
+
+    pub fn unregister_live_owner(&mut self, owner_epoch: u64) -> bool {
+        self.live_owners
+            .unregister(self.session.session_id(), owner_epoch)
+    }
+
+    pub fn claim_live_mailbox(
+        &mut self,
+        workspace: &str,
+        digest: Option<&str>,
+        now_ms: u64,
+        ttl_ms: u64,
+    ) -> Result<Option<crate::session::MailboxMessage>, AgentError> {
+        Ok(match digest {
+            Some(digest) => Some(self.live_owners.claim_message(
+                &self.session,
+                workspace,
+                digest,
+                now_ms,
+                ttl_ms,
+            )?),
+            None => self
+                .live_owners
+                .claim_next(&self.session, workspace, now_ms, ttl_ms)?,
+        })
+    }
+
+    pub fn finish_live_mailbox(
+        &mut self,
+        workspace: &str,
+        digest: &str,
+        result: serde_json::Value,
+        succeeded: bool,
+        now_ms: u64,
+        ttl_ms: u64,
+    ) -> Result<crate::session::MailboxMessage, AgentError> {
+        Ok(self.live_owners.finish_claim(
+            &self.session,
+            workspace,
+            digest,
+            result,
+            succeeded,
+            now_ms,
+            ttl_ms,
+        )?)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn finish_live_mailbox_with_reply(
+        &mut self,
+        sender: &SessionStore,
+        workspace: &str,
+        digest: &str,
+        result: serde_json::Value,
+        succeeded: bool,
+        now_ms: u64,
+        ttl_ms: u64,
+    ) -> Result<
+        (
+            crate::session::MailboxMessage,
+            crate::session::MailboxMessage,
+        ),
+        AgentError,
+    > {
+        Ok(self.live_owners.finish_claim_with_reply(
+            &self.session,
+            sender,
+            workspace,
+            digest,
+            result,
+            succeeded,
+            now_ms,
+            ttl_ms,
+        )?)
+    }
+
+    /// Selected entry ancestry for display and model preparation. Physical
+    /// history remains available through SessionStore for audit/replay cursors.
+    pub fn selected_history(&self) -> Result<Vec<Turn>, AgentError> {
+        Ok(self.session.selected_tree_turns(&|| false)?)
+    }
+
+    pub fn tree_request(
+        &mut self,
+        request: crate::protocol::TreeRequest,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Value, AgentError> {
+        use crate::protocol::TreeAction as A;
+        request
+            .validate()
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
+        if request.session_id != self.session.session_id() {
+            return Err(AgentError::InvalidTurn(
+                "tree selection belongs to a different session".into(),
+            ));
+        }
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        if let A::List { cursor, limit } = request.tree {
+            return serde_json::to_value(
+                self.session.tree_snapshot(cancelled)?.page(cursor, limit)?,
+            )
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()));
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
+        if queue.has_pending()
+            || !self.unknown_tool_outcomes().is_empty()
+            || !self.operation_recovery().is_empty()
+            || !self.pending_attachments.is_empty()
+        {
+            return Err(AgentError::InvalidTurn(
+                "tree navigation requires settled operations and no pending input or attachments"
+                    .into(),
+            ));
+        }
+        match request.tree {
+            A::List { .. } => unreachable!(),
+            A::Enable {} => {
+                self.session.enable_tree(Default::default(), cancelled)?;
+            }
+            A::Annotate {
+                entry_id,
+                annotation,
+            } => {
+                self.session
+                    .annotate_tree_entry(&entry_id, annotation, cancelled)?;
+            }
+            A::Select { leaf } => {
+                let turns = self
+                    .session
+                    .tree_ancestry_turns(leaf.as_deref(), cancelled)?;
+                crate::session_tree::validate_fork_turns(&turns)?;
+                self.backend
+                    .validate_history_model(&turns, self.model.as_deref())?;
+                // All fallible context validation occurs before the durable leaf switch.
+                self.session.semantic_checkpoint_at_tree_leaf(
+                    leaf.as_deref(),
+                    crate::context::ContextBudget {
+                        max_tokens: u64::MAX,
+                        reserved_output_tokens: 0,
+                    },
+                )?;
+                self.session.select_tree_leaf(leaf.as_deref(), cancelled)?;
+            }
+            A::Fork { leaf, destination } => {
+                let fork =
+                    self.session
+                        .fork_at_tree_leaf(leaf.as_deref(), destination, cancelled)?;
+                return Ok(
+                    serde_json::json!({"session_id":self.session.session_id(), "active_leaf":self.session.active_tree_leaf(), "fork": {"session_id":fork.session_id(), "path":fork.path()}, "tree":fork.tree_snapshot(&|| false)?.page(0, 32)?}),
+                );
+            }
+        }
+        serde_json::to_value(self.session.tree_snapshot(&|| false)?.page(0, 32)?)
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()))
+    }
+
+    pub fn tool_output_control(
+        &mut self,
+        request: crate::protocol::OutputRequest,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Value, crate::tool_output::OutputError> {
+        use crate::tool_output::OutputError;
+        request
+            .validate()
+            .map_err(|e| OutputError::Invalid(e.to_string()))?;
+        if request.session_id != self.session.session_id() {
+            return Err(OutputError::Invalid(
+                "output request belongs to another session".into(),
+            ));
+        }
+        if cancelled() {
+            return Err(OutputError::Cancelled);
+        }
+        if let Some(read) = request.output.read_request() {
+            return Ok(serde_json::to_value(
+                self.read_tool_output(read, cancelled)?,
+            )?);
+        }
+        match request.output {
+            crate::protocol::OutputAction::Cleanup {
+                call_id,
+                confirm: true,
+            } => Ok(
+                serde_json::json!({"session_id":self.session.session_id().to_owned(),"call_id":call_id,"removed":self.cleanup_tool_output(call_id.as_deref())?}),
+            ),
+            _ => Err(OutputError::Invalid(
+                "output cleanup requires explicit confirmation".into(),
+            )),
+        }
+    }
+
+    fn output_read_access(
+        &mut self,
+        request: &crate::tool_output::OutputReadRequest,
+        now_ms: u64,
+    ) -> Result<crate::tool_output::OutputReadAccess, crate::tool_output::OutputError> {
+        let reference = trusted_output_reference(&self.session, request, now_ms)?;
+        let store = self
+            .output_store
+            .existing_store(self.session.path(), self.session.session_id())?;
+        Ok(crate::tool_output::OutputReadAccess::new(store, reference))
+    }
+    pub fn read_tool_output(
+        &mut self,
+        request: crate::tool_output::OutputReadRequest,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<crate::tool_output::OutputReadReply, crate::tool_output::OutputError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(crate::tool_output::OutputError::Busy);
+        }
+        if cancelled() {
+            return Err(crate::tool_output::OutputError::Cancelled);
+        }
+        let now = crate::session::unix_time_ms();
+        self.output_read_access(&request, now)?
+            .read(&request, now, cancelled)
+    }
+    /// Explicit host lifecycle action; ordinary close/resume retains unexpired output.
+    pub fn cleanup_tool_output(
+        &mut self,
+        call_id: Option<&str>,
+    ) -> Result<usize, crate::tool_output::OutputError> {
+        self.cleanup_tool_output_with_receipt(call_id, |session, event| session.append_event(event))
+    }
+
+    fn cleanup_tool_output_with_receipt(
+        &mut self,
+        call_id: Option<&str>,
+        commit: impl FnOnce(&mut SessionStore, Value) -> Result<(), crate::session::SessionError>,
+    ) -> Result<usize, crate::tool_output::OutputError> {
+        use crate::tool_output::OutputError;
+        if self.phase != AgentPhase::Idle || !self.operation_recovery().is_empty() {
+            return Err(OutputError::Busy);
+        }
+        if let Some(call) = call_id
+            && !self
+                .session
+                .events()
+                .iter()
+                .any(|event| event["type"] == "tool_output_captured" && event["call_id"] == call)
+        {
+            return Err(OutputError::Invalid(
+                "call is not owned by this session".into(),
+            ));
+        }
+        let now = crate::session::unix_time_ms();
+        let session_id = self.session.session_id().to_owned();
+        // One outstanding intent per session, reused on retries. Changing
+        // scope cannot silently abandon an unresolved cleanup.
+        let pending = pending_output_cleanup(&self.session).cloned();
+        if pending
+            .as_ref()
+            .is_some_and(|event| event["call_id"].as_str() != call_id)
+        {
+            return Err(OutputError::Busy);
+        }
+        let store = match self
+            .output_store
+            .existing_store(self.session.path(), &session_id)
+        {
+            Ok(store) => Some(store),
+            Err(OutputError::Missing) => None,
+            Err(error) => return Err(error),
+        };
+        let plan: Vec<crate::tool_output::ArtifactRef> = if let Some(pending) = pending {
+            let plan: Vec<crate::tool_output::ArtifactRef> =
+                serde_json::from_value(pending["artifacts"].clone())?;
+            if plan.len() > crate::tool_output::OutputLimits::default().max_files {
+                return Err(OutputError::Quota);
+            }
+            plan
+        } else {
+            let plan = match &store {
+                Some(store) => {
+                    // Restrict the acknowledgement set to bounded current
+                    // IDs, rather than retaining all historical receipts.
+                    let current = store.retirement_ids()?;
+                    let receipted = self
+                        .session
+                        .events()
+                        .iter()
+                        .filter(|event| {
+                            event["type"] == "tool_output_cleanup"
+                                && event["session_id"] == session_id
+                        })
+                        .filter_map(|event| event["artifact_ids"].as_array())
+                        .flatten()
+                        .filter_map(|id| id.as_str())
+                        .filter(|id| current.contains(*id))
+                        .map(str::to_owned)
+                        .collect();
+                    store.acknowledge_cleanup(&session_id, &receipted)?;
+                    store.cleanup_plan(&session_id, call_id)?
+                }
+                None => Vec::new(),
+            };
+            // The intent pins full identities before any retirement or unlink.
+            self.session.append_event(serde_json::json!({"type":"tool_output_cleanup_started","session_id":session_id,"call_id":call_id,"artifacts":plan,"at_ms":now}))
+                .map_err(|error| OutputError::Invalid(format!("cleanup intent was not committed: {error}")))?;
+            plan
+        };
+        let removed = match &store {
+            Some(store) => store.cleanup_receipted(&session_id, call_id, &plan)?,
+            None if plan.is_empty() => Vec::new(),
+            None => return Err(OutputError::Interrupted),
+        };
+        let count = removed.len();
+        commit(&mut self.session, serde_json::json!({"type":"tool_output_cleanup","session_id":session_id,"call_id":call_id,"removed":count,"artifact_ids":removed,"at_ms":now}))
+            .map_err(|error| OutputError::Invalid(format!("cleanup pending durable receipt; retry or reopen to recover: {error}")))?;
+        if let Some(store) = store {
+            // The operation is committed. GC failure retains private recovery
+            // metadata and quota charges; the next cleanup retries GC using
+            // the durable receipt, without counting these IDs again.
+            let _ = store.acknowledge_cleanup(&session_id, &removed.into_iter().collect());
+        }
+        Ok(count)
     }
 
     pub fn history(&self) -> &[Turn] {
@@ -496,27 +1051,129 @@ impl Agent {
     }
 
     pub fn set_model(&mut self, model: Option<String>) -> Result<(), AgentError> {
-        if model
-            .as_deref()
-            .is_some_and(|value| value.trim().is_empty())
-        {
-            return Err(AgentError::InvalidTurn("model name is empty".into()));
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
         }
-        if model
-            .as_deref()
-            .is_some_and(|value| value.chars().any(char::is_control))
-        {
-            return Err(AgentError::InvalidTurn(
-                "model name contains control characters".into(),
-            ));
+        if self.phase == AgentPhase::Running {
+            return Err(AgentError::NotIdle);
         }
-        if model.as_deref().is_some_and(|value| value.len() > 256) {
-            return Err(AgentError::InvalidTurn(
-                "model name must be at most 256 bytes".into(),
-            ));
+        self.backend.validate_model(model.as_deref())?;
+        self.backend
+            .validate_history_model(&self.selected_history()?, model.as_deref())?;
+        let descriptor = self.backend.model_descriptor(model.as_deref())?;
+        let selected = model.or_else(|| self.backend.model().map(str::to_owned));
+        if let Some(descriptor) = &descriptor {
+            self.session.append_event(serde_json::json!({
+                "type": "model_selected", "model": selected,
+                "descriptor": descriptor, "digest": descriptor.digest(),
+                "reasoning_effort": self.backend.reasoning_effort(),
+            }))?;
         }
-        self.model = model;
+        self.model = selected;
         Ok(())
+    }
+
+    /// None restores the provider default (omits the field); Some("none") is
+    /// a distinct explicit level and is legal only when listed by the model.
+    pub fn set_reasoning_effort(&mut self, effort: Option<String>) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        self.backend
+            .validate_reasoning_effort(self.model.as_deref(), effort.as_deref())?;
+        let descriptor = self
+            .backend
+            .model_descriptor(self.model.as_deref())?
+            .ok_or_else(|| {
+                AgentError::InvalidTurn("reasoning settings require a model registry".into())
+            })?;
+        self.session.append_event(serde_json::json!({
+            "type":"model_selected", "model":self.model,
+            "descriptor":descriptor, "digest":descriptor.digest(), "reasoning_effort":effort,
+        }))?;
+        self.backend.commit_reasoning_effort(effort);
+        Ok(())
+    }
+
+    pub fn reasoning_effort(&self) -> Option<&str> {
+        self.backend.reasoning_effort()
+    }
+
+    fn selected_model_for_session(
+        &self,
+        session: &SessionStore,
+    ) -> Result<(Option<String>, Option<String>), AgentError> {
+        if self.backend.model_descriptor(None)?.is_none() {
+            self.backend.validate_history_model(
+                &session.selected_tree_turns(&|| false)?,
+                self.model.as_deref(),
+            )?;
+            return Ok((
+                self.model.clone(),
+                self.backend.reasoning_effort().map(str::to_owned),
+            ));
+        }
+        let saved = session.records().iter().rev().find_map(|record| {
+            let event = record.value.get("event")?;
+            (record.kind == "event" && event["type"] == "model_selected").then_some(event)
+        });
+        let Some(saved) = saved else {
+            self.backend.validate_history_model(
+                &session.selected_tree_turns(&|| false)?,
+                self.backend.model(),
+            )?;
+            return Ok((
+                self.backend.model().map(str::to_owned),
+                self.backend.reasoning_effort().map(str::to_owned),
+            ));
+        };
+        let selected = saved["model"]
+            .as_str()
+            .ok_or_else(|| AgentError::InvalidTurn("invalid saved model identity".into()))?;
+        let effort = match saved.get("reasoning_effort") {
+            Some(Value::Null) => None,
+            Some(Value::String(effort)) => Some(effort.clone()),
+            Some(_) => {
+                return Err(AgentError::InvalidTurn(
+                    "invalid saved reasoning effort".into(),
+                ));
+            }
+            None => self.backend.reasoning_effort().map(str::to_owned),
+        };
+        self.backend
+            .validate_reasoning_effort(Some(selected), effort.as_deref())?;
+        let descriptor = self
+            .backend
+            .model_descriptor(Some(selected))?
+            .ok_or_else(|| AgentError::InvalidTurn("saved model requires a registry".into()))?;
+        if saved["digest"].as_str() != Some(descriptor.digest().as_str()) {
+            return Err(AgentError::InvalidTurn(
+                "saved model metadata changed; explicitly select a model to adopt current metadata"
+                    .into(),
+            ));
+        }
+        self.backend
+            .validate_history_model(&session.selected_tree_turns(&|| false)?, Some(selected))?;
+        Ok((Some(selected.into()), effort))
+    }
+
+    pub fn restore_model_selection(&mut self) -> Result<(), AgentError> {
+        let (model, effort) = self.selected_model_for_session(&self.session)?;
+        self.model = model;
+        self.backend.commit_reasoning_effort(effort);
+        Ok(())
+    }
+
+    pub fn model_status(&self) -> Result<Value, AgentError> {
+        let active = self.backend.model_descriptor(self.model.as_deref())?;
+        Ok(serde_json::json!({
+            "active": active, "capabilities": self.backend.model_capabilities(self.model.as_deref())?,
+            "budget": self.context_budget(), "catalog": self.backend.model_catalog(),
+            "registry_bound": active.is_some(), "reasoning_effort": self.backend.reasoning_effort(),
+        }))
     }
 
     pub fn snapshot(&self) -> AgentSnapshot {
@@ -566,6 +1223,25 @@ impl Agent {
         std::mem::take(&mut self.events)
     }
 
+    /// Install model-callable resource tools before publishing a new runtime.
+    /// A duplicate registration leaves the current owner/tool set unchanged.
+    pub fn set_tools_with_resources(
+        &mut self,
+        mut registry: ToolRegistry,
+        context: ToolContext,
+        policy: SideEffectPolicy,
+    ) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        self.model_skill_tools.register(&mut registry)?;
+        self.set_tools(registry, context, policy);
+        Ok(())
+    }
+
     /// Install a bounded tool registry for subsequent provider turns. The
     /// default agent has no tools, so embedders must opt in explicitly.
     pub fn set_tools(
@@ -574,12 +1250,19 @@ impl Agent {
         context: ToolContext,
         policy: SideEffectPolicy,
     ) {
+        if let Some(mut old) = self.extensions.take() {
+            let errors = old.close("tools_replaced");
+            self.extension_errors(errors);
+        }
         self.tools = Some(ToolRuntime {
-            registry,
+            registry: std::sync::Arc::new(registry),
+            sequential: false,
             context,
             policy,
             approval: ApprovalCoordinator::new(),
-            approval_policy: ApprovalPolicy::default(),
+            approval_policy: ApprovalPolicy::default()
+                .with_remembered_events(self.session.events()),
+            configured_approval_policy: ApprovalPolicy::default(),
             worker_binding: None,
         });
     }
@@ -589,11 +1272,14 @@ impl Agent {
             runtime.context = context;
         } else {
             self.tools = Some(ToolRuntime {
-                registry: ToolRegistry::new(),
+                registry: std::sync::Arc::new(ToolRegistry::new()),
+                sequential: false,
                 context,
                 policy: SideEffectPolicy::read_only(),
                 approval: ApprovalCoordinator::new(),
-                approval_policy: ApprovalPolicy::default(),
+                approval_policy: ApprovalPolicy::default()
+                    .with_remembered_events(self.session.events()),
+                configured_approval_policy: ApprovalPolicy::default(),
                 worker_binding: None,
             });
         }
@@ -653,8 +1339,15 @@ impl Agent {
     /// host to surface/respond to pending side-effect requests.
     pub fn set_approval_policy(&mut self, policy: ApprovalPolicy) -> Option<ApprovalCoordinator> {
         let runtime = self.tools.as_mut()?;
-        runtime.approval_policy = policy;
+        runtime.approval_policy = policy.with_remembered_events(self.session.events());
+        runtime.configured_approval_policy = policy;
         Some(runtime.approval.clone())
+    }
+
+    pub fn configured_approval_policy(&self) -> Option<ApprovalPolicy> {
+        self.tools
+            .as_ref()
+            .map(|runtime| runtime.configured_approval_policy.clone())
     }
 
     pub fn approval_coordinator(&self) -> Option<ApprovalCoordinator> {
@@ -676,6 +1369,16 @@ impl Agent {
         if self.phase != AgentPhase::Idle {
             return Err(AgentError::NotIdle);
         }
+        if binding.is_some()
+            && self
+                .extensions
+                .as_ref()
+                .is_some_and(|runtime| runtime.has_hooks())
+        {
+            return Err(AgentError::InvalidTurn(
+                "worker cannot acquire extension hook authority".into(),
+            ));
+        }
         if let Some(binding) = &binding {
             binding.validate()?;
         }
@@ -692,6 +1395,132 @@ impl Agent {
         }
         runtime.worker_binding = binding;
         Ok(())
+    }
+
+    /// Atomically install a host-preflighted Blueprint gate and its immutable
+    /// worker correlation. A failed gate or binding leaves the previous tool
+    /// runtime untouched; this method never starts work or a child process.
+    pub fn admit_blueprint_worker(
+        &mut self,
+        policy: crate::tools::BlueprintPolicySpec,
+        lease: crate::tools::BlueprintLease,
+        binding: WorkerExecutionBinding,
+        limits: crate::governance::ResourceLimits,
+        credential_handles: Vec<String>,
+        now_ms: u64,
+    ) -> Result<crate::tools::BlueprintRevocation, AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        if self.worker_budget.is_none() {
+            return Err(AgentError::Governance(
+                "worker budget limits must be configured before admission".into(),
+            ));
+        }
+        binding.validate()?;
+        if binding.blueprint_sha256 != policy.blueprint_digest
+            || binding.item_id != policy.item_id
+            || binding.lease_id != lease.lease_id
+        {
+            return Err(AgentError::InvalidTurn(
+                "worker binding does not match Blueprint preflight".into(),
+            ));
+        }
+        let runtime = self.tools.as_mut().ok_or_else(|| {
+            AgentError::InvalidTurn("worker admission requires a configured tool runtime".into())
+        })?;
+        let (gate, revocation) =
+            crate::tools::BlueprintGate::compile(&runtime.context, policy, lease, now_ms)
+                .map_err(AgentError::Tool)?;
+        let context = runtime
+            .context
+            .clone()
+            .with_blueprint_gate(gate)
+            .map_err(AgentError::Tool)?;
+        let old_context = std::mem::replace(&mut runtime.context, context);
+        let old_binding = runtime.worker_binding.replace(binding.clone());
+        if let Some(evidence) = runtime.context.policy_evidence()
+            && let Err(error) = validate_worker_gate_binding(
+                runtime.worker_binding.as_ref().expect("binding installed"),
+                &evidence,
+            )
+        {
+            runtime.context = old_context;
+            runtime.worker_binding = old_binding;
+            return Err(error);
+        }
+        if let Some(worker_budget) = self.worker_budget.as_mut() {
+            let lease_record = crate::governance::WorkerLease {
+                lease_id: binding.lease_id.clone(),
+                blueprint_item: binding.item_id.clone(),
+                policy_digest: binding.policy_digest.clone(),
+                expires_at_ms: binding.expires_at_ms,
+                limits,
+            };
+            if let Err(error) = worker_budget.open_lease(&mut self.session, lease_record, now_ms) {
+                runtime.context = old_context;
+                runtime.worker_binding = old_binding;
+                return Err(AgentError::Governance(error.to_string()));
+            }
+            let admission_operation_id = format!("worker-admission-{}", binding.item_id);
+            let reservation = crate::governance::BudgetReservation {
+                operation_id: admission_operation_id.clone(),
+                lease_id: binding.lease_id.clone(),
+                policy_digest: binding.policy_digest.clone(),
+                origin: crate::governance::BudgetOrigin::BlueprintWorker,
+                resources: crate::governance::ResourceUsage {
+                    wall_ms: limits.max_wall_ms,
+                    concurrency: 1,
+                    processes: 1,
+                    ..Default::default()
+                },
+                gate_decision_id: format!("gate-{}", binding.item_id),
+                network_host: None,
+                credential_handles,
+            };
+            if let Err(error) = worker_budget.reserve(&mut self.session, reservation, now_ms) {
+                // `open_lease` is durable, so compensate with a durable
+                // revocation before restoring the in-memory runtime. This
+                // prevents a failed reservation from leaving an apparently
+                // usable lease behind after admission rejects.
+                let _ = worker_budget.revoke_lease(
+                    &mut self.session,
+                    &binding.lease_id,
+                    "admission_reservation_failed",
+                    now_ms,
+                );
+                runtime.context = old_context;
+                runtime.worker_binding = old_binding;
+                return Err(AgentError::Governance(error.to_string()));
+            }
+            self.worker_admission_operation = Some(admission_operation_id);
+        }
+        let admission_event = serde_json::json!({
+            "type": "worker_admitted",
+            "blueprint_digest": runtime.context.policy_evidence().map(|e| e.blueprint_digest),
+            "policy_digest": runtime.context.policy_evidence().map(|e| e.policy_digest),
+            "worker_binding": runtime.worker_binding,
+            "execution_started": false,
+        });
+        if let Err(error) = self.session.append_event(admission_event) {
+            if let Some(worker_budget) = self.worker_budget.as_mut() {
+                let _ = worker_budget.revoke_lease(
+                    &mut self.session,
+                    &binding.lease_id,
+                    "admission_event_failed",
+                    now_ms,
+                );
+            }
+            self.worker_admission_operation = None;
+            runtime.context = old_context;
+            runtime.worker_binding = old_binding;
+            return Err(AgentError::Session(error));
+        }
+        Ok(revocation)
+    }
+
+    pub fn worker_admission_operation_id(&self) -> Option<&str> {
+        self.worker_admission_operation.as_deref()
     }
 
     /// A durable dispatch without a known result is not proof of failure or
@@ -841,147 +1670,739 @@ impl Agent {
     }
 
     pub fn context_budget(&self) -> crate::context::ContextBudget {
-        self.context_budget
+        self.backend
+            .model_descriptor(self.model.as_deref())
+            .ok()
+            .flatten()
+            .map_or(
+                crate::context::ContextBudget {
+                    max_tokens: self
+                        .context_budget
+                        .max_tokens
+                        .min(crate::providers::registry::UNKNOWN_CONTEXT_WINDOW),
+                    reserved_output_tokens: self
+                        .context_budget
+                        .reserved_output_tokens
+                        .min(crate::providers::registry::UNKNOWN_MAX_OUTPUT),
+                },
+                |model| model.context_budget(self.context_budget),
+            )
     }
 
-    /// Compact the current durable context without invoking the provider.
-    ///
-    /// A deterministic checkpoint is written to the session journal.  The
-    /// checkpoint is then picked up by `complete_with_tools`, including after
-    /// a process restart, so this command changes the context sent on the
-    /// next provider turn rather than merely printing an acknowledgement.
-    pub fn compact_context(&mut self) -> Result<CompactionReport, AgentError> {
+    /// Monetary caps use the same durable budget owner as request/token limits.
+    pub fn set_summary_cost_limit(
+        &mut self,
+        limit_micro_usd: Option<u64>,
+    ) -> Result<(), AgentError> {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
         }
-        if self.phase == AgentPhase::Running {
+        if self.phase != AgentPhase::Idle {
             return Err(AgentError::NotIdle);
         }
-        let source_turns = self.session.turns().len();
-        let prepared =
-            crate::context::prepare_context(self.session.turns(), self.context_budget, &|| false)
-                .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
-        let before = crate::context::estimate_tokens(self.session.turns());
-        let marker_sequence = self.session.next_sequence();
-        let (compacted, checkpoint, already_recorded, marker_sequence) = if let Some(checkpoint) =
-            prepared.checkpoint.clone()
-        {
-            let already_recorded = self.session.events().iter().any(|event| {
-                event.get("type").and_then(Value::as_str) == Some("context_compacted")
-                    && event.get("trigger").and_then(Value::as_str) == Some("manual_slash")
-                    && event
-                        .get("checkpoint")
-                        .and_then(|value| {
-                            serde_json::from_value::<crate::context::CompactionCheckpoint>(
-                                value.clone(),
+        let limits = self
+            .governance
+            .as_ref()
+            .map_or_else(Default::default, |ledger| ledger.limits());
+        let mut candidate = crate::governance::BudgetLedger::restore(&self.session, limits)
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        candidate
+            .set_summary_cost_limit(limit_micro_usd)
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        candidate
+            .persist(&mut self.session)
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        self.governance = Some(candidate);
+        Ok(())
+    }
+
+    fn ensure_summary_ledger(&mut self) -> Result<(), AgentError> {
+        if self.governance.is_none() {
+            let mut ledger =
+                crate::governance::BudgetLedger::restore(&self.session, Default::default())
+                    .map_err(|e| AgentError::Governance(e.to_string()))?;
+            // A running turn owns one slot; its existing terminal paths release
+            // it even when this is the first operation that needs a ledger.
+            if self.phase == AgentPhase::Running {
+                ledger
+                    .charge(crate::governance::ResourceKind::Concurrency, 1)
+                    .map_err(|e| AgentError::Governance(e.to_string()))?;
+            }
+            ledger
+                .persist(&mut self.session)
+                .map_err(|e| AgentError::Governance(e.to_string()))?;
+            self.governance = Some(ledger);
+        }
+        Ok(())
+    }
+
+    fn prepare_semantic_provider_context<F: Fn() -> bool>(
+        &mut self,
+        budget: crate::context::ContextBudget,
+        cancelled: &F,
+    ) -> Result<crate::context::PreparedContext, AgentError> {
+        use crate::context::{ContextBudget, PreparedContext, estimate_tokens};
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        if budget.max_tokens <= budget.reserved_output_tokens {
+            return Err(AgentError::InvalidTurn(
+                "context budget has no input capacity".into(),
+            ));
+        }
+        let turns = self.context_source_for_provider()?;
+        let estimate = estimate_tokens(&turns);
+        if estimate.input_tokens <= budget.max_tokens - budget.reserved_output_tokens {
+            return Ok(PreparedContext {
+                turns,
+                checkpoint: None,
+                estimate,
+            });
+        }
+        let source = self.selected_history()?;
+        let branch_id = self.session.selected_tree_branch();
+        let session_id = self.session.session_id().to_owned();
+        let previous = self.session.latest_semantic_checkpoint(ContextBudget {
+            max_tokens: u64::MAX,
+            reserved_output_tokens: 0,
+        })?;
+        let keep_tokens = (budget.max_tokens - budget.reserved_output_tokens) / 2;
+        let scope = self
+            .active_turn_id
+            .clone()
+            .unwrap_or_else(|| "manual-compaction".into());
+        let pump =
+            crate::input_queue::InputPump::new(&mut self.session, self.input_port.clone(), &scope);
+        let plan = crate::context::prepare_semantic_compaction(
+            &source,
+            &session_id,
+            &branch_id,
+            keep_tokens,
+            &|| pump.poll(cancelled()),
+        );
+        pump.finish()?;
+        let plan = plan.map_err(|e| {
+            AgentError::InvalidTurn(format!("semantic compaction has no safe bounded cut: {e}"))
+        })?;
+        let data = plan
+            .summary_request_data(&source, previous.as_ref())
+            .map_err(|e| {
+                AgentError::InvalidTurn(format!(
+                    "semantic summary source is invalid or cannot advance: {e}"
+                ))
+            })?;
+        let descriptor = self.backend.model_descriptor(self.model.as_deref())?;
+        let summary_provider = descriptor.as_ref().map_or_else(
+            || self.backend.name().to_owned(),
+            |model| model.provider.clone(),
+        );
+        let request_budget = self.context_budget();
+        let output_limit = request_budget.reserved_output_tokens.min(4096);
+        if output_limit == 0 {
+            return Err(AgentError::InvalidTurn(
+                "semantic summary output budget is zero".into(),
+            ));
+        }
+        let operation_id = next_id("semantic-compaction");
+        let mut request_turn = Turn::new(
+            format!("summary-{}", self.session.next_sequence()),
+            TurnRole::User,
+            &data,
+        );
+        request_turn.created_at_ms = source.last().map_or(0, |turn| turn.created_at_ms);
+        let request_turns = [request_turn];
+        let request_estimate = estimate_tokens(&request_turns)
+            .input_tokens
+            .saturating_add(crate::context::SUMMARY_INSTRUCTIONS.len().div_ceil(4) as u64)
+            .saturating_add(64);
+        if request_estimate.saturating_add(output_limit) > request_budget.max_tokens {
+            return Err(AgentError::InvalidTurn("semantic summary source exceeds model/request budget; existing checkpoint retained".into()));
+        }
+        let price = descriptor.as_ref().and_then(|model| model.price.as_ref());
+        // Reserve the full allowed input window for a monetary ceiling. This is
+        // an upper-bound reservation, never a claim about the actual bill.
+        let quote = price
+            .map(|price| {
+                crate::governance::quoted_summary_cost(
+                    price,
+                    request_budget.max_tokens,
+                    output_limit,
+                )
+            })
+            .transpose()
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        self.ensure_summary_ledger()?;
+        let ledger = self.governance.as_mut().expect("summary ledger");
+        ledger
+            .persist(&mut self.session)
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        // Check the whole request against a candidate budget before publishing
+        // any reservation; a rejected request must not partly consume quotas.
+        let mut candidate =
+            crate::governance::BudgetLedger::restore(&self.session, ledger.limits())
+                .map_err(|e| AgentError::Governance(e.to_string()))?;
+        candidate
+            .charge(
+                crate::governance::ResourceKind::InputTokens,
+                request_estimate,
+            )
+            .and_then(|_| {
+                candidate.charge(crate::governance::ResourceKind::OutputTokens, output_limit)
+            })
+            .and_then(|_| candidate.charge(crate::governance::ResourceKind::NetworkRequests, 1))
+            .and_then(|_| candidate.reserve_summary_cost(quote))
+            .and_then(|_| candidate.persist(&mut self.session))
+            .map_err(|e| AgentError::Governance(e.to_string()))?;
+        self.governance = Some(candidate);
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        self.session
+            .begin_operation(&crate::session::InterruptedOperation {
+                operation_id: operation_id.clone(),
+                kind: crate::session::OperationKind::Compaction,
+                turn_id: scope.clone(),
+                retry_requires_confirmation: false,
+            })?;
+        use sha2::{Digest, Sha256};
+        self.session.append_event(serde_json::json!({
+            "type":"semantic_summary_requested", "operation_id":operation_id,
+            "source":plan.source(), "source_end":plan.source_end(),
+            "request_sha256":format!("{:x}",Sha256::digest(data.as_bytes())),
+            "requested_model":self.model, "provider":summary_provider, "backend":self.backend.name(), "model_metadata":descriptor,
+            "budget":request_budget, "approximate_input_tokens":request_estimate,
+            "max_output_tokens":output_limit, "reserved_cost_micro_usd":quote,
+            "price_known":price.is_some(),
+        }))?;
+        let metadata = serde_json::json!({"purpose":"semantic_compaction"});
+        let request =
+            CompletionRequest::new(&operation_id, &request_turns, self.model.as_deref(), &[])
+                .with_instructions(Some(crate::context::SUMMARY_INSTRUCTIONS))
+                .with_metadata(Some(&metadata))
+                .with_max_output_tokens(output_limit);
+        let pump =
+            crate::input_queue::InputPump::new(&mut self.session, self.input_port.clone(), &scope);
+        let mut streamed_bytes = 0usize;
+        let response =
+            self.backend
+                .complete_with_control(request, &|| pump.poll(cancelled()), &mut |event| {
+                    if let ProviderEvent::TextDelta { delta } = event {
+                        streamed_bytes = streamed_bytes.saturating_add(delta.len());
+                        if streamed_bytes > crate::context::MAX_SUMMARY_BYTES {
+                            return Err(BackendError::InvalidResponse(
+                                "semantic summary exceeded byte limit".into(),
+                            ));
+                        }
+                    }
+                    Ok(())
+                });
+        let pump_result = pump.finish();
+        let outcome = (|| -> Result<PreparedContext, AgentError> {
+            pump_result?;
+            let response = response?;
+            let actual_cost = response
+                .usage
+                .map(|usage| {
+                    price
+                        .map(|price| {
+                            crate::governance::quoted_summary_cost(
+                                price,
+                                usage.input_tokens,
+                                usage.output_tokens,
                             )
-                            .ok()
                         })
-                        .is_some_and(|existing| existing == checkpoint)
-            });
-            if already_recorded {
-                let recorded_sequence = self
-                    .session
-                    .records()
-                    .iter()
-                    .rev()
-                    .find(|record| {
-                        record.kind == "event"
-                            && record
-                                .value
-                                .get("event")
-                                .and_then(Value::as_object)
-                                .is_some_and(|event| {
-                                    event.get("type").and_then(Value::as_str)
-                                        == Some("context_compacted")
-                                        && event.get("trigger").and_then(Value::as_str)
-                                            == Some("manual_slash")
-                                        && event
-                                            .get("checkpoint")
-                                            .and_then(|value| {
-                                                serde_json::from_value::<
-                                                    crate::context::CompactionCheckpoint,
-                                                >(
-                                                    value.clone()
-                                                )
-                                                .ok()
-                                            })
-                                            .is_some_and(|existing| existing == checkpoint)
-                                })
-                    })
-                    .map_or(marker_sequence, |record| record.sequence);
-                (true, Some(checkpoint), true, recorded_sequence)
-            } else {
-                let operation_id = format!(
-                    "manual-compaction-{}-{}",
-                    checkpoint.source_sha256, marker_sequence
-                );
-                self.session
-                    .begin_operation(&crate::session::InterruptedOperation {
-                        operation_id: operation_id.clone(),
-                        kind: crate::session::OperationKind::Compaction,
-                        turn_id: format!("manual-{marker_sequence}"),
-                        retry_requires_confirmation: false,
-                    })?;
-                let checkpoint_sequence = self.session.next_sequence();
-                self.session.append_event(serde_json::json!({
-                    "type": "context_compacted",
-                    "trigger": "manual_slash",
-                    "checkpoint": checkpoint,
-                    "budget": self.context_budget,
-                }))?;
-                self.session
-                    .finish_operation(&operation_id, crate::session::OperationOutcome::Succeeded)?;
-                (true, Some(checkpoint), false, checkpoint_sequence)
-            }
-        } else {
-            let already_recorded = self.session.events().iter().any(|event| {
-                event.get("type").and_then(Value::as_str) == Some("context_compaction_skipped")
-                    && event.get("trigger").and_then(Value::as_str) == Some("manual_slash")
-            });
-            let recorded_sequence = self
-                .session
-                .records()
-                .iter()
-                .rev()
-                .find(|record| {
-                    record.kind == "event"
-                        && record
-                            .value
-                            .get("event")
-                            .and_then(Value::as_object)
-                            .is_some_and(|event| {
-                                event.get("type").and_then(Value::as_str)
-                                    == Some("context_compaction_skipped")
-                                    && event.get("trigger").and_then(Value::as_str)
-                                        == Some("manual_slash")
-                            })
+                        .transpose()
                 })
-                .map_or(marker_sequence, |record| record.sequence);
-            if !already_recorded {
-                self.session.append_event(serde_json::json!({
-                    "type": "context_compaction_skipped",
-                    "trigger": "manual_slash",
-                    "reason": "within_budget",
-                    "estimated_tokens": before.input_tokens,
-                    "budget": self.context_budget,
-                }))?;
+                .transpose()
+                .map_err(|e| AgentError::Governance(e.to_string()))?
+                .flatten();
+            let mut raw_end = response
+                .content
+                .len()
+                .min(crate::context::MAX_SUMMARY_BYTES);
+            while !response.content.is_char_boundary(raw_end) {
+                raw_end -= 1;
             }
-            (false, None, already_recorded, recorded_sequence)
+            let annotation_bytes = serde_json::to_vec(&response.annotations)
+                .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
+            let annotations = if annotation_bytes.len() <= crate::context::MAX_SUMMARY_BYTES {
+                serde_json::to_value(&response.annotations).expect("JSON values serialize")
+            } else {
+                serde_json::json!({"omitted":true,"bytes":annotation_bytes.len(),
+                "sha256":format!("{:x}",Sha256::digest(&annotation_bytes))})
+            };
+            self.session.append_event(serde_json::json!({
+                "type":"semantic_summary_response", "operation_id":operation_id,
+                "source":plan.source(), "response_id":response.response_id, "provider":summary_provider, "backend":self.backend.name(),
+                "model":response.model, "usage":response.usage, "usage_cost_estimate_micro_usd":actual_cost, "cost_basis":"reported_tokens_at_recorded_model_rates",
+                "raw_summary":&response.content[..raw_end], "raw_summary_bytes":response.content.len(),
+                "raw_summary_truncated":raw_end < response.content.len(),
+                "raw_summary_sha256":format!("{:x}",Sha256::digest(response.content.as_bytes())),
+                "annotations":annotations,
+            }))?;
+            if let Some(usage) = response.usage {
+                let ledger = self.governance.as_mut().expect("summary ledger");
+                ledger
+                    .charge(
+                        crate::governance::ResourceKind::InputTokens,
+                        usage.input_tokens.saturating_sub(request_estimate),
+                    )
+                    .and_then(|_| {
+                        ledger.charge(
+                            crate::governance::ResourceKind::OutputTokens,
+                            usage.output_tokens.saturating_sub(output_limit),
+                        )
+                    })
+                    .and_then(|_| {
+                        ledger.reserve_summary_cost(
+                            actual_cost
+                                .zip(quote)
+                                .map(|(actual, quote)| actual.saturating_sub(quote)),
+                        )
+                    })
+                    .and_then(|_| ledger.persist(&mut self.session))
+                    .map_err(|e| AgentError::Governance(e.to_string()))?;
+            }
+            if cancelled() {
+                return Err(BackendError::Cancelled.into());
+            }
+            if response.usage.is_some_and(|usage| {
+                usage.input_tokens.saturating_add(output_limit) > request_budget.max_tokens
+            }) {
+                return Err(AgentError::InvalidTurn("summary actual input usage exceeds request budget; previous checkpoint retained".into()));
+            }
+            let (summary, usage) = plan
+                .validate_summary_completion(&response, output_limit)
+                .map_err(|e| {
+                    AgentError::InvalidTurn(format!(
+                        "invalid semantic summary; previous checkpoint retained: {e}"
+                    ))
+                })?;
+            let reported_model = response
+                .model
+                .clone()
+                .or_else(|| self.model.clone())
+                .or_else(|| self.backend.model().map(str::to_owned))
+                .ok_or_else(|| {
+                    AgentError::InvalidTurn("summary model identity is unavailable".into())
+                })?;
+            let checkpoint = plan
+                .finalize(
+                    &self.selected_history()?,
+                    summary,
+                    summary_provider,
+                    reported_model,
+                    usage,
+                    budget,
+                    cancelled,
+                )
+                .map_err(|e| {
+                    AgentError::InvalidTurn(format!("semantic checkpoint rejected: {e}"))
+                })?;
+            self.session.append_semantic_checkpoint_for_operation(
+                &checkpoint,
+                budget,
+                cancelled,
+                Some(&operation_id),
+            )?;
+            let turns = crate::context::restore_semantic_checkpoint(
+                &self.selected_history()?,
+                &checkpoint,
+                self.session.session_id(),
+                &self.session.selected_tree_branch(),
+                budget,
+            )
+            .map_err(|e| AgentError::Recovery(e.to_string()))?;
+            Ok(PreparedContext {
+                estimate: estimate_tokens(&turns),
+                turns,
+                checkpoint: None,
+            })
+        })();
+        let status = match &outcome {
+            Ok(_) => crate::session::OperationOutcome::Succeeded,
+            Err(AgentError::Backend(BackendError::Cancelled)) => {
+                crate::session::OperationOutcome::Cancelled
+            }
+            Err(AgentError::Backend(
+                BackendError::Transport(_)
+                | BackendError::HttpStatus { .. }
+                | BackendError::InvalidResponse(_),
+            )) => crate::session::OperationOutcome::Interrupted,
+            Err(_) => crate::session::OperationOutcome::Failed,
         };
+        self.session.finish_operation(&operation_id, status)?;
+        outcome
+    }
+
+    /// Compact through the selected provider and publish only a validated,
+    /// durable semantic checkpoint. Compatible hosts may call this synchronously.
+    pub fn compact_context(&mut self) -> Result<CompactionReport, AgentError> {
+        self.compact_context_with_control(|| false)
+    }
+
+    pub fn compact_context_with_control(
+        &mut self,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<CompactionReport, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        if !self.operation_recovery().is_empty() {
+            return Err(AgentError::Recovery(
+                "resolve interrupted operations before compaction".into(),
+            ));
+        }
+        let source_turns = self.session.turns().len();
+        let before = crate::context::estimate_tokens(&self.context_source_for_provider()?);
+        let previous = self
+            .session
+            .latest_semantic_checkpoint(crate::context::ContextBudget {
+                max_tokens: u64::MAX,
+                reserved_output_tokens: 0,
+            })?;
+        // Manual compaction has no active user turn, but its existing owner
+        // still services queue tickets while waiting for the summary provider.
+        // Match InputPump's manual scope and retire it on success or failure.
+        self.input_port.set_scope(Some("manual-compaction"));
+        let preparing = self.input_port.preparation();
+        let result = self.prepare_semantic_provider_context(self.context_budget(), &cancelled);
+        drop(preparing);
+        self.input_port.set_scope(None);
+        let prepared = result?;
+        let checkpoint =
+            self.session
+                .latest_semantic_checkpoint(crate::context::ContextBudget {
+                    max_tokens: u64::MAX,
+                    reserved_output_tokens: 0,
+                })?;
+        let compacted = checkpoint != previous;
+        let marker_sequence = self.session.next_sequence();
+        self.session.append_event(serde_json::json!({
+            "type": if compacted { "context_compacted" } else { "context_compaction_skipped" },
+            "trigger": "manual_slash", "semantic": true,
+            "reason": if compacted { "semantic_checkpoint_committed" } else { "within_budget" },
+            "source_turns": source_turns, "estimated_tokens": prepared.estimate.input_tokens,
+            "budget": self.context_budget(),
+        }))?;
         Ok(CompactionReport {
             compacted,
-            already_recorded,
+            already_recorded: !compacted && checkpoint.is_some(),
             source_turns,
             prepared_turns: prepared.turns.len(),
             estimated_tokens_before: before.input_tokens,
             estimated_tokens_after: prepared.estimate.input_tokens,
             marker_sequence,
-            checkpoint,
+            checkpoint: None,
+            semantic_checkpoint: checkpoint,
         })
     }
 
+    pub fn extension_lease(&self) -> Option<crate::extension_runtime::ExtensionLease> {
+        self.extensions.as_ref().map(|runtime| runtime.lease())
+    }
+
+    fn prepare_extensions(
+        &self,
+        root: &Path,
+        session_id: &str,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<
+        (
+            crate::extension_runtime::ExtensionRuntime,
+            std::sync::Arc<ToolRegistry>,
+        ),
+        AgentError,
+    > {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let tools = self.tools.as_ref().ok_or_else(|| {
+            AgentError::InvalidTurn("extension runtime requires host tools".into())
+        })?;
+        // A worker gate cannot grant an arbitrary subprocess hook authority.
+        if tools.worker_binding.is_some()
+            || tools.context.origin() == crate::tools::ToolOrigin::BlueprintWorker
+        {
+            return Err(AgentError::InvalidTurn(
+                "extension hooks are unavailable to a Blueprint worker".into(),
+            ));
+        }
+        let candidate = crate::extension_runtime::ExtensionRuntime::prepare(
+            root,
+            tools.context.workspace_root(),
+            session_id,
+            cancelled,
+        )?;
+        let mut registry = (*tools.registry).clone();
+        if let Some(old) = &self.extensions {
+            registry.remove_extension_tools(&old.tool_names());
+        }
+        candidate.register_tools(&mut registry)?;
+        Ok((candidate, std::sync::Arc::new(registry)))
+    }
+
+    pub fn configure_extensions(
+        &mut self,
+        root: &Path,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<(), AgentError> {
+        let candidate = self.prepare_extensions(root, self.session.session_id(), &cancelled)?;
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        self.session.append_event(serde_json::json!({"type":"extensions_selected","generation":candidate.0.lease().identity().generation,"tools":candidate.0.tool_names()}))?;
+        self.publish_extensions(candidate, "reload");
+        Ok(())
+    }
+
+    fn publish_extensions(
+        &mut self,
+        candidate: (
+            crate::extension_runtime::ExtensionRuntime,
+            std::sync::Arc<ToolRegistry>,
+        ),
+        reason: &str,
+    ) {
+        if let Some(mut old) = self.extensions.take() {
+            let errors = old.close(reason);
+            self.extension_errors(errors);
+        }
+        self.tools.as_mut().expect("prepared tools").registry = candidate.1;
+        self.extensions = Some(candidate.0);
+        let errors = self.extensions.as_mut().expect("published").start(reason);
+        self.extension_errors(errors);
+    }
+
+    fn extension_errors(&mut self, errors: Vec<String>) {
+        for error in errors {
+            self.events.push(AgentEvent::Error {
+                message: crate::security::redact_text(&format!("extension: {error}"), &[]),
+            });
+        }
+    }
+    fn notify_extensions(
+        &mut self,
+        kind: crate::extension_runtime::HookKind,
+        turn_id: Option<&str>,
+        reason: &str,
+        cancelled: &dyn Fn() -> bool,
+    ) {
+        if self.tools.as_ref().is_some_and(|runtime| {
+            runtime.worker_binding.is_some()
+                || runtime.context.origin() == crate::tools::ToolOrigin::BlueprintWorker
+        }) {
+            return;
+        }
+        let errors = self
+            .extensions
+            .as_ref()
+            .map(|runtime| runtime.notify(kind, turn_id, reason, cancelled))
+            .unwrap_or_default();
+        self.extension_errors(errors);
+    }
+
+    /// Current catalogue for completion/status; each admitted turn retains its own Arc.
+    pub fn resource_snapshot(&self) -> std::sync::Arc<crate::resource_loader::ResourceSnapshot> {
+        self.resource_loader.as_ref().map_or_else(
+            || {
+                std::sync::Arc::new(crate::resource_loader::ResourceSnapshot {
+                    skills: self.skills.clone(),
+                    ..Default::default()
+                })
+            },
+            crate::resource_loader::ResourceLoader::snapshot,
+        )
+    }
+
+    /// Build and validate before publishing or journaling selected paths. Only
+    /// provenance is durable; Markdown bodies remain in the active turn memory.
+    pub fn configure_resources(
+        &mut self,
+        paths: crate::resource_loader::ResourcePaths,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<Value, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        let mut candidate = match &self.resource_loader {
+            Some(loader) => loader.clone(),
+            None => crate::resource_loader::ResourceLoader::new(paths.clone())
+                .map_err(resource_agent_error)?,
+        };
+        let snapshot = candidate
+            .reload_with_paths(paths, &cancelled)
+            .map_err(resource_agent_error)?;
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        let extension_candidate = self
+            .extensions
+            .as_ref()
+            .map(|runtime| {
+                self.prepare_extensions(runtime.root(), self.session.session_id(), &cancelled)
+            })
+            .transpose()?;
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        let mut provenance = resource_selection_event(candidate.paths(), &snapshot);
+        if let Some((runtime, _)) = &extension_candidate {
+            provenance["extension_generation"] = runtime.lease().identity().generation.into();
+        }
+        self.session.append_event(provenance)?;
+        self.skills = snapshot.skills.clone();
+        self.resource_loader = Some(candidate);
+        self.stale_resource_skills.clear();
+        if let Some(candidate) = extension_candidate {
+            self.publish_extensions(candidate, "reload");
+        }
+        Ok(self.resource_status())
+    }
+
+    /// Reconstruct paths from the existing journal, reading fresh bytes. A skill
+    /// changed since the last explicit selection requires /reload before use.
+    pub fn restore_resources(
+        &mut self,
+        defaults: crate::resource_loader::ResourcePaths,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let (loader, stale) = restore_resource_state(&self.session, defaults, &cancelled)?;
+        let snapshot = loader.snapshot();
+        self.skills = snapshot.skills.clone();
+        self.resource_loader = Some(loader);
+        self.stale_resource_skills = stale;
+        Ok(())
+    }
+
+    pub fn reload_resources(&mut self, cancelled: impl Fn() -> bool) -> Result<Value, AgentError> {
+        let paths = self
+            .resource_loader
+            .as_ref()
+            .ok_or_else(|| AgentError::InvalidTurn("resource paths are not configured".into()))?
+            .paths()
+            .clone();
+        self.configure_resources(paths, cancelled)
+    }
+
+    pub fn resource_status(&self) -> Value {
+        let snapshot = self.resource_snapshot();
+        serde_json::json!({
+            "generation": snapshot.generation,
+            "active_generation": self.active_resources.as_ref().map(|value| value.generation),
+            "skills": snapshot.skills.metadata().take(16).collect::<Vec<_>>(),
+            "templates": snapshot.templates.templates().take(16).map(|value| serde_json::json!({
+                "name": value.name, "description": value.description,
+                "argument_hint": value.argument_hint, "source": value.source,
+                "source_hash": value.source_hash, "scope": value.scope,
+            })).collect::<Vec<_>>(),
+            "collisions": snapshot.collisions().into_iter().take(16).collect::<Vec<_>>(),
+            "skills_total": snapshot.skills.metadata().count(),
+            "templates_total": snapshot.templates.templates().count(),
+            "reload_required_skills": self.stale_resource_skills,
+        })
+    }
+
+    fn turn_skills(&self) -> &crate::skills::SkillSet {
+        self.active_resources
+            .as_ref()
+            .map_or(&self.skills, |value| &value.skills)
+    }
+
+    fn prepare_resource_input(
+        &self,
+        snapshot: &crate::resource_loader::ResourceSnapshot,
+        input: &str,
+        cancelled: &impl Fn() -> bool,
+    ) -> Result<(Option<Value>, Option<String>), AgentError> {
+        if !input.trim_start().starts_with('/') {
+            return Ok((None, None));
+        }
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        if !crate::slash::resource_input_candidate(input) {
+            return Err(AgentError::InvalidTurn(
+                "slash controls must use the command owner".into(),
+            ));
+        }
+        if let Some(skill) = input.strip_prefix("/skill:") {
+            let (name, args) = skill.split_once(char::is_whitespace).unwrap_or((skill, ""));
+            if self.stale_resource_skills.contains(name) {
+                return Err(AgentError::InvalidTurn(
+                    "skill changed since previous process; /reload required".into(),
+                ));
+            }
+            let body = snapshot
+                .skills
+                .load_body(
+                    name,
+                    crate::skills::SkillInvocation::Explicit,
+                    args,
+                    cancelled,
+                )
+                .map_err(|error| {
+                    if matches!(error, crate::skills::SkillError::Cancelled) {
+                        AgentError::Backend(BackendError::Cancelled)
+                    } else {
+                        AgentError::InvalidTurn(error.to_string())
+                    }
+                })?;
+            let provenance = serde_json::json!({
+                "kind": "skill", "generation": snapshot.generation,
+                "name": body.metadata.name, "source": body.metadata.source,
+                "source_hash": body.metadata.source_hash, "base_dir": body.metadata.base_dir,
+            });
+            // JSON quotes provenance/arguments. No substitutions or shell evaluation.
+            let rendered = format!(
+                "Selected skill (relative resources resolve from base_dir):\n{}\n{}\nLiteral skill arguments: {}",
+                provenance,
+                body.body,
+                serde_json::to_string(&body.arguments).expect("string serializes")
+            );
+            if rendered.len() > MAX_TEXT_BYTES {
+                return Err(AgentError::InvalidTurn(
+                    "selected skill prompt exceeds turn limit".into(),
+                ));
+            }
+            return Ok((Some(provenance), Some(rendered)));
+        }
+        let expansion = snapshot
+            .templates
+            .expand(input, cancelled)
+            .map_err(|error| {
+                if matches!(error, crate::prompt_templates::TemplateError::Cancelled) {
+                    AgentError::Backend(BackendError::Cancelled)
+                } else {
+                    AgentError::InvalidTurn(error.to_string())
+                }
+            })?
+            .ok_or_else(|| AgentError::InvalidTurn("unknown resource slash command".into()))?;
+        if expansion.content.len() > MAX_TEXT_BYTES || expansion.content.trim().is_empty() {
+            return Err(AgentError::InvalidTurn(
+                "expanded template is empty or exceeds turn limit".into(),
+            ));
+        }
+        Ok((
+            Some(serde_json::json!({
+                "kind": "template", "generation": snapshot.generation,
+                "name": expansion.name, "source": expansion.source, "source_hash": expansion.source_hash,
+            })),
+            Some(expansion.content),
+        ))
+    }
+
     pub fn set_skills(&mut self, skills: crate::skills::SkillSet) {
+        self.resource_loader = None;
         self.skills = skills;
     }
 
@@ -994,6 +2415,147 @@ impl Agent {
                 .map_err(|error| AgentError::Governance(error.to_string()))?,
         );
         Ok(())
+    }
+
+    pub fn set_worker_budget_limits(
+        &mut self,
+        limits: crate::governance::ResourceLimits,
+    ) -> Result<(), AgentError> {
+        self.worker_budget = Some(
+            crate::governance::WorkerBudgetLedger::restore(&mut self.session, limits)
+                .map_err(|error| AgentError::Governance(error.to_string()))?,
+        );
+        Ok(())
+    }
+
+    /// Settle an admitted Blueprint worker only after its host has observed a
+    /// terminal outcome and reaped all owned children. Unknown effects remain
+    /// reserved in the durable ledger and are never implicitly retried.
+    pub fn settle_blueprint_worker(
+        &mut self,
+        operation_id: &str,
+        actual: crate::governance::ResourceUsage,
+        completion: crate::governance::BudgetCompletion,
+        now_ms: u64,
+    ) -> Result<Option<crate::governance::BudgetDirective>, AgentError> {
+        let ledger = self.worker_budget.as_mut().ok_or_else(|| {
+            AgentError::Governance("worker budget ledger is not configured".into())
+        })?;
+        ledger
+            .settle(&mut self.session, operation_id, actual, completion, now_ms)
+            .map_err(|error| AgentError::Governance(error.to_string()))
+    }
+
+    /// Renew an admitted worker lease through the host-owned durable ledger.
+    /// The worker supplies no policy material; the host must present the
+    /// exact digest originally admitted for this lease.
+    pub fn renew_blueprint_worker(
+        &mut self,
+        lease_id: &str,
+        policy_digest: &str,
+        new_expires_at_ms: u64,
+        now_ms: u64,
+    ) -> Result<(), AgentError> {
+        let ledger = self.worker_budget.as_mut().ok_or_else(|| {
+            AgentError::Governance("worker budget ledger is not configured".into())
+        })?;
+        ledger
+            .renew_lease(
+                &mut self.session,
+                lease_id,
+                policy_digest,
+                new_expires_at_ms,
+                now_ms,
+            )
+            .map_err(|error| AgentError::Governance(error.to_string()))
+    }
+
+    /// Request host-owned cancellation for one worker lease. The durable
+    /// directive marks owned operations for cancellation; it does not claim
+    /// that children were reaped until settlement confirms that fact.
+    pub fn cancel_blueprint_worker(
+        &mut self,
+        lease_id: &str,
+        reason: &str,
+        now_ms: u64,
+    ) -> Result<crate::governance::BudgetDirective, AgentError> {
+        let ledger = self.worker_budget.as_mut().ok_or_else(|| {
+            AgentError::Governance("worker budget ledger is not configured".into())
+        })?;
+        ledger
+            .revoke_lease(&mut self.session, lease_id, reason, now_ms)
+            .map_err(|error| AgentError::Governance(error.to_string()))
+    }
+
+    pub fn expire_blueprint_workers(
+        &mut self,
+        now_ms: u64,
+    ) -> Result<Vec<crate::governance::BudgetDirective>, AgentError> {
+        let ledger = self.worker_budget.as_mut().ok_or_else(|| {
+            AgentError::Governance("worker budget ledger is not configured".into())
+        })?;
+        ledger
+            .expire(&mut self.session, now_ms)
+            .map_err(|error| AgentError::Governance(error.to_string()))
+    }
+
+    /// Host-only external evidence route. It borrows the existing session,
+    /// worker budget and output owner instead of constructing parallel ledgers.
+    #[allow(clippy::too_many_arguments)]
+    pub fn external_evidence_control(
+        &mut self,
+        store: &mut crate::domain_execution::ExecutionStore,
+        handoff: &crate::domain_execution::BlueprintHandoff,
+        goal: &crate::domains::Goal,
+        blueprint: &crate::domains::Blueprint,
+        preparation: Option<&crate::domain_execution::ExternalPreparation>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<crate::domain_execution::ExternalEvidence, AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        if !self.operation_recovery().is_empty() {
+            return Err(AgentError::InvalidTurn(
+                "external validator requires operation reconciliation".into(),
+            ));
+        }
+        let workspace = self
+            .attachment_workspace_root()
+            .ok_or_else(|| {
+                AgentError::InvalidTurn("external evidence requires a configured workspace".into())
+            })?
+            .to_owned();
+        if self.worker_budget.is_none() {
+            self.worker_budget = Some(
+                crate::governance::WorkerBudgetLedger::restore_existing(&mut self.session)
+                    .map_err(|e| AgentError::Governance(e.to_string()))?,
+            );
+        }
+        let ledger = self.worker_budget.as_mut().expect("restored worker ledger");
+        let result = if let Some(preparation) = preparation {
+            store.prepare_external_evidence(
+                &self.session,
+                ledger,
+                handoff,
+                goal,
+                blueprint,
+                &workspace,
+                preparation,
+                cancelled,
+            )
+        } else {
+            store.accept_external_candidate(
+                &mut self.session,
+                ledger,
+                &mut self.output_store,
+                handoff,
+                goal,
+                blueprint,
+                &workspace,
+                cancelled,
+            )
+        };
+        result.map_err(|e| AgentError::InvalidTurn(e.to_string()))
     }
 
     /// Explicit host input, never a model tool or a provider turn. The runtime
@@ -1164,12 +2726,38 @@ impl Agent {
                 "operation_id": operation_id, "turn_id": operation_id, "call_id": operation_id,
                 "tool": "user_shell", "policy_digest": policy_digest, "worker_binding": null,
             }))?;
-            self.events.push(AgentEvent::ToolCall {
-                turn_id: operation_id.clone(),
-                call_id: operation_id.clone(),
-                tool: "user_shell".into(),
+            emit_tool_event(
+                &mut self.events,
+                self.live_tool_sink.as_ref(),
+                AgentEvent::ToolCall {
+                    turn_id: operation_id.clone(),
+                    call_id: operation_id.clone(),
+                    tool: "user_shell".into(),
+                },
+            );
+            let capture = begin_output_capture(
+                &mut self.output_store,
+                &mut self.session,
+                &mut self.governance,
+                &operation_id,
+            )?;
+            let context = context.clone().with_output_capture(capture.clone())?;
+            let sink = self.live_tool_sink.clone();
+            let progress = capture.progress();
+            let result = RunCommandTool::invoke_user_shell_with_cancel(&context, args, &|| {
+                publish_output_progress(sink.as_ref(), &operation_id, &progress);
+                cancelled()
             });
-            let result = RunCommandTool::invoke_user_shell_with_cancel(&context, args, &cancelled)?;
+            publish_output_progress(sink.as_ref(), &operation_id, &progress);
+            let report = capture.report();
+            persist_output_capture(
+                &mut self.session,
+                &operation_id,
+                &operation_id,
+                &operation_id,
+                &report,
+            )?;
+            let result = result?;
             let mut result = crate::security::redact_json(&result, &[]);
             let object = result
                 .as_object_mut()
@@ -1227,11 +2815,15 @@ impl Agent {
                 "operation_id": operation_id, "outcome": outcome, "policy_digest": policy_digest,
             }))?;
             self.session.finish_operation(&operation_id, outcome)?;
-            self.events.push(AgentEvent::ToolResult {
-                turn_id: operation_id.clone(),
-                call_id: operation_id.clone(),
-                success,
-            });
+            emit_tool_event(
+                &mut self.events,
+                self.live_tool_sink.as_ref(),
+                AgentEvent::ToolResult {
+                    turn_id: operation_id.clone(),
+                    call_id: operation_id.clone(),
+                    success,
+                },
+            );
             Ok(result)
         })();
         if let Err(error) = &execution {
@@ -1250,6 +2842,17 @@ impl Agent {
     /// Admit a request without invoking the backend.  This named boundary is
     /// useful to UIs that want to render acceptance immediately.
     pub fn submit(&mut self, request: TurnInputRequest) -> Result<TurnSubmission, AgentError> {
+        self.submit_with_cancel(request, || false)
+    }
+
+    pub fn submit_with_cancel(
+        &mut self,
+        request: TurnInputRequest,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<TurnSubmission, AgentError> {
+        if crate::slash::resource_input_candidate(&request.message) && cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
         }
@@ -1306,10 +2909,13 @@ impl Agent {
         }
 
         let result = match request.mode {
-            TurnMode::StartOrSteer if current.is_none() => {
-                self.start_new(request.message, attachments, TurnMode::StartOrSteer)
-            }
-            TurnMode::StartOrSteer => self.steer_existing(request.message, attachments),
+            TurnMode::StartOrSteer if current.is_none() => self.start_new(
+                request.message,
+                attachments,
+                TurnMode::StartOrSteer,
+                &cancelled,
+            ),
+            TurnMode::StartOrSteer => self.steer_existing(request.message, attachments, &cancelled),
             TurnMode::StartIfIdle if current.is_some() => {
                 let submission = TurnSubmission::NotSubmitted {
                     reason: NotSubmittedReason::NotIdle,
@@ -1319,9 +2925,12 @@ impl Agent {
                 });
                 Ok(submission)
             }
-            TurnMode::StartIfIdle => {
-                self.start_new(request.message, attachments, TurnMode::StartIfIdle)
-            }
+            TurnMode::StartIfIdle => self.start_new(
+                request.message,
+                attachments,
+                TurnMode::StartIfIdle,
+                &cancelled,
+            ),
             TurnMode::Steer if current.is_none() => {
                 let submission = TurnSubmission::NotSubmitted {
                     reason: NotSubmittedReason::NoActiveTurn,
@@ -1340,7 +2949,7 @@ impl Agent {
                 });
                 Ok(submission)
             }
-            TurnMode::Steer => self.steer_existing(request.message, attachments),
+            TurnMode::Steer => self.steer_existing(request.message, attachments, &cancelled),
         };
         if result.as_ref().is_ok_and(TurnSubmission::accepted) {
             self.pending_attachments.clear();
@@ -1377,7 +2986,11 @@ impl Agent {
         message: String,
         attachments: Vec<crate::backend::InputAttachment>,
         mode: TurnMode,
+        cancelled: &impl Fn() -> bool,
     ) -> Result<TurnSubmission, AgentError> {
+        self.repair_input_projections()?;
+        let snapshot = self.resource_snapshot();
+        let (provenance, rendered) = self.prepare_resource_input(&snapshot, &message, cancelled)?;
         let turn_id = next_id("turn");
         let mut turn = Turn::new(turn_id.clone(), TurnRole::User, message);
         let materialized = self.materialize_attachments(&turn_id, &attachments)?;
@@ -1386,10 +2999,23 @@ impl Agent {
                 "attachments": attachment_journal_metadata(&materialized),
             }));
         }
+        if let Some(provenance) = provenance {
+            turn.metadata.get_or_insert_with(|| serde_json::json!({}))["resource"] = provenance;
+        }
+        if rendered.is_some() && cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
         turn.validate()?;
         self.session.append_turn(turn)?;
+        self.active_resource_inputs.clear();
+        if let Some(rendered) = rendered {
+            self.active_resource_inputs
+                .insert(turn_id.clone(), rendered);
+        }
+        self.active_resources = Some(snapshot);
         self.active_attachments = materialized;
         self.active_turn_id = Some(turn_id.clone());
+        self.input_port.set_scope(Some(&turn_id));
         self.phase = AgentPhase::Running;
         self.active_steerable = true;
         self.last_error = None;
@@ -1404,6 +3030,7 @@ impl Agent {
         &mut self,
         message: String,
         attachments: Vec<crate::backend::InputAttachment>,
+        cancelled: &impl Fn() -> bool,
     ) -> Result<TurnSubmission, AgentError> {
         if self
             .active_attachments
@@ -1420,6 +3047,23 @@ impl Agent {
             .active_turn_id
             .clone()
             .ok_or(AgentError::NoActiveTurn)?;
+        let snapshot = self
+            .active_resources
+            .clone()
+            .unwrap_or_else(|| self.resource_snapshot());
+        let (provenance, rendered) = self.prepare_resource_input(&snapshot, &message, cancelled)?;
+        if rendered.as_ref().is_some_and(|text| {
+            self.active_resource_inputs
+                .values()
+                .map(String::len)
+                .sum::<usize>()
+                .saturating_add(text.len())
+                > MAX_TEXT_BYTES
+        }) {
+            return Err(AgentError::InvalidTurn(
+                "active resource inputs exceed turn limit".into(),
+            ));
+        }
         let input_id = next_id("input");
         let mut turn =
             Turn::with_parent(input_id.clone(), turn_id.clone(), TurnRole::User, message);
@@ -1429,8 +3073,17 @@ impl Agent {
                 "attachments": attachment_journal_metadata(&materialized),
             }));
         }
+        if let Some(provenance) = provenance {
+            turn.metadata.get_or_insert_with(|| serde_json::json!({}))["resource"] = provenance;
+        }
+        if rendered.is_some() && cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
         turn.validate()?;
         self.session.append_turn(turn)?;
+        if let Some(rendered) = rendered {
+            self.active_resource_inputs.insert(input_id, rendered);
+        }
         self.active_attachments.extend(materialized);
         self.phase = AgentPhase::Running;
         self.last_error = None;
@@ -1448,6 +3101,7 @@ impl Agent {
         &mut self,
         message: String,
         superseded_turn_id: &str,
+        cancelled: &impl Fn() -> bool,
     ) -> Result<TurnSubmission, AgentError> {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
@@ -1465,7 +3119,10 @@ impl Agent {
                 "superseded turn ID is invalid".into(),
             ));
         }
+        self.repair_input_projections()?;
         let turn_id = next_id("turn");
+        let snapshot = self.resource_snapshot();
+        let (provenance, rendered) = self.prepare_resource_input(&snapshot, &message, cancelled)?;
         let staged = std::mem::take(&mut self.pending_attachments);
         if staged.len() > crate::backend::MAX_ATTACHMENTS_PER_TURN {
             self.pending_attachments = staged;
@@ -1501,7 +3158,14 @@ impl Agent {
                 serde_json::json!(attachment_journal_metadata(&materialized)),
             );
         }
+        if let Some(provenance) = provenance {
+            metadata.insert("resource".into(), provenance);
+        }
         turn.metadata = Some(Value::Object(metadata));
+        if rendered.is_some() && cancelled() {
+            self.pending_attachments = staged;
+            return Err(BackendError::Cancelled.into());
+        }
         if let Err(error) = turn.validate() {
             self.pending_attachments = staged;
             return Err(error);
@@ -1510,8 +3174,15 @@ impl Agent {
             self.pending_attachments = staged;
             return Err(error.into());
         }
+        self.active_resources = Some(snapshot);
+        self.active_resource_inputs.clear();
+        if let Some(rendered) = rendered {
+            self.active_resource_inputs
+                .insert(turn_id.clone(), rendered);
+        }
         self.active_attachments = materialized;
         self.active_turn_id = Some(turn_id.clone());
+        self.input_port.set_scope(Some(&turn_id));
         self.phase = AgentPhase::Running;
         self.active_steerable = true;
         self.last_error = None;
@@ -1527,6 +3198,16 @@ impl Agent {
         input_turn_id: &str,
         attachments: &[crate::backend::InputAttachment],
     ) -> Result<Vec<crate::backend::RequestAttachment>, AgentError> {
+        if let Some(capabilities) = self.backend.model_capabilities(self.model.as_deref())?
+            && attachments.iter().any(|attachment| match attachment.kind {
+                crate::backend::AttachmentKind::Image => !capabilities.images,
+                crate::backend::AttachmentKind::File => !capabilities.files,
+            })
+        {
+            return Err(AgentError::InvalidTurn(
+                "selected model or wire does not support attachment kind".into(),
+            ));
+        }
         use sha2::{Digest, Sha256};
 
         let mut total = 0_usize;
@@ -1639,15 +3320,69 @@ impl Agent {
             turn_id: turn_id.clone(),
             retry_requires_confirmation: false,
         };
-        self.session
-            .begin_operation_with_key(&provider_operation, &provider_idempotency_key(&turn_id))?;
+        // This scope ends before any provider or tool dispatch. A failed
+        // reservation or begin marker must expire the admitted input scope,
+        // while keeping its durable user turn and received queue entries.
+        let mut concurrency_reserved = false;
+        let admission = (|| -> Result<(), AgentError> {
+            if let Some(governance) = self.governance.as_ref() {
+                governance
+                    .ensure_within_limits()
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+            }
+            if let Some(governance) = self.governance.as_mut() {
+                governance
+                    .charge(crate::governance::ResourceKind::Concurrency, 1)
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+                concurrency_reserved = true;
+                governance
+                    .persist(&mut self.session)
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+            }
+            self.session.begin_operation_with_key(
+                &provider_operation,
+                &provider_idempotency_key(&turn_id),
+            )?;
+            Ok(())
+        })();
+        if let Err(error) = admission {
+            self.last_error = Some(error.to_string());
+            self.phase = AgentPhase::Idle;
+            self.active_turn_id = None;
+            self.input_port.set_scope(None);
+            self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
+            self.events.push(AgentEvent::Error {
+                message: error.to_string(),
+            });
+            if concurrency_reserved {
+                self.release_turn_concurrency();
+            }
+            // Do not finish or clear recovery records here: a failed journal
+            // write may have persisted a marker. No old attempt is replayed.
+            return Err(error);
+        }
         const MAX_TOOL_ITERATIONS: usize = 8;
-        let completion = match self.complete_with_tools(
-            &turn_id,
-            MAX_TOOL_ITERATIONS,
+        self.notify_extensions(
+            crate::extension_runtime::HookKind::AgentStart,
+            Some(&turn_id),
+            "turn",
             &is_cancelled,
-            provider_sink,
-        ) {
+        );
+        let completion =
+            self.complete_with_tools(&turn_id, MAX_TOOL_ITERATIONS, &is_cancelled, provider_sink);
+        self.notify_extensions(
+            crate::extension_runtime::HookKind::AgentEnd,
+            Some(&turn_id),
+            if completion.is_ok() {
+                "complete"
+            } else {
+                "failed"
+            },
+            &|| false,
+        );
+        let completion = match completion {
             Ok(completion) => completion,
             Err(error) => {
                 let outcome = if matches!(
@@ -1673,12 +3408,16 @@ impl Agent {
                 self.last_error = Some(error.to_string());
                 self.phase = AgentPhase::Idle;
                 self.active_turn_id = None;
+                self.input_port.set_scope(None);
                 self.active_attachments.clear();
+                self.active_resources = None;
+                self.active_resource_inputs.clear();
                 self.events.push(AgentEvent::Error {
                     message: error.to_string(),
                 });
                 self.session
                     .finish_operation(&provider_operation.operation_id, outcome)?;
+                self.release_turn_concurrency();
                 return Err(error);
             }
         };
@@ -1687,11 +3426,15 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.input_port.set_scope(None);
             self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
             self.session.finish_operation(
                 &provider_operation.operation_id,
                 crate::session::OperationOutcome::Cancelled,
             )?;
+            self.release_turn_concurrency();
             return Err(error.into());
         }
         if completion.content.trim().is_empty() {
@@ -1699,7 +3442,10 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.input_port.set_scope(None);
             self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
@@ -1707,6 +3453,7 @@ impl Agent {
                 &provider_operation.operation_id,
                 crate::session::OperationOutcome::Failed,
             )?;
+            self.release_turn_concurrency();
             return Err(error.into());
         }
         let mut assistant = Turn::with_parent(
@@ -1736,7 +3483,10 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.input_port.set_scope(None);
             self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
@@ -1744,6 +3494,7 @@ impl Agent {
                 &provider_operation.operation_id,
                 crate::session::OperationOutcome::Failed,
             )?;
+            self.release_turn_concurrency();
             return Err(error);
         }
         let content = assistant.content.clone();
@@ -1751,7 +3502,10 @@ impl Agent {
             self.last_error = Some(error.to_string());
             self.phase = AgentPhase::Idle;
             self.active_turn_id = None;
+            self.input_port.set_scope(None);
             self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
@@ -1759,20 +3513,37 @@ impl Agent {
                 &provider_operation.operation_id,
                 crate::session::OperationOutcome::Failed,
             )?;
+            self.release_turn_concurrency();
             return Err(error.into());
         }
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
+        self.input_port.set_scope(None);
         self.active_attachments.clear();
+        self.active_resources = None;
+        self.active_resource_inputs.clear();
         self.pending_attachments.clear();
         self.last_error = None;
         self.session.finish_operation(
             &provider_operation.operation_id,
             crate::session::OperationOutcome::Succeeded,
         )?;
+        self.release_turn_concurrency();
         self.events
             .push(AgentEvent::AssistantMessage { turn_id, content });
         Ok(Some(assistant))
+    }
+
+    fn release_turn_concurrency(&mut self) {
+        if let Some(governance) = self.governance.as_mut() {
+            governance.release(crate::governance::ResourceKind::Concurrency, 1);
+            if let Err(error) = governance.persist(&mut self.session) {
+                self.last_error = Some(format!("concurrency release persistence failed: {error}"));
+                self.events.push(AgentEvent::Error {
+                    message: "concurrency release persistence failed".into(),
+                });
+            }
+        }
     }
 
     fn complete_with_tools<F, E>(
@@ -1786,10 +3557,77 @@ impl Agent {
         F: Fn() -> bool,
         E: FnMut(ProviderEvent) -> Result<(), BackendError>,
     {
-        for iteration in 0..=max_iterations {
+        if self
+            .extensions
+            .as_ref()
+            .is_some_and(|runtime| runtime.has_hooks())
+            && self.tools.as_ref().is_some_and(|runtime| {
+                runtime.worker_binding.is_some()
+                    || runtime.context.origin() == crate::tools::ToolOrigin::BlueprintWorker
+            })
+        {
+            return Err(AgentError::InvalidTurn(
+                "worker cannot execute extension hooks".into(),
+            ));
+        }
+        let _skill_turn = self.model_skill_tools.begin_turn(
+            self.turn_skills().clone(),
+            self.stale_resource_skills.clone(),
+        )?;
+        let extension_input = if let Some(runtime) = &self.extensions {
+            let turn = self
+                .session
+                .turns()
+                .iter()
+                .find(|turn| turn.id == turn_id)
+                .ok_or(AgentError::NoActiveTurn)?;
+            let input = if turn
+                .metadata
+                .as_ref()
+                .is_some_and(|m| m["resource"]["kind"] == "template")
+            {
+                self.active_resource_inputs
+                    .get(turn_id)
+                    .unwrap_or(&turn.content)
+            } else {
+                &turn.content
+            };
+            let input = input.clone();
+            let pump = crate::input_queue::InputPump::new(
+                &mut self.session,
+                self.input_port.clone(),
+                turn_id,
+            );
+            let result = runtime.input(turn_id, &input, &|| pump.poll(is_cancelled()));
+            pump.finish()?;
+            Some(result.map_err(extension_agent_error)?)
+        } else {
+            None
+        };
+        self.repair_input_projections()?;
+        let new_gate = || {
+            crate::runtime::InputBoundaryGate::new(next_id("input-boundary"))
+                .and_then(|gate| gate.with_context_parent(turn_id))
+                .map_err(|e| AgentError::Recovery(e.to_string()))
+        };
+        let mut gate = new_gate()?;
+        let max_input_continuations = crate::input_queue::InputQueueLimits::default().max_pending;
+        let mut input_continuations = 0;
+        let mut tool_iterations = 0;
+        for _iteration in 0..=max_iterations.saturating_add(max_input_continuations) {
+            self.input_boundary(&gate, false, is_cancelled())?;
             if is_cancelled() {
                 return Err(BackendError::Cancelled.into());
             }
+            if let Some(governance) = self.governance.as_ref() {
+                governance
+                    .ensure_within_limits()
+                    .map_err(|error| AgentError::Governance(error.to_string()))?;
+            }
+            let model_tools = self
+                .backend
+                .model_capabilities(self.model.as_deref())?
+                .is_none_or(|capabilities| capabilities.tools);
             let definitions: Vec<crate::tools::ToolDefinition> = self
                 .tools
                 .as_ref()
@@ -1798,19 +3636,109 @@ impl Agent {
                         .registry
                         .definitions()
                         .into_iter()
-                        .filter(|definition| self.skills.tool_allowed(&definition.name))
+                        .filter(|definition| {
+                            model_tools && self.turn_skills().tool_allowed(&definition.name)
+                        })
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let context_source = self.context_source_for_provider();
-            let prepared =
-                crate::context::prepare_context(&context_source, self.context_budget, is_cancelled)
-                    .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+            let selected_skills = self
+                .session
+                .turns()
+                .iter()
+                .filter(|turn| {
+                    turn.metadata
+                        .as_ref()
+                        .is_some_and(|metadata| metadata["resource"]["kind"] == "skill")
+                })
+                .filter_map(|turn| self.active_resource_inputs.get(&turn.id))
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join("\n");
+            let resource_text = self
+                .active_resources
+                .as_ref()
+                .map(|snapshot| {
+                    snapshot
+                        .text_resources
+                        .values()
+                        .map(|resource| resource.content.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                })
+                .unwrap_or_default();
+            let mut instructions = format!(
+                "{}\n{}\n{}\n{}",
+                self.turn_skills().effective_instructions(),
+                crate::persona::instructions(self.persona()),
+                resource_text,
+                selected_skills
+            );
+            if let Some(runtime) = &self.extensions {
+                let pump = crate::input_queue::InputPump::new(
+                    &mut self.session,
+                    self.input_port.clone(),
+                    turn_id,
+                );
+                let result = runtime.context(turn_id, &instructions, &|| pump.poll(is_cancelled()));
+                pump.finish()?;
+                instructions = result.map_err(extension_agent_error)?;
+            }
+            let instruction_tokens =
+                u64::try_from(instructions.len().div_ceil(4)).unwrap_or(u64::MAX);
+            let mut turn_budget = self.context_budget();
+            turn_budget.max_tokens = turn_budget
+                .max_tokens
+                .checked_sub(instruction_tokens)
+                .ok_or_else(|| {
+                    AgentError::InvalidTurn("resource instructions exceed context budget".into())
+                })?;
+            let prepared = loop {
+                gate.begin_prepare()
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                let preparing = self.input_port.preparation();
+                let mut prepared =
+                    self.prepare_semantic_provider_context(turn_budget, is_cancelled)?;
+                for turn in &mut prepared.turns {
+                    if turn
+                        .metadata
+                        .as_ref()
+                        .is_some_and(|m| m["resource"]["kind"] == "template")
+                        && let Some(rendered) = self.active_resource_inputs.get(&turn.id)
+                    {
+                        turn.content = rendered.clone();
+                    }
+                }
+                if let Some(input) = &extension_input
+                    && let Some(turn) = prepared.turns.iter_mut().find(|turn| turn.id == turn_id)
+                {
+                    turn.content = input.clone();
+                }
+                prepared.estimate = crate::context::estimate_tokens(&prepared.turns);
+                if prepared.estimate.input_tokens
+                    > turn_budget.max_tokens - turn_budget.reserved_output_tokens
+                {
+                    return Err(AgentError::InvalidTurn(
+                        "effective resource context exceeds model budget".into(),
+                    ));
+                }
+                drop(preparing);
+                gate.finish_prepare()
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                // Only an initially empty poll may add input after preparation.
+                // A committed nonempty boundary is frozen by InputQueue itself.
+                if !self.input_boundary(&gate, false, is_cancelled())? {
+                    break prepared;
+                }
+            };
             if let Some(governance) = self.governance.as_mut() {
                 governance
                     .charge(
                         crate::governance::ResourceKind::InputTokens,
-                        prepared.estimate.input_tokens,
+                        prepared
+                            .estimate
+                            .input_tokens
+                            .saturating_add(instruction_tokens),
                     )
                     .and_then(|_| {
                         governance.charge(crate::governance::ResourceKind::NetworkRequests, 1)
@@ -1820,27 +3748,6 @@ impl Agent {
                     .persist(&mut self.session)
                     .map_err(|error| AgentError::Governance(error.to_string()))?;
             }
-            if let Some(checkpoint) = &prepared.checkpoint {
-                let operation_id = format!("compaction-{}", checkpoint.source_sha256);
-                self.session
-                    .begin_operation(&crate::session::InterruptedOperation {
-                        operation_id: operation_id.clone(),
-                        kind: crate::session::OperationKind::Compaction,
-                        turn_id: turn_id.to_owned(),
-                        retry_requires_confirmation: false,
-                    })?;
-                self.session.append_event(serde_json::json!({
-                    "type": "context_compacted",
-                    "checkpoint": checkpoint,
-                }))?;
-                self.session
-                    .finish_operation(&operation_id, crate::session::OperationOutcome::Succeeded)?;
-            }
-            let instructions = format!(
-                "{}\n{}",
-                self.skills.effective_instructions(),
-                crate::persona::instructions(self.persona())
-            );
             let request = CompletionRequest::new(
                 turn_id,
                 &prepared.turns,
@@ -1848,13 +3755,22 @@ impl Agent {
                 &definitions,
             )
             .with_instructions((!instructions.is_empty()).then_some(instructions.as_str()))
-            .with_attachments(&self.active_attachments);
-            let completion =
-                self.backend
-                    .complete_with_control(request, is_cancelled, &mut |event| {
-                        provider_sink(event)?;
-                        Ok(())
-                    });
+            .with_attachments(&self.active_attachments)
+            .with_max_output_tokens(turn_budget.reserved_output_tokens);
+            let pump = crate::input_queue::InputPump::new(
+                &mut self.session,
+                self.input_port.clone(),
+                turn_id,
+            );
+            let completion = self.backend.complete_with_control(
+                request,
+                &|| pump.poll(is_cancelled()),
+                &mut |event| {
+                    provider_sink(event)?;
+                    Ok(())
+                },
+            );
+            pump.finish()?;
             let mut completion = completion.map_err(AgentError::from)?;
             if let Some(usage) = completion.usage
                 && let Some(governance) = self.governance.as_mut()
@@ -1880,11 +3796,57 @@ impl Agent {
                 return Ok(completion);
             }
             if completion.tool_calls.is_empty() {
-                return Ok(completion);
+                self.input_port
+                    .service(&mut self.session, turn_id, is_cancelled())
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                if is_cancelled() {
+                    return Err(BackendError::Cancelled.into());
+                }
+                let mut queue =
+                    crate::input_queue::InputQueue::recover(&self.session, Default::default())
+                        .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                if !queue.has_pending() {
+                    return Ok(completion);
+                }
+                if input_continuations == max_input_continuations {
+                    return Err(AgentError::InvalidTurn(
+                        "input continuation limit reached; remaining IDs stay received".into(),
+                    ));
+                }
+                input_continuations += 1;
+                let mut assistant = Turn::with_parent(
+                    next_id("assistant-input-boundary"),
+                    turn_id,
+                    TurnRole::Assistant,
+                    &completion.content,
+                );
+                assistant.metadata = Some(
+                    serde_json::json!({"input_boundary_completion": true, "annotations": completion.annotations, "model": completion.model}),
+                );
+                self.session.append_turn(assistant)?;
+                gate = new_gate()?;
+                if is_cancelled() {
+                    gate.cancel();
+                    return Err(BackendError::Cancelled.into());
+                }
+                // Freeze this owner's already-drained stop snapshot. A later
+                // cancel ticket is not acknowledged until the next poll and
+                // cannot erase the decision after the assistant was persisted.
+                let boundary = gate
+                    .boundary(true)
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                queue
+                    .apply_boundary(&mut self.session, &boundary)
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                queue
+                    .repair_projections(&mut self.session)
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                continue;
             }
-            if iteration == max_iterations {
+            if tool_iterations == max_iterations {
                 return Err(AgentError::ToolLoopLimit(max_iterations));
             }
+            tool_iterations += 1;
             if self.tools.is_none() {
                 return Err(AgentError::InvalidTurn(
                     "provider requested tools but no tool registry is configured".into(),
@@ -1910,17 +3872,36 @@ impl Agent {
                 next_id("assistant-tool-call"),
                 turn_id,
                 TurnRole::Assistant,
-                String::new(),
+                completion.content,
             );
-            assistant_call.metadata = Some(serde_json::json!({ "tool_calls": call_metadata }));
+            assistant_call.metadata = Some(
+                serde_json::json!({ "tool_calls": call_metadata, "annotations": completion.annotations, "model": completion.model }),
+            );
             self.session.append_turn(assistant_call)?;
+            gate = new_gate()?;
+            let batch_ids: Vec<_> = calls.iter().map(|call| call.id.clone()).collect();
+            gate.begin_tool_batch(&batch_ids)
+                .map_err(|e| AgentError::Recovery(e.to_string()))?;
+            let concurrency = self.parallel_tool_concurrency(&calls);
+            if concurrency > 1 {
+                self.invoke_parallel_tools(turn_id, &calls, &evidence, concurrency, is_cancelled)?;
+                for id in &batch_ids {
+                    gate.tool_completed(id)
+                        .map_err(|e| AgentError::Recovery(e.to_string()))?;
+                }
+                continue;
+            }
             let mut stop = None;
             for call in calls {
-                self.events.push(AgentEvent::ToolCall {
-                    turn_id: turn_id.to_owned(),
-                    call_id: call.id.clone(),
-                    tool: call.name.clone(),
-                });
+                emit_tool_event(
+                    &mut self.events,
+                    self.live_tool_sink.as_ref(),
+                    AgentEvent::ToolCall {
+                        turn_id: turn_id.to_owned(),
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                    },
+                );
                 let operation_id = tool_operation_id(turn_id, &call.id);
                 self.session
                     .begin_operation(&crate::session::InterruptedOperation {
@@ -1979,10 +3960,220 @@ impl Agent {
                 }
             }
             if let Some(error) = stop {
+                gate.cancel();
                 return Err(error);
+            }
+            for id in &batch_ids {
+                gate.tool_completed(id)
+                    .map_err(|e| AgentError::Recovery(e.to_string()))?;
             }
         }
         Err(AgentError::ToolLoopLimit(max_iterations))
+    }
+
+    /// Force whole-batch serialization even for otherwise parallel read tools.
+    pub fn set_tool_batch_sequential(&mut self, sequential: bool) -> Result<(), AgentError> {
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let runtime = self.tools.as_mut().ok_or_else(|| {
+            AgentError::InvalidTurn("tool execution requires a configured registry".into())
+        })?;
+        runtime.sequential = sequential;
+        Ok(())
+    }
+
+    fn parallel_tool_concurrency(&self, calls: &[crate::tools::ToolCall]) -> usize {
+        let Some(runtime) = self.tools.as_ref() else {
+            return 1;
+        };
+        if self.extensions.as_ref().is_some_and(|runtime| {
+            runtime.has_hook(crate::extension_runtime::HookKind::BeforeTool)
+                || runtime.has_hook(crate::extension_runtime::HookKind::AfterTool)
+        }) || runtime.sequential
+            || calls.iter().any(|call| {
+                runtime.registry.execution_mode(&call.name)
+                    != crate::tools::ToolExecutionMode::Parallel
+            })
+        {
+            return 1;
+        }
+        // The model request has finished; reuse its active-turn slot and
+        // reserve only extra workers against the same durable governance owner.
+        let available = self.governance.as_ref().map_or(
+            crate::governance::ResourceLimits::default().max_concurrency,
+            |ledger| {
+                ledger
+                    .limits()
+                    .max_concurrency
+                    .saturating_sub(ledger.usage().concurrency)
+                    .saturating_add(1)
+            },
+        );
+        calls
+            .len()
+            .min(crate::tool_runtime::MAX_BATCH_CALLS)
+            .min(available as usize)
+    }
+
+    fn invoke_parallel_tools<F: Fn() -> bool>(
+        &mut self,
+        turn_id: &str,
+        calls: &[crate::tools::ToolCall],
+        evidence: &ToolExecutionEvidence,
+        concurrency: usize,
+        is_cancelled: &F,
+    ) -> Result<(), AgentError> {
+        use crate::tool_runtime::{ToolBatchDecision, ToolBatchOptions, execute_tool_batch};
+        use crate::tools::{ToolErrorCode, ToolResult};
+        let runtime = self.tools.as_ref().expect("configured registry");
+        let registry = runtime.registry.clone();
+        let context = runtime.context.clone();
+        let policy = runtime.policy;
+        let extra = concurrency.saturating_sub(1) as u64;
+        if let Some(ledger) = self.governance.as_mut() {
+            ledger
+                .charge(crate::governance::ResourceKind::Concurrency, extra)
+                .map_err(|e| AgentError::Governance(e.to_string()))?;
+        }
+        // No early return between a successful reservation and its release.
+        // All executor threads are joined before this closure can finish.
+        let result = (|| {
+            if let Some(ledger) = self.governance.as_mut() {
+                ledger
+                    .persist(&mut self.session)
+                    .map_err(|e| AgentError::Governance(e.to_string()))?;
+            }
+            let mut evidence = vec![evidence.clone(); calls.len()];
+            let operations: Vec<_> = calls
+                .iter()
+                .map(|call| tool_operation_id(turn_id, &call.id))
+                .collect();
+            let mut rejected: Vec<Option<ToolInvocation>> =
+                (0..calls.len()).map(|_| None).collect();
+            for (call, operation_id) in calls.iter().zip(&operations) {
+                emit_tool_event(
+                    &mut self.events,
+                    self.live_tool_sink.as_ref(),
+                    AgentEvent::ToolCall {
+                        turn_id: turn_id.to_owned(),
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                    },
+                );
+                self.session
+                    .begin_operation(&crate::session::InterruptedOperation {
+                        operation_id: operation_id.clone(),
+                        kind: crate::session::OperationKind::Tool,
+                        turn_id: turn_id.to_owned(),
+                        retry_requires_confirmation: true,
+                    })?;
+            }
+            let halted = std::cell::Cell::new(false);
+            let mut preparation_error = None;
+            let owner = std::cell::RefCell::new(&mut *self);
+            let input_failure = std::cell::RefCell::new(None);
+            let batch = execute_tool_batch(
+                &registry,
+                &context,
+                policy,
+                calls,
+                ToolBatchOptions {
+                    max_concurrency: concurrency,
+                    ..Default::default()
+                },
+                &|| {
+                    let cancelled = halted.get() || is_cancelled();
+                    if let Ok(mut agent) = owner.try_borrow_mut() {
+                        let port = agent.input_port.clone();
+                        if let Err(error) = port.service(&mut agent.session, turn_id, cancelled) {
+                            *input_failure.borrow_mut() = Some(error.to_string());
+                            halted.set(true);
+                        }
+                    }
+                    cancelled || halted.get()
+                },
+                &mut |call| {
+                    let index = calls
+                        .iter()
+                        .position(|item| item.id == call.id)
+                        .expect("source call");
+                    let prepared = owner.borrow_mut().prepare_tool(
+                        turn_id,
+                        call,
+                        &operations[index],
+                        &mut evidence[index],
+                        is_cancelled,
+                    );
+                    let invocation = match prepared {
+                        Ok(PreparedTool::Execute(decision)) => return decision,
+                        Ok(PreparedTool::Rejected(invocation)) => invocation,
+                        Err(error) => {
+                            let invocation = tool_failure(
+                                call,
+                                ToolErrorCode::Internal,
+                                &error.to_string(),
+                                ToolInvocationOutcome::Failed,
+                            );
+                            preparation_error = Some(error);
+                            halted.set(true);
+                            invocation
+                        }
+                    };
+                    if invocation.outcome == ToolInvocationOutcome::Cancelled {
+                        halted.set(true);
+                    }
+                    let ToolResult::Error { error, .. } = &invocation.result else {
+                        unreachable!("rejection result")
+                    };
+                    let decision = ToolBatchDecision::Reject(error.clone());
+                    rejected[index] = Some(invocation);
+                    decision
+                },
+            )
+            .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+            let mut stop =
+                preparation_error.or_else(|| input_failure.into_inner().map(AgentError::Recovery));
+            for (index, (call, raw)) in calls.iter().zip(batch.results).enumerate() {
+                let invocation = rejected[index].take().unwrap_or_else(|| {
+                    Self::finish_tool_result(
+                        &context,
+                        call,
+                        registry.definition(&call.name).map(|d| d.side_effect),
+                        raw,
+                    )
+                });
+                self.persist_tool_invocation(
+                    turn_id,
+                    call,
+                    &operations[index],
+                    &evidence[index],
+                    &invocation,
+                )?;
+                if stop.is_none() {
+                    stop = match invocation.outcome {
+                        ToolInvocationOutcome::Cancelled => Some(BackendError::Cancelled.into()),
+                        ToolInvocationOutcome::UnknownOutcome => {
+                            Some(AgentError::Recovery(format!(
+                                "unknown_outcome for {}; explicit retry or abandon required",
+                                operations[index]
+                            )))
+                        }
+                        _ => None,
+                    };
+                }
+            }
+            stop.map_or(Ok(()), Err)
+        })();
+        let released = if let Some(ledger) = self.governance.as_mut() {
+            ledger.release(crate::governance::ResourceKind::Concurrency, extra);
+            ledger
+                .persist(&mut self.session)
+                .map_err(|e| AgentError::Governance(e.to_string()))
+        } else {
+            Ok(())
+        };
+        result.and(released)
     }
 
     fn tool_execution_evidence(&self) -> Result<ToolExecutionEvidence, AgentError> {
@@ -1996,7 +4187,7 @@ impl Agent {
             "command_execution": runtime.policy.allows(crate::tools::ToolSideEffect::CommandExecution),
             "approval": runtime.approval_policy,
             "tools": runtime.registry.definitions().into_iter()
-                .filter(|definition| self.skills.tool_allowed(&definition.name)).collect::<Vec<_>>(),
+                .filter(|definition| self.turn_skills().tool_allowed(&definition.name)).collect::<Vec<_>>(),
         });
         let approval_policy_digest = format!(
             "{:x}",
@@ -2030,34 +4221,35 @@ impl Agent {
         })
     }
 
-    fn invoke_tool<F: Fn() -> bool>(
+    fn prepare_tool<F: Fn() -> bool>(
         &mut self,
         turn_id: &str,
         call: &crate::tools::ToolCall,
         operation_id: &str,
         evidence: &mut ToolExecutionEvidence,
         is_cancelled: &F,
-    ) -> Result<ToolInvocation, AgentError> {
+    ) -> Result<PreparedTool, AgentError> {
         use crate::tools::{ToolErrorCode, ToolSideEffect};
+        let skill_allowed = self.turn_skills().tool_allowed(&call.name);
         let runtime = self
             .tools
             .as_mut()
             .expect("registry checked before call admission");
         let Some(definition) = runtime.registry.definition(&call.name).cloned() else {
-            return Ok(tool_failure(
+            return Ok(PreparedTool::Rejected(tool_failure(
                 call,
                 ToolErrorCode::UnknownTool,
                 "provider requested an unregistered tool",
                 ToolInvocationOutcome::Denied,
-            ));
+            )));
         };
-        if !self.skills.tool_allowed(&call.name) {
-            return Ok(tool_failure(
+        if !skill_allowed {
+            return Ok(PreparedTool::Rejected(tool_failure(
                 call,
                 ToolErrorCode::PolicyDenied,
                 "tool denied by skill policy",
                 ToolInvocationOutcome::Denied,
-            ));
+            )));
         }
         if let Some(binding) = &runtime.worker_binding {
             binding.validate()?;
@@ -2071,12 +4263,12 @@ impl Agent {
         ) {
             Ok(gate) => gate,
             Err(error) => {
-                return Ok(tool_failure(
+                return Ok(PreparedTool::Rejected(tool_failure(
                     call,
                     error.code(),
                     &error.to_string(),
                     ToolInvocationOutcome::Denied,
-                ));
+                )));
             }
         };
         let worker_preflight = match (&runtime.worker_binding, &gate) {
@@ -2086,12 +4278,12 @@ impl Agent {
             }
             (_, None) => false,
             _ => {
-                return Ok(tool_failure(
+                return Ok(PreparedTool::Rejected(tool_failure(
                     call,
                     ToolErrorCode::PolicyDenied,
                     "worker binding and prohibition gate must both be present",
                     ToolInvocationOutcome::Denied,
-                ));
+                )));
             }
         };
         evidence.prohibition_gate_enforced = worker_preflight;
@@ -2105,24 +4297,24 @@ impl Agent {
             Some(ApprovalDecision::Deny)
         };
         if approval == Some(ApprovalDecision::Deny) {
-            return Ok(tool_failure(
+            return Ok(PreparedTool::Rejected(tool_failure(
                 call,
                 ToolErrorCode::PolicyDenied,
                 "tool approval denied",
                 ToolInvocationOutcome::Denied,
-            ));
+            )));
         }
         let mut approved_preview = None;
         if approval.is_none() {
             let preview = match runtime.registry.approval_preview(&runtime.context, call) {
                 Ok(preview) => preview,
                 Err(error) => {
-                    return Ok(tool_failure(
+                    return Ok(PreparedTool::Rejected(tool_failure(
                         call,
                         error.code(),
                         &format!("tool preview failed: {error}"),
                         ToolInvocationOutcome::Failed,
-                    ));
+                    )));
                 }
             };
             let request = ApprovalRequest {
@@ -2143,19 +4335,25 @@ impl Agent {
                 lease_id: gate.as_ref().map(|gate| gate.lease_id.clone()),
             };
             let coordinator = runtime.approval.clone();
-            let response = match coordinator.request_response(
-                request,
-                &mut runtime.approval_policy,
-                is_cancelled,
-            ) {
+            let pump = crate::input_queue::InputPump::new(
+                &mut self.session,
+                self.input_port.clone(),
+                turn_id,
+            );
+            let response =
+                coordinator.request_response(request, &mut runtime.approval_policy, &|| {
+                    pump.poll(is_cancelled())
+                });
+            pump.finish()?;
+            let response = match response {
                 Ok(response) => response,
                 Err(ApprovalError::Cancelled) => {
-                    return Ok(tool_failure(
+                    return Ok(PreparedTool::Rejected(tool_failure(
                         call,
                         ToolErrorCode::Cancelled,
                         "approval wait cancelled; tool was not executed",
                         ToolInvocationOutcome::Cancelled,
-                    ));
+                    )));
                 }
                 Err(error) => return Err(error.into()),
             };
@@ -2202,12 +4400,12 @@ impl Agent {
                 "execution": evidence,
             }))?;
             if response.decision == ApprovalDecision::Deny {
-                return Ok(tool_failure(
+                return Ok(PreparedTool::Rejected(tool_failure(
                     call,
                     ToolErrorCode::PolicyDenied,
                     "tool approval denied or cancelled",
                     ToolInvocationOutcome::Denied,
-                ));
+                )));
             }
             approved_preview = preview;
         }
@@ -2227,21 +4425,48 @@ impl Agent {
         }
         // Waiting for approval may outlive a lease or a host cancellation.
         if is_cancelled() {
-            return Ok(tool_failure(
+            return Ok(PreparedTool::Rejected(tool_failure(
                 call,
                 ToolErrorCode::Cancelled,
                 "cancelled before dispatch",
                 ToolInvocationOutcome::Cancelled,
-            ));
+            )));
         }
         if let Some(binding) = &runtime.worker_binding {
             binding.validate()?;
         }
-        if definition.side_effect == ToolSideEffect::CommandExecution
+        // Processes is a cumulative start budget. Advanced search includes
+        // validation, listing and every bounded file batch before its first
+        // child starts; completed children do not refund this reservation.
+        let process_starts = if definition.side_effect == ToolSideEffect::CommandExecution {
+            1
+        } else {
+            call.arguments.as_object().map_or(0, |arguments| {
+                crate::tools::search_process_budget(&call.name, arguments)
+            })
+        };
+        if process_starts > 0
             && let Some(governance) = self.governance.as_mut()
         {
             governance
-                .charge(crate::governance::ResourceKind::Processes, 1)
+                .charge(crate::governance::ResourceKind::Processes, process_starts)
+                .and_then(|_| governance.persist(&mut self.session))
+                .map_err(|error| AgentError::Governance(error.to_string()))?;
+        }
+        // Reserve the maximum bytes a workspace mutation can introduce before
+        // dispatch.  The tool itself remains the authority for path and
+        // atomic-write checks, while this host-owned ledger prevents a write
+        // from bypassing the durable disk budget.  Reservations are
+        // intentionally non-refundable because the operation may have
+        // reached the filesystem before a later error is observed.
+        if definition.side_effect == ToolSideEffect::WorkspaceWrite
+            && let Some(governance) = self.governance.as_mut()
+        {
+            let bytes = Self::workspace_write_budget_bytes(call).ok_or_else(|| {
+                AgentError::InvalidTurn("workspace write arguments are not an object".into())
+            })?;
+            governance
+                .charge(crate::governance::ResourceKind::Disk, bytes)
                 .and_then(|_| governance.persist(&mut self.session))
                 .map_err(|error| AgentError::Governance(error.to_string()))?;
         }
@@ -2256,53 +4481,251 @@ impl Agent {
             "worker_binding": evidence.worker_binding,
             "execution": evidence,
         }))?;
-        let result = if call.name == "run_command"
-            && definition.side_effect == ToolSideEffect::CommandExecution
+        Ok(PreparedTool::Execute(if approval.is_none() {
+            crate::tool_runtime::ToolBatchDecision::ExecuteApproved(approved_preview)
+        } else {
+            crate::tool_runtime::ToolBatchDecision::Execute
+        }))
+    }
+
+    fn invoke_tool<F: Fn() -> bool>(
+        &mut self,
+        turn_id: &str,
+        call: &crate::tools::ToolCall,
+        operation_id: &str,
+        evidence: &mut ToolExecutionEvidence,
+        is_cancelled: &F,
+    ) -> Result<ToolInvocation, AgentError> {
+        let rewritten;
+        let call = if let Some(extensions) = self
+            .extensions
+            .as_ref()
+            .filter(|runtime| runtime.has_hook(crate::extension_runtime::HookKind::BeforeTool))
         {
-            match crate::tools::RunCommandTool::invoke_with_cancel(
-                &runtime.context,
-                call.arguments
-                    .as_object()
-                    .expect("validated call arguments"),
-                is_cancelled,
-            ) {
-                Ok(output) => crate::tools::ToolResult::Success {
-                    call_id: call.id.clone(),
-                    tool: call.name.clone(),
-                    output,
-                },
+            let runtime = self.tools.as_ref().expect("configured registry");
+            let effect = runtime
+                .registry
+                .definition(&call.name)
+                .map(|d| d.side_effect);
+            if !self.turn_skills().tool_allowed(&call.name)
+                || effect.is_some_and(|effect| {
+                    !runtime.policy.allows(effect)
+                        || runtime
+                            .approval_policy
+                            .decide_after_preflight(effect, &call.name, false)
+                            == Some(ApprovalDecision::Deny)
+                })
+            {
+                return Ok(tool_failure(
+                    call,
+                    crate::tools::ToolErrorCode::PolicyDenied,
+                    "original tool policy denied",
+                    ToolInvocationOutcome::Denied,
+                ));
+            }
+            let original = runtime.registry.validate_hook_call(&runtime.context, call);
+            let pump = crate::input_queue::InputPump::new(
+                &mut self.session,
+                self.input_port.clone(),
+                turn_id,
+            );
+            let changed = original
+                .and_then(|_| extensions.before_tool(call, &|| pump.poll(is_cancelled())))
+                .and_then(|changed| {
+                    runtime
+                        .registry
+                        .validate_hook_call(&runtime.context, &changed)?;
+                    Ok(changed)
+                });
+            pump.finish()?;
+            rewritten = match changed {
+                Ok(changed) => changed,
                 Err(error) => {
-                    tool_failure(
+                    return Ok(tool_failure(
                         call,
                         error.code(),
                         &error.to_string(),
+                        if matches!(error, crate::tools::ToolError::Cancelled) {
+                            ToolInvocationOutcome::Cancelled
+                        } else {
+                            ToolInvocationOutcome::Denied
+                        },
+                    ));
+                }
+            };
+            if rewritten.arguments != call.arguments {
+                self.session.append_event(serde_json::json!({"type":"extension_tool_rewrite","turn_id":turn_id,"call_id":call.id,"arguments":crate::security::redact_json(&rewritten.arguments,&[])}))?;
+            }
+            &rewritten
+        } else {
+            call
+        };
+        let mut decision =
+            match self.prepare_tool(turn_id, call, operation_id, evidence, is_cancelled)? {
+                PreparedTool::Rejected(invocation) => return Ok(invocation),
+                PreparedTool::Execute(decision) => decision,
+            };
+        let output_read = if call.name == "read_tool_output" {
+            if self.tools.as_ref().is_some_and(|runtime| {
+                runtime.worker_binding.is_some()
+                    || runtime.context.origin() == crate::tools::ToolOrigin::BlueprintWorker
+            }) {
+                return Ok(tool_failure(
+                    call,
+                    crate::tools::ToolErrorCode::PolicyDenied,
+                    "worker output read is not granted",
+                    ToolInvocationOutcome::Denied,
+                ));
+            }
+            let access = serde_json::from_value::<crate::tool_output::OutputReadRequest>(
+                call.arguments.clone(),
+            )
+            .map_err(|e| crate::tool_output::OutputError::Invalid(e.to_string()))
+            .and_then(|request| self.output_read_access(&request, crate::session::unix_time_ms()));
+            match access {
+                Ok(access) => Some(access),
+                Err(error) => {
+                    return Ok(tool_failure(
+                        call,
+                        crate::tools::ToolErrorCode::InvalidArguments,
+                        &format!("{}: {error}", error.code()),
                         ToolInvocationOutcome::Failed,
-                    )
-                    .result
+                    ));
                 }
             }
-        } else if approval.is_none() {
-            runtime.registry.execute_approved(
-                &runtime.context,
-                runtime.policy,
-                call.clone(),
-                approved_preview.as_ref(),
-            )
         } else {
+            None
+        };
+        let capture = if call.name == "run_command"
+            && self.tools.as_ref().is_some_and(|runtime| {
+                runtime.worker_binding.is_none()
+                    && runtime.context.origin() != crate::tools::ToolOrigin::BlueprintWorker
+            }) {
+            let capture = begin_output_capture(
+                &mut self.output_store,
+                &mut self.session,
+                &mut self.governance,
+                &call.id,
+            )?;
+            decision = match decision {
+                crate::tool_runtime::ToolBatchDecision::Execute => {
+                    crate::tool_runtime::ToolBatchDecision::ExecuteWithCapture(capture.clone())
+                }
+                crate::tool_runtime::ToolBatchDecision::ExecuteApproved(preview) => {
+                    crate::tool_runtime::ToolBatchDecision::ExecuteApprovedWithCapture {
+                        preview,
+                        capture: capture.clone(),
+                    }
+                }
+                _ => {
+                    return Err(AgentError::InvalidTurn(
+                        "unexpected output capture admission".into(),
+                    ));
+                }
+            };
+            Some(capture)
+        } else {
+            None
+        };
+        let sink = self.live_tool_sink.clone();
+        let progress = capture.as_ref().map(|capture| capture.progress());
+        let runtime = self.tools.as_ref().expect("configured registry");
+        let context = match output_read {
+            Some(access) => match runtime.context.clone().with_output_read(access) {
+                Ok(context) => context,
+                Err(error) => {
+                    return Ok(tool_failure(
+                        call,
+                        error.code(),
+                        &error.to_string(),
+                        ToolInvocationOutcome::Denied,
+                    ));
+                }
+            },
+            None => runtime.context.clone(),
+        };
+        let pump =
+            crate::input_queue::InputPump::new(&mut self.session, self.input_port.clone(), turn_id);
+        let batch = crate::tool_runtime::execute_tool_batch(
+            &runtime.registry,
+            &context,
+            runtime.policy,
+            std::slice::from_ref(call),
+            crate::tool_runtime::ToolBatchOptions::default(),
+            &|| {
+                if let Some(progress) = &progress {
+                    publish_output_progress(sink.as_ref(), turn_id, progress);
+                }
+                pump.poll(is_cancelled())
+            },
+            &mut |_| decision.clone(),
+        );
+        let pumped = pump.finish();
+        if let Some(progress) = &progress {
+            publish_output_progress(sink.as_ref(), turn_id, progress);
+        }
+        // Batch return guarantees all readers were joined and writers finalized.
+        // Persist identities even if input pumping or later result compaction fails.
+        let output_capture = capture.as_ref().map(|capture| capture.report());
+        if let Some(report) = &output_capture {
+            persist_output_capture(&mut self.session, turn_id, &call.id, operation_id, report)?;
+        }
+        pumped?;
+        let batch = batch.map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+        let mut invocation = Self::finish_tool_result(
+            &runtime.context,
+            call,
             runtime
                 .registry
-                .execute(&runtime.context, runtime.policy, call.clone())
-        };
-        let result = match crate::tools::compact_tool_result(&runtime.context, result) {
+                .definition(&call.name)
+                .map(|d| d.side_effect),
+            batch
+                .results
+                .into_iter()
+                .next()
+                .expect("one result per call"),
+        );
+        invocation.output_capture = output_capture;
+        if let crate::tools::ToolResult::Success { output, .. } = &invocation.result
+            && let Some(extensions) = self
+                .extensions
+                .as_ref()
+                .filter(|runtime| runtime.has_hook(crate::extension_runtime::HookKind::AfterTool))
+        {
+            match extensions.after_tool(call, output, is_cancelled) {
+                Ok(output) => {
+                    let result = crate::tools::ToolResult::Success {
+                        call_id: call.id.clone(),
+                        tool: call.name.clone(),
+                        output,
+                    };
+                    match crate::tools::compact_tool_result(&runtime.context, result) {
+                        Ok(result) => invocation.result = result,
+                        Err(error) => self.extension_errors(vec![error.to_string()]),
+                    }
+                }
+                Err(error) => self.extension_errors(vec![error.to_string()]),
+            }
+        }
+        Ok(invocation)
+    }
+
+    fn finish_tool_result(
+        context: &ToolContext,
+        call: &crate::tools::ToolCall,
+        side_effect: Option<crate::tools::ToolSideEffect>,
+        result: crate::tools::ToolResult,
+    ) -> ToolInvocation {
+        use crate::tools::{ToolErrorCode, ToolSideEffect};
+        let result = match crate::tools::compact_tool_result(context, result) {
             Ok(result) => result,
             Err(error) => {
-                tool_failure(
+                return tool_failure(
                     call,
                     error.code(),
                     &format!("result persistence failed: {error}"),
                     ToolInvocationOutcome::UnknownOutcome,
-                )
-                .result
+                );
             }
         };
         let outcome = match &result {
@@ -2312,7 +4735,7 @@ impl Agent {
                 | ToolErrorCode::Internal
                 | ToolErrorCode::CommandTimeout
                 | ToolErrorCode::Cancelled
-                    if definition.side_effect != ToolSideEffect::ReadOnly =>
+                    if side_effect != Some(ToolSideEffect::ReadOnly) =>
                 {
                     ToolInvocationOutcome::UnknownOutcome
                 }
@@ -2335,7 +4758,23 @@ impl Agent {
                 error,
             },
         };
-        Ok(ToolInvocation { result, outcome })
+        ToolInvocation {
+            result,
+            outcome,
+            output_capture: None,
+        }
+    }
+
+    fn workspace_write_budget_bytes(call: &crate::tools::ToolCall) -> Option<u64> {
+        let arguments = call.arguments.as_object()?;
+        let bytes = match call.name.as_str() {
+            "write_file" => arguments.get("content")?.as_str()?.len(),
+            "edit_file" => arguments.get("new")?.as_str()?.len(),
+            // A third-party tool cannot silently opt into the workspace-write
+            // budget without declaring how many bytes it may introduce.
+            _ => return None,
+        };
+        Some(bytes as u64)
     }
 
     fn persist_tool_invocation(
@@ -2346,9 +4785,15 @@ impl Agent {
         evidence: &ToolExecutionEvidence,
         invocation: &ToolInvocation,
     ) -> Result<(), AgentError> {
-        let serialized = serde_json::to_string(&invocation.result).map_err(|error| {
+        let mut result_value = serde_json::to_value(&invocation.result).map_err(|error| {
             AgentError::InvalidTurn(format!("tool result serialization failed: {error}"))
         })?;
+        if let Some(report) = &invocation.output_capture {
+            result_value["output_capture"] = serde_json::to_value(report)
+                .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+        }
+        let serialized = serde_json::to_string(&result_value)
+            .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
         let mut tool_turn = Turn::with_parent(next_id("tool"), turn_id, TurnRole::Tool, serialized);
         tool_turn.metadata = Some(serde_json::json!({
             "tool_call_id": call.id,
@@ -2359,7 +4804,19 @@ impl Agent {
             "execution": evidence,
             "outcome": invocation.outcome,
             "implementation_complete": false,
+            "output_capture": invocation.output_capture,
         }));
+        if call.name == "load_skill"
+            && invocation.result.is_success()
+            && let Some(name) = call.arguments.get("name").and_then(Value::as_str)
+            && let Some(metadata) = self.model_skill_tools.loaded_metadata(name)?
+        {
+            tool_turn.metadata.as_mut().expect("tool metadata")["resource"] = serde_json::json!({
+                "kind":"skill", "invocation":"model", "name":metadata.name,
+                "source":metadata.source, "source_hash":metadata.source_hash,
+                "base_dir":metadata.base_dir, "scope":metadata.scope,
+            });
+        }
         if let Err(error) = self.session.append_turn(tool_turn) {
             // Storage may be unavailable entirely. The already durable
             // dispatch marker remains the authoritative recovery fallback.
@@ -2378,11 +4835,15 @@ impl Agent {
             "policy_digest": evidence.policy_digest,
             "worker_binding": evidence.worker_binding,
         }))?;
-        self.events.push(AgentEvent::ToolResult {
-            turn_id: turn_id.to_owned(),
-            call_id: call.id.clone(),
-            success: invocation.result.is_success(),
-        });
+        emit_tool_event(
+            &mut self.events,
+            self.live_tool_sink.as_ref(),
+            AgentEvent::ToolResult {
+                turn_id: turn_id.to_owned(),
+                call_id: call.id.clone(),
+                success: invocation.result.is_success(),
+            },
+        );
         self.session.finish_operation(
             operation_id,
             match invocation.outcome {
@@ -2394,31 +4855,58 @@ impl Agent {
                 _ => crate::session::OperationOutcome::Failed,
             },
         )?;
+        if evidence.worker_binding.is_some()
+            && invocation.outcome != ToolInvocationOutcome::UnknownOutcome
+            && let Some(admission_operation) = self.worker_admission_operation.clone()
+        {
+            let ledger = self.worker_budget.as_mut().ok_or_else(|| {
+                AgentError::Governance("worker budget ledger disappeared before settlement".into())
+            })?;
+            ledger
+                .settle(
+                    &mut self.session,
+                    &admission_operation,
+                    crate::governance::ResourceUsage {
+                        concurrency: 0,
+                        processes: 1,
+                        ..Default::default()
+                    },
+                    match invocation.outcome {
+                        ToolInvocationOutcome::Succeeded => {
+                            crate::governance::BudgetCompletion::Completed
+                        }
+                        ToolInvocationOutcome::Cancelled => {
+                            crate::governance::BudgetCompletion::Cancelled
+                        }
+                        _ => crate::governance::BudgetCompletion::Failed,
+                    },
+                    crate::session::unix_time_ms(),
+                )
+                .map_err(|error| AgentError::Governance(error.to_string()))?;
+            self.worker_admission_operation = None;
+        }
         Ok(())
     }
 
-    /// Rebuild the latest explicit slash checkpoint from the durable journal.
-    /// Invalid/stale markers are ignored in favour of the raw history; this
-    /// keeps an edited or partially-written journal recoverable while never
-    /// trusting unverified summary content.
-    fn context_source_for_provider(&self) -> Vec<Turn> {
-        for event in self.session.events().iter().rev() {
-            if event.get("type").and_then(Value::as_str) != Some("context_compacted")
-                || event.get("trigger").and_then(Value::as_str) != Some("manual_slash")
-            {
-                continue;
-            }
-            let Some(checkpoint) = event.get("checkpoint").and_then(|value| {
-                serde_json::from_value::<crate::context::CompactionCheckpoint>(value.clone()).ok()
-            }) else {
-                continue;
-            };
-            if let Ok(turns) = crate::context::restore_checkpoint(self.session.turns(), &checkpoint)
-            {
-                return turns;
-            }
+    /// Validate the latest semantic checkpoint against the complete ancestry.
+    /// Old digest markers remain readable journal data; provider preparation
+    /// uses full history when no semantic checkpoint has been committed.
+    fn context_source_for_provider(&self) -> Result<Vec<Turn>, AgentError> {
+        let budget = crate::context::ContextBudget {
+            max_tokens: u64::MAX,
+            reserved_output_tokens: 0,
+        };
+        if let Some(checkpoint) = self.session.latest_semantic_checkpoint(budget)? {
+            return crate::context::restore_semantic_checkpoint(
+                &self.selected_history()?,
+                &checkpoint,
+                self.session.session_id(),
+                &self.session.selected_tree_branch(),
+                budget,
+            )
+            .map_err(|e| AgentError::Recovery(e.to_string()));
         }
-        self.session.turns().to_vec()
+        self.selected_history()
     }
 
     /// Admit and, when accepted, immediately run one turn.
@@ -2448,7 +4936,7 @@ impl Agent {
         F: Fn() -> bool,
         E: FnMut(ProviderEvent) -> Result<(), BackendError>,
     {
-        let submission = self.submit(request)?;
+        let submission = self.submit_with_cancel(request, &is_cancelled)?;
         if submission.accepted() {
             let assistant =
                 self.run_active_turn_cancelable_with_events(is_cancelled, provider_sink)?;
@@ -2478,7 +4966,7 @@ impl Agent {
         F: Fn() -> bool,
         E: FnMut(ProviderEvent) -> Result<(), BackendError>,
     {
-        let submission = self.start_reissued(message, superseded_turn_id)?;
+        let submission = self.start_reissued(message, superseded_turn_id, &is_cancelled)?;
         let assistant = self.run_active_turn_cancelable_with_events(is_cancelled, provider_sink)?;
         Ok(ProcessResult {
             submission,
@@ -2491,7 +4979,16 @@ impl Agent {
         message: String,
         superseded_turn_id: &str,
     ) -> Result<TurnSubmission, AgentError> {
-        self.start_reissued(message, superseded_turn_id)
+        self.start_reissued(message, superseded_turn_id, &|| false)
+    }
+
+    pub fn start_steer_reissue_with_cancel(
+        &mut self,
+        message: String,
+        superseded_turn_id: &str,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<TurnSubmission, AgentError> {
+        self.start_reissued(message, superseded_turn_id, &cancelled)
     }
 
     pub fn append_handoff(&mut self, handoff: Handoff) -> Result<(), AgentError> {
@@ -2533,16 +5030,145 @@ impl Agent {
         Ok(())
     }
 
+    /// A fresh conversation reuses this owner and its configured tool policy.
+    /// All preparation is cancellable; the host checkpoint is the commit point.
+    pub(crate) fn new_session_with_commit(
+        &mut self,
+        digest: &str,
+        cancelled: &dyn Fn() -> bool,
+        commit: impl FnOnce(
+            &mut SessionStore,
+            &crate::session::NewSessionFile,
+        ) -> Result<(), AgentError>,
+    ) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase != AgentPhase::Idle {
+            return Err(AgentError::NotIdle);
+        }
+        let queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .map_err(|e| AgentError::InvalidTurn(e.to_string()))?;
+        if queue.has_pending()
+            || !self.unknown_tool_outcomes().is_empty()
+            || !self.operation_recovery().is_empty()
+            || !self.pending_attachments.is_empty()
+        {
+            return Err(AgentError::InvalidTurn(
+                "new session requires settled operations and no pending input or attachments"
+                    .into(),
+            ));
+        }
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        let old_path = self
+            .session
+            .path()
+            .canonicalize()
+            .map_err(crate::session::SessionError::from)?;
+        let parent = old_path
+            .parent()
+            .ok_or_else(|| AgentError::InvalidTurn("session has no durable parent".into()))?;
+        let (mut replacement, mut file) = SessionStore::create_fresh(
+            parent,
+            Path::new(&self.session.header().cwd),
+            digest,
+            cancelled,
+        )?;
+        let result = (|| {
+            if let Some(descriptor) = self.backend.model_descriptor(self.model.as_deref())? {
+                file.append_event(
+                    &mut replacement,
+                    serde_json::json!({
+                        "type":"model_selected", "model":self.model,
+                        "descriptor":descriptor, "digest":descriptor.digest(),
+                        "reasoning_effort":self.backend.reasoning_effort(),
+                    }),
+                )?;
+            }
+            file.append_event(
+                &mut replacement,
+                serde_json::json!({"type":"persona_selected", "persona":self.persona()}),
+            )?;
+            self.replace_session_with_commit(replacement, cancelled, |replacement| {
+                file.verify()?;
+                commit(replacement, &file)?;
+                file.retain();
+                Ok(())
+            })
+        })();
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => match file.cleanup() {
+                Ok(()) => {
+                    // A competing headless host may have appended its identical
+                    // startup selection before winning the project checkpoint.
+                    // Refresh that audit projection so this unchanged owner can
+                    // accept the next turn with a current journal sequence.
+                    self.session
+                        .refresh_extension_audit_tail()
+                        .map_err(|refresh| {
+                            AgentError::InvalidTurn(format!("{error}; {refresh}"))
+                        })?;
+                    Err(error)
+                }
+                Err(cleanup) => Err(crate::session::SessionError::CandidateRetained(format!(
+                    "{error}; {cleanup}"
+                ))
+                .into()),
+            },
+        }
+    }
+
     /// Replace the session only while idle.  The old store is moved out only
     /// after the new path has recovered successfully.
     pub fn resume_session(&mut self, path: impl Into<PathBuf>) -> Result<(), AgentError> {
+        self.resume_session_with_commit(path, |_| Ok(()))
+    }
+
+    /// Prepare a replacement completely, then commit host persistence before
+    /// changing the live owner or revoking its input port. A rejected commit
+    /// leaves the current session usable. No fallible work follows the hook.
+    pub(crate) fn resume_session_with_commit(
+        &mut self,
+        path: impl Into<PathBuf>,
+        commit: impl FnOnce(&SessionStore) -> Result<(), AgentError>,
+    ) -> Result<(), AgentError> {
         if self.phase == AgentPhase::Closed {
             return Err(AgentError::Closed);
         }
         if self.phase == AgentPhase::Running {
             return Err(AgentError::NotIdle);
         }
-        let replacement = SessionStore::open_existing_writable(path.into())?;
+        let path = path.into();
+        let inspected = SessionStore::open_existing(&path)?;
+        // A resume preserves the durable project identity. Embedders may
+        // configure a narrower ToolContext; do not reinterpret that explicit
+        // tool scope as the session's workspace when comparing journals.
+        let workspace = Path::new(&self.session.header().cwd);
+        if Path::new(&inspected.header().cwd)
+            .canonicalize()
+            .map_err(crate::session::SessionError::from)?
+            != workspace
+                .canonicalize()
+                .map_err(crate::session::SessionError::from)?
+        {
+            return Err(AgentError::InvalidTurn(
+                "session belongs to another project; open that project first".into(),
+            ));
+        }
+        drop(inspected);
+        let replacement = SessionStore::open_existing_writable(path)?;
+        self.replace_session_with_commit(replacement, &|| false, |replacement| commit(replacement))
+    }
+
+    fn replace_session_with_commit(
+        &mut self,
+        mut replacement: SessionStore,
+        cancelled: &dyn Fn() -> bool,
+        commit: impl FnOnce(&mut SessionStore) -> Result<(), AgentError>,
+    ) -> Result<(), AgentError> {
         let replacement_governance = self
             .governance
             .as_ref()
@@ -2551,10 +5177,47 @@ impl Agent {
                     .map_err(|error| AgentError::Governance(error.to_string()))
             })
             .transpose()?;
+        let replacement_resources = self
+            .resource_loader
+            .as_ref()
+            .map(|loader| restore_resource_state(&replacement, loader.paths().clone(), &cancelled))
+            .transpose()?;
+        let replacement_model = self.selected_model_for_session(&replacement)?;
+        let replacement_extensions = self
+            .extensions
+            .as_ref()
+            .map(|runtime| {
+                self.prepare_extensions(runtime.root(), replacement.session_id(), cancelled)
+            })
+            .transpose()?;
+        if cancelled() {
+            return Err(BackendError::Cancelled.into());
+        }
+        commit(&mut replacement)?;
+        // A saved port belongs to one session owner. Revoke that handle before
+        // replacing it so old clones can never acquire the new turn's scope.
+        self.input_port.set_scope(None);
+        self.input_port = crate::input_queue::InputPort::new(replacement.session_id());
+        self.output_store = crate::tool_output::SessionOutputStore::default();
         self.session = replacement;
+        if let Some(runtime) = self.tools.as_mut() {
+            runtime.approval_policy = runtime
+                .configured_approval_policy
+                .with_remembered_events(self.session.events());
+        }
+        self.model = replacement_model.0;
+        self.backend.commit_reasoning_effort(replacement_model.1);
+        if let Some((loader, stale)) = replacement_resources {
+            self.skills = loader.snapshot().skills.clone();
+            self.resource_loader = Some(loader);
+            self.stale_resource_skills = stale;
+        }
         self.phase = AgentPhase::Idle;
         self.active_turn_id = None;
+        self.input_port.set_scope(None);
         self.active_attachments.clear();
+        self.active_resources = None;
+        self.active_resource_inputs.clear();
         self.pending_attachments.clear();
         self.last_error = None;
         // Events belong to the session that produced them. Do not let
@@ -2562,12 +5225,19 @@ impl Agent {
         // into the first request on the replacement session.
         self.events.clear();
         self.governance = replacement_governance;
+        if let Some(candidate) = replacement_extensions {
+            self.publish_extensions(candidate, "resume");
+        }
         Ok(())
     }
 
     pub fn try_close(&mut self) -> Result<(), AgentError> {
         if self.phase == AgentPhase::Closed {
             return Ok(());
+        }
+        if let Some(runtime) = self.extensions.as_mut() {
+            let errors = runtime.close("close");
+            self.extension_errors(errors);
         }
         for (order, output) in self.skills.session_close_outputs().into_iter().enumerate() {
             self.session.append_event(serde_json::json!({
@@ -2576,9 +5246,13 @@ impl Agent {
                 "output": output,
             }))?;
         }
+        self.output_store = crate::tool_output::SessionOutputStore::default();
         self.phase = AgentPhase::Closed;
         self.active_turn_id = None;
+        self.input_port.set_scope(None);
         self.active_attachments.clear();
+        self.active_resources = None;
+        self.active_resource_inputs.clear();
         self.pending_attachments.clear();
         Ok(())
     }
@@ -2589,9 +5263,13 @@ impl Agent {
             self.events.push(AgentEvent::Error {
                 message: error.to_string(),
             });
+            self.output_store = crate::tool_output::SessionOutputStore::default();
             self.phase = AgentPhase::Closed;
             self.active_turn_id = None;
+            self.input_port.set_scope(None);
             self.active_attachments.clear();
+            self.active_resources = None;
+            self.active_resource_inputs.clear();
             self.pending_attachments.clear();
         }
     }
@@ -3054,58 +5732,105 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
         "echo" => Err(ZenpiError::arguments(
             "echo is a test fixture; rebuild with --features dev-fixtures and pass --backend echo",
         )),
-        "openai" => {
-            let effective = crate::config::resolve_default(&crate::config::ConfigOverrides {
-                profile: options.profile.clone(),
-                backend: options.backend_explicit.then(|| options.backend.clone()),
-                model: options.model.clone(),
-                ..crate::config::ConfigOverrides::default()
-            })?;
-            let base_url = effective.base_url.ok_or_else(|| {
-                ZenpiError::arguments(
-                    "no provider URL configured; run `zenpi config import-codex` or set ZENPI_BASE_URL",
-                )
-            })?;
-            let api_key = if effective.requires_openai_auth {
-                Some(effective.api_key.ok_or_else(|| {
-                    ZenpiError::arguments(
-                        "no provider API key configured; run `zenpi config import-codex` or set ZENPI_API_KEY",
-                    )
-                })?)
-            } else {
-                effective.api_key
-            };
-            let model = effective.model.ok_or_else(|| {
-                ZenpiError::arguments(
-                    "no provider model configured; run `zenpi config import-codex` or set ZENPI_MODEL",
-                )
-            })?;
-            let wire_api = effective
-                .wire_api
-                .as_deref()
-                .unwrap_or("responses")
-                .parse::<OpenAiWireApi>()?;
-            let backend = OpenAiCompatibleBackend::from_values_with_settings_and_timeout(
-                base_url,
-                api_key,
-                model,
-                wire_api,
-                effective.model_reasoning_effort,
-                effective.model_verbosity,
-                std::time::Duration::from_secs(effective.timeout_seconds.unwrap_or(120)),
-            )?
-            .with_max_retries(effective.max_retries.unwrap_or(2))?;
-            Ok(Box::new(backend))
+        "openai" | "anthropic" | "google" => {
+            let effective = crate::config::resolve_workspace(
+                &crate::config::ConfigOverrides {
+                    profile: options.profile.clone(),
+                    backend: options.backend_explicit.then(|| options.backend.clone()),
+                    model: options.model.clone(),
+                    ..crate::config::ConfigOverrides::default()
+                },
+                Some(&env::current_dir()?),
+            )?;
+            backend_from_effective(effective)
         }
         other => Err(ZenpiError::arguments(format!(
-            "unknown backend `{other}` (expected echo or openai)"
+            "unknown backend `{other}` (expected echo, openai, anthropic or google)"
         ))),
     }
 }
 
+fn backend_from_effective(
+    effective: crate::config::EffectiveConfig,
+) -> Result<Box<dyn Backend>, ZenpiError> {
+    if !matches!(
+        effective.backend.as_str(),
+        "openai" | "anthropic" | "google"
+    ) {
+        return Err(ZenpiError::arguments(
+            "unsupported production provider backend",
+        ));
+    }
+    let base_url = effective.base_url.ok_or_else(|| {
+        ZenpiError::arguments(
+            "no provider URL configured; run `zenpi config import-codex` or set ZENPI_BASE_URL",
+        )
+    })?;
+    let api_key = if effective.requires_openai_auth {
+        Some(effective.api_key.ok_or_else(|| {
+                    ZenpiError::arguments(
+                        "no provider API key configured; run `zenpi config import-codex` or set ZENPI_API_KEY",
+                    )
+                })?)
+    } else {
+        effective.api_key
+    };
+    let model = effective.model.ok_or_else(|| {
+        ZenpiError::arguments(
+            "no provider model configured; run `zenpi config import-codex` or set ZENPI_MODEL",
+        )
+    })?;
+    let wire_api = effective
+        .wire_api
+        .as_deref()
+        .unwrap_or(if effective.backend == "google" {
+            "google_generative_ai"
+        } else if effective.backend == "anthropic" {
+            "anthropic_messages"
+        } else {
+            "responses"
+        })
+        .parse::<OpenAiWireApi>()?;
+    let registry =
+        crate::providers::registry::ModelRegistry::with_overrides(&effective.model_overrides)
+            .map_err(|error| ZenpiError::Message(error.to_string()))?;
+    if effective.backend == "anthropic" && wire_api != OpenAiWireApi::AnthropicMessages {
+        return Err(ZenpiError::arguments(
+            "anthropic backend requires anthropic_messages wire",
+        ));
+    }
+    if effective.backend == "google" && wire_api != OpenAiWireApi::GoogleGenerativeAi {
+        return Err(ZenpiError::arguments(
+            "google backend requires google_generative_ai wire",
+        ));
+    }
+    let provider = effective.provider.unwrap_or_else(|| {
+        if wire_api == OpenAiWireApi::GoogleGenerativeAi {
+            return "google".into();
+        }
+        if wire_api == OpenAiWireApi::AnthropicMessages {
+            "anthropic".into()
+        } else {
+            "openai".into()
+        }
+    });
+    let backend = OpenAiCompatibleBackend::from_values_with_settings_and_timeout(
+        base_url,
+        api_key,
+        model,
+        wire_api,
+        effective.model_reasoning_effort,
+        effective.model_verbosity,
+        std::time::Duration::from_secs(effective.timeout_seconds.unwrap_or(120)),
+    )?
+    .with_max_retries(effective.max_retries.unwrap_or(2))?
+    .with_model_registry(provider, registry)?;
+    Ok(Box::new(backend))
+}
+
 fn print_help() {
     println!(
-        "zenpi [--mode tui|headless] [--session PATH] [--backend openai] [--profile NAME] [--model NAME]"
+        "zenpi [--mode tui|headless] [--session PATH] [--backend openai|anthropic|google] [--profile NAME] [--model NAME]"
     );
     println!("zenpi config import-codex [--profile NAME]");
     println!("zenpi config doctor [--profile NAME] [--json]");
@@ -3356,25 +6081,26 @@ pub fn run() -> Result<(), ZenpiError> {
     let backend = make_backend(&options)?;
     let session = SessionStore::open(&options.session)?;
     let mut agent = Agent::new(session, backend);
+    agent.project_overrides = crate::config::ConfigOverrides {
+        profile: options.profile.clone(),
+        backend: options.backend_explicit.then(|| options.backend.clone()),
+        model: options.model.clone(),
+        ..crate::config::ConfigOverrides::default()
+    };
     let _ = agent.acknowledge_recovery()?;
     // Advertise the complete bounded tool set. Side effects still cannot run
     // until the local approval policy grants the individual call.
     let workspace = env::current_dir()?;
-    let mut tools = crate::tools::ToolRegistry::with_all_builtins()
+    let tools = crate::tools::ToolRegistry::with_all_builtins()
         .map_err(|error| ZenpiError::Message(format!("tool registry: {error}")))?;
     let paths = crate::config::ConfigPaths::discover()?;
-    let extensions = crate::extensions::ExtensionCatalog::load(&paths.extensions)
-        .map_err(|error| ZenpiError::Message(format!("extension loading: {error}")))?;
-    extensions
-        .register_tools(&mut tools)
-        .map_err(|error| ZenpiError::Message(format!("extension tools: {error}")))?;
     let tool_context = crate::tools::ToolContext::new(workspace)
         .map_err(|error| ZenpiError::Message(format!("tool workspace: {error}")))?;
-    agent.set_tools(
+    agent.set_tools_with_resources(
         tools,
         tool_context,
         crate::tools::SideEffectPolicy::all_builtins(),
-    );
+    )?;
     let approval_mode = match options.mode {
         RunMode::Headless => crate::approval::ApprovalMode::Always,
         RunMode::Tui => crate::approval::ApprovalMode::ReadOnly,
@@ -3383,12 +6109,14 @@ pub fn run() -> Result<(), ZenpiError> {
         mode: approval_mode,
         ..crate::approval::ApprovalPolicy::default()
     });
-    let project_skills = env::current_dir()?.join(".zenpi").join("skills");
-    let skills = crate::skills::SkillSet::load(&paths.skills, &project_skills)
-        .map_err(|error| ZenpiError::Message(format!("skill loading: {error}")))?;
-    agent.set_skills(skills);
+    agent.restore_resources(default_resource_paths(&paths, &env::current_dir()?), || {
+        false
+    })?;
+    agent.configure_extensions(&paths.extensions, || false)?;
     if let Some(model) = options.model {
         agent.set_model(Some(model))?;
+    } else {
+        agent.restore_model_selection()?;
     }
     match options.mode {
         RunMode::Headless => crate::headless::run_stdio_owned(agent)
@@ -3416,6 +6144,7 @@ fn tool_failure(
         message.truncate(boundary);
     }
     ToolInvocation {
+        output_capture: None,
         result: crate::tools::ToolResult::Error {
             call_id: call.id.clone(),
             tool: call.name.clone(),
@@ -3423,6 +6152,69 @@ fn tool_failure(
         },
         outcome,
     }
+}
+
+fn pending_output_cleanup(session: &SessionStore) -> Option<&Value> {
+    session
+        .events()
+        .iter()
+        .rev()
+        .find(|event| {
+            event["session_id"] == session.session_id()
+                && matches!(
+                    event["type"].as_str(),
+                    Some("tool_output_cleanup_started" | "tool_output_cleanup")
+                )
+        })
+        .filter(|event| event["type"] == "tool_output_cleanup_started")
+}
+
+fn begin_output_capture(
+    output: &mut crate::tool_output::SessionOutputStore,
+    session: &mut SessionStore,
+    governance: &mut Option<crate::governance::BudgetLedger>,
+    call_id: &str,
+) -> Result<crate::tool_output::CommandOutputCapture, AgentError> {
+    // Opening a capture runs expiry maintenance. Until cleanup recovery has
+    // committed, it must not expire an intent's not-yet-retired identities.
+    if pending_output_cleanup(session).is_some() {
+        return Err(ToolError::InvalidCall(
+            "output cleanup is pending; retry its original scope before capturing more output"
+                .into(),
+        )
+        .into());
+    }
+    if let Some(ledger) = governance.as_mut() {
+        ledger
+            .charge(
+                crate::governance::ResourceKind::Disk,
+                crate::tool_output::command_disk_reservation(
+                    crate::tool_output::OutputLimits::default(),
+                ),
+            )
+            .and_then(|_| ledger.persist(session))
+            .map_err(|error| AgentError::Governance(error.to_string()))?;
+    }
+    let now = crate::session::unix_time_ms();
+    let store = output
+        .store(session.path(), session.session_id(), now)
+        .map_err(|error| ToolError::InvalidCall(format!("output capture: {error}")))?;
+    crate::tool_output::CommandOutputCapture::new(store, session.session_id(), call_id, now)
+        .map_err(|error| ToolError::InvalidCall(format!("output capture: {error}")).into())
+}
+
+fn persist_output_capture(
+    session: &mut SessionStore,
+    turn_id: &str,
+    call_id: &str,
+    operation_id: &str,
+    report: &crate::tool_output::CaptureReport,
+) -> Result<(), AgentError> {
+    session.append_event(serde_json::json!({
+        "type": "tool_output_captured", "turn_id": turn_id, "call_id": call_id,
+        "operation_id": operation_id, "output_capture": report,
+    }))?;
+    Ok(())
 }
 
 fn tool_operation_id(turn_id: &str, call_id: &str) -> String {
@@ -3491,6 +6283,11 @@ fn validate_provider_calls(
             return Err(invalid("provider tool batch exceeds 256 KiB"));
         }
     }
+    // Include the array brackets and separators checked by the executor too,
+    // so an oversized batch is rejected before any operation is announced.
+    if bytes.saturating_add(calls.len().saturating_add(1)) > crate::tool_runtime::MAX_BATCH_BYTES {
+        return Err(invalid("provider tool batch exceeds 256 KiB"));
+    }
     Ok(())
 }
 
@@ -3537,4 +6334,555 @@ fn print_config_status(report: &crate::config::ConfigStatus) {
             "missing"
         }
     );
+}
+
+fn resource_agent_error(error: crate::resource_loader::ResourceError) -> AgentError {
+    if matches!(error, crate::resource_loader::ResourceError::Cancelled) {
+        BackendError::Cancelled.into()
+    } else {
+        AgentError::InvalidTurn(error.to_string())
+    }
+}
+
+pub fn default_resource_paths(
+    paths: &crate::config::ConfigPaths,
+    cwd: &Path,
+) -> crate::resource_loader::ResourcePaths {
+    crate::resource_loader::ResourcePaths {
+        user_skills: paths.skills.clone(),
+        project_skills: cwd.join(".zenpi/skills"),
+        skill_paths: vec![],
+        user_templates: paths.root.join("prompts"),
+        project_templates: cwd.join(".zenpi/prompts"),
+        template_paths: vec![],
+        text_resources: vec![],
+    }
+}
+
+fn resource_selection_event(
+    paths: &crate::resource_loader::ResourcePaths,
+    snapshot: &crate::resource_loader::ResourceSnapshot,
+) -> Value {
+    let skill_hashes = snapshot
+        .skills
+        .metadata()
+        .map(|metadata| (metadata.name.clone(), metadata.source_hash.clone()))
+        .collect::<BTreeMap<_, _>>();
+    serde_json::json!({"type": "resources_selected", "paths": paths, "generation": snapshot.generation, "skill_hashes": skill_hashes})
+}
+
+fn restore_resource_state(
+    session: &SessionStore,
+    defaults: crate::resource_loader::ResourcePaths,
+    cancelled: &impl Fn() -> bool,
+) -> Result<(crate::resource_loader::ResourceLoader, BTreeSet<String>), AgentError> {
+    let previous = session
+        .events()
+        .iter()
+        .rev()
+        .find(|event| event["type"] == "resources_selected")
+        .cloned();
+    let paths = match previous.as_ref() {
+        Some(event) => serde_json::from_value(event["paths"].clone()).map_err(|error| {
+            AgentError::InvalidTurn(format!("resource selection recovery: {error}"))
+        })?,
+        None => defaults,
+    };
+    let mut loader =
+        crate::resource_loader::ResourceLoader::new(paths).map_err(resource_agent_error)?;
+    let snapshot = loader.reload(cancelled).map_err(resource_agent_error)?;
+    let mut expected = BTreeMap::<String, String>::new();
+    for record in session.records() {
+        let event = &record.value["event"];
+        if event["type"] == "resources_selected" {
+            expected = serde_json::from_value(event["skill_hashes"].clone()).map_err(|error| {
+                AgentError::InvalidTurn(format!("invalid resource hash checkpoint: {error}"))
+            })?;
+        }
+        let resource = &record.value["turn"]["metadata"]["resource"];
+        if resource["kind"] == "skill"
+            && let (Some(name), Some(hash)) =
+                (resource["name"].as_str(), resource["source_hash"].as_str())
+        {
+            expected.insert(name.to_owned(), hash.to_owned());
+        }
+    }
+    let stale = snapshot
+        .skills
+        .metadata()
+        .filter(|metadata| {
+            expected
+                .get(&metadata.name)
+                .is_some_and(|hash| hash != &metadata.source_hash)
+        })
+        .map(|metadata| metadata.name.clone())
+        .collect();
+    if cancelled() {
+        return Err(BackendError::Cancelled.into());
+    }
+    Ok((loader, stale))
+}
+
+/// Resolve only host capture events preceded by their actual dispatch marker.
+/// Copies of ArtifactRef in model/tool text, forked history, or request JSON are
+/// deliberately not authority. The returned reference is bounded journal data.
+fn trusted_output_reference(
+    session: &crate::session::SessionStore,
+    request: &crate::tool_output::OutputReadRequest,
+    now_ms: u64,
+) -> Result<crate::tool_output::ArtifactRef, crate::tool_output::OutputError> {
+    use crate::tool_output::{ArtifactRef, OutputError, OutputLimits};
+    request.validate()?;
+    let mut found: Option<ArtifactRef> = None;
+    for record in session.records() {
+        let event = &record.value["event"];
+        if record.kind != "event" || event["type"] != "tool_output_captured" {
+            continue;
+        }
+        let Some(artifacts) = event["output_capture"]["artifacts"].as_array() else {
+            continue;
+        };
+        for raw in artifacts
+            .iter()
+            .filter(|raw| raw["artifact_id"] == request.artifact_id)
+        {
+            let reference: ArtifactRef = serde_json::from_value(raw.clone())?;
+            let operation = event["operation_id"]
+                .as_str()
+                .ok_or(OutputError::Integrity)?;
+            let turn = event["turn_id"].as_str().ok_or(OutputError::Integrity)?;
+            if event["call_id"] != request.call_id
+                || reference.call_id != request.call_id
+                || reference.session_id != session.session_id()
+                || reference.version != 1
+            {
+                return Err(OutputError::Integrity);
+            }
+            let dispatched = session
+                .records()
+                .iter()
+                .take_while(|prior| prior.sequence < record.sequence)
+                .any(|prior| {
+                    let prior_event = &prior.value["event"];
+                    prior.kind == "event"
+                        && prior_event["type"] == "tool_execution_started"
+                        && prior_event["operation_id"] == operation
+                        && prior_event["turn_id"] == turn
+                        && prior_event["call_id"] == request.call_id
+                        && matches!(
+                            prior_event["tool"].as_str(),
+                            Some("run_command" | "user_shell")
+                        )
+                });
+            if !dispatched || found.as_ref().is_some_and(|old| old != &reference) {
+                return Err(OutputError::Integrity);
+            }
+            found = Some(reference);
+        }
+    }
+    let reference = found.ok_or_else(|| {
+        OutputError::Invalid("artifact is not owned by this session and call".into())
+    })?;
+    if now_ms >= reference.expires_at_ms {
+        return Err(OutputError::Expired);
+    }
+    if !reference.finalized {
+        return Err(OutputError::Interrupted);
+    }
+    if reference.bytes_stored > reference.bytes_observed
+        || reference.created_at_ms > reference.expires_at_ms
+        || reference.expires_at_ms - reference.created_at_ms > 7 * 24 * 60 * 60 * 1000
+        || reference.bytes_stored > OutputLimits::default().max_file_bytes
+        || reference.sha256.as_deref().is_none_or(|sha| {
+            sha.len() != 64
+                || !sha
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+        || (reference.complete
+            && (reference.failure.is_some()
+                || reference.truncated
+                || reference.bytes_stored != reference.bytes_observed))
+    {
+        return Err(OutputError::Integrity);
+    }
+    if request.offset > reference.bytes_stored {
+        return Err(OutputError::Invalid(
+            "range starts after stored output".into(),
+        ));
+    }
+    Ok(reference)
+}
+
+fn extension_agent_error(error: crate::tools::ToolError) -> AgentError {
+    if matches!(error, crate::tools::ToolError::Cancelled) {
+        BackendError::Cancelled.into()
+    } else {
+        AgentError::Tool(error)
+    }
+}
+
+#[cfg(all(test, unix))]
+mod extension_resume_commit_tests {
+    use super::*;
+    use std::{fs, os::unix::fs::PermissionsExt, sync::Arc};
+
+    #[test]
+    fn rejected_resume_commit_keeps_old_extension_live_until_successful_retry() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let extensions = root.join("extensions");
+        let fixture = extensions.join("fixture");
+        fs::create_dir_all(&fixture).unwrap();
+        fs::write(
+            fixture.join("extension.toml"),
+            r#"
+name = "fixture"
+version = "1.0.0"
+api_version = 2
+executable = "plugin.py"
+hooks = ["session_start", "session_close"]
+hook_timeout_ms = 1000
+[permissions]
+workspace_read = true
+[[tools]]
+name = "fixture_echo"
+description = "Actual subprocess lease probe"
+side_effect = "read_only"
+input_schema = {type="object"}
+"#,
+        )
+        .unwrap();
+        fs::write(fixture.join("plugin.py"), r#"#!/usr/bin/python3
+import json,sys
+r=json.loads(sys.stdin.readline()); p=r['params']; method=r['method']
+with open('events','a') as f:
+    f.write(json.dumps({'kind':p.get('hook',method),'capability':r['capability']})+'\n')
+if method=='initialize': result={'api_version':2,'hooks':p['hooks'],'tools':[t['name'] for t in p['tools']]}
+elif method=='tools/call': result={'echo':p['arguments']}
+else: result={'action':'continue'}
+print(json.dumps({'jsonrpc':'2.0','id':r['id'],'capability':r['capability'],'result':result}))
+"#).unwrap();
+        fs::set_permissions(fixture.join("plugin.py"), fs::Permissions::from_mode(0o700)).unwrap();
+        // This test exercises session and real extension processes; no model turn runs.
+        let mut agent = Agent::with_echo(
+            SessionStore::open_in_workspace(root.join("old.jsonl"), root).unwrap(),
+        );
+        agent.set_tools(
+            ToolRegistry::with_all_builtins().unwrap(),
+            ToolContext::new(root).unwrap(),
+            SideEffectPolicy::all_builtins(),
+        );
+        let mut configured = false;
+        for attempt in 0..3 {
+            match agent.configure_extensions(&extensions, || false) {
+                Ok(()) => {
+                    configured = true;
+                    break;
+                }
+                Err(AgentError::Tool(crate::tools::ToolError::CommandTimeout(_)))
+                    if attempt < 2 =>
+                {
+                    // The fixture launches a real interpreter; under a busy
+                    // parallel test runner startup can consume the one-second
+                    // hook budget. Retry only this transient class and keep
+                    // all manifest/policy failures fail-fast.
+                    std::thread::sleep(std::time::Duration::from_millis(25));
+                }
+                Err(error) => panic!("extension fixture setup failed: {error}"),
+            }
+        }
+        assert!(configured, "extension fixture never initialized");
+        let old_lease = agent.extension_lease().unwrap();
+        let old_id = agent.session.session_id().to_owned();
+        let old_registry = agent.tools.as_ref().unwrap().registry.clone();
+        let old_sequence = agent.session.next_sequence();
+        let replacement = root.join("replacement.jsonl");
+        drop(SessionStore::open_in_workspace(&replacement, root).unwrap());
+        let checkpoint = root.join("project-tabs.json");
+        fs::create_dir(&checkpoint).unwrap();
+        let result = agent.resume_session_with_commit(&replacement, |session| {
+            assert_ne!(session.session_id(), old_id);
+            fs::write(&checkpoint, session.session_id())
+                .map_err(|error| AgentError::InvalidTurn(error.to_string()))
+        });
+        assert!(result.is_err());
+        assert_eq!(agent.session.session_id(), old_id);
+        assert_eq!(agent.session.next_sequence(), old_sequence);
+        assert!(old_lease.is_active());
+        assert!(Arc::ptr_eq(
+            &old_registry,
+            &agent.tools.as_ref().unwrap().registry
+        ));
+        let read_events = || -> Vec<Value> {
+            fs::read_to_string(fixture.join("events"))
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect()
+        };
+        let events = read_events();
+        assert_eq!(
+            events
+                .iter()
+                .map(|e| e["kind"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["initialize", "session_start", "initialize"]
+        );
+        let call = || crate::tools::ToolCall {
+            id: "probe".into(),
+            name: "fixture_echo".into(),
+            arguments: serde_json::json!({"value":"still-live"}),
+        };
+        let runtime = agent.tools.as_ref().unwrap();
+        let result = old_registry.execute(&runtime.context, runtime.policy, call());
+        assert!(
+            matches!(result, crate::tools::ToolResult::Success { ref output, .. }
+            if output["echo"]["value"] == "still-live")
+        );
+        fs::remove_dir(&checkpoint).unwrap();
+        agent
+            .resume_session_with_commit(&replacement, |session| {
+                fs::write(&checkpoint, session.session_id())
+                    .map_err(|error| AgentError::InvalidTurn(error.to_string()))
+            })
+            .unwrap();
+        assert!(!old_lease.is_active());
+        assert_ne!(agent.session.session_id(), old_id);
+        assert_eq!(
+            fs::read_to_string(&checkpoint).unwrap(),
+            agent.session.session_id()
+        );
+        let events = read_events();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| e["kind"] == "session_close")
+                .count(),
+            1
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| e["kind"] == "session_start")
+                .count(),
+            2
+        );
+        let runtime = agent.tools.as_ref().unwrap();
+        assert!(matches!(
+            old_registry.execute(&runtime.context, runtime.policy, call()),
+            crate::tools::ToolResult::Error { .. }
+        ));
+        assert!(matches!(
+            runtime
+                .registry
+                .execute(&runtime.context, runtime.policy, call()),
+            crate::tools::ToolResult::Success { .. }
+        ));
+    }
+}
+
+#[cfg(all(test, unix))]
+mod output_cleanup_recovery_tests {
+    use super::*;
+    use crate::tool_output::{ArtifactRef, OutputError};
+    use std::fs;
+
+    fn captured_agent(root: &std::path::Path) -> (Agent, Vec<ArtifactRef>, std::path::PathBuf) {
+        let mut agent = Agent::with_echo(SessionStore::open(root.join("session.jsonl")).unwrap());
+        agent.set_tools(
+            crate::tools::ToolRegistry::with_all_builtins().unwrap(),
+            crate::tools::ToolContext::new(root).unwrap(),
+            crate::tools::SideEffectPolicy::all_builtins(),
+        );
+        agent.set_approval_policy(crate::approval::ApprovalPolicy {
+            mode: crate::approval::ApprovalMode::Never,
+            ..Default::default()
+        });
+        let value = agent
+            .run_user_shell_with_cancel("!printf cleanup-recovery", || false)
+            .unwrap();
+        let refs: Vec<ArtifactRef> =
+            serde_json::from_value(value["output_artifacts"].clone()).unwrap();
+        use sha2::{Digest, Sha256};
+        let store = root.join(format!(
+            ".zenpi-output-{:x}",
+            Sha256::digest(agent.session.session_id().as_bytes())
+        ));
+        (agent, refs, store)
+    }
+
+    fn fail_receipt(agent: &mut Agent, store: &std::path::Path, refs: &[ArtifactRef]) {
+        let result = agent.cleanup_tool_output_with_receipt(None, |session, event| {
+            for reference in refs {
+                assert!(
+                    !store
+                        .join(format!("{}.raw", reference.artifact_id))
+                        .exists()
+                );
+                assert!(
+                    store
+                        .join(format!("{}.cleanup", reference.artifact_id))
+                        .is_file()
+                );
+            }
+            // Real filesystem failure at the final journal write, after the
+            // production cleanup algorithm has synced its unlinks.
+            let path = session.path().to_path_buf();
+            let backup = path.with_extension("backup");
+            fs::rename(&path, &backup).unwrap();
+            fs::create_dir(&path).unwrap();
+            let result = session.append_event(event);
+            fs::remove_dir(&path).unwrap();
+            fs::rename(&backup, &path).unwrap();
+            result
+        });
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("pending durable receipt")
+        );
+        assert_eq!(
+            agent
+                .session
+                .events()
+                .iter()
+                .filter(|event| event["type"] == "tool_output_cleanup_started")
+                .count(),
+            1
+        );
+        assert!(
+            !agent
+                .session
+                .events()
+                .iter()
+                .any(|event| event["type"] == "tool_output_cleanup")
+        );
+    }
+
+    #[test]
+    fn receipt_io_failure_retries_same_agent_without_losing_or_double_counting_removals() {
+        let root = tempfile::tempdir().unwrap();
+        let (mut agent, refs, store) = captured_agent(root.path());
+        fail_receipt(&mut agent, &store, &refs);
+        assert!(matches!(
+            agent.cleanup_tool_output(Some(&refs[0].call_id)),
+            Err(OutputError::Busy)
+        ));
+        let mut output = crate::tool_output::SessionOutputStore::default();
+        assert!(
+            begin_output_capture(
+                &mut output,
+                &mut agent.session,
+                &mut None,
+                "must-not-capture"
+            )
+            .is_err()
+        );
+        assert_eq!(agent.cleanup_tool_output(None).unwrap(), refs.len());
+        assert_eq!(fs::read_dir(&store).unwrap().count(), 0);
+        assert_eq!(
+            agent
+                .session
+                .events()
+                .iter()
+                .filter(|event| event["type"] == "tool_output_cleanup_started")
+                .count(),
+            1
+        );
+        assert_eq!(agent.cleanup_tool_output(None).unwrap(), 0);
+        println!(
+            "actual receipt I/O failure; same Agent recovered {} IDs; next cleanup=0",
+            refs.len()
+        );
+    }
+
+    #[test]
+    fn receipt_io_failure_recovers_in_independent_process() {
+        let root = tempfile::tempdir().unwrap();
+        let (mut agent, refs, store) = captured_agent(root.path());
+        fail_receipt(&mut agent, &store, &refs);
+        let journal = agent.session.path().to_path_buf();
+        drop(agent);
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "core::output_cleanup_recovery_tests::cleanup_recovery_process_helper",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("ZENPI_CLEANUP_RECOVERY_JOURNAL", &journal)
+            .env("ZENPI_CLEANUP_RECOVERY_COUNT", refs.len().to_string())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("independent process recovered"));
+        assert_eq!(fs::read_dir(&store).unwrap().count(), 0);
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+    }
+
+    #[test]
+    #[ignore = "launched by receipt_io_failure_recovers_in_independent_process"]
+    fn cleanup_recovery_process_helper() {
+        let path = std::env::var_os("ZENPI_CLEANUP_RECOVERY_JOURNAL").unwrap();
+        let count: usize = std::env::var("ZENPI_CLEANUP_RECOVERY_COUNT")
+            .unwrap()
+            .parse()
+            .unwrap();
+        let mut agent = Agent::with_echo(SessionStore::open(path).unwrap());
+        assert_eq!(agent.cleanup_tool_output(None).unwrap(), count);
+        assert_eq!(agent.cleanup_tool_output(None).unwrap(), 0);
+        println!("independent process recovered {count} IDs, no duplicate count");
+    }
+
+    #[test]
+    fn pending_intent_rejects_tampered_missing_or_replaced_retirements() {
+        for mutation in ["identity", "missing-record", "replaced-payload"] {
+            let root = tempfile::tempdir().unwrap();
+            let (mut agent, refs, store) = captured_agent(root.path());
+            fail_receipt(&mut agent, &store, &refs);
+            let record = store.join(format!("{}.cleanup", refs[0].artifact_id));
+            match mutation {
+                "identity" => {
+                    let mut reference = refs[0].clone();
+                    reference.call_id = "different-valid-call".into();
+                    fs::write(&record, serde_json::to_vec(&reference).unwrap()).unwrap();
+                }
+                "missing-record" => fs::remove_file(&record).unwrap(),
+                _ => {
+                    use std::os::unix::fs::PermissionsExt;
+                    let raw = store.join(format!("{}.raw", refs[0].artifact_id));
+                    fs::write(&raw, b"replacement bytes").unwrap();
+                    fs::set_permissions(raw, fs::Permissions::from_mode(0o600)).unwrap();
+                }
+            }
+            let error = agent.cleanup_tool_output(None).unwrap_err();
+            assert!(
+                matches!(error, OutputError::Integrity | OutputError::Interrupted),
+                "{mutation}: {error}"
+            );
+            assert!(
+                !agent
+                    .session
+                    .events()
+                    .iter()
+                    .any(|event| event["type"] == "tool_output_cleanup")
+            );
+            assert_eq!(
+                agent
+                    .session
+                    .events()
+                    .iter()
+                    .filter(|event| event["type"] == "tool_output_cleanup_started")
+                    .count(),
+                1
+            );
+        }
+    }
 }

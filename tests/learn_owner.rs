@@ -123,6 +123,15 @@ fn headless_learn_evidence_is_bounded_idempotent_and_restart_safe() {
         "untracked"
     );
     assert_eq!(resumed["data"]["checkpoint"]["zenpi_started"], false);
+    let checkpoint_digest = resumed["data"]["checkpoint"]["checkpoint_digest"]
+        .as_str()
+        .unwrap();
+    assert_eq!(checkpoint_digest.len(), 64);
+    assert!(
+        checkpoint_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    );
 
     let missing = responses
         .iter()
@@ -165,6 +174,10 @@ fn headless_learn_evidence_is_bounded_idempotent_and_restart_safe() {
         .unwrap();
     assert_eq!(restart["success"], true, "{restart}");
     assert_eq!(
+        restart["data"]["checkpoint"]["checkpoint_digest"],
+        resumed["data"]["checkpoint"]["checkpoint_digest"]
+    );
+    assert_eq!(
         restart["data"]["learn"]["evidence"]
             .as_array()
             .unwrap()
@@ -173,6 +186,68 @@ fn headless_learn_evidence_is_bounded_idempotent_and_restart_safe() {
     );
 
     let _ = std::fs::remove_dir_all(evidence_dir);
+}
+
+#[test]
+fn headless_learn_external_manifest_is_checkpoint_bound_and_idempotent() {
+    let directory = tempdir().unwrap();
+    let session_path = directory.path().join("session.jsonl");
+    seed(&session_path);
+    let root = std::env::current_dir().unwrap();
+    let manifest_path = root
+        .join("target")
+        .join(format!("zenpi-learn-manifest-{}.json", std::process::id()));
+    let learn = Learn::new("learn-1", "src", "Docs/learn", Vec::new()).unwrap();
+    let checkpoint = format!("{:x}", Sha256::digest(serde_json::to_vec(&learn).unwrap()));
+    std::fs::write(
+        &manifest_path,
+        serde_json::json!({
+            "checkpoint_digest": checkpoint,
+            "source": "src",
+            "target": "Docs/learn",
+            "status": "succeeded",
+            "acceptance_passed": true,
+            "acceptance_evidence": ["external worker self-test passed"]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let reference = manifest_path
+        .strip_prefix(&root)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let input = format!(
+        "{}\n{}\n{}\n",
+        serde_json::json!({"type":"command","id":"import-1","text":format!("/learn import learn-1 {reference}")}),
+        serde_json::json!({"type":"command","id":"import-2","text":format!("/learn import learn-1 {reference}")}),
+        serde_json::json!({"type":"shutdown","id":"stop"}),
+    );
+    let mut output = Vec::new();
+    run_headless(
+        &mut Agent::with_echo(SessionStore::open(&session_path).unwrap()),
+        Cursor::new(input.into_bytes()),
+        &mut output,
+    )
+    .unwrap();
+    let rows = records(&output);
+    assert_eq!(
+        rows.iter().find(|row| row["id"] == "import-1").unwrap()["success"],
+        true,
+        "{rows:?}"
+    );
+    assert_eq!(
+        rows.iter().find(|row| row["id"] == "import-2").unwrap()["success"],
+        true
+    );
+    assert_eq!(
+        rows.iter().find(|row| row["id"] == "import-2").unwrap()["data"]["change"],
+        "unchanged"
+    );
+    let persisted = DomainStore::open(path_for_session(&session_path)).unwrap();
+    assert_eq!(persisted.learn("learn-1").unwrap().evidence.len(), 1);
+    assert!(persisted.learn("learn-1").unwrap().evidence[0].starts_with("external:"));
+    let _ = std::fs::remove_file(manifest_path);
 }
 
 #[test]

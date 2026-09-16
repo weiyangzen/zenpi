@@ -1,0 +1,55 @@
+{"t": 0.842281458, "kind": "spawn", "pid": 51880}
+{"t": 0.912776541, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 0.934924708, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIG5lZWRsZTEyNg=="}
+{"t": 1.334321583, "kind": "input", "base64": "DQ=="}
+{"t": 1.334468041, "kind": "command_submitted", "text": "/session search needle126"}
+{"t": 1.93078575, "kind": "input", "base64": "L3Nlc3Npb24gbGlzdA=="}
+{"t": 2.231006333, "kind": "input", "base64": "DQ=="}
+{"t": 2.231117625, "kind": "command_submitted", "text": "/session list"}
+{"t": 2.700014166, "kind": "snapshot", "label": "list-two-scopes", "pane": {"B126": true, "C126": false, "O126": false}}
+{"t": 2.700241541, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 2.746554541, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIG5lZWRsZTEyNg=="}
+{"t": 3.136714, "kind": "input", "base64": "DQ=="}
+{"t": 3.136903083, "kind": "command_submitted", "text": "/session search needle126"}
+{"t": 3.691840375, "kind": "input", "base64": "G1tC"}
+{"t": 5.401321125, "kind": "observation_end", "seconds": 1.2, "pane": {"A126": false, "B126": false, "C126": true}}
+{"t": 5.417319041, "kind": "snapshot", "label": "selection-preserved-after-insert", "pane": {"A126": false, "B126": false, "C126": true}}
+{"t": 5.417381583, "kind": "input", "base64": "DQ=="}
+{"t": 5.451258666, "kind": "snapshot", "label": "keyboard-enter-selected-path", "pane": {"A126": false, "B126": false, "C126": true}}
+{"t": 5.487737333, "kind": "input", "base64": "L3Nlc3Npb24gb3BlbiAvVXNlcnMvd2FuZ3dlaXlhbmcvR2l0SHViL3plbnBpLy5vcHMvc3RhZ2UxX2V4ZWN1dGlvbi9hc3luYy1zZXNzaW9uLWJyb3dzZXItaW50ZWdyYXRpb24vYWN0dWFsLXB0eS9maXh0dXJlL2luaXRpYWwvbC9tLW93bmVyLmpzb25s"}
+{"t": 5.894371208, "kind": "input", "base64": "DQ=="}
+{"t": 5.894630791, "kind": "command_submitted", "text": "/session open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/l/m-owner.jsonl"}
+{"t": 6.027975208, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 6.051528208, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIG5lZWRsZTEyNg=="}
+{"t": 6.459983625, "kind": "input", "base64": "DQ=="}
+{"t": 6.460143791, "kind": "command_submitted", "text": "/session search needle126"}
+{"t": 7.058645125, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIGZhaWx1cmUxMjY="}
+{"t": 7.351118208, "kind": "input", "base64": "DQ=="}
+{"t": 7.351276833, "kind": "command_submitted", "text": "/session search failure126"}
+{"t": 7.516981833, "kind": "snapshot", "label": "search-failure-keeps-old-projection", "pane": {"A126": true, "B126": false, "C126": false}}
+{"t": 7.517447083, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 7.743576666, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 7.775682875, "kind": "input", "base64": "L3Byb2plY3Qgb3BlbiAvVXNlcnMvd2FuZ3dlaXlhbmcvR2l0SHViL3plbnBpLy5vcHMvc3RhZ2UxX2V4ZWN1dGlvbi9hc3luYy1zZXNzaW9uLWJyb3dzZXItaW50ZWdyYXRpb24vYWN0dWFsLXB0eS9maXh0dXJlL2luaXRpYWwvb3RoZXI="}
+{"t": 8.1929465, "kind": "input", "base64": "DQ=="}
+{"t": 8.193047583, "kind": "command_submitted", "text": "/project open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other"}
+{"t": 8.370218916, "kind": "input", "base64": "L3Nlc3Npb24gb3BlbiAvVXNlcnMvd2FuZ3dlaXlhbmcvR2l0SHViL3plbnBpLy5vcHMvc3RhZ2UxX2V4ZWN1dGlvbi9hc3luYy1zZXNzaW9uLWJyb3dzZXItaW50ZWdyYXRpb24vYWN0dWFsLXB0eS9maXh0dXJlL2luaXRpYWwvb3RoZXIvcy9kLmpzb25s"}
+{"t": 8.766139916, "kind": "input", "base64": "DQ=="}
+{"t": 8.766327416, "kind": "command_submitted", "text": "/session open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other/s/d.jsonl"}
+{"t": 8.902333166, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIG90aGVybmVlZGxlMTI2"}
+{"t": 9.428250916, "kind": "input", "base64": "DQ=="}
+{"t": 9.428394833, "kind": "command_submitted", "text": "/session search otherneedle126"}
+{"t": 9.571649083, "kind": "input", "base64": "L3Byb2plY3Qgc2VsZWN0IDA2YTYwZGQ5Y2RmNDk2NTkwYzlkNmNkYWI2MmQwZWQzM2VlNGExM2Y1MTY5Y2EzOTk0NTQ3MGRmODU0YTcyMWM="}
+{"t": 9.989097125, "kind": "input", "base64": "DQ=="}
+{"t": 9.989290375, "kind": "command_submitted", "text": "/project select 06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c"}
+{"t": 10.159533083, "kind": "input", "base64": "L3Nlc3Npb24gc2VhcmNoIHJhY2UxMjY="}
+{"t": 10.568241375, "kind": "input", "base64": "DQ=="}
+{"t": 10.5684935, "kind": "command_submitted", "text": "/session search race126"}
+{"t": 10.69361, "kind": "input", "base64": "L3Byb2plY3Qgc2VsZWN0IDc1ZjQ1NjkxYTYyY2NkY2U3MzI3NDUwN2RjNzc2ODRkYTljYmJlMDRlZGYyNzkyMDc4ZjM5NTNhYjkxMDdmNzE="}
+{"t": 11.217665041, "kind": "input", "base64": "DQ=="}
+{"t": 11.217804166, "kind": "command_submitted", "text": "/project select 75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"}
+{"t": 13.428388958, "kind": "observation_end", "seconds": 2, "pane": {"D126": true}}
+{"t": 13.457884625, "kind": "snapshot", "label": "other-project-keeps-own-query", "pane": {"D126": true}}
+{"t": 13.458099416, "kind": "input", "base64": "G1sxOzVICw=="}
+{"t": 13.502310291, "kind": "input", "base64": "L3F1aXQ="}
+{"t": 14.026564125, "kind": "input", "base64": "DQ=="}
+{"t": 14.026749458, "kind": "command_submitted", "text": "/quit"}

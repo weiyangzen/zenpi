@@ -1,0 +1,20 @@
+{
+  "current_input_files": 131,
+  "all_current_inputs_match": true,
+  "cancellation_before_ms": 4942,
+  "cancellation_after_ms": 4,
+  "top_level_tests": 97,
+  "ignored_helpers": 3,
+  "cli_processes": [
+    90622,
+    90641,
+    90642
+  ],
+  "effect_count": 1,
+  "http_requests": 0,
+  "wal_payload_hashes_and_replays_exact": true,
+  "orphan_read_envelope_code": "invalid_turn",
+  "orphan_read_inner_error": "output_invalid",
+  "cleanup_streams": 2,
+  "release_build": false
+}

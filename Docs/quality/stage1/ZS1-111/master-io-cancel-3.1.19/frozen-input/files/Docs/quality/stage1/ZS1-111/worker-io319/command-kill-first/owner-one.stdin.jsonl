@@ -1,0 +1,1 @@
+{"schema_version": 2, "type": "user_shell", "id": "killed-command", "text": "!exec /Applications/Xcode.app/Contents/Developer/usr/bin/python3 effect.py"}

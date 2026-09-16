@@ -1,0 +1,19 @@
+diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/result.json b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/result.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-production-config/result.json
+@@ -0,0 +1,14 @@
++{
++  "passed": true,
++  "binary_sha256": "c1f4f0e9478665ade1b3c69709ce7939a6d461330d863ed3085d19ee3014f18e",
++  "harness_sha256": "c7ae77df35d579681412e4ba99b8190112938cc7db5f8f4c898c4fb5ef612870",
++  "provider_fixture_sha256": "5601ddbc5ad0689e593617ca41b570e51032e6a2022afdd613db354b41c22442",
++  "effect_count": 1,
++  "operation_id": "user-shell-1789190554197-1",
++  "call_id": "user-shell-1789190554197-1",
++  "unknown_provider": false,
++  "unknown_tool": true,
++  "orphan_streams": 2,
++  "explicit_cleanup_removed": 2,
++  "scope": "SIGKILL bypasses cleanup; bounded child released by fixture, not claimed automatically killed or reaped by application"
++}

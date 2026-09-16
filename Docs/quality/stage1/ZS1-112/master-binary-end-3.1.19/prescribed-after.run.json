@@ -1,0 +1,31 @@
+{
+  "name": "prescribed-after",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--locked",
+    "--offline",
+    "--test",
+    "stage1_search",
+    "--test",
+    "tools",
+    "--test",
+    "security"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T06:09:26.955783+00:00",
+  "ended_at": "2026-09-12T06:09:44.378587+00:00",
+  "elapsed_seconds": 17.422421958999998,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1691664384,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/prescribed-after.log",
+  "bytes": 6206,
+  "sha256": "ffb8fefe4d2d6801d752001346702c77dc68e369d7cbc8155f7e86bd1b3ad29d"
+}

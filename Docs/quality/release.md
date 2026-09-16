@@ -19,9 +19,16 @@ dist/*/zenpi --help
 The production package must not contain `.codex`, `.zenpi`, `auth.json`, test
 fixtures, or environment files. Installing or upgrading replaces only the
 binary; sessions and profiles remain under `~/.zenpi/` and are never included
-in an archive. A failed smoke or checksum step prevents publication.
+in an archive. Unix jobs verify the tarball checksum and Windows jobs verify
+the ZIP checksum, SBOM presence, and the same credential/fixture exclusions.
+A failed smoke or checksum step prevents publication.
 
 ## Acceptance Receipt (2026-09-04)
+
+The arm64 Darwin packaging path was rerun on 2026-09-09 with the current
+toolchain. The archive checksum verified, the inventory contained only
+`zenpi`, `README.md`, `LICENSE`, and `SBOM.cdx.json`, and the packaged
+`zenpi --help` command exited successfully.
 
 - Host package: `aarch64-apple-darwin`; archive checksum verified and packaged
   `zenpi --help` executed successfully.

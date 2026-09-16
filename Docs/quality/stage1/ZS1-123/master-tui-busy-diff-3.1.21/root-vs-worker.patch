@@ -1,0 +1,55 @@
+--- worker/src/slash_actions.rs
++++ root/src/slash_actions.rs
+@@ -818,8 +818,12 @@
+             }
+         }
+         control.check()?;
++        let mut text = String::from_utf8_lossy(&bytes).into_owned();
++        if truncated {
++            text.push_str(DIFF_TRUNCATION_MARKER);
++        }
+         return Ok(GitStatus {
+-            text: bound_status(String::from_utf8_lossy(&bytes).into_owned()),
++            text: bound_status(text),
+             untracked,
+         });
+     }
+@@ -1929,6 +1933,38 @@
+         assert!(truncated);
+     }
+     #[test]
++    fn controlled_status_preserves_the_truncation_warning() {
++        let dir = tempfile::tempdir().unwrap();
++        assert!(
++            Command::new("git")
++                .args(["init", "-q"])
++                .arg(dir.path())
++                .status()
++                .unwrap()
++                .success()
++        );
++        for index in 0..500 {
++            fs::write(
++                dir.path()
++                    .join(format!("file-{index:04}-{}", "x".repeat(70))),
++                "sample\n",
++            )
++            .unwrap();
++        }
++        let original = diff_value_at(dir.path(), None).unwrap();
++        let controlled = diff_value_at_with_cancel(dir.path(), None, || false).unwrap();
++        let expected = original["status"].as_str().unwrap();
++        let actual = controlled["status"].as_str().unwrap();
++        assert!(expected.ends_with(DIFF_TRUNCATION_MARKER));
++        assert!(
++            actual.ends_with(DIFF_TRUNCATION_MARKER),
++            "controlled status silently omitted its truncation warning"
++        );
++        assert_eq!(actual, expected);
++        assert!(actual.len() <= MAX_STATUS_BYTES);
++    }
++
++    #[test]
+     fn controlled_and_original_diff_keep_the_same_path_and_output_contract() {
+         let dir = tempfile::tempdir().unwrap();
+         assert!(

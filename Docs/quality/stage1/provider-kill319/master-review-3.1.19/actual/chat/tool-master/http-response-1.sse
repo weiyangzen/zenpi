@@ -1,0 +1,2 @@
+data: {"id": "chat319", "object": "chat.completion.chunk", "model": "gpt-4.1", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "INTERRUPTED_PARTIAL_319"}, "finish_reason": null}]}
+

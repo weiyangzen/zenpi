@@ -36,6 +36,35 @@ fn redaction_covers_headers_urls_nested_json_and_known_values() {
 }
 
 #[test]
+fn redaction_covers_cookie_proxy_and_provider_specific_key_headers() {
+    let value = serde_json::json!({
+        "Cookie": "session=fixture-cookie",
+        "Set-Cookie": "sid=fixture-cookie",
+        "Proxy-Authorization": "Basic fixture-proxy",
+        "X-Api-Key": "fixture-x-key",
+        "nested": {"private_key": "fixture-private"},
+    });
+    let encoded = serde_json::to_string(&redact_json(&value, &[])).unwrap();
+    for secret in [
+        "fixture-cookie",
+        "fixture-proxy",
+        "fixture-x-key",
+        "fixture-private",
+    ] {
+        assert!(!encoded.contains(secret), "leaked {secret}: {encoded}");
+    }
+}
+
+#[test]
+fn text_redaction_covers_header_colons_and_query_credentials() {
+    let text = "X-Api-Key: fixture-header\nCookie: sid=fixture-cookie\nhttps://example.test/v1?api_key=fixture-query";
+    let redacted = redact_text(text, &[]);
+    for secret in ["fixture-header", "fixture-cookie", "fixture-query"] {
+        assert!(!redacted.contains(secret), "leaked {secret}: {redacted}");
+    }
+}
+
+#[test]
 fn filtered_child_environment_contains_no_credential_names() {
     let environment = child_environment();
     assert!(environment.iter().any(|(key, _)| key == "PATH"));

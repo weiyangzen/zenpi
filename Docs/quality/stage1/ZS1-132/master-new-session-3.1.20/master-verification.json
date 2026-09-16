@@ -1,0 +1,54 @@
+{
+  "schema_version": "stage1-incremental-review/v1",
+  "item": "ZS1-132",
+  "complete": false,
+  "product_changes": true,
+  "incremental_checks_passed": true,
+  "blueprint_version": "3.1.20",
+  "requirement_digest": "8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645",
+  "binary_sha256": "78cf6b9795b5bc6487fd3e3cd280d3f64f84fdcb6a8f1c7a7c4d7b596eceaa6e",
+  "files": {
+    "src/slash.rs": {
+      "bytes": 81726,
+      "sha256": "d0702d86e3cf8087dbc09a3fe68c9067dd6bed9f37f499abcdb7e0131927a1c9"
+    },
+    "src/session.rs": {
+      "bytes": 176828,
+      "sha256": "8fb3ff2c387b13d34d8bbe4533bb2b0a81b5e546f5e03216b74b5cf2c61c9a2b"
+    },
+    "src/core.rs": {
+      "bytes": 278737,
+      "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+    },
+    "src/project_workspace.rs": {
+      "bytes": 30437,
+      "sha256": "f1b3fcd96290c82c9eaad74b9b9a8acfdc8ea133f793ef85d82d1ef8a91d3ca8"
+    },
+    "src/headless.rs": {
+      "bytes": 360998,
+      "sha256": "de0b0f1dc884cd53aa494d12fca75beffc4806f32c206d67da8fdf773ecd7f94"
+    },
+    "src/tui.rs": {
+      "bytes": 568016,
+      "sha256": "3c0d6305434e45a40bab118ee41ee9ef6896d7557cbca1e0513b6eeaf41d3592"
+    },
+    "tests/session_new.rs": {
+      "bytes": 23934,
+      "sha256": "b6f8065033732e01bdb3938f5f9ace1afc93afe3f675e7130a9f9f980835220b"
+    },
+    "tools/tui_session_new_smoke.py": {
+      "bytes": 32251,
+      "sha256": "de573672cd8ef3128fef67026bf78d089e39944933289acfa305994947d2f5f9"
+    }
+  },
+  "rust_direct_passed": 121,
+  "audit_unit_passed": 3,
+  "actual_entry_groups": 8,
+  "actual_recovery_groups": 3,
+  "tui_processes": 4,
+  "jsonl_processes": 9,
+  "http_requests": 10,
+  "release_budget_passed": false,
+  "report": "Docs/quality/stage1/ZS1-132/master-new-session-3.1.20/review.md",
+  "integrated_at": "2026-09-12T08:56:24.447429+00:00"
+}

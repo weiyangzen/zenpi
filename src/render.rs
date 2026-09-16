@@ -7,8 +7,11 @@
 //! as ordinary text rather than dropped or interpreted as terminal control
 //! sequences.
 
+use std::collections::VecDeque;
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Maximum input copied into the renderer.
@@ -54,6 +57,10 @@ pub enum MarkdownBlock {
 pub fn parse_markdown(input: &str) -> Vec<MarkdownBlock> {
     let sanitized = sanitize_text(truncate_bytes(input, MAX_MARKDOWN_BYTES));
     let bounded = truncate_bytes(&sanitized, MAX_MARKDOWN_BYTES);
+    parse_markdown_bounded(bounded)
+}
+
+fn parse_markdown_bounded(bounded: &str) -> Vec<MarkdownBlock> {
     let mut blocks = Vec::new();
     let mut paragraph = Vec::new();
     let mut code: Option<(char, usize, Option<String>, Vec<String>)> = None;
@@ -221,6 +228,508 @@ pub fn render_plain_prefixed(
             Line::from(spans)
         })
         .collect()
+}
+
+/// A bounded visible window over all visual rows of accepted plain text.
+/// `offset` is clamped to the final full viewport; no head or tail row cap
+/// prevents scrolling through the middle. Only visible spans are retained.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedPlainWindow {
+    pub lines: Vec<Line<'static>>,
+    pub offset: usize,
+    pub total_lines: usize,
+    pub input_truncated: bool,
+}
+
+pub fn render_plain_window(
+    input: &str,
+    width: usize,
+    offset: usize,
+    height: usize,
+) -> RenderedPlainWindow {
+    let width = width.clamp(1, MAX_MARKDOWN_WIDTH);
+    let height = height.min(bounded_line_limit(width, MAX_MARKDOWN_LINES));
+    let bounded = truncate_bytes(input, MAX_MARKDOWN_BYTES);
+    let segments = [StyledSegment {
+        // Delayed tab expansion cannot consume the last accepted source bytes.
+        text: sanitize_compact(bounded),
+        style: Style::default(),
+    }];
+    let total_lines = walk_wrapped_segments(&segments, width, |_| {});
+    let offset = offset.min(total_lines.saturating_sub(height));
+    let end = offset.saturating_add(height);
+    let mut row = 0usize;
+    let mut lines = Vec::new();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    walk_wrapped_segments(&segments, width, |event| {
+        if let Some((text, style)) = event {
+            if row >= offset && row < end {
+                if let Some(last) = spans.last_mut()
+                    && last.style == style
+                {
+                    last.content.to_mut().push_str(text);
+                } else {
+                    spans.push(Span::styled(text.to_owned(), style));
+                }
+            }
+        } else {
+            if row >= offset && row < end {
+                lines.push(Line::from(std::mem::take(&mut spans)));
+            }
+            row += 1;
+        }
+    });
+    RenderedPlainWindow {
+        lines,
+        offset,
+        total_lines,
+        input_truncated: bounded.len() != input.len(),
+    }
+}
+
+/// Render the latest visual rows of a bounded Markdown message.
+///
+/// Unlike the head API, this parses the whole accepted input before selecting
+/// blocks from the end, so a retained code/inline continuation keeps its style.
+/// Input beyond MAX_MARKDOWN_BYTES retains the existing head-byte policy. Tabs
+/// expand during wrapping, not before byte bounding, so even a legal input full
+/// of tabs cannot displace its final text. The role prefix labels the first
+/// retained row; internal list/code markers retain their original row position.
+pub fn render_markdown_tail_prefixed(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    prefix_style: Style,
+) -> Vec<Line<'static>> {
+    render_markdown_tail_prefixed_with_metadata(prefix, input, width, prefix_style).lines
+}
+
+/// Plain-text counterpart of [`render_markdown_tail_prefixed`].
+/// Markdown markers remain literal; controls and wrapping use the same bounds.
+pub fn render_plain_tail_prefixed(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    prefix_style: Style,
+) -> Vec<Line<'static>> {
+    render_plain_tail_prefixed_with_metadata(prefix, input, width, prefix_style).lines
+}
+
+/// A retained suffix with its exact visual-row origin in the accepted input.
+/// `omitted_visual_lines + index` is the original row of `lines[index]` under
+/// this renderer and width. A width change or a Markdown edit that reparses an
+/// earlier block can change that layout; callers must invalidate such anchors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedTail {
+    pub lines: Vec<Line<'static>>,
+    pub omitted_visual_lines: usize,
+}
+
+/// Metadata variant of [`render_markdown_tail_prefixed`]. Counts all accepted
+/// visual rows without constructing discarded lines or expanding rules.
+pub fn render_markdown_tail_prefixed_with_metadata(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    prefix_style: Style,
+) -> RenderedTail {
+    render_tail_metadata(prefix, input, width, prefix_style, true)
+}
+
+/// Metadata variant of [`render_plain_tail_prefixed`]. The row count includes
+/// a final empty row after a newline, matching the plain head renderer.
+pub fn render_plain_tail_prefixed_with_metadata(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    prefix_style: Style,
+) -> RenderedTail {
+    render_tail_metadata(prefix, input, width, prefix_style, false)
+}
+
+#[cfg(test)]
+fn render_tail_prefixed(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    style: Style,
+    markdown: bool,
+) -> Vec<Line<'static>> {
+    render_tail_metadata(prefix, input, width, style, markdown).lines
+}
+
+fn render_tail_metadata(
+    prefix: &str,
+    input: &str,
+    width: usize,
+    prefix_style: Style,
+    markdown: bool,
+) -> RenderedTail {
+    let width = width.clamp(1, MAX_MARKDOWN_WIDTH);
+    let prefix = sanitize_text(truncate_bytes(prefix, MAX_MARKDOWN_BYTES)).replace('\n', " ");
+    let prefix = tail_prefix_to_width(&prefix, width.saturating_sub(1));
+    let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+    let body_width = width.saturating_sub(prefix_width).max(1);
+    // Count the role indentation in the cell budget, not only body columns.
+    let limit = bounded_line_limit(width, MAX_MARKDOWN_LINES);
+    let compact = sanitize_compact(truncate_bytes(input, MAX_MARKDOWN_BYTES));
+    let mut output = VecDeque::new();
+    let total;
+    if markdown {
+        let blocks = parse_markdown_bounded(&compact);
+        total = (blocks
+            .iter()
+            .map(|block| block_visual_lines(block, body_width))
+            .sum::<usize>()
+            + blocks.len().saturating_sub(1))
+        .max(1);
+        for (index, block) in blocks.iter().enumerate().rev() {
+            let lines = render_block_tail(block, body_width, limit - output.len());
+            for line in lines.into_iter().rev() {
+                output.push_front(line);
+            }
+            if output.len() == limit {
+                break;
+            }
+            if index > 0 {
+                output.push_front(Line::default());
+                if output.len() == limit {
+                    break;
+                }
+            }
+        }
+    } else {
+        (output, total) = wrap_tail_segments(
+            &[StyledSegment {
+                text: compact,
+                style: Style::default(),
+            }],
+            body_width,
+            limit,
+        );
+    }
+    if output.is_empty() {
+        output.push_back(Line::default());
+    }
+    let continuation = " ".repeat(prefix_width);
+    let omitted_visual_lines = total - output.len();
+    let lines = output
+        .into_iter()
+        .enumerate()
+        .map(|(index, mut line)| {
+            line.spans.insert(
+                0,
+                Span::styled(
+                    if index == 0 {
+                        prefix.clone()
+                    } else {
+                        continuation.clone()
+                    },
+                    prefix_style,
+                ),
+            );
+            line
+        })
+        .collect();
+    RenderedTail {
+        lines,
+        omitted_visual_lines,
+    }
+}
+
+// Normalization cannot expand the bounded source: retain tabs as a compact
+// token until wrapping. CRLF/lone CR and other controls match sanitize_text.
+fn sanitize_compact(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character == '\r' && chars.peek() == Some(&'\n') {
+            continue;
+        }
+        output.push(match character {
+            '\r' => '\n',
+            '\n' | '\t' => character,
+            c if c.is_control() => '?',
+            c => c,
+        });
+    }
+    output
+}
+
+fn retain_tail(lines: &mut VecDeque<Line<'static>>, line: Line<'static>, limit: usize) {
+    if lines.len() == limit {
+        lines.pop_front();
+    }
+    lines.push_back(line);
+}
+
+// At most limit completed rows plus one in-progress row are allocated. Text
+// spans are bounded by the input; tab expansion is emitted one cell at a time.
+// The total count lets callers distinguish an original first row from a tail
+// continuation without attaching a potentially huge marker to discarded rows.
+fn wrap_tail_segments(
+    segments: &[StyledSegment],
+    width: usize,
+    limit: usize,
+) -> (VecDeque<Line<'static>>, usize) {
+    let mut lines = VecDeque::new();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let total = walk_wrapped_segments(segments, width, |event| {
+        if let Some((text, style)) = event {
+            if let Some(last) = spans.last_mut()
+                && last.style == style
+            {
+                last.content.to_mut().push_str(text);
+            } else {
+                spans.push(Span::styled(text.to_owned(), style));
+            }
+        } else {
+            retain_tail(&mut lines, Line::from(std::mem::take(&mut spans)), limit);
+        }
+    });
+    (lines, total)
+}
+
+// One wrapping state machine for counting and retaining. None completes a row;
+// the counting caller ignores events and allocates no Line, Span or separator.
+fn walk_wrapped_segments(
+    segments: &[StyledSegment],
+    width: usize,
+    mut emit: impl FnMut(Option<(&str, Style)>),
+) -> usize {
+    let mut used = 0usize;
+    let mut total = 0usize;
+    // Graphemes can cross Markdown style boundaries (for example a styled
+    // VS16 after a plain heart). Join at most the bounded source bytes and
+    // assign each indivisible grapheme the style of its first byte.
+    let joined = segments
+        .iter()
+        .map(|segment| segment.text.as_str())
+        .collect::<String>();
+    let mut segment_index = 0usize;
+    let mut segment_end = segments.first().map_or(0, |segment| segment.text.len());
+    for (offset, raw) in joined.grapheme_indices(true) {
+        while segment_index + 1 < segments.len() && offset >= segment_end {
+            segment_index += 1;
+            segment_end += segments[segment_index].text.len();
+        }
+        let style = segments[segment_index].style;
+        for _ in 0..if raw == "\t" { 4 } else { 1 } {
+            let text = if raw == "\t" { " " } else { raw };
+            if text == "\n" {
+                emit(None);
+                total += 1;
+                used = 0;
+                continue;
+            }
+            let cells = UnicodeWidthStr::width(text);
+            let (text, cells) = if cells > width || (cells == 0 && used == 0) {
+                ("?", 1)
+            } else {
+                (text, cells)
+            };
+            if cells > 0 && used > 0 && used.saturating_add(cells) > width {
+                emit(None);
+                total += 1;
+                used = 0;
+            }
+            emit(Some((text, style)));
+            used += cells;
+        }
+    }
+    emit(None);
+    total + 1
+}
+
+fn block_visual_lines(block: &MarkdownBlock, width: usize) -> usize {
+    let inline_count = |text: &str, prefix: &str| {
+        let prefix = tail_prefix_to_width(prefix, width.saturating_sub(1));
+        walk_wrapped_segments(
+            &inline_segments(text, Style::default()),
+            width - UnicodeWidthStr::width(prefix.as_str()),
+            |_| {},
+        )
+    };
+    match block {
+        MarkdownBlock::Paragraph(text) | MarkdownBlock::Heading { text, .. } => {
+            inline_count(text, "")
+        }
+        MarkdownBlock::Quote(text) => inline_count(text, "| "),
+        MarkdownBlock::ListItem {
+            ordered,
+            marker,
+            text,
+        } => inline_count(
+            text,
+            &if *ordered {
+                format!("{marker} ")
+            } else {
+                "- ".to_owned()
+            },
+        ),
+        MarkdownBlock::Rule => 1,
+        MarkdownBlock::Code { language, text } => {
+            let body_width = width - 2.min(width.saturating_sub(1));
+            usize::from(language.is_some())
+                + text
+                    .split('\n')
+                    .map(|text| {
+                        walk_wrapped_segments(
+                            &[StyledSegment {
+                                text: text.to_owned(),
+                                style: Style::default(),
+                            }],
+                            body_width,
+                            |_| {},
+                        )
+                    })
+                    .sum::<usize>()
+        }
+    }
+}
+
+fn tail_inline(
+    prefix: &str,
+    text: &str,
+    style: Style,
+    width: usize,
+    limit: usize,
+) -> VecDeque<Line<'static>> {
+    let prefix = tail_prefix_to_width(prefix, width.saturating_sub(1));
+    let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+    let segments = inline_segments(text, style);
+    let (mut lines, total) = wrap_tail_segments(&segments, width - prefix_width, limit);
+    let first = total - lines.len();
+    // Decorate only retained rows. A long ordered-list marker cannot multiply
+    // allocations by the total number of discarded one-cell body rows.
+    for (index, line) in lines.iter_mut().enumerate() {
+        let original_first = first + index == 0;
+        line.spans.insert(
+            0,
+            Span::styled(
+                if original_first {
+                    prefix.clone()
+                } else {
+                    " ".repeat(prefix_width)
+                },
+                if original_first {
+                    style.add_modifier(Modifier::BOLD)
+                } else {
+                    style
+                },
+            ),
+        );
+    }
+    lines
+}
+
+fn render_block_tail(block: &MarkdownBlock, width: usize, limit: usize) -> VecDeque<Line<'static>> {
+    match block {
+        MarkdownBlock::Paragraph(text) => {
+            wrap_tail_segments(&inline_segments(text, Style::default()), width, limit).0
+        }
+        MarkdownBlock::Heading { level, text } => {
+            wrap_tail_segments(&inline_segments(text, heading_style(*level)), width, limit).0
+        }
+        MarkdownBlock::Quote(text) => tail_inline(
+            "| ",
+            text,
+            Style::default().fg(Color::DarkGray),
+            width,
+            limit,
+        ),
+        MarkdownBlock::ListItem {
+            ordered,
+            marker,
+            text,
+        } => tail_inline(
+            &if *ordered {
+                format!("{marker} ")
+            } else {
+                "- ".to_owned()
+            },
+            text,
+            Style::default(),
+            width,
+            limit,
+        ),
+        MarkdownBlock::Rule => VecDeque::from([Line::from(Span::styled(
+            "-".repeat(width),
+            Style::default().fg(Color::DarkGray),
+        ))]),
+        MarkdownBlock::Code { language, text } => {
+            let style = Style::default().fg(Color::LightYellow);
+            let prefix = tail_prefix_to_width("| ", width.saturating_sub(1));
+            let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+            let mut output = VecDeque::new();
+            // Select physical code rows backwards, while wrapping each row
+            // forwards. This retains the original fence state and row markers.
+            for text in text.rsplit('\n') {
+                let (mut lines, total) = wrap_tail_segments(
+                    &[StyledSegment {
+                        text: text.to_owned(),
+                        style,
+                    }],
+                    width - prefix_width,
+                    limit - output.len(),
+                );
+                let first = total - lines.len();
+                for (index, line) in lines.iter_mut().enumerate() {
+                    if line.spans.is_empty() {
+                        line.spans.push(Span::styled("", style));
+                    }
+                    line.spans.insert(
+                        0,
+                        Span::styled(
+                            if first + index == 0 {
+                                prefix.clone()
+                            } else {
+                                " ".repeat(prefix_width)
+                            },
+                            style,
+                        ),
+                    );
+                }
+                for line in lines.into_iter().rev() {
+                    output.push_front(line);
+                }
+                if output.len() == limit {
+                    return output;
+                }
+            }
+            if let Some(language) = language {
+                let label = tail_prefix_to_width(&format!("[{language}]"), width);
+                // Tabs in a fence info string are separators, so the language
+                // token itself contains no delayed tab expansion.
+                output.push_front(Line::from(Span::styled(
+                    label,
+                    style.add_modifier(Modifier::BOLD),
+                )));
+            }
+            output
+        }
+    }
+}
+
+// Keep extended graphemes intact, including VS16 and ZWJ sequences whose
+// display width is not the sum of individual Unicode scalar widths.
+fn tail_prefix_to_width(text: &str, width: usize) -> String {
+    let mut result = String::new();
+    let mut used = 0usize;
+    for grapheme in text.graphemes(true) {
+        let cells = UnicodeWidthStr::width(grapheme);
+        let (grapheme, cells) = if cells == 0 && used == 0 {
+            ("?", 1)
+        } else {
+            (grapheme, cells)
+        };
+        if used.saturating_add(cells) > width {
+            break;
+        }
+        result.push_str(grapheme);
+        used += cells;
+    }
+    result
 }
 
 /// Variant of [`render_markdown`] with an explicit output-line limit.
@@ -517,15 +1026,13 @@ fn inline_segments(text: &str, base_style: Style) -> Vec<StyledSegment> {
     let mut segments = Vec::new();
     let mut plain = String::new();
     let mut index = 0usize;
+    let mut previous_non_underscore: Option<char> = None;
+    let mut link_scan = LinkScan::default();
     while index < text.len() {
         let rest = &text[index..];
         let special = rest.as_bytes().first().copied().unwrap_or_default();
-        let intraword_underscore = special == b'_'
-            && text[..index]
-                .trim_end_matches('_')
-                .chars()
-                .next_back()
-                .is_some_and(char::is_alphanumeric);
+        let intraword_underscore =
+            special == b'_' && previous_non_underscore.is_some_and(char::is_alphanumeric);
         let parsed = if intraword_underscore {
             None
         } else if special == b'`' {
@@ -548,7 +1055,7 @@ fn inline_segments(text: &str, base_style: Style) -> Vec<StyledSegment> {
                 (content, consumed, base_style.add_modifier(Modifier::ITALIC))
             })
         } else if special == b'[' {
-            parse_link(rest).map(|(content, consumed)| {
+            link_scan.parse(text, index).map(|(content, consumed)| {
                 (
                     content,
                     consumed,
@@ -572,12 +1079,18 @@ fn inline_segments(text: &str, base_style: Style) -> Vec<StyledSegment> {
                 text: content,
                 style,
             });
+            if let Some(character) = rest[..consumed].trim_end_matches('_').chars().next_back() {
+                previous_non_underscore = Some(character);
+            }
             index += consumed;
             continue;
         }
 
         let character = rest.chars().next().unwrap_or_default();
         plain.push(character);
+        if character != '_' {
+            previous_non_underscore = Some(character);
+        }
         index += character.len_utf8();
     }
     if !plain.is_empty() {
@@ -609,56 +1122,66 @@ fn parse_delimited(rest: &str, _marker: char, delimiter: &str) -> Option<(String
     Some((rest[content_start..content_end].to_owned(), consumed))
 }
 
-fn parse_link(rest: &str) -> Option<(String, usize)> {
-    let label_end = rest[1..].find(']')? + 1;
-    if !rest[label_end..].starts_with("](") {
-        return None;
+// Searches advance monotonically even when many '[' candidates share a
+// missing/invalid closer. Cache EOF as well: unsuccessful searches are not
+// restarted on each following '['. The successful-link grammar is unchanged.
+#[derive(Default)]
+struct LinkScan {
+    label_end: usize,
+    target_end: usize,
+    #[cfg(test)]
+    scanned_bytes: usize,
+}
+
+impl LinkScan {
+    fn closer(&mut self, text: &str, start: usize, delimiter: char, cached: usize) -> usize {
+        if cached >= start {
+            return cached;
+        }
+        let relative = text[start..].find(delimiter);
+        #[cfg(test)]
+        {
+            self.scanned_bytes += relative.map_or(text.len() - start, |offset| offset + 1);
+        }
+        relative.map_or(text.len(), |offset| start + offset)
     }
-    let target_start = label_end + 2;
-    let target_end = rest[target_start..].find(')')? + target_start;
-    if target_end == target_start {
-        return None;
+
+    fn parse(&mut self, text: &str, index: usize) -> Option<(String, usize)> {
+        self.label_end = self.closer(text, index + 1, ']', self.label_end);
+        if !text[self.label_end..].starts_with("](") {
+            return None;
+        }
+        let target_start = self.label_end + 2;
+        self.target_end = self.closer(text, target_start, ')', self.target_end);
+        if self.target_end == text.len() || self.target_end == target_start {
+            return None;
+        }
+        Some((
+            text[index + 1..self.label_end].to_owned(),
+            self.target_end + 1 - index,
+        ))
     }
-    Some((rest[1..label_end].to_owned(), target_end + 1))
 }
 
 fn wrap_segments(segments: &[StyledSegment], width: usize) -> Vec<Line<'static>> {
-    let width = width.max(1);
     let mut lines = Vec::new();
     let mut spans: Vec<Span<'static>> = Vec::new();
-    let mut used = 0usize;
-
-    for segment in segments {
-        for character in segment.text.chars() {
-            if character == '\n' {
-                lines.push(Line::from(std::mem::take(&mut spans)));
-                used = 0;
-                continue;
-            }
-            let character_width = UnicodeWidthChar::width(character).unwrap_or(0);
-            let (character, character_width) = if character_width > width {
-                ('?', 1)
-            } else {
-                (character, character_width)
-            };
-            if character_width > 0 && used > 0 && used.saturating_add(character_width) > width {
-                lines.push(Line::from(std::mem::take(&mut spans)));
-                used = 0;
-            }
+    // Inspectors and approval previews use the head renderer too. Measure the
+    // same indivisible graphemes as the transcript so a variation selector or
+    // ZWJ cannot make Ratatui clip characters that were counted as fitting.
+    walk_wrapped_segments(segments, width.max(1), |event| {
+        if let Some((text, style)) = event {
             if let Some(last) = spans.last_mut()
-                && last.style == segment.style
+                && last.style == style
             {
-                last.content.to_mut().push(character);
+                last.content.to_mut().push_str(text);
             } else {
-                spans.push(Span::styled(character.to_string(), segment.style));
+                spans.push(Span::styled(text.to_owned(), style));
             }
-            used = used.saturating_add(character_width);
+        } else {
+            lines.push(Line::from(std::mem::take(&mut spans)));
         }
-    }
-    lines.push(Line::from(spans));
-    if lines.is_empty() {
-        lines.push(Line::default());
-    }
+    });
     lines
 }
 
@@ -897,5 +1420,326 @@ mod tests {
         let input = "---\n".repeat(128);
         let lines = render_markdown_with_limit(&input, u16::MAX as usize, MAX_MARKDOWN_LINES);
         assert!(lines.len() <= MAX_MARKDOWN_CELLS / u16::MAX as usize + 1);
+    }
+
+    #[test]
+    fn tail_retains_latest_wrapped_rows_while_head_stays_at_start() {
+        let input = format!("{}LATEST", "x".repeat(MAX_MARKDOWN_BYTES - 6));
+        for markdown in [false, true] {
+            let tail = render_tail_prefixed("", &input, 1, Style::default(), markdown);
+            assert_eq!(tail.len(), MAX_MARKDOWN_LINES);
+            assert!(
+                tail.iter()
+                    .map(line_text)
+                    .collect::<String>()
+                    .ends_with("LATEST")
+            );
+            assert!(tail.iter().all(|line| line.width() <= 1));
+        }
+        let head = render_markdown_prefixed("", &input, 1, Style::default());
+        assert_eq!(head.len(), MAX_MARKDOWN_LINES);
+        assert!(head.iter().all(|line| line_text(line) == "x"));
+        let plain_head = render_plain_prefixed("", &input, 1, Style::default());
+        assert!(plain_head.iter().all(|line| line_text(line) == "x"));
+    }
+
+    #[test]
+    fn tail_matches_uncapped_head_styles_and_block_spacing() {
+        let inputs = [
+            "# Heading\n\nhello **bold** _italic_ `code` [link](target)",
+            "> quote wraps across rows\n\n12. ordered item\n\n- item\n---",
+            "```rust\nlet x = 1;\n\nnext\n```\n\nlast",
+            "```\n\n```",
+            "",
+            "a\r\n\r\nb\rc",
+            "a\tb\n\n> c\td",
+        ];
+        for input in inputs {
+            for width in [1, 3, 12, 80] {
+                let style = Style::default().fg(Color::Green);
+                assert_eq!(
+                    render_markdown_tail_prefixed("ai: ", input, width, style),
+                    render_markdown_prefixed("ai: ", input, width, style),
+                    "{input:?}, {width}"
+                );
+                assert_eq!(
+                    render_plain_tail_prefixed("ai: ", input, width, style),
+                    render_plain_prefixed("ai: ", input, width, style),
+                    "plain {input:?}, {width}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tail_preserves_unclosed_fence_and_inline_context() {
+        let code = format!("```rust\n{}**literal**\n", "old\n".repeat(10_000));
+        let lines = render_markdown_tail_prefixed("ai: ", &code, 40, Style::default());
+        assert_eq!(lines.len(), MAX_MARKDOWN_LINES);
+        let last = lines.last().unwrap();
+        assert!(line_text(last).contains("| **literal**"));
+        assert!(
+            last.spans
+                .iter()
+                .any(|span| span.content.contains("**literal**")
+                    && span.style.fg == Some(Color::LightYellow))
+        );
+        assert!(!lines.iter().any(|line| line_text(line).contains("[rust]")));
+        let inline = format!("**{}LATEST**", "x".repeat(20_000));
+        let lines = render_markdown_tail_prefixed("", &inline, 1, Style::default());
+        assert!(
+            lines
+                .iter()
+                .map(line_text)
+                .collect::<String>()
+                .ends_with("LATEST")
+        );
+        assert!(
+            lines
+                .iter()
+                .flat_map(|line| &line.spans)
+                .filter(|span| !span.content.is_empty())
+                .all(|span| span.style.add_modifier.contains(Modifier::BOLD))
+        );
+    }
+
+    #[test]
+    fn tail_distinguishes_closed_fence_quote_list_and_plain_markers() {
+        let input = format!(
+            "~~~rust\n{}~~~\n\n# Final\n\n> quote\n\n1. last",
+            "old\n".repeat(10_000)
+        );
+        let lines = render_markdown_tail_prefixed("", &input, 40, Style::default());
+        assert_eq!(line_text(lines.last().unwrap()), "1. last");
+        assert!(lines.iter().any(|line| line_text(line) == "| quote"));
+        assert!(lines.iter().any(|line| {
+            line.spans
+                .iter()
+                .any(|span| span.content == "Final" && span.style.fg == Some(Color::LightCyan))
+        }));
+        let plain = render_plain_tail_prefixed("", "# Final\n---\n**bold**", 80, Style::default());
+        assert_eq!(
+            plain.iter().map(line_text).collect::<Vec<_>>(),
+            ["# Final", "---", "**bold**"]
+        );
+    }
+
+    #[test]
+    fn tail_tabs_do_not_consume_the_final_legal_input_bytes() {
+        let input = format!("{}END", "\t".repeat(MAX_MARKDOWN_BYTES - 3));
+        for markdown in [false, true] {
+            let lines = render_tail_prefixed("", &input, 1, Style::default(), markdown);
+            assert!(
+                lines
+                    .iter()
+                    .map(line_text)
+                    .collect::<String>()
+                    .ends_with("END")
+            );
+            assert!(lines.len() <= MAX_MARKDOWN_LINES);
+        }
+        let over = format!("{}OUTSIDE", "x".repeat(MAX_MARKDOWN_BYTES));
+        assert!(
+            !render_plain_tail_prefixed("", &over, 80, Style::default())
+                .iter()
+                .map(line_text)
+                .collect::<String>()
+                .contains("OUTSIDE")
+        );
+    }
+
+    #[test]
+    fn tail_unicode_prefix_controls_and_cells_are_bounded() {
+        let input = "世界 ❤️ 👨‍👩‍👧‍👦 e\u{301}\r\nnext\u{1b}[2J\tend\u{7f}";
+        for width in [0, 1, 2, 8, 80, usize::MAX] {
+            for markdown in [false, true] {
+                let lines =
+                    render_tail_prefixed("❤️\u{1b}\t", input, width, Style::default(), markdown);
+                let bound = width.clamp(1, MAX_MARKDOWN_WIDTH);
+                assert!(lines.iter().all(|line| line.width() <= bound));
+                assert!(
+                    lines
+                        .iter()
+                        .all(|line| UnicodeWidthStr::width(line_text(line).as_str()) <= bound)
+                );
+                assert!(
+                    lines
+                        .iter()
+                        .flat_map(|line| &line.spans)
+                        .all(|span| !span.content.chars().any(char::is_control))
+                );
+            }
+        }
+        let lines = render_plain_tail_prefixed("", "❤️", 1, Style::default());
+        assert_eq!(line_text(&lines[0]), "?");
+    }
+
+    #[test]
+    fn tail_wide_rules_and_role_indentation_share_the_cell_budget() {
+        let input = format!("{}LATEST", "---\n".repeat(60_000));
+        let prefix = "p".repeat(MAX_MARKDOWN_WIDTH - 2);
+        for role in ["", prefix.as_str()] {
+            let lines = render_markdown_tail_prefixed(role, &input, usize::MAX, Style::default());
+            assert!(lines.len() <= MAX_MARKDOWN_CELLS / MAX_MARKDOWN_WIDTH);
+            assert!(lines.iter().map(Line::width).sum::<usize>() <= MAX_MARKDOWN_CELLS);
+            assert!(
+                lines
+                    .iter()
+                    .map(line_text)
+                    .collect::<String>()
+                    .replace(' ', "")
+                    .ends_with("LATEST")
+            );
+            assert!(
+                lines
+                    .iter()
+                    .map(|line| line
+                        .spans
+                        .iter()
+                        .map(|span| span.content.len())
+                        .sum::<usize>())
+                    .sum::<usize>()
+                    <= MAX_MARKDOWN_CELLS * 4 + MAX_MARKDOWN_BYTES * 2
+            );
+        }
+    }
+
+    #[test]
+    fn tail_continuation_does_not_reinsert_ordered_marker() {
+        let input = format!("1. {}END", "x".repeat(30_000));
+        let lines = render_markdown_tail_prefixed("ai: ", &input, 9, Style::default());
+        assert_eq!(lines.len(), MAX_MARKDOWN_LINES);
+        assert!(line_text(&lines[0]).starts_with("ai:    "));
+        assert!(!lines.iter().any(|line| line_text(line).contains("1.")));
+        assert!(
+            lines
+                .iter()
+                .map(line_text)
+                .collect::<String>()
+                .replace(' ', "")
+                .ends_with("END")
+        );
+    }
+
+    #[test]
+    fn unfinished_link_search_is_linear_and_valid_links_remain_styled() {
+        for suffix in ["", "]no-target", "](missing-close", "]()", "]x]x](missing"] {
+            let text = format!("{}{suffix}", "[".repeat(MAX_MARKDOWN_BYTES - suffix.len()));
+            let mut scan = LinkScan::default();
+            for (index, character) in text.char_indices() {
+                if character == '[' {
+                    assert!(scan.parse(&text, index).is_none());
+                }
+            }
+            assert!(
+                scan.scanned_bytes <= text.len() * 2,
+                "{}",
+                scan.scanned_bytes
+            );
+            let lines = render_markdown_tail_prefixed("", &text, 80, Style::default());
+            assert!(!lines.is_empty());
+        }
+        let text = "[bad] [ok](target) [unfinished";
+        let lines = render_markdown_tail_prefixed("", text, 80, Style::default());
+        assert_eq!(line_text(&lines[0]), "[bad] ok [unfinished");
+        assert!(
+            lines[0].spans.iter().any(|span| span.content == "ok"
+                && span.style.add_modifier.contains(Modifier::UNDERLINED))
+        );
+        let underscores = format!("word{} tail", "_".repeat(20_000));
+        assert_eq!(
+            inline_segments(&underscores, Style::default())
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>(),
+            underscores
+        );
+    }
+
+    #[test]
+    fn tail_metadata_matches_full_small_render_and_large_exact_row_counts() {
+        let input = format!(
+            "{}\n\n```rust\ncode\n```\n\n> final",
+            "row\n".repeat(10_000)
+        );
+        let full = render_markdown_with_limit(&input, 16, 30_000);
+        let tail = render_markdown_tail_prefixed_with_metadata("", &input, 16, Style::default());
+        assert_eq!(tail.omitted_visual_lines + tail.lines.len(), full.len());
+        // Remove only the empty outer role span to compare the actual suffix.
+        let body = tail
+            .lines
+            .iter()
+            .cloned()
+            .map(|mut line| {
+                line.spans.remove(0);
+                line
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(body, full[tail.omitted_visual_lines..]);
+        let rules = format!("{}LATEST", "---\n".repeat(60_000));
+        let tail = render_markdown_tail_prefixed_with_metadata(
+            "",
+            &rules,
+            MAX_MARKDOWN_WIDTH,
+            Style::default(),
+        );
+        assert_eq!(tail.omitted_visual_lines + tail.lines.len(), 120_001);
+        let tail = render_plain_tail_prefixed_with_metadata("", "abc\n", 2, Style::default());
+        assert_eq!(tail.omitted_visual_lines, 0);
+        assert_eq!(
+            tail.lines.iter().map(line_text).collect::<Vec<_>>(),
+            ["ab", "c", ""]
+        );
+    }
+
+    #[test]
+    fn tail_metadata_keeps_surviving_streamed_rows_at_original_indices() {
+        let input = format!("{}stable\n", "row\n".repeat(10_000));
+        let before = render_plain_tail_prefixed_with_metadata("", &input, 20, Style::default());
+        let after =
+            render_plain_tail_prefixed_with_metadata("", &(input + "new\n"), 20, Style::default());
+        assert_eq!(after.omitted_visual_lines, before.omitted_visual_lines + 1);
+        for index in
+            after.omitted_visual_lines..(before.omitted_visual_lines + before.lines.len() - 1)
+        {
+            assert_eq!(
+                before.lines[index - before.omitted_visual_lines],
+                after.lines[index - after.omitted_visual_lines]
+            );
+        }
+        assert_eq!(line_text(&after.lines[after.lines.len() - 2]), "new");
+    }
+
+    #[test]
+    fn tail_grapheme_safety_crosses_style_and_role_boundaries() {
+        for input in [
+            "❤**\u{fe0f}**x",
+            "1**\u{20e3}**x",
+            "a**\u{301}**",
+            "\u{fe0f}x",
+        ] {
+            for prefix in ["", "❤", "\u{301}", "role\n\r\u{1b}"] {
+                for width in [1, 2, 3, 16] {
+                    let lines =
+                        render_markdown_tail_prefixed(prefix, input, width, Style::default());
+                    assert!(
+                        lines
+                            .iter()
+                            .all(|line| UnicodeWidthStr::width(line_text(line).as_str()) <= width),
+                        "{prefix:?}, {input:?}, {width}"
+                    );
+                    assert!(
+                        lines
+                            .iter()
+                            .flat_map(|line| &line.spans)
+                            .all(|span| !span.content.chars().any(char::is_control))
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            line_text(&render_markdown_tail_prefixed("", "❤**\u{fe0f}**", 1, Style::default())[0]),
+            "?"
+        );
     }
 }

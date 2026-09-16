@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "tools/validate_stage1_blueprint.py",
+    "--item",
+    "ZS1-404"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T18:29:47.471068+00:00",
+  "ended_at": "2026-09-12T18:29:48.503446+00:00"
+}

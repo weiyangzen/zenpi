@@ -1,0 +1,121 @@
+{
+  "complete": false,
+  "files": {
+    "apply-results.json": {
+      "bytes": 460,
+      "sha256": "1d6616c35c40c050913d84484f37b4967204ae38e58299abd3b5a0cdf3708431"
+    },
+    "build.log": {
+      "bytes": 819,
+      "sha256": "e36a602e3174671de5bfdd91d4f1922f4a1b296d806d576a4ee87fb7b3aaa967"
+    },
+    "build.run.json": {
+      "bytes": 385,
+      "sha256": "29a03e188afbe0faac7f26a0f4b8d5efc698f464346c3643d8743606458b6d17"
+    },
+    "candidate.patch": {
+      "bytes": 4529,
+      "sha256": "b564c50cef59744d040b17ab42094f4ab5c3c2b6a2e00a44f16eca931bfa6597"
+    },
+    "clippy.log": {
+      "bytes": 829,
+      "sha256": "946d7d630424b53df1d427522c6584dc7d7a9a54ccf6d24693d40975a78001d4"
+    },
+    "clippy.run.json": {
+      "bytes": 443,
+      "sha256": "5c6639cb8f3c5445decaa63137bc54fd08aa88d3c0882e052d4308aa57f1ac7f"
+    },
+    "fmt.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fmt.run.json": {
+      "bytes": 342,
+      "sha256": "ffec1e0974c2f664c279fb1692e0c9090eb29e3b15cc4fa5334d5e182f6b331b"
+    },
+    "hosts-after.log": {
+      "bytes": 13583,
+      "sha256": "cc3bc48a63e39262c00af08ab1637bc6c13f2c4b417fc128cc939952f69ae5e9"
+    },
+    "hosts-after.run.json": {
+      "bytes": 625,
+      "sha256": "0c3ccbb5f19e1503b30e7f93c1a23534a8e6469b524c0f6ebd2e288221c94505"
+    },
+    "hosts-before.log": {
+      "bytes": 13682,
+      "sha256": "5fcb0af9becb7f6e805c283701d5b02483d3f566e68e750b20cd5fb12438ed7d"
+    },
+    "hosts-before.run.json": {
+      "bytes": 667,
+      "sha256": "05132a25d099caf0fb9daa0bdd9103724b747ceffa650a91bc64261c6e3c5651"
+    },
+    "inputs-before.json": {
+      "bytes": 31647,
+      "sha256": "844206843c662663e5ad662b6007aaedd84bd14d656179852aa8b515fa7869ff"
+    },
+    "master-verification.json": {
+      "bytes": 414,
+      "sha256": "56f6e06218d07da96a59b9b1cbd575bfc44f3980d4a4b68690bffacf53a14552"
+    },
+    "offline-verification.json": {
+      "bytes": 1925,
+      "sha256": "632d9e5060b9921f435d51a3a991bcca2fd788577f664bbacf4dede06b4c0485"
+    },
+    "probe_hosts.py": {
+      "bytes": 1664,
+      "sha256": "d30bf8df95d103b3b7608c9bfe809d4e3bdeed7bb4d07a5a75c97a8900281066"
+    },
+    "review.md": {
+      "bytes": 4768,
+      "sha256": "4f46b2cbb6d6cae1d9088b17f5a91ebb30f552da2d6bf9f435a5717dda8fefed"
+    },
+    "rollback.patch": {
+      "bytes": 4529,
+      "sha256": "1e02175b7cc3af24a1ac6c03ce791aa4dee3da6f8671fc8ed24aa5eb2790ea4a"
+    },
+    "root-host-evidence.tar.gz": {
+      "bytes": 13491939,
+      "sha256": "7f01e992c79426030c738a0d08dab209de6613faf0bb3f3da51cff2265051828"
+    },
+    "run_checks.py": {
+      "bytes": 1696,
+      "sha256": "5cdaae222f5ea1d78b80a6948c25b50a2d5d2b95a730fe72a6974140c940a96a"
+    },
+    "run_checks_v2.py": {
+      "bytes": 1708,
+      "sha256": "2ac893132710d5cfb12b5e6b5e1d8de4ebf87b3598dff8c155c4dba56942ee63"
+    },
+    "stage-validation.json": {
+      "bytes": 5060,
+      "sha256": "5b4b4084eb2ffb7cae25b09a75b32a732dfcf9cfa446faf7f18e00a39adfa138"
+    },
+    "tests-v2.log": {
+      "bytes": 6686,
+      "sha256": "e967a4265c2b2ec50a86a7c9eac524c94b511391a4e2bee96ae8875c8ec85914"
+    },
+    "tests-v2.run.json": {
+      "bytes": 498,
+      "sha256": "53442d8117704ef206ac19ab30951003c4862a720d5231a9bbb3a4232483c39c"
+    },
+    "tests.log": {
+      "bytes": 1471,
+      "sha256": "fd29b9c47a8531b15b3252b7ad62facc0b6a14f5f0eabe55c35bb9a1534da5f9"
+    },
+    "tests.run.json": {
+      "bytes": 491,
+      "sha256": "ebba1334d56e5150e7610faaa0cf3f0eed4522efd8f883af627d903d1597ad9a"
+    },
+    "worker-input-drift.json": {
+      "bytes": 35,
+      "sha256": "95894d368194c12e7283790d7a2dc3ba0f65a7b4d8dc7e8e0415126ce0a3b93c"
+    },
+    "worker-manifest.json": {
+      "bytes": 140199,
+      "sha256": "ff1723bf281da9e2e9b8966a5c9a5ca893044a796183b5103eec7a5be6adce5a"
+    },
+    "worker-ready.tar.gz": {
+      "bytes": 13242165,
+      "sha256": "28fc551a04772f54ae3c4d8dafc6dd9cb9a6eee0202a2beb8ee4056650331607"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+
+ RUN  v4.1.9 /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053
+
+ ✓ directory.test.ts > D053-01 real bash spill is found by fd and searched by rg in this and a fresh process 519ms
+ × directory.test.ts > D053-02 real rg regex literal ignore hidden and context behavior stays distinct from file discovery 10ms
+   → expected 'kept.txt:2: alpha1\nignored.txt:1: al…' not to contain 'ignored.txt'
+ ✓ directory.test.ts > D053-03 zero limit and truncation metadata differ between grep and find 11ms
+ ✓ directory.test.ts > D053-04 all wrappers reject pre-abort; real rg syntax and missing-path errors remain errors 4ms
+ ✓ directory.test.ts > D053-05 rg context formatting after child close ignores late abort and rereads changed file 5ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  08:44:59
+   Duration  770ms (transform 55ms, setup 0ms, import 155ms, tests 550ms, environment 0ms)
+
+JSON report written to /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/test-results.json

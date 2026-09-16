@@ -1,0 +1,30 @@
+[
+  {
+    "path": "packages/agent/src/agent-loop.ts",
+    "bytes": 22796,
+    "lines": 803,
+    "sha256": "1e16404a231912fbd7643d8317b15ec4cc6245ed8cedc37582a31d430a1cc6ac",
+    "role": "subject"
+  },
+  {
+    "path": "packages/agent/src/stream-fn.ts",
+    "bytes": 683,
+    "lines": 20,
+    "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+    "role": "real dependency, not additional source coverage"
+  },
+  {
+    "path": "packages/ai/src/utils/event-stream.ts",
+    "bytes": 2878,
+    "lines": 110,
+    "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+    "role": "real dependency, not additional source coverage"
+  },
+  {
+    "path": "packages/ai/src/utils/validation.ts",
+    "bytes": 9902,
+    "lines": 350,
+    "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7",
+    "role": "real dependency, not additional source coverage"
+  }
+]

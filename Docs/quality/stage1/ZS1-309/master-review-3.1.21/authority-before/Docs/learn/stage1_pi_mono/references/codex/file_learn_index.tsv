@@ -1,0 +1,11 @@
+item_id	source_path	source_hash	target_artifact	status
+ZS1-300	codex-rs/tui/src/bottom_pane/chat_composer.rs	234189c66f50c8654ef72e86ad5463eea5dd1e0c09c98f8d64c898449161b6da	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/chat_composer.rs_learn.md	[ ]
+ZS1-301	codex-rs/tui/src/bottom_pane/textarea.rs	8cb5241c9e818210bfff63975e703f45a25a3da91bdb395667893903f7cb4b45	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/textarea.rs_learn.md	[ ]
+ZS1-302	codex-rs/tui/src/bottom_pane/paste_burst.rs	c80558dfd3cbde437f2fec9a855b01a3180542a53bb135dc92ce7c81299f1ee7	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/paste_burst.rs_learn.md	[ ]
+ZS1-303	codex-rs/tui/src/bottom_pane/approval_overlay.rs	c924923b402b198f8f77b249f0d37892896c0b84002c0f6e48330917da80cecc	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/approval_overlay.rs_learn.md	[ ]
+ZS1-304	codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs	a401d7c6ba3051fcf2c20152a9e86a3f4f8751a87470cbc7f518001326618a2f	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/pending_thread_approvals.rs_learn.md	[x]
+ZS1-305	codex-rs/tui/src/bottom_pane/mod.rs	97af02eed39dbfdf69d1ec3e14dc13b9a91f4b33f5e4b985cc1f2cbae4105823	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/bottom_pane/mod.rs_learn.md	[ ]
+ZS1-306	codex-rs/tui/src/slash_command.rs	9e53ca5bff5a5e7b86aa97731da985082db5d130c453e2d363edb9c5758ebc5a	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/slash_command.rs_learn.md	[ ]
+ZS1-307	codex-rs/tui/src/file_search.rs	7aaa33ac7fd28cbe5fa3405cd3490b30e614272122bb572c9c352acc418b71d9	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/file_search.rs_learn.md	[ ]
+ZS1-308	codex-rs/tui/src/key_hint.rs	07f34aab630b2658560d2d4e73719481ec8638e33eb38401d7a23643689f13c8	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/key_hint.rs_learn.md	[x]
+ZS1-309	codex-rs/tui/src/status_indicator_widget.rs	e35e3efbd18784b55343366b2001bda08dfc1543f7e4a88700a715562d519cc5	Docs/learn/stage1_pi_mono/references/codex/files/codex-rs/tui/src/status_indicator_widget.rs_learn.md	[ ]

@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "authority": "3.1.20",
+  "requirement_digest": "8d525b351d066ce9b0487a485337647d47233275782e4f4d154423a623fe1645",
+  "item": "ZS1-015",
+  "payload_files": 30,
+  "source_sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
+  "source_bytes": 37411,
+  "source_lines": 881,
+  "ranges": [
+    [
+      0,
+      8064
+    ],
+    [
+      8064,
+      15965
+    ],
+    [
+      15965,
+      28201
+    ],
+    [
+      28201,
+      37411
+    ]
+  ],
+  "named_declarations": 72,
+  "type_only_reexports": 1,
+  "target_files": 5,
+  "target_excerpts": 10,
+  "unchanged_obligation_since_worker_authority": true,
+  "scope": "Static single-file semantic review and actual integrity/G-FILE primitives; no TypeScript typecheck, runtime, provider, directory or product acceptance"
+}

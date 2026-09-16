@@ -1,0 +1,34 @@
+{
+  "original_bytes_exactly_recoverable": true,
+  "production_prefix_identical": true,
+  "all_existing_code_assertions_deadlines_identical": true,
+  "fmt": {
+    "argv": [
+      "rustfmt",
+      "+stable-aarch64-apple-darwin",
+      "--edition",
+      "2024",
+      "--check",
+      "src/extension_runtime.rs"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "patch_replay": {
+    "argv": [
+      "/usr/bin/patch",
+      "--batch",
+      "-p1",
+      "-i",
+      "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/changes.patch"
+    ],
+    "exit": 0,
+    "stdout": "patching file 'src/extension_runtime.rs'\n",
+    "stderr": "",
+    "exact": true
+  },
+  "baseline_sha256": "3cd763f944b7a6dd5cbdc0959d71c5f514c240d501239773d443c87bb8e97f7a",
+  "final_sha256": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "checked_at": "2026-09-12T06:03:55.377941+00:00"
+}

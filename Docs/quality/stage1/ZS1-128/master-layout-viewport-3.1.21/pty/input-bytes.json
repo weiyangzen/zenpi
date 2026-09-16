@@ -1,0 +1,68 @@
+[
+  {
+    "label": "Tab first visible pane",
+    "elapsed": 1.558627208,
+    "hex": "09",
+    "bytes": 1
+  },
+  {
+    "label": "Tab skips zero-row panes",
+    "elapsed": 1.954058875,
+    "hex": "09",
+    "bytes": 1
+  },
+  {
+    "label": "Ctrl-Left uses actual workspace geometry",
+    "elapsed": 2.264511792,
+    "hex": "1b5b313b3544",
+    "bytes": 6
+  },
+  {
+    "label": "Ctrl-Right returns to Gantt",
+    "elapsed": 2.572724333,
+    "hex": "1b5b313b3543",
+    "bytes": 6
+  },
+  {
+    "label": "Shift-Tab reverses focus",
+    "elapsed": 2.893726042,
+    "hex": "1b5b5a",
+    "bytes": 3
+  },
+  {
+    "label": "Tab after resize",
+    "elapsed": 3.644315583,
+    "hex": "09",
+    "bytes": 1
+  },
+  {
+    "label": "Tab recovers from now hidden prior focus",
+    "elapsed": 4.3944836249999994,
+    "hex": "09",
+    "bytes": 1
+  },
+  {
+    "label": "narrow Tab reveals next stacked pane",
+    "elapsed": 5.157562292,
+    "hex": "09",
+    "bytes": 1
+  },
+  {
+    "label": "narrow BackTab",
+    "elapsed": 5.556448125,
+    "hex": "1b5b5a",
+    "bytes": 3
+  },
+  {
+    "label": "quit control",
+    "elapsed": 5.9562835419999995,
+    "hex": "1b5b3230307e2f717569741b5b3230317e",
+    "bytes": 17
+  },
+  {
+    "label": "explicit quit submit",
+    "elapsed": 6.178665917,
+    "hex": "0d",
+    "bytes": 1
+  }
+]

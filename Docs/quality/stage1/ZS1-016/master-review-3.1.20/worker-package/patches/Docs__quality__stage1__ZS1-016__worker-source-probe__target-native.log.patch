@@ -1,0 +1,30 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log b/Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log
+@@ -0,0 +1,25 @@
++   Compiling zenpi v0.1.0 (/Users/wangweiyang/.codex/worktrees/ff51/zenpi)
++    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.64s
++     Running tests/stage1_anthropic.rs (target/debug/deps/stage1_anthropic-bf4bf908b4562395)
++
++running 17 tests
++test cancellation_during_slow_body_drops_one_connection_without_retry ... ok
++test empty_refusal_remains_replayable_after_next_user_turn ... ok
++test first_text_is_observable_before_terminal_and_split_utf8_crlf_is_valid ... ok
++test image_input_uses_native_base64_part ... ok
++test independent_semantic_summary_marker_is_local_and_no_format_is_forced ... ok
++test malformed_json_frames_and_bad_tool_json_fail_closed ... ok
++test malformed_terminal_and_signature_never_publish_executable_tools ... ok
++test native_config_does_not_borrow_openai_credentials_or_identity ... ok
++test native_headers_system_tool_schema_effort_and_usage_are_exact ... ok
++test native_history_integrity_and_cross_wire_are_authoritative ... ok
++test production_incomplete_tool_stream_never_writes_and_restart_does_not_replay ... ok
++test production_tool_continuation_and_restart_keep_signed_ordered_blocks ... ok
++test secret_handle_uses_native_headers_and_http_auth_failure_stays_typed ... ok
++test signed_no_tool_completion_survives_real_101_follow_up_boundary ... ok
++test streamed_text_tool_arguments_and_opaque_thinking_are_folded_separately ... ok
++test unknown_model_cannot_execute_unadvertised_tool_and_refusal_has_no_calls ... ok
++test unsupported_request_fields_and_history_fail_before_network ... ok
++
++test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.58s
++

@@ -965,7 +965,7 @@ impl LayoutModel {
     /// At a narrow width the geometry intentionally exposes only one pane, but
     /// all available, non-collapsed panes remain candidates so a user can use
     /// the keyboard to move through the single-pane stack.  At wider widths,
-    /// breakpoint-collapsed and unavailable panes are omitted.
+    /// breakpoint-collapsed, unavailable and zero-area panes are omitted.
     pub fn focusable_panes(&self, width: u16, height: u16) -> Vec<PaneId> {
         let viewport = Viewport::new(width, height);
         let snapshot = self.compute_viewport(viewport);
@@ -982,7 +982,9 @@ impl LayoutModel {
                 } else {
                     snapshot
                         .pane(spec.id)
-                        .filter(|pane| pane.visibility == Visibility::Visible)
+                        .filter(|pane| {
+                            pane.visibility == Visibility::Visible && !pane.rect.is_empty()
+                        })
                         .map(|_| spec.id)
                 }
             })

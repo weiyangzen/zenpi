@@ -1,0 +1,34 @@
+                    TuiAction::Interrupt => {
+                        if new_sessions.cancel_current(&mut state) {
+                            scheduler.request();
+                            continue 'outer;
+                        }
+                        if active_job.is_some()
+                            && active_job_project.as_deref() != Some(state.active_project())
+                        {
+                            state.push_message(MessageRole::System,"The running request belongs to another project; switch to that tab to interrupt.");
+                            continue 'outer;
+                        }
+                        pending_inputs.cancel(&mut state);
+                        if let Some(id) = active_job {
+                            let cancel_result = runner.try_cancel(id);
+                            if !matches!(cancel_result, Err(crate::runtime::SubmitError::QueueFull))
+                            {
+                                // The cancel command is admitted (or the
+                                // worker is already closed), so no approval
+                                // from this turn can be answered safely.
+                                if let Some(approval) = approval.as_ref() {
+                                    approval.emergency_cancel();
+                                }
+                                pending_approvals.clear();
+                                state
+                                    .approval_views
+                                    .remove(&state.project_tabs[state.active_project]);
+                            }
+                            state.set_status("Interrupt requested");
+                        } else {
+                            state.set_status("Ready");
+                        }
+                    }
+                    TuiAction::Quit => break 'outer,
+                    TuiAction::Redraw | TuiAction::None => {}

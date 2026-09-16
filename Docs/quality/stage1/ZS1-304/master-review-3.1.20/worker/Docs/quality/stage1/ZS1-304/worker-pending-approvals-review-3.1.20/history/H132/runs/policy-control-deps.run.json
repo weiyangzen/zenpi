@@ -1,0 +1,27 @@
+{
+  "name": "policy-control-deps",
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/new132-ownership-integration/candidate-first/tools/tui_session_new_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/new132-ownership-integration/candidate-first/zenpi",
+    "--evidence",
+    ".ops/stage1_execution/new132-ownership-integration/policy-control-deps.json",
+    "--policy-only"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T09:29:01.331564+00:00",
+  "ended_at": "2026-09-12T09:29:09.107622+00:00",
+  "elapsed_seconds": 7.776025875,
+  "exit_code": 1,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 75137024,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/policy-control-deps.log",
+  "bytes": 16870,
+  "sha256": "0cdc7a0c090387d1ade2218be1ccbff9dda09a78bab2668d6ab3e8aa5f4e4b9f"
+}

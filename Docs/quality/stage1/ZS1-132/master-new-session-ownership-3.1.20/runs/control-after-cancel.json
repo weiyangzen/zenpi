@@ -1,0 +1,18 @@
+{
+  "binary_sha256": "9e76676bc87d7a859409954ae5d19ebc0560070a4685096f2dff87ea15e918dc",
+  "checks": {
+    "actual_tui_menu_new_same_project_empty_history_zero_http": true,
+    "next_actual_http_has_only_new_context_and_tool_uses_same_cwd": true,
+    "independent_jsonl_restore_old_history_and_open_new_again": true,
+    "same_id_and_independent_restart_replay_no_extra_journal_or_http": true,
+    "saved_unicode_fold_draft_layout_preferences_restore_without_autosubmit": true,
+    "restored_model_effort_used_by_actual_http": true,
+    "actual_tui_ctrl_c_before_commit_restores_command_owner_layout_and_next_http": true,
+    "actual_second_headless_writer_wins_cas_first_tui_owner_remains_usable": true
+  },
+  "fixture_executable_setup_ms": 403.29029199999945,
+  "status": "passed",
+  "tui_processes": 4,
+  "jsonl_processes": 5,
+  "request_count": 6
+}

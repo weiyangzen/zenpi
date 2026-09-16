@@ -1,0 +1,29 @@
+{
+  "name": "control-build-cancel",
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "build",
+    "--locked",
+    "--offline",
+    "--jobs",
+    "1",
+    "--target-dir",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-integration/target"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/work",
+  "started_at": "2026-09-12T09:33:09.859662+00:00",
+  "ended_at": "2026-09-12T09:33:14.526460+00:00",
+  "elapsed_seconds": 4.6667214580000005,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 1401733120,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/control-build-cancel.log",
+  "bytes": 875,
+  "sha256": "b1160d288bcbefd1850af3d38c7c593846d1a91416aa5ee17b3f2244c2322b06"
+}

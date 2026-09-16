@@ -20,6 +20,18 @@ use crate::{
 };
 
 pub const MAX_RUNTIME_INTENTS_VIEW: usize = 64;
+pub const MAX_RUNTIME_LIFECYCLE_DETAIL_BYTES: usize = 8 * 1024;
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeLifecycleState {
+    Claimed,
+    Acknowledged,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
 
 const DEFAULT_COMPETE_TOKENS: u64 = 400_000;
 const DEFAULT_LOOP_TOKENS: u64 = 250_000;
@@ -44,8 +56,12 @@ pub enum RuntimeIntentError {
     UnsupportedOption(String),
     #[error("runtime request ID `{0}` was already stored for a different intent")]
     RequestConflict(String),
+    #[error("runtime intent lifecycle transition is invalid: {0}")]
+    InvalidLifecycle(String),
     #[error("runtime intent failed: {0}")]
     Agent(#[from] AgentError),
+    #[error("runtime intent failed: {0}")]
+    Session(#[from] crate::session::SessionError),
     #[error("runtime intent failed: {0}")]
     B3(#[from] crate::b3::B3Error),
 }
@@ -54,6 +70,7 @@ impl RuntimeIntentError {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::RequestConflict(_) => "runtime_intent_conflict",
+            Self::InvalidLifecycle(_) => "runtime_intent_lifecycle_conflict",
             _ => "runtime_intent_error",
         }
     }
@@ -119,6 +136,17 @@ pub fn runtime_intent_value_with_source(
     args: &[String],
     source: Option<RuntimeIntentSource<'_>>,
 ) -> Result<Value, RuntimeIntentError> {
+    if let Some(action) = args.first().map(String::as_str)
+        && let Some(state) = lifecycle_state(action)
+    {
+        let intent_id = args.get(1).ok_or(RuntimeIntentError::MissingAction)?;
+        if args.len() > 3 {
+            return Err(RuntimeIntentError::UnsupportedOption(
+                "lifecycle accepts intent ID and optional detail".into(),
+            ));
+        }
+        return append_runtime_lifecycle(agent, intent_id, state, args.get(2).map(String::as_str));
+    }
     let (action, remaining) = split_action(args)?;
     if action == "status" {
         if !remaining.is_empty() {
@@ -201,6 +229,18 @@ pub fn runtime_intent_value_with_source(
     Ok(intent_value(agent, intent, estimator, action, true, false))
 }
 
+fn lifecycle_state(action: &str) -> Option<RuntimeLifecycleState> {
+    match action.to_ascii_lowercase().as_str() {
+        "claim" => Some(RuntimeLifecycleState::Claimed),
+        "ack" | "acknowledge" => Some(RuntimeLifecycleState::Acknowledged),
+        "running" => Some(RuntimeLifecycleState::Running),
+        "succeed" | "succeeded" | "result" => Some(RuntimeLifecycleState::Succeeded),
+        "fail" | "failed" => Some(RuntimeLifecycleState::Failed),
+        "cancel" | "cancelled" => Some(RuntimeLifecycleState::Cancelled),
+        _ => None,
+    }
+}
+
 fn intent_value(
     agent: &Agent,
     intent: RuntimeIntent,
@@ -226,6 +266,116 @@ fn intent_value(
         "next_sequence": agent.session().next_sequence(),
         "message": "runtime intent stored locally; external delivery and execution are untracked",
     })
+}
+
+/// Append one externally-owned lifecycle transition. The intent itself stays
+/// immutable; reconnect/replay therefore observes every transition in order.
+pub fn append_runtime_lifecycle(
+    agent: &mut Agent,
+    intent_id: &str,
+    state: RuntimeLifecycleState,
+    detail: Option<&str>,
+) -> Result<Value, RuntimeIntentError> {
+    let intent = agent
+        .session()
+        .runtime_intents()
+        .iter()
+        .find(|intent| intent.intent_id == intent_id)
+        .ok_or(RuntimeIntentError::MissingAction)?
+        .clone();
+    if let Some(detail) = detail
+        && (detail.len() > MAX_RUNTIME_LIFECYCLE_DETAIL_BYTES
+            || detail.chars().any(char::is_control))
+    {
+        return Err(RuntimeIntentError::UnsupportedOption(
+            "lifecycle detail is invalid".into(),
+        ));
+    }
+    let prior = agent
+        .session()
+        .events()
+        .iter()
+        .rfind(|event| {
+            event["type"] == "runtime_intent_lifecycle" && event["intent_id"] == intent_id
+        })
+        .and_then(|event| {
+            serde_json::from_value::<RuntimeLifecycleState>(event["state"].clone()).ok()
+        });
+    if prior == Some(state) {
+        return Ok(json!({
+            "command": intent.kind.as_str(),
+            "route": "runtime_intent",
+            "action": "lifecycle",
+            "accepted": true,
+            "idempotent_replay": true,
+            "intent_id": intent.intent_id,
+            "state": state,
+            "delivery": "journal",
+            "zenpi_started": false,
+        }));
+    }
+    if !valid_lifecycle_transition(prior, state) {
+        return Err(RuntimeIntentError::InvalidLifecycle(format!(
+            "cannot transition from {:?} to {:?}",
+            prior, state
+        )));
+    }
+    let event = json!({
+        "type": "runtime_intent_lifecycle",
+        "intent_id": intent.intent_id,
+        "kind": intent.kind,
+        "state": state,
+        "detail": detail,
+        "session_id": intent.session_id,
+    });
+    agent.session_mut().append_event(event.clone())?;
+    Ok(json!({
+        "command": intent.kind.as_str(),
+        "route": "runtime_intent",
+        "action": "lifecycle",
+        "accepted": true,
+        "intent_id": intent.intent_id,
+        "state": state,
+        "event": event,
+        "delivery": "journal",
+        "zenpi_started": false,
+    }))
+}
+
+fn valid_lifecycle_transition(
+    prior: Option<RuntimeLifecycleState>,
+    next: RuntimeLifecycleState,
+) -> bool {
+    matches!(
+        (prior, next),
+        (None, RuntimeLifecycleState::Claimed)
+            | (None, RuntimeLifecycleState::Acknowledged)
+            | (None, RuntimeLifecycleState::Running)
+            | (
+                Some(RuntimeLifecycleState::Claimed),
+                RuntimeLifecycleState::Acknowledged
+            )
+            | (
+                Some(RuntimeLifecycleState::Claimed),
+                RuntimeLifecycleState::Running
+            )
+            | (
+                Some(RuntimeLifecycleState::Acknowledged),
+                RuntimeLifecycleState::Running
+            )
+            | (
+                Some(RuntimeLifecycleState::Running),
+                RuntimeLifecycleState::Succeeded
+            )
+            | (
+                Some(RuntimeLifecycleState::Running),
+                RuntimeLifecycleState::Failed
+            )
+            | (
+                Some(RuntimeLifecycleState::Running),
+                RuntimeLifecycleState::Cancelled
+            )
+    )
 }
 
 fn split_action(args: &[String]) -> Result<(&str, &[String]), RuntimeIntentError> {
@@ -364,6 +514,21 @@ fn status_value(agent: &Agent, kind: RuntimeIntentKind) -> Value {
     let mut intents = matching;
     intents.reverse();
     let latest_intent_id = intents.last().map(|intent| intent.intent_id.clone());
+    let lifecycle = agent
+        .session()
+        .events()
+        .iter()
+        .filter(|event| {
+            event["type"] == "runtime_intent_lifecycle" && event["kind"] == kind.as_str()
+        })
+        .rev()
+        .take(MAX_RUNTIME_INTENTS_VIEW)
+        .cloned()
+        .collect::<Vec<_>>();
+    let execution_state = lifecycle
+        .iter()
+        .find_map(|event| event["state"].as_str())
+        .unwrap_or("untracked");
     json!({
         "command": kind.as_str(),
         "route": "runtime_intent",
@@ -372,11 +537,12 @@ fn status_value(agent: &Agent, kind: RuntimeIntentKind) -> Value {
         "records_durable": true,
         "delivery": "journal_only",
         "zenpi_started": false,
-        "execution_state": "untracked",
+        "execution_state": execution_state,
         "stored_count": total,
         "intents": intents,
         "truncated": total > MAX_RUNTIME_INTENTS_VIEW,
         "latest_intent_id": latest_intent_id,
+        "lifecycle": lifecycle,
         "message": "stored runtime intents only; external delivery and execution are untracked",
     })
 }

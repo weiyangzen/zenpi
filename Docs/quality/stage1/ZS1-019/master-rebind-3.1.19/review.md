@@ -1,0 +1,5 @@
+# ZS1-019: requirement delta review 3.1.19
+
+Controller independently checked the complete 3.1.18 to 3.1.19 delta, all existing worker/master receipt artifacts, the 111-artifact reset candidate and the original 77-file crossterm crate inventory against the untouched registry. Only event.rs differs in the dependency candidate. The controller ran four before and five after real macOS PTY cases using matching shared input bytes, plus 100 reset/reinitialize cycles with stable FD counts and delivered Resize/SIGTERM events. Historical UTF8 result used a shorter continuation than the packaged runner; fresh controller replay supplies the same continuation to both binaries and preserves the old record.
+
+This adds bounded dependency item131 and makes130 depend on it. The existing56 frozen files,25 directories and all11 accepted obligations are unchanged. This rebind preserves ZS1-019 acceptance only; it accepts neither131 nor130 nor additional product/platform behavior. Root Cargo and product sources have not changed at registration. Full editor integration, dependency build gates and product regressions remain required.

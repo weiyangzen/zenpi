@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/executed-tools/tui_transcript_ux_smoke.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/zenpi",
+    "--evidence",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/single-message-tail-integration/transcript-controls.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:55:35.959422+00:00",
+  "elapsed_seconds": 7.617730334,
+  "exit_code": 0,
+  "log_sha256": "c4203e5b0c17cb19f41a858dd4d084e16ac6362201eec2cfeb8edda3173c9741"
+}

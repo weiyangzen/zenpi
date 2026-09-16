@@ -60,6 +60,7 @@ pub enum ResourceKind {
 
 #[derive(Debug)]
 pub struct BudgetLedger {
+    summary_cost: SummaryCostBudget,
     limits: ResourceLimits,
     usage: ResourceUsage,
     started: Instant,
@@ -68,6 +69,7 @@ pub struct BudgetLedger {
 impl BudgetLedger {
     pub fn new(limits: ResourceLimits, usage: ResourceUsage) -> Result<Self, GovernanceError> {
         let ledger = Self {
+            summary_cost: SummaryCostBudget::default(),
             limits,
             usage,
             started: Instant::now(),
@@ -91,7 +93,19 @@ impl BudgetLedger {
             })
             .transpose()?
             .unwrap_or_default();
-        Self::new(limits, usage)
+        let mut ledger = Self::new(limits, usage)?;
+        if let Some(value) = session
+            .events()
+            .iter()
+            .rev()
+            .find(|event| event["type"] == "resource_usage")
+            .and_then(|event| event.get("summary_cost"))
+        {
+            ledger.summary_cost = serde_json::from_value(value.clone())
+                .map_err(|error| GovernanceError::InvalidSnapshot(error.to_string()))?;
+            ledger.check_summary_cost()?;
+        }
+        Ok(ledger)
     }
 
     pub const fn limits(&self) -> ResourceLimits {
@@ -106,6 +120,79 @@ impl BudgetLedger {
         usage
     }
 
+    /// Check every durable and elapsed resource dimension without reserving
+    /// new work. Hosts call this at cooperative loop boundaries so wall-time
+    /// exhaustion cannot be bypassed by a long operation with no new charge.
+    pub fn ensure_within_limits(&self) -> Result<(), GovernanceError> {
+        self.check_all()
+    }
+
+    pub fn summary_cost_budget(&self) -> SummaryCostBudget {
+        self.summary_cost
+    }
+
+    pub fn set_summary_cost_limit(
+        &mut self,
+        limit_micro_usd: Option<u64>,
+    ) -> Result<(), GovernanceError> {
+        if limit_micro_usd.is_some_and(|limit| self.summary_cost.reserved_micro_usd > limit) {
+            return Err(GovernanceError::InvalidSnapshot(
+                "summary cost limit below durable reservations".into(),
+            ));
+        }
+        self.summary_cost.limit_micro_usd = limit_micro_usd;
+        Ok(())
+    }
+
+    /// Reserve a conservative quoted upper bound before a summary request.
+    /// Missing price is never treated as zero when a monetary cap is enabled.
+    /// Reservations are durable and non-refundable; actual usage/cost is also
+    /// journaled for parsed responses, including rejected summaries/overruns.
+    /// Transport errors can leave actual usage unknown; the reservation stays.
+    pub fn reserve_summary_cost(&mut self, quote: Option<u64>) -> Result<(), GovernanceError> {
+        let Some(quote) = quote else {
+            return if self.summary_cost.limit_micro_usd.is_some() {
+                Err(GovernanceError::InvalidSnapshot(
+                    "summary price unknown with a configured monetary limit".into(),
+                ))
+            } else {
+                Ok(())
+            };
+        };
+        let next = self
+            .summary_cost
+            .reserved_micro_usd
+            .checked_add(quote)
+            .ok_or_else(|| {
+                GovernanceError::InvalidSnapshot("summary cost accounting overflow".into())
+            })?;
+        if self
+            .summary_cost
+            .limit_micro_usd
+            .is_some_and(|limit| next > limit)
+        {
+            return Err(GovernanceError::InvalidSnapshot(
+                "summary cost budget exceeded".into(),
+            ));
+        }
+        self.summary_cost.reserved_micro_usd = next;
+        Ok(())
+    }
+
+    fn check_summary_cost(&self) -> Result<(), GovernanceError> {
+        if self
+            .summary_cost
+            .limit_micro_usd
+            .is_some_and(|limit| self.summary_cost.reserved_micro_usd > limit)
+        {
+            Err(GovernanceError::InvalidSnapshot(
+                "summary cost budget exceeded".into(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn charge(&mut self, kind: ResourceKind, amount: u64) -> Result<(), GovernanceError> {
         let previous = *self.usage_mut(kind);
         {
@@ -117,6 +204,10 @@ impl BudgetLedger {
         if let Err(error) = self.check(kind) {
             let usage = self.usage_mut(kind);
             *usage = previous;
+            // A rejected reservation did not start work. Reset the sampling
+            // anchor so scheduler jitter during validation cannot appear as
+            // spent wall time in the unchanged ledger.
+            self.started = Instant::now();
             return Err(error);
         }
         Ok(())
@@ -141,7 +232,7 @@ impl BudgetLedger {
         ] {
             self.check(kind)?;
         }
-        Ok(())
+        self.check_summary_cost()
     }
 
     pub fn persist(&mut self, session: &mut SessionStore) -> Result<(), GovernanceError> {
@@ -153,6 +244,7 @@ impl BudgetLedger {
             "type": "resource_usage",
             "usage": self.usage,
             "limits": self.limits,
+            "summary_cost": self.summary_cost,
         }))?;
         Ok(())
     }
@@ -198,6 +290,7 @@ const WORKER_SNAPSHOT_VERSION: u32 = 1;
 const MAX_WORKER_LEASES: usize = 32;
 const MAX_WORKER_OPERATIONS: usize = 512;
 const MAX_WORKER_SNAPSHOT_BYTES: usize = 900_000;
+const MAX_LEASE_RENEWAL_MS: u64 = 24 * 60 * 60 * 1_000;
 
 const RESOURCE_KINDS: [ResourceKind; 7] = [
     ResourceKind::InputTokens,
@@ -412,6 +505,65 @@ impl WorkerBudgetLedger {
         Ok(ledger)
     }
 
+    /// Inspect an existing lease through the same validated snapshot, without
+    /// introducing a new lease or accepting worker-supplied lifecycle state.
+    pub fn active_lease(
+        &self,
+        lease_id: &str,
+        policy_digest: &str,
+        item: &str,
+        now_ms: u64,
+    ) -> Result<&WorkerLease, GovernanceError> {
+        self.require_open(now_ms)?;
+        let lease = self
+            .snapshot
+            .leases
+            .get(lease_id)
+            .ok_or_else(|| GovernanceError::LeaseUnavailable(lease_id.into()))?;
+        if self.snapshot.revoked_leases.contains_key(lease_id)
+            || lease.expires_at_ms <= now_ms
+            || lease.policy_digest != policy_digest
+            || lease.blueprint_item != item
+        {
+            return Err(GovernanceError::LeaseUnavailable(lease_id.into()));
+        }
+        Ok(lease)
+    }
+    /// Product acceptance cannot race a worker still holding a reservation.
+    pub fn require_settled_item(&self, lease_id: &str) -> Result<(), GovernanceError> {
+        let lease = self
+            .snapshot
+            .leases
+            .get(lease_id)
+            .ok_or_else(|| GovernanceError::LeaseUnavailable(lease_id.into()))?;
+        if self.snapshot.operations.values().any(|op| {
+            op.settlement.is_none()
+                && self.snapshot.leases[&op.reservation.lease_id].blueprint_item
+                    == lease.blueprint_item
+        }) {
+            return Err(GovernanceError::RecoveryRequired);
+        }
+        Ok(())
+    }
+
+    /// A restarted host restores exactly the previously journaled limits.
+    pub fn restore_existing(session: &mut SessionStore) -> Result<Self, GovernanceError> {
+        let limits = session
+            .events()
+            .iter()
+            .rev()
+            .find(|e| e["type"] == "worker_budget_snapshot")
+            .map(|e| serde_json::from_value(e["snapshot"]["limits"].clone()))
+            .transpose()
+            .map_err(|e| GovernanceError::InvalidSnapshot(format!("{e}")))?
+            .ok_or_else(|| {
+                GovernanceError::InvalidSnapshot(
+                    "external evidence requires an existing host lease".into(),
+                )
+            })?;
+        Self::restore(session, limits)
+    }
+
     pub fn open_lease(
         &mut self,
         session: &mut SessionStore,
@@ -525,6 +677,50 @@ impl WorkerBudgetLedger {
             }
         }
         self.commit(session, proposed.snapshot, None)
+    }
+
+    /// Extend one active lease without changing its immutable policy or
+    /// resource limits. Renewal is host-authenticated by the policy digest,
+    /// bounded to one day from the renewal point, and durably journaled before
+    /// the caller may continue worker work.
+    pub fn renew_lease(
+        &mut self,
+        session: &mut SessionStore,
+        lease_id: &str,
+        policy_digest: &str,
+        new_expires_at_ms: u64,
+        now_ms: u64,
+    ) -> Result<(), GovernanceError> {
+        self.require_open(now_ms)?;
+        validate_identifier(lease_id)?;
+        validate_lease_digest(policy_digest)?;
+        let lease = self
+            .snapshot
+            .leases
+            .get(lease_id)
+            .ok_or_else(|| GovernanceError::LeaseUnavailable(lease_id.into()))?;
+        if self.snapshot.revoked_leases.contains_key(lease_id)
+            || lease.expires_at_ms <= now_ms
+            || lease.policy_digest != policy_digest
+        {
+            return Err(GovernanceError::LeaseUnavailable(lease_id.into()));
+        }
+        if new_expires_at_ms <= lease.expires_at_ms
+            || new_expires_at_ms <= now_ms
+            || new_expires_at_ms.saturating_sub(now_ms) > MAX_LEASE_RENEWAL_MS
+        {
+            return Err(GovernanceError::InvalidSnapshot(
+                "lease renewal must extend an active lease by at most 24 hours".into(),
+            ));
+        }
+        let mut candidate = self.snapshot.clone();
+        candidate.last_observed_ms = now_ms;
+        candidate
+            .leases
+            .get_mut(lease_id)
+            .expect("lease checked")
+            .expires_at_ms = new_expires_at_ms;
+        self.commit(session, candidate, None)
     }
 
     /// Call only after the host has observed the result and reaped owned children.
@@ -897,10 +1093,15 @@ fn validate_transition(
             .terminal
             .as_ref()
             .is_some_and(|terminal| next.terminal.as_ref() != Some(terminal))
-        || previous
-            .leases
-            .iter()
-            .any(|(id, lease)| next.leases.get(id) != Some(lease))
+        || previous.leases.iter().any(|(id, lease)| {
+            next.leases.get(id).is_none_or(|updated| {
+                updated.lease_id != lease.lease_id
+                    || updated.blueprint_item != lease.blueprint_item
+                    || updated.policy_digest != lease.policy_digest
+                    || updated.limits != lease.limits
+                    || updated.expires_at_ms < lease.expires_at_ms
+            })
+        })
         || previous
             .revoked_leases
             .iter()
@@ -942,9 +1143,13 @@ fn validate_identifier(value: &str) -> Result<(), GovernanceError> {
 fn validate_lease(lease: &WorkerLease) -> Result<(), GovernanceError> {
     validate_identifier(&lease.lease_id)?;
     validate_identifier(&lease.blueprint_item)?;
-    if lease.policy_digest.len() != 64
-        || !lease
-            .policy_digest
+    validate_lease_digest(&lease.policy_digest)?;
+    Ok(())
+}
+
+fn validate_lease_digest(value: &str) -> Result<(), GovernanceError> {
+    if value.len() != 64
+        || !value
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
     {
@@ -1025,4 +1230,27 @@ pub enum GovernanceError {
     SnapshotCapacity,
     #[error("resource journal: {0}")]
     Session(#[from] SessionError),
+}
+
+/// Kept inside BudgetLedger/resource_usage rather than adding a parallel ledger
+/// or changing the versioned worker lease resource dimensions.
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SummaryCostBudget {
+    pub limit_micro_usd: Option<u64>,
+    pub reserved_micro_usd: u64,
+}
+
+pub fn quoted_summary_cost(
+    price: &crate::providers::registry::ModelPrice,
+    input: u64,
+    output: u64,
+) -> Result<u64, GovernanceError> {
+    let input_cost = u128::from(input) * u128::from(price.input_micro_usd_per_million);
+    let output_cost = u128::from(output) * u128::from(price.output_micro_usd_per_million);
+    let total = input_cost
+        .checked_add(output_cost)
+        .ok_or_else(|| GovernanceError::InvalidSnapshot("summary price overflow".into()))?;
+    u64::try_from(total.div_ceil(1_000_000))
+        .map_err(|_| GovernanceError::InvalidSnapshot("summary price overflow".into()))
 }

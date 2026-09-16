@@ -1,0 +1,229 @@
+{
+  "active": 1,
+  "metadata": {
+    "06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/l/m-owner.jsonl"
+    },
+    "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other/s/d.jsonl"
+    }
+  },
+  "project_name": "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71",
+  "project_state": [
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "/session search needle126",
+          "/session list",
+          "/session search needle126",
+          "/session open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/l/m-owner.jsonl",
+          "/session search needle126",
+          "/session search failure126",
+          "/project open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other",
+          "/session search race126",
+          "/project select 75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"
+        ],
+        "input": "",
+        "next_paste_id": 1,
+        "paste_folds": [],
+        "presets": {
+          "project": {
+            "capabilities": {
+              "browser": false,
+              "terminal": false
+            },
+            "collapsed": [],
+            "focused": null,
+            "ratios": {
+              "center": 45,
+              "left": 30,
+              "right": 25
+            },
+            "row_weights": {},
+            "tab": "project"
+          }
+        },
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [],
+        "focused": "session_list",
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "session"
+      },
+      "messages": [
+        {
+          "role": "User",
+          "text": "owner body"
+        },
+        {
+          "role": "System",
+          "text": "session opened:\n{\"accepted\":true,\"action\":\"open\",\"command\":\"session\",\"route\":\"local\",\"session\":{\"created_at_ms\":1789171200000,\"event_count\":2,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":4,\"path\":\"./l/m-owner.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"O126\",\"turn_count\":1}}"
+        },
+        {
+          "role": "User",
+          "text": "/session search needle126"
+        },
+        {
+          "role": "System",
+          "text": "session search:\n{\"accepted\":true,\"action\":\"search\",\"command\":\"session\",\"count\":3,\"matches\":[{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./l/a.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"A126\",\"turn_count\":1},\"snippets\":[\"needle126\"]},{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./l/b.jsonl\",\"recovery_warnings\":0,\"runtime_in"
+        },
+        {
+          "role": "User",
+          "text": "/session search failure126"
+        },
+        {
+          "role": "Error",
+          "text": "session search failed: session record is invalid: inspection source is not an existing session file"
+        },
+        {
+          "role": "User",
+          "text": "/project open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other"
+        },
+        {
+          "role": "User",
+          "text": "/session search race126"
+        },
+        {
+          "role": "System",
+          "text": "session search:\n{\"accepted\":true,\"action\":\"search\",\"command\":\"session\",\"count\":1,\"matches\":[{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./l/c.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"C126\",\"turn_count\":1},\"snippets\":[\"needle126 race126\"]}],\"query\":\"race126\",\"route\":\"local\"}"
+        },
+        {
+          "role": "User",
+          "text": "/project select 75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"
+        }
+      ],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/l/m-owner.jsonl"
+      },
+      "name": "06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c"
+    },
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "/session open /Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other/s/d.jsonl",
+          "/session search otherneedle126",
+          "/project select 06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c",
+          "/quit"
+        ],
+        "input": "",
+        "next_paste_id": 1,
+        "paste_folds": [],
+        "presets": {
+          "project": {
+            "capabilities": {
+              "browser": false,
+              "terminal": false
+            },
+            "collapsed": [],
+            "focused": null,
+            "ratios": {
+              "center": 45,
+              "left": 30,
+              "right": 25
+            },
+            "row_weights": {},
+            "tab": "project"
+          }
+        },
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [],
+        "focused": "session_list",
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "session"
+      },
+      "messages": [
+        {
+          "role": "User",
+          "text": "otherneedle126"
+        },
+        {
+          "role": "System",
+          "text": "session opened:\n{\"accepted\":true,\"action\":\"open\",\"command\":\"session\",\"route\":\"local\",\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./other/s/d.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"D126\",\"turn_count\":1}}"
+        },
+        {
+          "role": "User",
+          "text": "/session search otherneedle126"
+        },
+        {
+          "role": "System",
+          "text": "session search:\n{\"accepted\":true,\"action\":\"search\",\"command\":\"session\",\"count\":1,\"matches\":[{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./other/s/d.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"D126\",\"turn_count\":1},\"snippets\":[\"otherneedle126\"]}],\"query\":\"otherneedle126\",\"route\":\"local\"}"
+        },
+        {
+          "role": "User",
+          "text": "/project select 06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c"
+        },
+        {
+          "role": "User",
+          "text": "/quit"
+        }
+      ],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other/s/d.jsonl"
+      },
+      "name": "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"
+    }
+  ],
+  "projects": [
+    "06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c",
+    "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"
+  ],
+  "scheduled_inputs": [],
+  "schema_version": 3,
+  "session_cursors": {
+    "06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c": {
+      "next_sequence": 4,
+      "session_id": "O126"
+    },
+    "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71": {
+      "next_sequence": 2,
+      "session_id": "D126"
+    }
+  },
+  "workspace": {
+    "active": "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71",
+    "schema_version": 1,
+    "tabs": [
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial",
+        "id": "06a60dd9cdf496590c9d6cdab62d0ed33ee4a13f5169ca39945470df854a721c"
+      },
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty/fixture/initial/other",
+        "id": "75f45691a62ccdce73274507dc77684da9cbbe04edf2792078f3953ab9107f71"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "compiled_tui_processes": 2,
+  "compiled_cli_processes": 1,
+  "actual_http_requests": 5,
+  "actual_effect_count": 1,
+  "cancelled_selection_response": {
+    "project": {
+      "project_id": "2841e8eb1b6f87e02da358197dde61e7e9e6cc5a2411f76e121b087323aa1bd8",
+      "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/acceptance106-select-cancel/run-3/fixture/initial",
+      "session_id": "session-1789194276792-15279-0"
+    },
+    "schema_version": 2,
+    "id": "cancel-this-select",
+    "type": "response",
+    "command": "tree",
+    "success": false,
+    "error": "request was cancelled",
+    "code": "backend_cancelled"
+  },
+  "journal_prefix_unchanged": true,
+  "new_tree_actions_during_cancel": 0,
+  "scope": "offline verification only; does not run product"
+}

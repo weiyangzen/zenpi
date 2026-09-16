@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--lib",
+    "--test",
+    "tui_transcript_ux",
+    "--test",
+    "render_markdown",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/checkout",
+  "started_at": "2026-09-12T12:27:24.015361+00:00",
+  "ended_at": "2026-09-12T12:27:36.820915+00:00",
+  "elapsed_seconds": 12.8053995,
+  "exit_code": 101,
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/zs1-125-tail-wiring-work/target",
+    "CARGO_NET_OFFLINE": "true"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "inputs_file": "cargo-clippy-06-inputs.json",
+  "inputs_sha256": "a62a6c52cea68685cc36f7cf0b6e180c02745d51030e741ee912754aa606e4d2",
+  "inputs_unchanged": true,
+  "changed_inputs": {},
+  "log": "cargo-clippy-06.log",
+  "log_bytes": 5935,
+  "log_sha256": "a9e5995e7f91566b001d8b8615badd3883c18a11a2e3df31433c321a6e559a20"
+}

@@ -1,0 +1,188 @@
+{
+  "item": "ZS1-016",
+  "status": "[_]",
+  "authority_version": "3.1.13",
+  "authority_digest": "154a7e902cc3752e90396868b419c71adaab1414b7652bbc22c6c2125e489be2",
+  "observed_authority_file_sha256": "02b09956ccb516465f2ad0c51a80502c1a6c1bd4a6d7f50dc5d1f9c7baa82d4c",
+  "worktree": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
+  "scope": "Whole source reread; prior report hash reused. Actual pinned SDK and real loopback HTTP, no mocks. Target 17 tests. Native implementation unchanged; platform gaps remain.",
+  "source": {
+    "path": "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/anthropic-messages.ts",
+    "sha256": "8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7",
+    "bytes": 48616,
+    "lines": 1490
+  },
+  "files": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/files/packages/ai/src/api/anthropic-messages.ts_learn.md",
+      "base_exists": true,
+      "base_sha256": "58d4ab8ff0d365e10022fd7bed80f0f453a4cf52df4e3ae21913da6ecaa83085",
+      "base_bytes": 4222,
+      "sha256": "fda441946508ad53585d69e269c7fba7d9ee205670773b9c154546905d052fbd",
+      "bytes": 7606,
+      "lines": 35,
+      "patch_sha256": "77a50691b727af401bf45fd9bc95b4b30b8f8239071a6a9c4590b2ac0ca3066e",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/README.md",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "3e474841875db73443fe799257b6630457c5946abb11555dba611308a8b90ffe",
+      "bytes": 860,
+      "lines": 5,
+      "patch_sha256": "67abc5053e16adb82bc4d0d85af57a001ce22b59d90e586434228480ba2f299e",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/artifact-index.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "0b6c83449836bcb5b60ca3473e25c3bc4f3ec5236b0f256ba43f4a12fa8d6d2d",
+      "bytes": 2262,
+      "lines": 62,
+      "patch_sha256": "67ca9b96cde5d2fa87d6d3ef68f10665861e799b859e321d5db198a5fb45e0d1",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/install.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "829dbc0cd1c03d78cfed218cea77e5e0d62991392cafd04d8bf260056a1d7abd",
+      "bytes": 24,
+      "lines": 2,
+      "patch_sha256": "f0bf0a6243e94f1b3c99434c49388af52a69e3c0ff874e971907ca93d1e268dc",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/owner-hashes.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "66ee4de0ca50636b6c61d2b32f4f3324959f6875264877f0526ca9d5356a29c0",
+      "bytes": 734,
+      "lines": 27,
+      "patch_sha256": "4c1cdf51229af689629ffd479ca73bd1ed24d5eefa270c411cac449f72fe049d",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/package-lock.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "4f6588027ae4ef088ed8c73ab56f65ad05014316e44796425feb424533c5b7e4",
+      "bytes": 3263,
+      "lines": 90,
+      "patch_sha256": "ffe5d920f1636dccef5a1b69b07e6f0314b92cda20fcbf1566df3121573ef3a3",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/package.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "8bbe65428ff29c0154c61d238fffa4e81abd74ec9895efef3dd31fe395c293d7",
+      "bytes": 94,
+      "lines": 6,
+      "patch_sha256": "2866dc7833efa90e308bcf023e9b8eb15e05a22760cd1912c9fb4c86816f2634",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "d248ecf11acec471c03d0856d2727d3b5841cf9c5a0100b3a20325779be13ae3",
+      "bytes": 10076,
+      "lines": 48,
+      "patch_sha256": "08840a3b6c02bfaf6aa1cccb48f0f0133e793e556a37bc94a8664746f7fddc93",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "601376538c5673c3a0d58885f90dd93894fd09a869ceb0b81c1e002862ce3a02",
+      "bytes": 954,
+      "lines": 24,
+      "patch_sha256": "a694893796db605b09b81ba87e1c60b071c28970d8dd28074a0c1ca17aa7fd36",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native-final.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "3b1afccacb15d8bd184bff8b8c8f2f13b83f5d26c8dff5592b1085f3efdf2fe2",
+      "bytes": 2833,
+      "lines": 103,
+      "patch_sha256": "a84f78b9d2295deea29f62163b8b5c98b4485953f5d56bbbc1812fdfb47cdff7",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "94bf429c79a5265a06b4538b304c0f8524de49f2c07afd8087d3ffeddc7646e4",
+      "bytes": 935,
+      "lines": 24,
+      "patch_sha256": "442f3d52e565dfc17540eac09bc8e29c8f197bf66f7a741e33b50ef51c961adf",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/source-native.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "2293c2c486a9c6c87fab2fde7a6f5432730a9642d2429ac1255ef9a466d59365",
+      "bytes": 3844,
+      "lines": 20,
+      "patch_sha256": "16b85a390d9d777672aa26e054367171053b545c6fb7cb84a4777cc93e650124",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.json",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "c18b126c2d1bed7d65dace0d6b518bb9c526ee0f7c07650b8e3f971aa8a371b6",
+      "bytes": 899,
+      "lines": 28,
+      "patch_sha256": "4098a2244f73d37d84605176ef993567d588831d4a957f34054d85632d5d2863",
+      "status": "[_]"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-016/worker-source-probe/target-native.log",
+      "base_exists": false,
+      "base_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "base_bytes": 0,
+      "sha256": "1d17e3916926b3635b2ad4e8247c49468c3d3b09cf660bb25d90d36d491a318b",
+      "bytes": 1626,
+      "lines": 25,
+      "patch_sha256": "6486223086d48bbd9a9ab236eba2a67d1cb534dad744f0b697392ea981c7b8ab",
+      "status": "[_]"
+    }
+  ],
+  "validators": [
+    "source-native-final",
+    "target-native"
+  ],
+  "evidence_directory": "Docs/quality/stage1/ZS1-016/worker-source-probe",
+  "patch_sha256": "75a22a0c6ad6bf807adc92f52ea5c3942b777d461410016bf9f05d01fb0c9ccb",
+  "patch_bytes": 36992,
+  "runner_sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8",
+  "verification": "git apply --check, forward full-byte hash verification, reverse --check and exact base restoration; new evidence paths removed by reverse",
+  "immutable_prior_manifest_hashes": {
+    "extension115-ready": "300d3a1cb9c7c58ecee77a459e6846637bc9354bfdedf2996f10fb1f6bf6a2f4",
+    "transport-ready": "4d717a16524918b80d06eeb44ecb6c95f17b94e5f522d978f89fd72d7b06799d",
+    "anthropic-ready": "6e931d64d957735fd624792d83b7c83a5e62258fb40f9a39dd00db218f62295a",
+    "gemini-ready": "a3f4c6b9ab250885ac15bcf04a0b5bb326f35286702c294dbac4059c66e83e26"
+  },
+  "frozen_at": "2026-09-10T19:41:44.011656+00:00",
+  "integration": "Main reviews and integrates only this candidate delta; shared main repository was read-only. No acceptance mark or commit."
+}

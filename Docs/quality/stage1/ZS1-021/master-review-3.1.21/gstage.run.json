@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "python3",
+    "tools/validate_stage1_blueprint.py",
+    "--item",
+    "ZS1-021"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T23:31:35.476992+00:00",
+  "ended_at": "2026-09-12T23:31:36.509559+00:00",
+  "exit_code": 0,
+  "stdout": {
+    "bytes": 3885,
+    "sha256": "c63dd53e918f3ae6bb9a6f0e44c69cd2ae4335500e200f2fde33a61d4ba71d07"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

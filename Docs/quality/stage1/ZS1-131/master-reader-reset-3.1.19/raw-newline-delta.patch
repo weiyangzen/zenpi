@@ -1,0 +1,64 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -44,3 +44,7 @@
+ strip = "symbols"
+ codegen-units = 1
+ panic = "abort"
++
++# ZS1-131: fixed terminal reader reset; upstream 0.29.0 and features preserved.
++[patch.crates-io]
++crossterm = { path = "vendor/crossterm" }
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -204,8 +204,6 @@
+ [[package]]
+ name = "crossterm"
+ version = "0.29.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "d8b9f2e4c67f833b660cdb0a3523065869fb35570177239812ed4c905aeff87b"
+ dependencies = [
+  "bitflags",
+  "crossterm_winapi",
+--- a/vendor/crossterm/src/event.rs
++++ b/vendor/crossterm/src/event.rs
+@@ -148,6 +148,22 @@
+ /// This needs to be static because there can be one event reader.
+ static INTERNAL_EVENT_READER: Mutex<Option<InternalEventReader>> = parking_lot::const_mutex(None);
+ 
++/// Discard complete events and incomplete input bytes before handing the terminal
++/// to another process. This does not flush the operating system's input queue.
++///
++/// Call only while the application has stopped all event readers and no cursor
++/// position query is running. A concurrent reader returns `WouldBlock`; callers
++/// must keep terminal input suspended and handle that error. The next poll/read
++/// constructs a fresh input source. This API is unavailable with event-stream.
++#[cfg(all(unix, not(feature = "event-stream")))]
++pub fn reset_event_reader() -> std::io::Result<()> {
++    let mut reader = INTERNAL_EVENT_READER.try_lock().ok_or_else(|| {
++        std::io::Error::new(std::io::ErrorKind::WouldBlock, "event reader is in use")
++    })?;
++    drop(reader.take());
++    Ok(())
++}
++
+ pub(crate) fn lock_internal_event_reader() -> MappedMutexGuard<'static, InternalEventReader> {
+     MutexGuard::map(INTERNAL_EVENT_READER.lock(), |reader| {
+         reader.get_or_insert_with(InternalEventReader::default)
+@@ -1745,3 +1761,17 @@
+         }
+     }
+ }
++
++#[cfg(all(test, unix, not(feature = "event-stream")))]
++mod zenpi_reset_candidate_tests {
++    #[test]
++    fn reset_fails_without_waiting_for_an_existing_reader() {
++        let reader = super::INTERNAL_EVENT_READER.lock();
++        let started = std::time::Instant::now();
++        let error = super::reset_event_reader().unwrap_err();
++        assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
++        assert!(started.elapsed() < std::time::Duration::from_millis(100));
++        drop(reader);
++        super::reset_event_reader().unwrap();
++    }
++}

@@ -1,0 +1,4041 @@
+[
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\nSelected skill (relative resources resolve from base_dir):\n{\"base_dir\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample\",\"generation\":1,\"kind\":\"skill\",\"name\":\"sample\",\"source\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample/SKILL.md\",\"source_hash\":\"81882f0f468514577f07cf6a8ee73adff00616365146bb15c47f07ae8462556e\"}\nONLY_SELECTED_SKILL_ONE\n\nLiteral skill arguments: \"literal $(no-run)\"",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "TEMPLATE_EXPANDED: Ada | Ada",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": [
+          {
+            "text": "inspect @\"工作 folder/note file.txt\" please",
+            "type": "input_text"
+          },
+          {
+            "file_data": "data:text/plain;base64,RklMRV9BVFRBQ0hNRU5UX01BUktFUg==",
+            "filename": "note file.txt",
+            "type": "input_file"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\nSelected skill (relative resources resolve from base_dir):\n{\"base_dir\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample\",\"generation\":3,\"kind\":\"skill\",\"name\":\"sample\",\"source\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample/SKILL.md\",\"source_hash\":\"868f4fa4124fab314b49ede34849634414b7b030f0033d894c4d896dac7af893\"}\nONLY_SELECTED_SKILL_TWO\n\nLiteral skill arguments: \"after-reload\"",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\nSelected skill (relative resources resolve from base_dir):\n{\"base_dir\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample\",\"generation\":3,\"kind\":\"skill\",\"name\":\"sample\",\"source\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample/SKILL.md\",\"source_hash\":\"868f4fa4124fab314b49ede34849634414b7b030f0033d894c4d896dac7af893\"}\nONLY_SELECTED_SKILL_TWO\n\nLiteral skill arguments: \"after-failure\"",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\nSelected skill (relative resources resolve from base_dir):\n{\"base_dir\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample\",\"generation\":1,\"kind\":\"skill\",\"name\":\"sample\",\"source\":\"/Users/wangweiyang/GitHub/zenpi/.ops/command-pty-jwcl2sbj/工作 é aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/来源 space bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/项目 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/initial/.zenpi/skills/sample/SKILL.md\",\"source_hash\":\"868f4fa4124fab314b49ede34849634414b7b030f0033d894c4d896dac7af893\"}\nONLY_SELECTED_SKILL_TWO\n\nLiteral skill arguments: \"after-restart\"",
+    "max_output_tokens": 8192,
+    "model": "gpt-4.1",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_07",
+        "role": "assistant"
+      },
+      {
+        "content": "model-effort-high",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "ux-reasoner",
+    "reasoning": {
+      "effort": "high"
+    },
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_07",
+        "role": "assistant"
+      },
+      {
+        "content": "model-effort-high",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_08",
+        "role": "assistant"
+      },
+      {
+        "content": "restored-model-effort-low",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "ux-reasoner",
+    "reasoning": {
+      "effort": "low"
+    },
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_07",
+        "role": "assistant"
+      },
+      {
+        "content": "model-effort-high",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_08",
+        "role": "assistant"
+      },
+      {
+        "content": "restored-model-effort-low",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_09",
+        "role": "assistant"
+      },
+      {
+        "content": "explicit-none",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "ux-reasoner",
+    "reasoning": {
+      "effort": "none"
+    },
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_07",
+        "role": "assistant"
+      },
+      {
+        "content": "model-effort-high",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_08",
+        "role": "assistant"
+      },
+      {
+        "content": "restored-model-effort-low",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_09",
+        "role": "assistant"
+      },
+      {
+        "content": "explicit-none",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_10",
+        "role": "assistant"
+      },
+      {
+        "content": "default-fast",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "ux-fast",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  },
+  {
+    "input": [
+      {
+        "content": "/skill:sample literal $(no-run)",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_01",
+        "role": "assistant"
+      },
+      {
+        "content": "/fixture-hi Ada",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_02",
+        "role": "assistant"
+      },
+      {
+        "content": "inspect @\"工作 folder/note file.txt\" please",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_03",
+        "role": "assistant"
+      },
+      {
+        "content": "slow-resource-case",
+        "role": "user"
+      },
+      {
+        "content": "BUSY_RESOURCE_MARKERREPLY_04",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-reload",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_05",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-failure",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_06",
+        "role": "assistant"
+      },
+      {
+        "content": "/skill:sample after-restart",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_07",
+        "role": "assistant"
+      },
+      {
+        "content": "model-effort-high",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_08",
+        "role": "assistant"
+      },
+      {
+        "content": "restored-model-effort-low",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_09",
+        "role": "assistant"
+      },
+      {
+        "content": "explicit-none",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_10",
+        "role": "assistant"
+      },
+      {
+        "content": "default-fast",
+        "role": "user"
+      },
+      {
+        "content": "REPLY_11",
+        "role": "assistant"
+      },
+      {
+        "content": "restored-default-fast",
+        "role": "user"
+      }
+    ],
+    "instructions": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+    "max_output_tokens": 8192,
+    "model": "ux-fast",
+    "store": false,
+    "stream": true,
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "description": "Replace one exact UTF-8 text occurrence atomically and return a bounded unified diff.",
+        "name": "edit_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "new": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "old": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Find workspace files by glob using installed ripgrep, with explicit ignore/hidden options and bounded results.",
+        "name": "find",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "limit": {
+              "maximum": 256,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "List one workspace directory without recursively following links.",
+        "name": "list_directory",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_entries": {
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Load the body of one available skill by exact name. Optional arguments are literal text. Disabled skills cannot be model-invoked. Load again in each new turn before using read_skill_resource.",
+        "name": "load_skill",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "arguments": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a UTF-8 text file inside the workspace with a byte limit.",
+        "name": "read_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "max_bytes": {
+              "maximum": 524288,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded UTF-8 resource relative to a skill loaded with load_skill in this turn. Paths stay inside that skill directory; SKILL.md must use load_skill.",
+        "name": "read_skill_resource",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "skill": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "skill",
+            "path"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Read a bounded redacted range of a recorded output artifact in this session. Use the artifact_id and call_id from its capture result; offsets count original raw bytes.",
+        "name": "read_tool_output",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            "call_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "length": {
+              "maximum": 8192,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "call_id",
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Run a bounded shell command in the workspace.",
+        "name": "run_command",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            "timeout_ms": {
+              "maximum": 120000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Search literal text by default. Explicit regex/glob/ignore/hidden/context options use installed ripgrep with bounded traversal.",
+        "name": "search_text",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "case_sensitive": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "glob": {
+              "type": "string"
+            },
+            "hidden": {
+              "default": false,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_matches": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "default": ".",
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "regex": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      },
+      {
+        "description": "Atomically write UTF-8 text inside the workspace and return a bounded unified diff.",
+        "name": "write_file",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 524288,
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ],
+          "type": "object"
+        },
+        "type": "function"
+      }
+    ]
+  }
+]

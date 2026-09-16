@@ -1,0 +1,49 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.56s
+     Running tests/approval_owner.rs (.ops/stage1_execution/new132-integration/target/debug/deps/approval_owner-1f022dbb5c0b9c31)
+
+running 8 tests
+test tui_approval_owner_rejects_missing_coordinator ... ok
+test host_emergency_cancel_denies_pending_approval_without_a_write ... ok
+test denied_pending_request_is_durable_and_has_no_side_effect ... ok
+test worker_allow_requires_a_live_matched_gate_and_records_its_digest ... ok
+test remembered_allow_is_durable_and_executes_once ... ok
+test request_identity_is_session_scoped_and_responses_carry_policy ... ok
+test worker_allow_cannot_override_prohibitions_revocation_or_missing_preflight ... ok
+test host_emergency_cancel_stops_and_reaps_an_already_allowed_command ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.99s
+
+     Running tests/session_new.rs (.ops/stage1_execution/new132-integration/target/debug/deps/session_new-960bff5bb994ad0a)
+
+running 13 tests
+test bare_new_is_the_only_public_syntax_and_is_registered ... ok
+test staged_attachment_is_not_dropped_or_moved_by_new ... ok
+test durable_pending_input_and_unknown_operation_are_not_erased ... ok
+test actual_directory_permission_failure_keeps_old_owner_usable ... ok
+test old_port_cannot_acquire_the_new_sessions_running_turn ... ok
+test failed_owner_checkpoint_preserves_old_session_and_removes_candidate ... ok
+test configured_tool_deny_survives_jsonl_new_even_with_process_never ... ok
+test new_keeps_project_and_preferences_but_has_empty_history_and_durable_replay ... ok
+test exclusive_names_skip_existing_files_links_directories_and_stop_at_limit ... ok
+test running_request_rejects_new_without_cancelling_old_work_then_allows_retry ... ok
+test actual_extension_preparation_jsonl_cancel_keeps_owner_and_old_port ... ok
+test worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_new ... ok
+test replaced_candidate_regular_link_and_directory_are_retained_without_switching ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.12s
+

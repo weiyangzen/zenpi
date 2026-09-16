@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "scope": "independent directory understanding only",
+  "formal_children": [
+    "ZS1-022",
+    "ZS1-023"
+  ],
+  "context_only_direct_files": [
+    "index.ts",
+    "loader.ts",
+    "wrapper.ts"
+  ],
+  "new_context_reads": 17,
+  "prior_full_source_reuse": [
+    "ZS1-022",
+    "ZS1-023"
+  ],
+  "historical_combination_probe": "54 lines/9 helper scenarios read, no rerun/no AgentSession or loader execution",
+  "new_product_executions": 0
+}

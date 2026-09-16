@@ -1,0 +1,61 @@
+        state: &mut TuiState,
+        guard: &mut TerminalGuard,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        owner: Option<&Arc<Mutex<crate::core::Agent>>>,
+    ) -> Result<(), TuiError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (guard, terminal, owner);
+            state.set_status("External editor is unavailable on this platform");
+        }
+        #[cfg(unix)]
+        {
+            if guard.original_terminal.is_none() {
+                state.set_status("External editor requires the foreground terminal on stdin");
+                return Ok(());
+            }
+            let token = match state.begin_external_edit() {
+                Ok(token) => token,
+                Err(error) => {
+                    state.set_status(error);
+                    return Ok(());
+                }
+            };
+            let prepared = self
+                .command
+                .as_ref()
+                .map_err(Clone::clone)
+                .and_then(|command| {
+                    crate::external_editor::PreparedEditor::new(
+                        state.input(),
+                        command,
+                        &state.project_cwd(),
+                    )
+                });
+            let prepared = match prepared {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    let error = state.finish_external_edit(token, Err(error)).unwrap_err();
+                    state.set_status(error);
+                    return Ok(());
+                }
+            };
+            if let Err(error) = guard.suspend_editor(event::reset_event_reader) {
+                let error = prepared.reject(format!("Editor terminal suspension failed: {error}"));
+                let _ = state.finish_external_edit(token, Err(error.clone()));
+                return Err(io::Error::other(error).into());
+            }
+            match crate::external_editor::EditorSession::start(prepared) {
+                Ok(session) => {
+                    self.current = Some(RunningExternalEditor {
+                        token,
+                        session,
+                        owner: owner.map(Arc::clone),
+                    });
+                }
+                Err(error) => {
+                    let error = state.finish_external_edit(token, Err(error)).unwrap_err();
+                    state.set_status(error);
+                    guard.resume_editor(event::reset_event_reader, terminal)?;
+                }
+            }

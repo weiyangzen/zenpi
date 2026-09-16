@@ -1,0 +1,142 @@
+{
+  "item": "ZS1-080",
+  "master_accepted": true,
+  "artifacts": {
+    "before-promotion.json": {
+      "bytes": 5344,
+      "sha256": "78e88014903d17b20aa5970af814f0b623c2c3fe3a96e1b92879803969a40a3f"
+    },
+    "extensions-tests.rs": {
+      "bytes": 6302,
+      "sha256": "00a3873257e010a9fdd337d8b913fda3f2efe101710c45ae225975ab59c2237d"
+    },
+    "after-promotion.json": {
+      "bytes": 5323,
+      "sha256": "96462f26a94ce1be2774c818347f47872cccfc453dbbdab03ed0c0aec28ff014"
+    },
+    "worker-manifest.json": {
+      "bytes": 41970,
+      "sha256": "175d88faad7789422029f2a0b85c140f3a9248f260cff3aa115e2a26faef9dc1"
+    },
+    "offline-stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gstage.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "offline-run.json": {
+      "bytes": 355,
+      "sha256": "609194ab6a8ec679e5f54062bd0efc11d8b8fda0695944e3a73503cd1e57149e"
+    },
+    "baseline-extensions.rs": {
+      "bytes": 23071,
+      "sha256": "9b1879edcfb70e711960092e12060a9137e2aacda6bdc547318e5ccb7510fe39"
+    },
+    "worker-external.tar.gz": {
+      "bytes": 1937,
+      "sha256": "cef9ecaf39da8d93078e95bdb99bd290a984afbb9d8168db86cdd65166dd2c2c"
+    },
+    "accept.py": {
+      "bytes": 8406,
+      "sha256": "5cd0aef6870c43b32082c7e675fa6e0d63ac80bef7e2f91a6667e3fad2e970c3"
+    },
+    "read-binding.json": {
+      "bytes": 18090,
+      "sha256": "da12344c9c754cda82f730110150f40bdc103759e8e3929780773da7dd547ca1"
+    },
+    "gstage.run.json": {
+      "bytes": 504,
+      "sha256": "ccf229ba10b7256a4c5b839c3cdea27aa036b1dd378e3be3555de1035dada9bd"
+    },
+    "root-audit.py": {
+      "bytes": 12854,
+      "sha256": "877252d3e3ece2a67f7a1e7d5caa0b8512113c98ee7d0fbc0ca0e66eeceaa2cd"
+    },
+    "offline-stdout.log": {
+      "bytes": 4407,
+      "sha256": "4cb5c4fb4aa94efa629dd0d3a790bf8f20ab96d137513da0bc2556d5813b6f81"
+    },
+    "baseline-to-current.diff": {
+      "bytes": 12866,
+      "sha256": "999cb38bfacbebb46d6c55e0f158b889f2fc2ff504db374b0f70be5063ed1bcd"
+    },
+    "gstage.stdout.log": {
+      "bytes": 4173,
+      "sha256": "b468cabda99fa4f017a9d3ed8e513b2ddd63451f3fa6242530351d4eddd56b96"
+    },
+    "worker-ready.tar.gz": {
+      "bytes": 2267554,
+      "sha256": "4e8691e470f3bd5d5b95cb730135d73a07894b1e2598259aa2f0f5f5e77192d8"
+    },
+    "offline-started.json": {
+      "bytes": 359,
+      "sha256": "3633806cda64e07a8a8fb80b894ce6662714b190f390e954933b7ec6b752eb69"
+    },
+    "review.md": {
+      "bytes": 7479,
+      "sha256": "7a82f2420d5a44474126ebab701b56a0dbc64c4becc116c4dd26b532899a95a4"
+    },
+    "worker-report.md": {
+      "bytes": 31331,
+      "sha256": "ca553c741238339f613e87fc6a13af9a513516c702f93e740d60a72768ddbb16"
+    },
+    "current-extensions.rs": {
+      "bytes": 20742,
+      "sha256": "38a242eff3ec911f4560e3dea3868b742d511205ff0ccab1b622962b41e420ed"
+    },
+    "authority-before/Docs/stage_1_v3_pi_mono_blueprint.md": {
+      "bytes": 153896,
+      "sha256": "7577131ead9a6c2c77481ee58af8a83db2124e8570b0b6aad7ea54a2afc76c80"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/file_learn_index.tsv": {
+      "bytes": 4407,
+      "sha256": "e0fbf2539b74342e273757ad203d77d1cd7dfd30923efa8d47b7ad3aa665e5e6"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/folder_learn_index.tsv": {
+      "bytes": 2071,
+      "sha256": "4cfdda0e6ed1e5223a76f1252dffc63d62681def44b3cd68be4cc12630ba1679"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/chunk_manifest.tsv": {
+      "bytes": 695,
+      "sha256": "0435b8f17a4782aacfdf573407c4c6ad4a5fc50b665939b1c3f81cadd3dec411"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/source_manifest.tsv": {
+      "bytes": 7225,
+      "sha256": "63ea2a5c33820f47a1adf35942def26f8944da0d2b4d36aaa82066c805ed2e36"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/claims.json": {
+      "bytes": 2310,
+      "sha256": "0c5760592df0933031bc0ecb4aeace2fb8229041db1ad34d2a6645ef5373c857"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/targets/zenpi/file_learn_index.tsv": {
+      "bytes": 4553,
+      "sha256": "5ece748ca7ea974d5e193c18d21d27a6104370dc619b3a4fa932ef273fc8bb18"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/targets/zenpi/folder_learn_index.tsv": {
+      "bytes": 1547,
+      "sha256": "7a304156582dd4bc9b6bf580b265fa2f89932b3eb2a525372296b23d14fc6230"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/targets/zenpi/source_manifest.tsv": {
+      "bytes": 7862,
+      "sha256": "39060eef47af63472ca2aed55247055d42105a8beb649434476f64de0cda9af4"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/references/codex/file_learn_index.tsv": {
+      "bytes": 2229,
+      "sha256": "462e97abe10493c1394c790f619dcecf880c90d1c6006b47c9f8d59decddaf8e"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/references/codex/folder_learn_index.tsv": {
+      "bytes": 696,
+      "sha256": "5a1a9423a6eb0b066ef8d0842fc7d024d81f215c658ce0b83db8279526ff530f"
+    },
+    "authority-before/Docs/learn/stage1_pi_mono/references/codex/source_manifest.tsv": {
+      "bytes": 3821,
+      "sha256": "7776a625df3c7221f07c7034cdd6ef73b1bd4b7f335951683fe1119a99b8683e"
+    },
+    "authority-before/Docs/execution/active_requirement.json": {
+      "bytes": 9853,
+      "sha256": "d681b392539e2e6f2bde512aeddf7ff5e6e9096405f2d5f99c39b5a3c5e55127"
+    }
+  }
+}

@@ -4,7 +4,7 @@
 > This file describes how work is claimed, isolated, validated, integrated,
 > and published. It is not a second product checklist; the authoritative
 > checklist is `Zenpi_Execution_Blueprint.md`. Its v1 receipt is a workflow
-> record, not proof of end-user product usability; the versioned v2.1.0 draft
+> record, not proof of end-user product usability; the versioned v2.3.0 draft
 > (`Docs/Zenpi_Execution_Blueprint_v2.md`) is the current UX audit and re-plan.
 
 ```yaml
@@ -42,8 +42,10 @@ two modes selected by `--mode`:
 
 The parser must reject `print`, `json`, `rpc`, `server`, `daemon`, and any
 unknown mode with a typed error before opening a session or backend. These are
-not hidden aliases and no third mode, HTTP listener, broker, daemon, or app
-server is in scope. TUI and headless call the same core, backend trait, session
+not hidden aliases. No third mode, HTTP listener, or app server is in scope.
+The only proposed shared-service extension is bounded by section 1.1 below;
+it is not part of the accepted implementation baseline.
+TUI and headless call the same core, backend trait, session
 journal, and handoff codec; mode-specific code owns only transport and view.
 
 The migration inventory is based on these read-only local evidence points:
@@ -66,6 +68,44 @@ That receipt is not the v2 end-user acceptance matrix, and a completed `ZP-*`
 foundation row does not implicitly close any `CF-*` row. The 5,000 LOC cap is
 evaluated independently for each item; there is neither a 5,000-item target
 nor an aggregate 5,000-line cap.
+
+### 1.1 Proposed account service extension (2026-09-13)
+
+CF-901 through CF-910 add account routing and a shared connection service as
+unaccepted product work. Their detailed contracts are
+[provider and account routing](feat-provider-account-routing.md),
+[scheduler plugins](feat-account-scheduler-plugins.md), and
+[local account broker](feat-account-broker.md). These documents specify
+behavior; external learning evidence is not an implementation dependency.
+
+Keep `RunMode` limited to `tui` and `headless`. A separate administrative
+`broker` subcommand owns a user-approved service lifecycle, not another agent
+host or a hidden mode alias. First-use configuration requires explicit user
+approval; only then may ordinary CLI clients start the configured instance.
+One instance per OS user and canonical state root owns account state, model
+quota reservations, credentials, and actual upstream HTTP connections. Client
+processes retain agent loops, tools, and session journals. No SQLite, Redis,
+general async runtime, worker scheduler, or HTTP listener is added by default.
+
+The service uses authenticated local IPC, one state owner, one journal writer,
+bounded synchronous network workers, and a replaceable pure scheduling port.
+Durable admission precedes paid dispatch. External relay mode must use one
+remote quota authority and must never fail open into an independent local
+ledger. A shared UID is not sufficient worker authorization: workers receive
+only revocable, scope-bound capabilities protected by host isolation.
+
+This product extension does not change any frozen execution-worker YAML field,
+transport, nested-service prohibition, credential boundary, or launch policy.
+Workers may not start/manage a broker, acquire admin credentials, or use IPC
+to bypass their lease. Root-product service integration needs explicit
+preflight network/IPC grants and acceptance evidence. Documentation approval
+does not authorize starting services in this repository task.
+
+Existing two-mode tests remain mandatory. CF-910 must additionally prove
+administrative lifecycle separation, unchanged worker prohibitions, and no
+automatic migration or creation of account state during legacy config reads.
+5000-client support is a measured service capability, not a promise of 5000
+simultaneous model streams or of low total RSS across 5000 CLI processes.
 
 ## 2. Lean b3ehive subset
 

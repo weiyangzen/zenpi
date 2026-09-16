@@ -1,0 +1,138 @@
+{
+  "kind": "local-controlled-fixture-not-Ubuntu-Actions",
+  "yaml_changed_step_indices": [
+    9,
+    10
+  ],
+  "before_sha256": "b9e70ba448d157341e0069fcd9ad19eae8f0412aaf0b9e03bbd97b4f2ef59dbd",
+  "after_sha256": "44c1d0964cd0c3504f028f3fa2dbcac89c8063ca895d039eba729dd64bc263c9",
+  "main_bench_sha256": "ef6701f52659c78f58fb3f31adf87343c31b34229145f57acba2be05b1a9a52c",
+  "cases": [
+    {
+      "case": "success",
+      "benchmark_exit_code": 0,
+      "logger_exit_code": 0,
+      "shell_exit_code": 0,
+      "stdout_base64": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+      "stderr_base64": "",
+      "artifacts_base64": {
+        "budget.log": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+        "exit-code.txt": "MAo=",
+        "startup/sample-00.json": "eyJmaXh0dXJlIjogdHJ1ZSwgInJldHVybmNvZGUiOiAwfQo=",
+        "summary.json": "eyJmaXh0dXJlIjogdHJ1ZSwgIm9rIjogdHJ1ZX0K"
+      },
+      "repeated_directory_exit_code": 1,
+      "invocations": 1,
+      "sentinel_unchanged": true
+    },
+    {
+      "case": "budget-failed",
+      "benchmark_exit_code": 1,
+      "logger_exit_code": 0,
+      "shell_exit_code": 1,
+      "stdout_base64": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+      "stderr_base64": "",
+      "artifacts_base64": {
+        "budget.log": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+        "exit-code.txt": "MQo=",
+        "startup/sample-00.json": "eyJmaXh0dXJlIjogdHJ1ZSwgInJldHVybmNvZGUiOiAxfQo=",
+        "summary.json": "eyJmaXh0dXJlIjogdHJ1ZSwgIm9rIjogZmFsc2V9Cg=="
+      },
+      "repeated_directory_exit_code": 1,
+      "invocations": 1,
+      "sentinel_unchanged": true
+    },
+    {
+      "case": "early-failed",
+      "benchmark_exit_code": 17,
+      "logger_exit_code": 0,
+      "shell_exit_code": 17,
+      "stdout_base64": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+      "stderr_base64": "",
+      "artifacts_base64": {
+        "budget.log": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+        "exit-code.txt": "MTcK",
+        "startup/sample-00.json": "eyJmaXh0dXJlIjogdHJ1ZSwgInJldHVybmNvZGUiOiAxN30K"
+      },
+      "repeated_directory_exit_code": 1,
+      "invocations": 1,
+      "sentinel_unchanged": true
+    },
+    {
+      "case": "logger-failed",
+      "benchmark_exit_code": 0,
+      "logger_exit_code": 23,
+      "shell_exit_code": 23,
+      "stdout_base64": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+      "stderr_base64": "",
+      "artifacts_base64": {
+        "budget.log": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+        "exit-code.txt": "MAo=",
+        "startup/sample-00.json": "eyJmaXh0dXJlIjogdHJ1ZSwgInJldHVybmNvZGUiOiAwfQo=",
+        "summary.json": "eyJmaXh0dXJlIjogdHJ1ZSwgIm9rIjogdHJ1ZX0K"
+      },
+      "repeated_directory_exit_code": 1,
+      "invocations": 1,
+      "sentinel_unchanged": true
+    },
+    {
+      "case": "both-failed",
+      "benchmark_exit_code": 17,
+      "logger_exit_code": 23,
+      "shell_exit_code": 17,
+      "stdout_base64": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+      "stderr_base64": "",
+      "artifacts_base64": {
+        "budget.log": "Zml4dHVyZSBzdGRvdXQNCmZpeHR1cmUgc3RkZXJyDQo=",
+        "exit-code.txt": "MTcK",
+        "startup/sample-00.json": "eyJmaXh0dXJlIjogdHJ1ZSwgInJldHVybmNvZGUiOiAxN30K"
+      },
+      "repeated_directory_exit_code": 1,
+      "invocations": 1,
+      "sentinel_unchanged": true
+    }
+  ],
+  "patch_commands": [
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "product.patch"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "product.patch"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "product.patch"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "product.patch"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "prior_ready_files_verified": 0,
+  "tracked_files_preserved": 0,
+  "real_Actions_run": false,
+  "production_benchmark_run": false,
+  "acceptance": false
+}

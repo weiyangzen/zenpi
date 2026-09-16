@@ -1,0 +1,48 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__config.rs-1270-1312.txt
+@@ -0,0 +1,43 @@
++/// A secret-free entry in the model picker exposed by the interactive hosts.
++/// Profiles are listed rather than credentials, so `/models` remains useful
++/// even when a provider is not currently reachable.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ModelCatalogEntry {
++    pub profile: Option<String>,
++    pub active: bool,
++    pub provider: Option<String>,
++    pub model: Option<String>,
++    pub backend: String,
++    pub configured: bool,
++    pub metadata: Option<crate::providers::registry::ModelDescriptor>,
++}
++
++/// Return the bounded, redacted model/profile catalogue used by `/models`.
++/// This is deliberately read-only and never contacts a provider. A legacy
++/// flat config is represented by one `default` entry; named profiles remain
++/// independently selectable in the output.
++pub fn model_catalog(profile: Option<&str>) -> Result<Vec<ModelCatalogEntry>, ConfigError> {
++    model_catalog_in_workspace(profile, None)
++}
++
++pub fn model_catalog_in_workspace(
++    profile: Option<&str>,
++    workspace: Option<&Path>,
++) -> Result<Vec<ModelCatalogEntry>, ConfigError> {
++    let paths = ConfigPaths::discover()?;
++    let config = load_workspace_config(&paths, workspace)?;
++    let metadata = |provider: Option<&str>,
++                    id: Option<&str>,
++                    overrides: &[crate::providers::registry::ModelOverride]| {
++        let registry = crate::providers::registry::ModelRegistry::with_overrides(overrides)
++            .map_err(|error| ConfigError::Invalid(error.to_string()))?;
++        id.map(|id| registry.resolve(provider.unwrap_or("openai"), id))
++            .transpose()
++            .map_err(|error| ConfigError::Invalid(error.to_string()))
++    };
++    if config.profiles.is_empty() {
++        let resolved = resolve_workspace(
++            &ConfigOverrides {
++                profile: profile.map(str::to_owned),
++                ..ConfigOverrides::default()
++            },

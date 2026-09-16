@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "tools/tui_transcript_ux_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/transcript-tail-integration/zenpi",
+    "--long-history-only",
+    "--evidence",
+    ".ops/stage1_execution/transcript-tail-integration/after-pty.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T11:58:18.071420+00:00",
+  "elapsed_seconds": 3.394053333,
+  "exit_code": 0,
+  "log_sha256": "792cee76952ef7cc028e2d277d755e80974dc105cd9a833beed07ba1650d7be5",
+  "log_bytes": 240
+}

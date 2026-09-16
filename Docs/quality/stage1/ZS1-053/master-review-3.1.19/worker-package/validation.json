@@ -1,0 +1,34 @@
+{
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi",
+  "node": {
+    "path": "/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bytes": 121306800,
+    "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+  },
+  "node_version": "v24.19.0",
+  "argv": [
+    "/Users/wangweiyang/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/runtime/node_modules/vitest/vitest.mjs",
+    "run",
+    "--root",
+    "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053",
+    "--config",
+    "vitest.config.mjs"
+  ],
+  "env": {
+    "DIR_RESULT": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/test-results.json",
+    "DIR_OBSERVATIONS": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/observations.json",
+    "TMPDIR": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-directory053-22qa7_ug",
+    "PI_CODING_AGENT_DIR": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/agent-home",
+    "PI_PACKAGE_DIR": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/directory053/source/packages/coding-agent",
+    "PI_OFFLINE": "1"
+  },
+  "collection_only": false,
+  "collected": null,
+  "exit_code": 0,
+  "passed": 5,
+  "failed": 0,
+  "pending": 0,
+  "source_persistence_claim": false,
+  "actual_provider_network": false
+}

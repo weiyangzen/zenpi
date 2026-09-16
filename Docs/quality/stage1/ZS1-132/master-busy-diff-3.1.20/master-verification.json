@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "complete": false,
+  "product_files": [
+    "src/headless.rs"
+  ],
+  "binary_sha256": "f190eb9c46decc0d23c24ae64f4832e0635b9b773126a3660e1cec8fa8c84ba3",
+  "rust_top_level_passes": 74,
+  "rust_counts": [
+    12,
+    43,
+    19
+  ],
+  "actual_before_failed": 4,
+  "actual_after_passed": 17,
+  "other_inputs_unchanged": 223,
+  "stage_items_accepted": false,
+  "new_release_budget_run": false
+}

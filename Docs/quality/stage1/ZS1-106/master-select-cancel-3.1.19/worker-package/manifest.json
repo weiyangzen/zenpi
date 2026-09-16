@@ -1,0 +1,112 @@
+{
+  "item": "ZS1-106",
+  "status": "[_] provisional; master acceptance pending",
+  "authority_version": "3.1.19",
+  "requirement_digest": "3ce9613262de0a8499837571137782becc01daa7b56923a53b11f7f04058f60d",
+  "production_changes": false,
+  "new_combined_scenarios_passed": 1,
+  "prior_attempts_without_cancelled_terminal": 2,
+  "evidence_files": 108,
+  "files": [
+    {
+      "path": "review.md",
+      "bytes": 7897,
+      "sha256": "664f8fa174181f932a4c83807bf73f18168a7f9471b2ddf65ad2dd503e3a4021"
+    },
+    {
+      "path": "binary-only-cli.json",
+      "bytes": 325,
+      "sha256": "9ee8610df1866acf9f19a002eb2c2dfdaa3c26e3d947d9d72ec00410c75ffc35"
+    },
+    {
+      "path": "binary-inputs.json",
+      "bytes": 36554,
+      "sha256": "1d26379828d0b471803f484d004f82da1b7fb2cd706fe504713472dbf36e5dff"
+    },
+    {
+      "path": "per-file-adaptation.md",
+      "bytes": 2449,
+      "sha256": "6dcdd74075170144c1a6aa8074e6563e327ebdd05efc367e3af2359f2f1aac7b"
+    },
+    {
+      "path": "select_cancel_pty.py",
+      "bytes": 10489,
+      "sha256": "f87552e5c42d27733534fb6b45c5f89abde5a84248a8ef7070abeaa7106b3baa"
+    },
+    {
+      "path": "select_cancel_pty_initial.py",
+      "bytes": 8779,
+      "sha256": "43dfe2b8ef00382cf1289a41bf18f60356a6295e81c7b7b8bbd5b42d57255521"
+    },
+    {
+      "path": "select_cancel_cli_short.py",
+      "bytes": 10406,
+      "sha256": "9063348709a3267e445cb1165e00d9caf1fa28af9512ce1ab028c43a01817cad"
+    },
+    {
+      "path": "cli_transport.py",
+      "bytes": 12675,
+      "sha256": "c1c75a69003952cc843d0ca5d118f18edee6ed1fe2784d28f2f3be6218afd653"
+    },
+    {
+      "path": "large_branch_fixture.rs",
+      "bytes": 991,
+      "sha256": "5987e25ddd9b7df0657943157058b363c8c33ed11f9f3ea5b340b52cef1de5e8"
+    },
+    {
+      "path": "fixture-compile.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 810,
+      "sha256": "3936390846fdf9e9b463f3bf4d6ab6b194cb1f8ca3f773c62ef9aeeb52eec536"
+    },
+    {
+      "path": "verify_evidence.py",
+      "bytes": 2677,
+      "sha256": "cd730cd12924c209ccf13efac85439f37832991ef0333c6ecc899cc8a86d4153"
+    },
+    {
+      "path": "replay.py",
+      "bytes": 1222,
+      "sha256": "cc4359cd896e6d2c703a302dc9845083d03113204133ac1f48bc7d05a2a78994"
+    },
+    {
+      "path": "run-1.log",
+      "bytes": 11452,
+      "sha256": "5aef2f77695073a5b6f36e515a0fe76e8271a3d2842d939b33f3f984cbf323d8"
+    },
+    {
+      "path": "run-2.log",
+      "bytes": 14229,
+      "sha256": "5d1413737922fce3b059265e43c2996dfa99b546eddb530b8d79016b0835e549"
+    },
+    {
+      "path": "run-3.log",
+      "bytes": 1141,
+      "sha256": "acbe670a61ce9a35ffacb7678a9cf379f341d6ffd99bd0a9f29de38d8d01d059"
+    },
+    {
+      "path": "pty-support/tui_project_workspace_smoke.py",
+      "bytes": 30738,
+      "sha256": "dadbc8943db5ab69b5485eacc9d91864c8091cf918369ac23f89a585147e4f2a"
+    },
+    {
+      "path": "pty-support/tui_user_shell_smoke.py",
+      "bytes": 6964,
+      "sha256": "e7cb738699b28d495bcceea6b44261784e551980eaf83c178cadd9d2a2d92319"
+    },
+    {
+      "path": "evidence.tar.gz",
+      "bytes": 5405013,
+      "sha256": "ded6d5eec8f8434c4c45e0f5661988731d948d84d44f8588a1915a067357da70"
+    },
+    {
+      "path": "evidence-inputs.json",
+      "bytes": 18685,
+      "sha256": "85cef041a30957e4c5a1f5ebee5a8aa94f63e6f455f3ab9e024d7cabe34807f7"
+    }
+  ]
+}

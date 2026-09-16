@@ -1,0 +1,19 @@
+diff --git a/Docs/quality/stage1/provider-kill319/chat/tool-corrected/result.json b/Docs/quality/stage1/provider-kill319/chat/tool-corrected/result.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/chat/tool-corrected/result.json
+@@ -0,0 +1,14 @@
++{
++  "provider": "chat",
++  "scenario": "tool",
++  "passed": true,
++  "checks": [
++    "SIGKILL -9 during open native SSE; observed public delta durable; expected tool execution count",
++    "independent process reports unknown provider outcome and replays every observed event byte-for-byte",
++    "unknown/conflict/gated fresh IDs do not resubmit; retry is durable idempotent decision only",
++    "fresh explicit new attempt succeeds with clean partial history; known tool identity preserved; terminal replay survives third process without execution"
++  ],
++  "http_requests": 3,
++  "binary_sha256": "9334844f18ea25b6ac01dc3955a724dc8b143e462ff53438277200ea05ecf673",
++  "harness_sha256": "5601ddbc5ad0689e593617ca41b570e51032e6a2022afdd613db354b41c22442"
++}

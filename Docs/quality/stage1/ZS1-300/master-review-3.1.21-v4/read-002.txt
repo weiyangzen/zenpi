@@ -1,0 +1,2000 @@
+        // Adjust the provided byte offset to the nearest valid char boundary at or before it.
+        let mut safe_cursor = cursor_offset.min(text.len());
+        // If we're not on a char boundary, move back to the start of the current char.
+        if safe_cursor < text.len() && !text.is_char_boundary(safe_cursor) {
+            // Find the last valid boundary <= cursor_offset.
+            safe_cursor = text
+                .char_indices()
+                .map(|(i, _)| i)
+                .take_while(|&i| i <= cursor_offset)
+                .last()
+                .unwrap_or(0);
+        }
+
+        // Split the line around the (now safe) cursor position.
+        let before_cursor = &text[..safe_cursor];
+        let after_cursor = &text[safe_cursor..];
+
+        // Detect whether we're on whitespace at the cursor boundary.
+        let at_whitespace = if safe_cursor < text.len() {
+            text[safe_cursor..]
+                .chars()
+                .next()
+                .map(char::is_whitespace)
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        // Left candidate: token containing the cursor position.
+        let start_left = before_cursor
+            .char_indices()
+            .rfind(|(_, c)| c.is_whitespace())
+            .map(|(idx, c)| idx + c.len_utf8())
+            .unwrap_or(0);
+        let end_left_rel = after_cursor
+            .char_indices()
+            .find(|(_, c)| c.is_whitespace())
+            .map(|(idx, _)| idx)
+            .unwrap_or(after_cursor.len());
+        let end_left = safe_cursor + end_left_rel;
+        let token_left = if start_left < end_left {
+            Some(&text[start_left..end_left])
+        } else {
+            None
+        };
+
+        // Right candidate: token immediately after any whitespace from the cursor.
+        let ws_len_right: usize = after_cursor
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .map(char::len_utf8)
+            .sum();
+        let start_right = safe_cursor + ws_len_right;
+        let end_right_rel = text[start_right..]
+            .char_indices()
+            .find(|(_, c)| c.is_whitespace())
+            .map(|(idx, _)| idx)
+            .unwrap_or(text.len() - start_right);
+        let end_right = start_right + end_right_rel;
+        let token_right = if start_right < end_right {
+            Some(&text[start_right..end_right])
+        } else {
+            None
+        };
+
+        let prefix_str = prefix.to_string();
+        let left_match = token_left.filter(|t| t.starts_with(prefix));
+        let right_match = token_right.filter(|t| t.starts_with(prefix));
+
+        let left_prefixed = left_match.map(|t| t[prefix.len_utf8()..].to_string());
+        let right_prefixed = right_match.map(|t| t[prefix.len_utf8()..].to_string());
+
+        if at_whitespace {
+            if right_prefixed.is_some() {
+                return right_prefixed;
+            }
+            if token_left.is_some_and(|t| t == prefix_str) {
+                return allow_empty.then(String::new);
+            }
+            return left_prefixed;
+        }
+        if after_cursor.starts_with(prefix) {
+            let prefix_starts_token = before_cursor
+                .chars()
+                .next_back()
+                .is_none_or(char::is_whitespace);
+            return if prefix_starts_token {
+                right_prefixed.or(left_prefixed)
+            } else {
+                left_prefixed
+            };
+        }
+        left_prefixed.or(right_prefixed)
+    }
+
+    /// Extract the `@token` that the cursor is currently positioned on, if any.
+    ///
+    /// The returned string **does not** include the leading `@`.
+    fn current_at_token(textarea: &TextArea) -> Option<String> {
+        Self::current_prefixed_token(textarea, '@', /*allow_empty*/ false)
+    }
+
+    fn current_mention_token(&self) -> Option<String> {
+        if !self.mentions_enabled() {
+            return None;
+        }
+        Self::current_prefixed_token(&self.textarea, '$', /*allow_empty*/ true)
+    }
+
+    /// Replace the active `@token` (the one under the cursor) with `path`.
+    ///
+    /// The algorithm mirrors `current_at_token` so replacement works no matter
+    /// where the cursor is within the token and regardless of how many
+    /// `@tokens` exist in the line.
+    fn insert_selected_path(&mut self, path: &str) {
+        let cursor_offset = self.textarea.cursor();
+        let text = self.textarea.text();
+        // Clamp to a valid char boundary to avoid panics when slicing.
+        let safe_cursor = Self::clamp_to_char_boundary(text, cursor_offset);
+
+        let before_cursor = &text[..safe_cursor];
+        let after_cursor = &text[safe_cursor..];
+
+        // Determine token boundaries.
+        let start_idx = before_cursor
+            .char_indices()
+            .rfind(|(_, c)| c.is_whitespace())
+            .map(|(idx, c)| idx + c.len_utf8())
+            .unwrap_or(0);
+
+        let end_rel_idx = after_cursor
+            .char_indices()
+            .find(|(_, c)| c.is_whitespace())
+            .map(|(idx, _)| idx)
+            .unwrap_or(after_cursor.len());
+        let end_idx = safe_cursor + end_rel_idx;
+
+        // If the path contains whitespace, wrap it in double quotes so the
+        // local prompt arg parser treats it as a single argument. Avoid adding
+        // quotes when the path already contains one to keep behavior simple.
+        let needs_quotes = path.chars().any(char::is_whitespace);
+        let inserted = if needs_quotes && !path.contains('"') {
+            format!("\"{path}\"")
+        } else {
+            path.to_string()
+        };
+
+        // Replace just the active `@token` so unrelated text elements, such as
+        // large-paste placeholders, remain atomic and can still expand on submit.
+        self.textarea
+            .replace_range(start_idx..end_idx, &format!("{inserted} "));
+        let new_cursor = start_idx.saturating_add(inserted.len()).saturating_add(1);
+        self.textarea.set_cursor(new_cursor);
+    }
+
+    fn insert_selected_mention(&mut self, insert_text: &str, path: Option<&str>) {
+        let cursor_offset = self.textarea.cursor();
+        let text = self.textarea.text();
+        let safe_cursor = Self::clamp_to_char_boundary(text, cursor_offset);
+
+        let before_cursor = &text[..safe_cursor];
+        let after_cursor = &text[safe_cursor..];
+
+        let start_idx = before_cursor
+            .char_indices()
+            .rfind(|(_, c)| c.is_whitespace())
+            .map(|(idx, c)| idx + c.len_utf8())
+            .unwrap_or(0);
+
+        let end_rel_idx = after_cursor
+            .char_indices()
+            .find(|(_, c)| c.is_whitespace())
+            .map(|(idx, _)| idx)
+            .unwrap_or(after_cursor.len());
+        let end_idx = safe_cursor + end_rel_idx;
+
+        // Remove the active token and insert the selected mention as an atomic element.
+        self.textarea.replace_range(start_idx..end_idx, "");
+        self.textarea.set_cursor(start_idx);
+        let id = self.textarea.insert_element(insert_text);
+
+        if let (Some(path), Some(mention)) =
+            (path, Self::mention_name_from_insert_text(insert_text))
+        {
+            self.mention_bindings.insert(
+                id,
+                ComposerMentionBinding {
+                    mention,
+                    path: path.to_string(),
+                },
+            );
+        }
+
+        self.textarea.insert_str(" ");
+        let new_cursor = start_idx
+            .saturating_add(insert_text.len())
+            .saturating_add(1);
+        self.textarea.set_cursor(new_cursor);
+    }
+
+    fn mention_name_from_insert_text(insert_text: &str) -> Option<String> {
+        let name = insert_text.strip_prefix('$')?;
+        if name.is_empty() {
+            return None;
+        }
+        if name
+            .as_bytes()
+            .iter()
+            .all(|byte| is_mention_name_char(*byte))
+        {
+            Some(name.to_string())
+        } else {
+            None
+        }
+    }
+
+    fn current_mention_elements(&self) -> Vec<(u64, String)> {
+        self.textarea
+            .text_element_snapshots()
+            .into_iter()
+            .filter_map(|snapshot| {
+                Self::mention_name_from_insert_text(snapshot.text.as_str())
+                    .map(|mention| (snapshot.id, mention))
+            })
+            .collect()
+    }
+
+    fn snapshot_mention_bindings(&self) -> Vec<MentionBinding> {
+        let mut ordered = Vec::new();
+        for (id, mention) in self.current_mention_elements() {
+            if let Some(binding) = self.mention_bindings.get(&id)
+                && binding.mention == mention
+            {
+                ordered.push(MentionBinding {
+                    mention: binding.mention.clone(),
+                    path: binding.path.clone(),
+                });
+            }
+        }
+        ordered
+    }
+
+    fn bind_mentions_from_snapshot(&mut self, mention_bindings: Vec<MentionBinding>) {
+        self.mention_bindings.clear();
+        if mention_bindings.is_empty() {
+            return;
+        }
+
+        let text = self.textarea.text().to_string();
+        let mut scan_from = 0usize;
+        for binding in mention_bindings {
+            let token = format!("${}", binding.mention);
+            let Some(range) =
+                find_next_mention_token_range(text.as_str(), token.as_str(), scan_from)
+            else {
+                continue;
+            };
+
+            let id = if let Some(id) = self.textarea.add_element_range(range.clone()) {
+                Some(id)
+            } else {
+                self.textarea.element_id_for_exact_range(range.clone())
+            };
+
+            if let Some(id) = id {
+                self.mention_bindings.insert(
+                    id,
+                    ComposerMentionBinding {
+                        mention: binding.mention,
+                        path: binding.path,
+                    },
+                );
+                scan_from = range.end;
+            }
+        }
+    }
+
+    /// Prepare text for submission/queuing. Returns None if submission should be suppressed.
+    /// On success, clears pending paste payloads because placeholders have been expanded.
+    ///
+    /// When `record_history` is true, the final submission is stored for ↑/↓ recall.
+    fn prepare_submission_text(
+        &mut self,
+        record_history: bool,
+    ) -> Option<(String, Vec<TextElement>)> {
+        let mut text = self.textarea.text().to_string();
+        let original_input = text.clone();
+        let original_text_elements = self.textarea.text_elements();
+        let original_mention_bindings = self.snapshot_mention_bindings();
+        let original_local_image_paths = self
+            .attached_images
+            .iter()
+            .map(|img| img.path.clone())
+            .collect::<Vec<_>>();
+        let original_pending_pastes = self.pending_pastes.clone();
+        let mut text_elements = original_text_elements.clone();
+        let input_starts_with_space = original_input.starts_with(' ');
+        self.recent_submission_mention_bindings.clear();
+        self.textarea.set_text_clearing_elements("");
+
+        if !self.pending_pastes.is_empty() {
+            // Expand placeholders so element byte ranges stay aligned.
+            let (expanded, expanded_elements) =
+                Self::expand_pending_pastes(&text, text_elements, &self.pending_pastes);
+            text = expanded;
+            text_elements = expanded_elements;
+        }
+
+        let expanded_input = text.clone();
+
+        // If there is neither text nor attachments, suppress submission entirely.
+        text = text.trim().to_string();
+        text_elements = Self::trim_text_elements(&expanded_input, &text, text_elements);
+
+        if self.slash_commands_enabled()
+            && let Some((name, _rest, _rest_offset)) = parse_slash_name(&text)
+        {
+            let treat_as_plain_text = input_starts_with_space || name.contains('/');
+            if !treat_as_plain_text {
+                let is_builtin =
+                    slash_commands::find_builtin_command(name, self.builtin_command_flags())
+                        .is_some();
+                let prompt_prefix = format!("{PROMPTS_CMD_PREFIX}:");
+                let is_known_prompt = name
+                    .strip_prefix(&prompt_prefix)
+                    .map(|prompt_name| {
+                        self.custom_prompts
+                            .iter()
+                            .any(|prompt| prompt.name == prompt_name)
+                    })
+                    .unwrap_or(false);
+                if !is_builtin && !is_known_prompt {
+                    let message = format!(
+                        r#"Unrecognized command '/{name}'. Type "/" for a list of supported commands."#
+                    );
+                    self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                        history_cell::new_info_event(message, /*hint*/ None),
+                    )));
+                    self.set_text_content_with_mention_bindings(
+                        original_input.clone(),
+                        original_text_elements,
+                        original_local_image_paths,
+                        original_mention_bindings,
+                    );
+                    self.pending_pastes.clone_from(&original_pending_pastes);
+                    self.textarea.set_cursor(original_input.len());
+                    return None;
+                }
+            }
+        }
+
+        if self.slash_commands_enabled() {
+            let expanded_prompt =
+                match expand_custom_prompt(&text, &text_elements, &self.custom_prompts) {
+                    Ok(expanded) => expanded,
+                    Err(err) => {
+                        self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                            history_cell::new_error_event(err.user_message()),
+                        )));
+                        self.set_text_content_with_mention_bindings(
+                            original_input.clone(),
+                            original_text_elements,
+                            original_local_image_paths,
+                            original_mention_bindings,
+                        );
+                        self.pending_pastes.clone_from(&original_pending_pastes);
+                        self.textarea.set_cursor(original_input.len());
+                        return None;
+                    }
+                };
+            if let Some(expanded) = expanded_prompt {
+                text = expanded.text;
+                text_elements = expanded.text_elements;
+            }
+        }
+        let actual_chars = text.chars().count();
+        if actual_chars > MAX_USER_INPUT_TEXT_CHARS {
+            let message = user_input_too_large_message(actual_chars);
+            self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+                history_cell::new_error_event(message),
+            )));
+            self.set_text_content_with_mention_bindings(
+                original_input.clone(),
+                original_text_elements,
+                original_local_image_paths,
+                original_mention_bindings,
+            );
+            self.pending_pastes.clone_from(&original_pending_pastes);
+            self.textarea.set_cursor(original_input.len());
+            return None;
+        }
+        // Custom prompt expansion can remove or rewrite image placeholders, so prune any
+        // attachments that no longer have a corresponding placeholder in the expanded text.
+        self.prune_attached_images_for_submission(&text, &text_elements);
+        if text.is_empty() && self.attached_images.is_empty() && self.remote_image_urls.is_empty() {
+            return None;
+        }
+        self.recent_submission_mention_bindings = original_mention_bindings.clone();
+        if record_history
+            && (!text.is_empty()
+                || !self.attached_images.is_empty()
+                || !self.remote_image_urls.is_empty())
+        {
+            let local_image_paths = self
+                .attached_images
+                .iter()
+                .map(|img| img.path.clone())
+                .collect();
+            self.history.record_local_submission(HistoryEntry {
+                text: text.clone(),
+                text_elements: text_elements.clone(),
+                local_image_paths,
+                remote_image_urls: self.remote_image_urls.clone(),
+                mention_bindings: original_mention_bindings,
+                pending_pastes: Vec::new(),
+            });
+        }
+        self.pending_pastes.clear();
+        Some((text, text_elements))
+    }
+
+    /// Common logic for handling message submission/queuing.
+    /// Returns the appropriate InputResult based on `should_queue`.
+    fn handle_submission(&mut self, should_queue: bool) -> (InputResult, bool) {
+        self.handle_submission_with_time(should_queue, Instant::now())
+    }
+
+    fn handle_submission_with_time(
+        &mut self,
+        should_queue: bool,
+        now: Instant,
+    ) -> (InputResult, bool) {
+        // If the first line is a bare built-in slash command (no args),
+        // dispatch it even when the slash popup isn't visible. This preserves
+        // the workflow: type a prefix ("/di"), press Tab to complete to
+        // "/diff ", then press Enter/Ctrl+Shift+Q to run it. Tab moves the cursor beyond
+        // the '/name' token and our caret-based heuristic hides the popup,
+        // but Enter/Ctrl+Shift+Q should still dispatch the command rather than submit
+        // literal text.
+        if let Some(result) = self.try_dispatch_bare_slash_command() {
+            return (result, true);
+        }
+
+        // If we're in a paste-like burst capture, treat Enter/Ctrl+Shift+Q as part of the burst
+        // and accumulate it rather than submitting or inserting immediately.
+        // Do not treat as paste inside a slash-command context.
+        let in_slash_context = self.slash_commands_enabled()
+            && (matches!(self.active_popup, ActivePopup::Command(_))
+                || self
+                    .textarea
+                    .text()
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .starts_with('/'));
+        if !self.disable_paste_burst
+            && self.paste_burst.is_active()
+            && !in_slash_context
+            && self.paste_burst.append_newline_if_active(now)
+        {
+            return (InputResult::None, true);
+        }
+
+        // During a paste-like burst, treat Enter/Ctrl+Shift+Q as a newline instead of submit.
+        if !in_slash_context
+            && !self.disable_paste_burst
+            && self
+                .paste_burst
+                .newline_should_insert_instead_of_submit(now)
+        {
+            self.textarea.insert_str("\n");
+            self.paste_burst.extend_window(now);
+            return (InputResult::None, true);
+        }
+
+        let original_input = self.textarea.text().to_string();
+        let original_text_elements = self.textarea.text_elements();
+        let original_mention_bindings = self.snapshot_mention_bindings();
+        let original_local_image_paths = self
+            .attached_images
+            .iter()
+            .map(|img| img.path.clone())
+            .collect::<Vec<_>>();
+        let original_pending_pastes = self.pending_pastes.clone();
+        if let Some(result) = self.try_dispatch_slash_command_with_args() {
+            return (result, true);
+        }
+
+        if let Some((text, text_elements)) =
+            self.prepare_submission_text(/*record_history*/ true)
+        {
+            if should_queue {
+                (
+                    InputResult::Queued {
+                        text,
+                        text_elements,
+                    },
+                    true,
+                )
+            } else {
+                // Do not clear attached_images here; ChatWidget drains them via take_recent_submission_images().
+                (
+                    InputResult::Submitted {
+                        text,
+                        text_elements,
+                    },
+                    true,
+                )
+            }
+        } else {
+            // Restore text if submission was suppressed.
+            self.set_text_content_with_mention_bindings(
+                original_input,
+                original_text_elements,
+                original_local_image_paths,
+                original_mention_bindings,
+            );
+            self.pending_pastes = original_pending_pastes;
+            (InputResult::None, true)
+        }
+    }
+
+    /// Check if the first line is a bare slash command (no args) and dispatch it.
+    /// Returns Some(InputResult) if a command was dispatched, None otherwise.
+    fn try_dispatch_bare_slash_command(&mut self) -> Option<InputResult> {
+        if !self.slash_commands_enabled() {
+            return None;
+        }
+        let first_line = self.textarea.text().lines().next().unwrap_or("");
+        if let Some((name, rest, _rest_offset)) = parse_slash_name(first_line)
+            && rest.is_empty()
+            && let Some(cmd) =
+                slash_commands::find_builtin_command(name, self.builtin_command_flags())
+        {
+            if self.reject_slash_command_if_unavailable(cmd) {
+                return Some(InputResult::None);
+            }
+            self.textarea.set_text_clearing_elements("");
+            Some(InputResult::Command(cmd))
+        } else {
+            None
+        }
+    }
+
+    /// Check if the input is a slash command with args (e.g., /review args) and dispatch it.
+    /// Returns Some(InputResult) if a command was dispatched, None otherwise.
+    fn try_dispatch_slash_command_with_args(&mut self) -> Option<InputResult> {
+        if !self.slash_commands_enabled() {
+            return None;
+        }
+        let text = self.textarea.text().to_string();
+        if text.starts_with(' ') {
+            return None;
+        }
+
+        let (name, rest, rest_offset) = parse_slash_name(&text)?;
+        if rest.is_empty() || name.contains('/') {
+            return None;
+        }
+
+        let cmd = slash_commands::find_builtin_command(name, self.builtin_command_flags())?;
+
+        if !cmd.supports_inline_args() {
+            return None;
+        }
+        if self.reject_slash_command_if_unavailable(cmd) {
+            return Some(InputResult::None);
+        }
+
+        let mut args_elements =
+            Self::slash_command_args_elements(rest, rest_offset, &self.textarea.text_elements());
+        let trimmed_rest = rest.trim();
+        args_elements = Self::trim_text_elements(rest, trimmed_rest, args_elements);
+        Some(InputResult::CommandWithArgs(
+            cmd,
+            trimmed_rest.to_string(),
+            args_elements,
+        ))
+    }
+
+    /// Expand pending placeholders and extract normalized inline-command args.
+    ///
+    /// Inline-arg commands are initially dispatched using the raw draft so command rejection does
+    /// not consume user input. Once a command is accepted, this helper performs the usual
+    /// submission preparation (paste expansion, element trimming) and rebases element ranges from
+    /// full-text offsets to command-arg offsets.
+    pub(crate) fn prepare_inline_args_submission(
+        &mut self,
+        record_history: bool,
+    ) -> Option<(String, Vec<TextElement>)> {
+        let (prepared_text, prepared_elements) = self.prepare_submission_text(record_history)?;
+        let (_, prepared_rest, prepared_rest_offset) = parse_slash_name(&prepared_text)?;
+        let mut args_elements = Self::slash_command_args_elements(
+            prepared_rest,
+            prepared_rest_offset,
+            &prepared_elements,
+        );
+        let trimmed_rest = prepared_rest.trim();
+        args_elements = Self::trim_text_elements(prepared_rest, trimmed_rest, args_elements);
+        Some((trimmed_rest.to_string(), args_elements))
+    }
+
+    fn reject_slash_command_if_unavailable(&self, cmd: SlashCommand) -> bool {
+        if !self.is_task_running || cmd.available_during_task() {
+            return false;
+        }
+        let message = format!(
+            "'/{}' is disabled while a task is in progress.",
+            cmd.command()
+        );
+        self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
+            history_cell::new_error_event(message),
+        )));
+        true
+    }
+
+    /// Translate full-text element ranges into command-argument ranges.
+    ///
+    /// `rest_offset` is the byte offset where `rest` begins in the full text.
+    fn slash_command_args_elements(
+        rest: &str,
+        rest_offset: usize,
+        text_elements: &[TextElement],
+    ) -> Vec<TextElement> {
+        if rest.is_empty() || text_elements.is_empty() {
+            return Vec::new();
+        }
+        text_elements
+            .iter()
+            .filter_map(|elem| {
+                if elem.byte_range.end <= rest_offset {
+                    return None;
+                }
+                let start = elem.byte_range.start.saturating_sub(rest_offset);
+                let mut end = elem.byte_range.end.saturating_sub(rest_offset);
+                if start >= rest.len() {
+                    return None;
+                }
+                end = end.min(rest.len());
+                (start < end).then_some(elem.map_range(|_| ByteRange { start, end }))
+            })
+            .collect()
+    }
+
+    fn remote_images_lines(&self, _width: u16) -> Vec<Line<'static>> {
+        self.remote_image_urls
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| {
+                let label = local_image_label_text(idx + 1);
+                if self.selected_remote_image_index == Some(idx) {
+                    label.cyan().reversed().into()
+                } else {
+                    label.cyan().into()
+                }
+            })
+            .collect()
+    }
+
+    fn clear_remote_image_selection(&mut self) {
+        self.selected_remote_image_index = None;
+    }
+
+    fn remove_selected_remote_image(&mut self, selected_index: usize) {
+        if selected_index >= self.remote_image_urls.len() {
+            self.clear_remote_image_selection();
+            return;
+        }
+        self.remote_image_urls.remove(selected_index);
+        self.selected_remote_image_index = if self.remote_image_urls.is_empty() {
+            None
+        } else {
+            Some(selected_index.min(self.remote_image_urls.len() - 1))
+        };
+        self.relabel_attached_images_and_update_placeholders();
+        self.sync_popups();
+    }
+
+    fn handle_remote_image_selection_key(
+        &mut self,
+        key_event: &KeyEvent,
+    ) -> Option<(InputResult, bool)> {
+        if self.remote_image_urls.is_empty()
+            || key_event.modifiers != KeyModifiers::NONE
+            || key_event.kind != KeyEventKind::Press
+        {
+            return None;
+        }
+
+        match key_event.code {
+            KeyCode::Up => {
+                if let Some(selected) = self.selected_remote_image_index {
+                    self.selected_remote_image_index = Some(selected.saturating_sub(1));
+                    Some((InputResult::None, true))
+                } else if self.textarea.cursor() == 0 {
+                    self.selected_remote_image_index = Some(self.remote_image_urls.len() - 1);
+                    Some((InputResult::None, true))
+                } else {
+                    None
+                }
+            }
+            KeyCode::Down => {
+                if let Some(selected) = self.selected_remote_image_index {
+                    if selected + 1 < self.remote_image_urls.len() {
+                        self.selected_remote_image_index = Some(selected + 1);
+                    } else {
+                        self.clear_remote_image_selection();
+                    }
+                    Some((InputResult::None, true))
+                } else {
+                    None
+                }
+            }
+            KeyCode::Delete | KeyCode::Backspace => {
+                if let Some(selected) = self.selected_remote_image_index {
+                    self.remove_selected_remote_image(selected);
+                    Some((InputResult::None, true))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Handle key event when no popup is visible.
+    fn handle_key_event_without_popup(&mut self, key_event: KeyEvent) -> (InputResult, bool) {
+        if let Some((result, redraw)) = self.handle_remote_image_selection_key(&key_event) {
+            return (result, redraw);
+        }
+        if self.selected_remote_image_index.is_some() {
+            self.clear_remote_image_selection();
+        }
+        if self.handle_shortcut_overlay_key(&key_event) {
+            return (InputResult::None, true);
+        }
+        if key_event.code == KeyCode::Esc {
+            if self.is_empty() {
+                let next_mode = esc_hint_mode(self.footer_mode, self.is_task_running);
+                if next_mode != self.footer_mode {
+                    self.footer_mode = next_mode;
+                    return (InputResult::None, true);
+                }
+            }
+        } else {
+            self.footer_mode = reset_mode_after_activity(self.footer_mode);
+        }
+        match key_event {
+            KeyEvent {
+                code: KeyCode::Char('d'),
+                modifiers: crossterm::event::KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                ..
+            } if self.is_empty() => (InputResult::None, false),
+            // -------------------------------------------------------------
+            // History navigation (Up / Down) – only when the composer is not
+            // empty or when the cursor is at the correct position, to avoid
+            // interfering with normal cursor movement.
+            // -------------------------------------------------------------
+            KeyEvent {
+                code: KeyCode::Up | KeyCode::Down,
+                kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                ..
+            }
+            | KeyEvent {
+                code: KeyCode::Char('p') | KeyCode::Char('n'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                if self
+                    .history
+                    .should_handle_navigation(self.textarea.text(), self.textarea.cursor())
+                {
+                    let replace_entry = match key_event.code {
+                        KeyCode::Up => self.history.navigate_up(&self.app_event_tx),
+                        KeyCode::Down => self.history.navigate_down(&self.app_event_tx),
+                        KeyCode::Char('p') => self.history.navigate_up(&self.app_event_tx),
+                        KeyCode::Char('n') => self.history.navigate_down(&self.app_event_tx),
+                        _ => unreachable!(),
+                    };
+                    if let Some(entry) = replace_entry {
+                        self.apply_history_entry(entry);
+                        return (InputResult::None, true);
+                    }
+                }
+                self.handle_input_basic(key_event)
+            }
+            KeyEvent {
+                code: KeyCode::Tab,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                ..
+            } if !self.is_bang_shell_command() => self.handle_submission(self.is_task_running),
+            KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => self.handle_submission(/*should_queue*/ false),
+            input => self.handle_input_basic(input),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn handle_voice_space_key_event(
+        &mut self,
+        _key_event: &KeyEvent,
+    ) -> Option<(InputResult, bool)> {
+        None
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn handle_voice_space_key_event(
+        &mut self,
+        key_event: &KeyEvent,
+    ) -> Option<(InputResult, bool)> {
+        if !self.voice_transcription_enabled() || !matches!(key_event.code, KeyCode::Char(' ')) {
+            return None;
+        }
+        match key_event.kind {
+            KeyEventKind::Press => {
+                if self.paste_burst.is_active() {
+                    return None;
+                }
+
+                // If textarea is empty, start recording immediately without inserting a space.
+                if self.textarea.text().is_empty() {
+                    if self.start_recording_with_placeholder() {
+                        return Some((InputResult::None, true));
+                    }
+                    return None;
+                }
+
+                // If a hold is already pending, swallow further press events to
+                // avoid inserting multiple spaces and resetting the timer on key repeat.
+                if self.voice_state.space_hold_started_at.is_some() {
+                    if !self.voice_state.key_release_supported {
+                        self.voice_state.space_hold_repeat_seen = true;
+                    }
+                    return Some((InputResult::None, false));
+                }
+
+                // Insert a named element that renders as a space so we can later
+                // remove it on timeout or convert it to a plain space on release.
+                let elem_id = self.next_id();
+                self.textarea.insert_named_element(" ", elem_id.clone());
+
+                // Record pending hold metadata.
+                self.voice_state.space_hold_started_at = Some(Instant::now());
+                self.voice_state.space_hold_element_id = Some(elem_id);
+                self.voice_state.space_hold_repeat_seen = false;
+
+                // Spawn a delayed task to flip an atomic flag; we check it on next key event.
+                let flag = Arc::new(AtomicBool::new(false));
+                let frame = self.frame_requester.clone();
+                Self::schedule_space_hold_timer(flag.clone(), frame);
+                self.voice_state.space_hold_trigger = Some(flag);
+
+                Some((InputResult::None, true))
+            }
+            // If we see a repeat before release, handling occurs in the top-level pending block.
+            KeyEventKind::Repeat => {
+                // Swallow repeats while a hold is pending to avoid extra spaces.
+                if self.voice_state.space_hold_started_at.is_some() {
+                    if !self.voice_state.key_release_supported {
+                        self.voice_state.space_hold_repeat_seen = true;
+                    }
+                    return Some((InputResult::None, false));
+                }
+                // Fallback: if no pending hold, treat as normal input.
+                None
+            }
+            // Space release without pending (fallback): treat as normal input.
+            KeyEventKind::Release => {
+                // If a hold is pending, convert the element to a plain space and clear state.
+                self.voice_state.space_hold_started_at = None;
+                if let Some(id) = self.voice_state.space_hold_element_id.take() {
+                    let _ = self.textarea.replace_element_by_id(&id, " ");
+                }
+                self.voice_state.space_hold_trigger = None;
+                self.voice_state.space_hold_repeat_seen = false;
+                Some((InputResult::None, true))
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn handle_key_event_while_recording(
+        &mut self,
+        _key_event: KeyEvent,
+    ) -> Option<(InputResult, bool)> {
+        None
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn handle_key_event_while_recording(
+        &mut self,
+        key_event: KeyEvent,
+    ) -> Option<(InputResult, bool)> {
+        if self.voice_state.voice.is_some() {
+            let should_stop = if self.voice_state.key_release_supported {
+                match key_event.kind {
+                    KeyEventKind::Release => matches!(key_event.code, KeyCode::Char(' ')),
+                    KeyEventKind::Press | KeyEventKind::Repeat => {
+                        !matches!(key_event.code, KeyCode::Char(' '))
+                    }
+                }
+            } else {
+                match key_event.kind {
+                    KeyEventKind::Release => matches!(key_event.code, KeyCode::Char(' ')),
+                    KeyEventKind::Press | KeyEventKind::Repeat => {
+                        if matches!(key_event.code, KeyCode::Char(' ')) {
+                            self.voice_state.space_recording_last_repeat_at = Some(Instant::now());
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                }
+            };
+
+            if should_stop {
+                let needs_redraw = self.stop_recording_and_start_transcription();
+                return Some((InputResult::None, needs_redraw));
+            }
+
+            // Swallow non-stopping keys while recording.
+            return Some((InputResult::None, false));
+        }
+
+        None
+    }
+
+    fn is_bang_shell_command(&self) -> bool {
+        self.textarea.text().trim_start().starts_with('!')
+    }
+
+    /// Applies any due `PasteBurst` flush at time `now`.
+    ///
+    /// Converts [`PasteBurst::flush_if_due`] results into concrete textarea mutations.
+    ///
+    /// Callers:
+    ///
+    /// - UI ticks via [`ChatComposer::flush_paste_burst_if_due`], so held first-chars can render.
+    /// - Input handling via [`ChatComposer::handle_input_basic`], so a due burst does not lag.
+    fn handle_paste_burst_flush(&mut self, now: Instant) -> bool {
+        match self.paste_burst.flush_if_due(now) {
+            FlushResult::Paste(pasted) => {
+                self.handle_paste(pasted);
+                true
+            }
+            FlushResult::Typed(ch) => {
+                self.textarea.insert_str(ch.to_string().as_str());
+                self.sync_popups();
+                true
+            }
+            FlushResult::None => false,
+        }
+    }
+
+    /// Handles keys that mutate the textarea, including paste-burst detection.
+    ///
+    /// Acts as the lowest-level keypath for keys that mutate the textarea. It is also where plain
+    /// character streams are converted into explicit paste operations on terminals that do not
+    /// reliably provide bracketed paste.
+    ///
+    /// Ordering is important:
+    ///
+    /// - Always flush any *due* paste burst first so buffered text does not lag behind unrelated
+    ///   edits.
+    /// - Then handle the incoming key, intercepting only "plain" (no Ctrl/Alt) char input.
+    /// - For non-plain keys, flush via `flush_before_modified_input()` before applying the key;
+    ///   otherwise `clear_window_after_non_char()` can leave buffered text waiting without a
+    ///   timestamp to time out against.
+    fn handle_input_basic(&mut self, input: KeyEvent) -> (InputResult, bool) {
+        // Ignore key releases here to avoid treating them as additional input
+        // (e.g., appending the same character twice via paste-burst logic).
+        if !matches!(input.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+            return (InputResult::None, false);
+        }
+
+        self.handle_input_basic_with_time(input, Instant::now())
+    }
+
+    fn handle_input_basic_with_time(
+        &mut self,
+        input: KeyEvent,
+        now: Instant,
+    ) -> (InputResult, bool) {
+        // If we have a buffered non-bracketed paste burst and enough time has
+        // elapsed since the last char, flush it before handling a new input.
+        self.handle_paste_burst_flush(now);
+
+        if !matches!(input.code, KeyCode::Esc) {
+            self.footer_mode = reset_mode_after_activity(self.footer_mode);
+        }
+
+        // If we're capturing a burst and receive Enter, accumulate it instead of inserting.
+        if matches!(input.code, KeyCode::Enter)
+            && !self.disable_paste_burst
+            && self.paste_burst.is_active()
+            && self.paste_burst.append_newline_if_active(now)
+        {
+            return (InputResult::None, true);
+        }
+
+        // Intercept plain Char inputs to optionally accumulate into a burst buffer.
+        //
+        // This is intentionally limited to "plain" (no Ctrl/Alt) chars so shortcuts keep their
+        // normal semantics, and so we can aggressively flush/clear any burst state when non-char
+        // keys are pressed.
+        if let KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers,
+            ..
+        } = input
+        {
+            let has_ctrl_or_alt = has_ctrl_or_alt(modifiers);
+            if !has_ctrl_or_alt && !self.disable_paste_burst {
+                // Non-ASCII characters (e.g., from IMEs) can arrive in quick bursts, so avoid
+                // holding the first char while still allowing burst detection for paste input.
+                if !ch.is_ascii() {
+                    return self.handle_non_ascii_char(input, now);
+                }
+
+                match self.paste_burst.on_plain_char(ch, now) {
+                    CharDecision::BufferAppend => {
+                        self.paste_burst.append_char_to_buffer(ch, now);
+                        return (InputResult::None, true);
+                    }
+                    CharDecision::BeginBuffer { retro_chars } => {
+                        let cur = self.textarea.cursor();
+                        let txt = self.textarea.text();
+                        let safe_cur = Self::clamp_to_char_boundary(txt, cur);
+                        let before = &txt[..safe_cur];
+                        if let Some(grab) =
+                            self.paste_burst
+                                .decide_begin_buffer(now, before, retro_chars as usize)
+                        {
+                            if !grab.grabbed.is_empty() {
+                                self.textarea.replace_range(grab.start_byte..safe_cur, "");
+                            }
+                            self.paste_burst.append_char_to_buffer(ch, now);
+                            return (InputResult::None, true);
+                        }
+                        // If decide_begin_buffer opted not to start buffering,
+                        // fall through to normal insertion below.
+                    }
+                    CharDecision::BeginBufferFromPending => {
+                        // First char was held; now append the current one.
+                        self.paste_burst.append_char_to_buffer(ch, now);
+                        return (InputResult::None, true);
+                    }
+                    CharDecision::RetainFirstChar => {
+                        // Keep the first fast char pending momentarily.
+                        return (InputResult::None, true);
+                    }
+                }
+            }
+            if let Some(pasted) = self.paste_burst.flush_before_modified_input() {
+                self.handle_paste(pasted);
+            }
+        }
+
+        // Flush any buffered burst before applying a non-char input (arrow keys, etc).
+        //
+        // `clear_window_after_non_char()` clears `last_plain_char_time`. If we cleared that while
+        // `PasteBurst.buffer` is non-empty, `flush_if_due()` would no longer have a timestamp to
+        // time out against, and the buffered paste could remain stuck until another plain char
+        // arrives.
+        if !matches!(input.code, KeyCode::Char(_) | KeyCode::Enter)
+            && let Some(pasted) = self.paste_burst.flush_before_modified_input()
+        {
+            self.handle_paste(pasted);
+        }
+        // For non-char inputs (or after flushing), handle normally.
+        // Track element removals so we can drop any corresponding placeholders without scanning
+        // the full text. (Placeholders are atomic elements; when deleted, the element disappears.)
+        let elements_before = if self.pending_pastes.is_empty()
+            && self.attached_images.is_empty()
+            && self.remote_image_urls.is_empty()
+        {
+            None
+        } else {
+            Some(self.textarea.element_payloads())
+        };
+
+        self.textarea.input(input);
+
+        if let Some(elements_before) = elements_before {
+            self.reconcile_deleted_elements(elements_before);
+        }
+
+        // Update paste-burst heuristic for plain Char (no Ctrl/Alt) events.
+        let crossterm::event::KeyEvent {
+            code, modifiers, ..
+        } = input;
+        match code {
+            KeyCode::Char(_) => {
+                let has_ctrl_or_alt = has_ctrl_or_alt(modifiers);
+                if has_ctrl_or_alt {
+                    self.paste_burst.clear_window_after_non_char();
+                }
+            }
+            KeyCode::Enter => {
+                // Keep burst window alive (supports blank lines in paste).
+            }
+            _ => {
+                // Other keys: clear burst window (buffer should have been flushed above if needed).
+                self.paste_burst.clear_window_after_non_char();
+            }
+        }
+
+        (InputResult::None, true)
+    }
+
+    fn reconcile_deleted_elements(&mut self, elements_before: Vec<String>) {
+        let elements_after: HashSet<String> =
+            self.textarea.element_payloads().into_iter().collect();
+
+        let mut removed_any_image = false;
+        for removed in elements_before
+            .into_iter()
+            .filter(|payload| !elements_after.contains(payload))
+        {
+            self.pending_pastes.retain(|(ph, _)| ph != &removed);
+
+            if let Some(idx) = self
+                .attached_images
+                .iter()
+                .position(|img| img.placeholder == removed)
+            {
+                self.attached_images.remove(idx);
+                removed_any_image = true;
+            }
+        }
+
+        if removed_any_image {
+            self.relabel_attached_images_and_update_placeholders();
+        }
+    }
+
+    fn relabel_attached_images_and_update_placeholders(&mut self) {
+        for idx in 0..self.attached_images.len() {
+            let expected = local_image_label_text(self.remote_image_urls.len() + idx + 1);
+            let current = self.attached_images[idx].placeholder.clone();
+            if current == expected {
+                continue;
+            }
+
+            self.attached_images[idx].placeholder = expected.clone();
+            let _renamed = self.textarea.replace_element_payload(&current, &expected);
+        }
+    }
+
+    fn handle_shortcut_overlay_key(&mut self, key_event: &KeyEvent) -> bool {
+        if key_event.kind != KeyEventKind::Press {
+            return false;
+        }
+
+        let toggles = matches!(key_event.code, KeyCode::Char('?'))
+            && !has_ctrl_or_alt(key_event.modifiers)
+            && self.is_empty()
+            && !self.is_in_paste_burst();
+
+        if !toggles {
+            return false;
+        }
+
+        let next = toggle_shortcut_mode(
+            self.footer_mode,
+            self.quit_shortcut_hint_visible(),
+            self.is_empty(),
+        );
+        let changed = next != self.footer_mode;
+        self.footer_mode = next;
+        changed
+    }
+
+    fn footer_props(&self) -> FooterProps {
+        let mode = self.footer_mode();
+        let is_wsl = {
+            #[cfg(target_os = "linux")]
+            {
+                mode == FooterMode::ShortcutOverlay && crate::clipboard_paste::is_probably_wsl()
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                false
+            }
+        };
+
+        FooterProps {
+            mode,
+            esc_backtrack_hint: self.esc_backtrack_hint,
+            use_shift_enter_hint: self.use_shift_enter_hint,
+            is_task_running: self.is_task_running,
+            quit_shortcut_key: self.quit_shortcut_key,
+            collaboration_modes_enabled: self.collaboration_modes_enabled,
+            is_wsl,
+            context_window_percent: self.context_window_percent,
+            context_window_used_tokens: self.context_window_used_tokens,
+            status_line_value: self.status_line_value.clone(),
+            status_line_enabled: self.status_line_enabled,
+            active_agent_label: self.active_agent_label.clone(),
+        }
+    }
+
+    /// Resolve the effective footer mode via a small priority waterfall.
+    ///
+    /// The base mode is derived solely from whether the composer is empty:
+    /// `ComposerEmpty` iff empty, otherwise `ComposerHasDraft`. Transient
+    /// modes (Esc hint, overlay, quit reminder) can override that base when
+    /// their conditions are active.
+    fn footer_mode(&self) -> FooterMode {
+        let base_mode = if self.is_empty() {
+            FooterMode::ComposerEmpty
+        } else {
+            FooterMode::ComposerHasDraft
+        };
+
+        match self.footer_mode {
+            FooterMode::EscHint => FooterMode::EscHint,
+            FooterMode::ShortcutOverlay => FooterMode::ShortcutOverlay,
+            FooterMode::QuitShortcutReminder if self.quit_shortcut_hint_visible() => {
+                FooterMode::QuitShortcutReminder
+            }
+            FooterMode::ComposerEmpty | FooterMode::ComposerHasDraft
+                if self.quit_shortcut_hint_visible() =>
+            {
+                FooterMode::QuitShortcutReminder
+            }
+            FooterMode::QuitShortcutReminder => base_mode,
+            FooterMode::ComposerEmpty | FooterMode::ComposerHasDraft => base_mode,
+        }
+    }
+
+    fn custom_footer_height(&self) -> Option<u16> {
+        if self.footer_flash_visible() {
+            return Some(1);
+        }
+        self.footer_hint_override
+            .as_ref()
+            .map(|items| if items.is_empty() { 0 } else { 1 })
+    }
+
+    pub(crate) fn sync_popups(&mut self) {
+        self.sync_slash_command_elements();
+        if !self.popups_enabled() {
+            self.active_popup = ActivePopup::None;
+            return;
+        }
+        let file_token = Self::current_at_token(&self.textarea);
+        let browsing_history = self
+            .history
+            .should_handle_navigation(self.textarea.text(), self.textarea.cursor());
+        // When browsing input history (shell-style Up/Down recall), skip all popup
+        // synchronization so nothing steals focus from continued history navigation.
+        if browsing_history {
+            if self.current_file_query.is_some() {
+                self.app_event_tx
+                    .send(AppEvent::StartFileSearch(String::new()));
+                self.current_file_query = None;
+            }
+            self.active_popup = ActivePopup::None;
+            return;
+        }
+        let mention_token = self.current_mention_token();
+
+        let allow_command_popup =
+            self.slash_commands_enabled() && file_token.is_none() && mention_token.is_none();
+        self.sync_command_popup(allow_command_popup);
+
+        if matches!(self.active_popup, ActivePopup::Command(_)) {
+            if self.current_file_query.is_some() {
+                self.app_event_tx
+                    .send(AppEvent::StartFileSearch(String::new()));
+                self.current_file_query = None;
+            }
+            self.dismissed_file_popup_token = None;
+            self.dismissed_mention_popup_token = None;
+            return;
+        }
+
+        if let Some(token) = mention_token {
+            if self.current_file_query.is_some() {
+                self.app_event_tx
+                    .send(AppEvent::StartFileSearch(String::new()));
+                self.current_file_query = None;
+            }
+            self.sync_mention_popup(token);
+            return;
+        }
+        self.dismissed_mention_popup_token = None;
+
+        if let Some(token) = file_token {
+            self.sync_file_search_popup(token);
+            return;
+        }
+
+        if self.current_file_query.is_some() {
+            self.app_event_tx
+                .send(AppEvent::StartFileSearch(String::new()));
+            self.current_file_query = None;
+        }
+        self.dismissed_file_popup_token = None;
+        if matches!(
+            self.active_popup,
+            ActivePopup::File(_) | ActivePopup::Skill(_)
+        ) {
+            self.active_popup = ActivePopup::None;
+        }
+    }
+
+    /// Keep slash command elements aligned with the current first line.
+    fn sync_slash_command_elements(&mut self) {
+        if !self.slash_commands_enabled() {
+            return;
+        }
+        let text = self.textarea.text();
+        let first_line_end = text.find('\n').unwrap_or(text.len());
+        let first_line = &text[..first_line_end];
+        let desired_range = self.slash_command_element_range(first_line);
+        // Slash commands are only valid at byte 0 of the first line.
+        // Any slash-shaped element not matching the current desired prefix is stale.
+        let mut has_desired = false;
+        let mut stale_ranges = Vec::new();
+        for elem in self.textarea.text_elements() {
+            let Some(payload) = elem.placeholder(text) else {
+                continue;
+            };
+            if payload.strip_prefix('/').is_none() {
+                continue;
+            }
+            let range = elem.byte_range.start..elem.byte_range.end;
+            if desired_range.as_ref() == Some(&range) {
+                has_desired = true;
+            } else {
+                stale_ranges.push(range);
+            }
+        }
+
+        for range in stale_ranges {
+            self.textarea.remove_element_range(range);
+        }
+
+        if let Some(range) = desired_range
+            && !has_desired
+        {
+            self.textarea.add_element_range(range);
+        }
+    }
+
+    fn slash_command_element_range(&self, first_line: &str) -> Option<Range<usize>> {
+        let (name, _rest, _rest_offset) = parse_slash_name(first_line)?;
+        if name.contains('/') {
+            return None;
+        }
+        let element_end = 1 + name.len();
+        let has_space_after = first_line
+            .get(element_end..)
+            .and_then(|tail| tail.chars().next())
+            .is_some_and(char::is_whitespace);
+        if !has_space_after {
+            return None;
+        }
+        if self.is_known_slash_name(name) {
+            Some(0..element_end)
+        } else {
+            None
+        }
+    }
+
+    fn is_known_slash_name(&self, name: &str) -> bool {
+        let is_builtin =
+            slash_commands::find_builtin_command(name, self.builtin_command_flags()).is_some();
+        if is_builtin {
+            return true;
+        }
+        if let Some(rest) = name.strip_prefix(PROMPTS_CMD_PREFIX)
+            && let Some(prompt_name) = rest.strip_prefix(':')
+        {
+            return self
+                .custom_prompts
+                .iter()
+                .any(|prompt| prompt.name == prompt_name);
+        }
+        false
+    }
+
+    /// If the cursor is currently within a slash command on the first line,
+    /// extract the command name and the rest of the line after it.
+    /// Returns None if the cursor is outside a slash command.
+    fn slash_command_under_cursor(first_line: &str, cursor: usize) -> Option<(&str, &str)> {
+        if !first_line.starts_with('/') {
+            return None;
+        }
+
+        let name_start = 1usize;
+        let name_end = first_line[name_start..]
+            .find(char::is_whitespace)
+            .map(|idx| name_start + idx)
+            .unwrap_or_else(|| first_line.len());
+
+        if cursor > name_end {
+            return None;
+        }
+
+        let name = &first_line[name_start..name_end];
+        let rest_start = first_line[name_end..]
+            .find(|c: char| !c.is_whitespace())
+            .map(|idx| name_end + idx)
+            .unwrap_or(name_end);
+        let rest = &first_line[rest_start..];
+
+        Some((name, rest))
+    }
+
+    /// Heuristic for whether the typed slash command looks like a valid
+    /// prefix for any known command (built-in or custom prompt).
+    /// Empty names only count when there is no extra content after the '/'.
+    fn looks_like_slash_prefix(&self, name: &str, rest_after_name: &str) -> bool {
+        if !self.slash_commands_enabled() {
+            return false;
+        }
+        if name.is_empty() {
+            return rest_after_name.is_empty();
+        }
+
+        if slash_commands::has_builtin_prefix(name, self.builtin_command_flags()) {
+            return true;
+        }
+
+        self.custom_prompts.iter().any(|prompt| {
+            fuzzy_match(&format!("{PROMPTS_CMD_PREFIX}:{}", prompt.name), name).is_some()
+        })
+    }
+
+    /// Synchronize `self.command_popup` with the current text in the
+    /// textarea. This must be called after every modification that can change
+    /// the text so the popup is shown/updated/hidden as appropriate.
+    fn sync_command_popup(&mut self, allow: bool) {
+        if !allow {
+            if matches!(self.active_popup, ActivePopup::Command(_)) {
+                self.active_popup = ActivePopup::None;
+            }
+            return;
+        }
+        // Determine whether the caret is inside the initial '/name' token on the first line.
+        let text = self.textarea.text();
+        let first_line_end = text.find('\n').unwrap_or(text.len());
+        let first_line = &text[..first_line_end];
+        let cursor = self.textarea.cursor();
+        let caret_on_first_line = cursor <= first_line_end;
+
+        let is_editing_slash_command_name = caret_on_first_line
+            && Self::slash_command_under_cursor(first_line, cursor)
+                .is_some_and(|(name, rest)| self.looks_like_slash_prefix(name, rest));
+
+        // If the cursor is currently positioned within an `@token`, prefer the
+        // file-search popup over the slash popup so users can insert a file path
+        // as an argument to the command (e.g., "/review @docs/...").
+        if Self::current_at_token(&self.textarea).is_some() {
+            if matches!(self.active_popup, ActivePopup::Command(_)) {
+                self.active_popup = ActivePopup::None;
+            }
+            return;
+        }
+        match &mut self.active_popup {
+            ActivePopup::Command(popup) => {
+                if is_editing_slash_command_name {
+                    popup.on_composer_text_change(first_line.to_string());
+                } else {
+                    self.active_popup = ActivePopup::None;
+                }
+            }
+            _ => {
+                if is_editing_slash_command_name {
+                    let collaboration_modes_enabled = self.collaboration_modes_enabled;
+                    let connectors_enabled = self.connectors_enabled;
+                    let fast_command_enabled = self.fast_command_enabled;
+                    let personality_command_enabled = self.personality_command_enabled;
+                    let realtime_conversation_enabled = self.realtime_conversation_enabled;
+                    let audio_device_selection_enabled = self.audio_device_selection_enabled;
+                    let mut command_popup = CommandPopup::new(
+                        self.custom_prompts.clone(),
+                        CommandPopupFlags {
+                            collaboration_modes_enabled,
+                            connectors_enabled,
+                            fast_command_enabled,
+                            personality_command_enabled,
+                            realtime_conversation_enabled,
+                            audio_device_selection_enabled,
+                            windows_degraded_sandbox_active: self.windows_degraded_sandbox_active,
+                        },
+                    );
+                    command_popup.on_composer_text_change(first_line.to_string());
+                    self.active_popup = ActivePopup::Command(command_popup);
+                }
+            }
+        }
+    }
+    pub(crate) fn set_custom_prompts(&mut self, prompts: Vec<CustomPrompt>) {
+        self.custom_prompts = prompts.clone();
+        if let ActivePopup::Command(popup) = &mut self.active_popup {
+            popup.set_prompts(prompts);
+        }
+    }
+
+    /// Synchronize `self.file_search_popup` with the current text in the textarea.
+    /// Note this is only called when self.active_popup is NOT Command.
+    fn sync_file_search_popup(&mut self, query: String) {
+        // If user dismissed popup for this exact query, don't reopen until text changes.
+        if self.dismissed_file_popup_token.as_ref() == Some(&query) {
+            return;
+        }
+
+        if query.is_empty() {
+            self.app_event_tx
+                .send(AppEvent::StartFileSearch(String::new()));
+        } else {
+            self.app_event_tx
+                .send(AppEvent::StartFileSearch(query.clone()));
+        }
+
+        match &mut self.active_popup {
+            ActivePopup::File(popup) => {
+                if query.is_empty() {
+                    popup.set_empty_prompt();
+                } else {
+                    popup.set_query(&query);
+                }
+            }
+            _ => {
+                let mut popup = FileSearchPopup::new();
+                if query.is_empty() {
+                    popup.set_empty_prompt();
+                } else {
+                    popup.set_query(&query);
+                }
+                self.active_popup = ActivePopup::File(popup);
+            }
+        }
+
+        if query.is_empty() {
+            self.current_file_query = None;
+        } else {
+            self.current_file_query = Some(query);
+        }
+        self.dismissed_file_popup_token = None;
+    }
+
+    fn sync_mention_popup(&mut self, query: String) {
+        if self.dismissed_mention_popup_token.as_ref() == Some(&query) {
+            return;
+        }
+
+        let mentions = self.mention_items();
+        if mentions.is_empty() {
+            self.active_popup = ActivePopup::None;
+            return;
+        }
+
+        match &mut self.active_popup {
+            ActivePopup::Skill(popup) => {
+                popup.set_query(&query);
+                popup.set_mentions(mentions);
+            }
+            _ => {
+                let mut popup = SkillPopup::new(mentions);
+                popup.set_query(&query);
+                self.active_popup = ActivePopup::Skill(popup);
+            }
+        }
+    }
+
+    fn mention_items(&self) -> Vec<MentionItem> {
+        let mut mentions = Vec::new();
+
+        if let Some(skills) = self.skills.as_ref() {
+            for skill in skills {
+                let display_name = skill_display_name(skill).to_string();
+                let description = skill_description(skill);
+                let skill_name = skill.name.clone();
+                let search_terms = if display_name == skill.name {
+                    vec![skill_name.clone()]
+                } else {
+                    vec![skill_name.clone(), display_name.clone()]
+                };
+                mentions.push(MentionItem {
+                    display_name,
+                    description,
+                    insert_text: format!("${skill_name}"),
+                    search_terms,
+                    path: Some(skill.path_to_skills_md.to_string_lossy().into_owned()),
+                    category_tag: Some("[Skill]".to_string()),
+                    sort_rank: 1,
+                });
+            }
+        }
+
+        if let Some(plugins) = self.plugins.as_ref() {
+            for plugin in plugins {
+                let (plugin_name, marketplace_name) = plugin
+                    .config_name
+                    .split_once('@')
+                    .unwrap_or((plugin.config_name.as_str(), ""));
+                let mut capability_labels = Vec::new();
+                if plugin.has_skills {
+                    capability_labels.push("skills".to_string());
+                }
+                if !plugin.mcp_server_names.is_empty() {
+                    let mcp_server_count = plugin.mcp_server_names.len();
+                    capability_labels.push(if mcp_server_count == 1 {
+                        "1 MCP server".to_string()
+                    } else {
+                        format!("{mcp_server_count} MCP servers")
+                    });
+                }
+                if !plugin.app_connector_ids.is_empty() {
+                    let app_count = plugin.app_connector_ids.len();
+                    capability_labels.push(if app_count == 1 {
+                        "1 app".to_string()
+                    } else {
+                        format!("{app_count} apps")
+                    });
+                }
+                let description = plugin.description.clone().or_else(|| {
+                    Some(if capability_labels.is_empty() {
+                        "Plugin".to_string()
+                    } else {
+                        format!("Plugin · {}", capability_labels.join(" · "))
+                    })
+                });
+                let mut search_terms = vec![plugin_name.to_string(), plugin.config_name.clone()];
+                if plugin.display_name != plugin_name {
+                    search_terms.push(plugin.display_name.clone());
+                }
+                if !marketplace_name.is_empty() {
+                    search_terms.push(marketplace_name.to_string());
+                }
+                mentions.push(MentionItem {
+                    display_name: plugin.display_name.clone(),
+                    description,
+                    insert_text: format!("${plugin_name}"),
+                    search_terms,
+                    path: Some(format!("plugin://{}", plugin.config_name)),
+                    category_tag: Some("[Plugin]".to_string()),
+                    sort_rank: 0,
+                });
+            }
+        }
+
+        if self.connectors_enabled
+            && let Some(snapshot) = self.connectors_snapshot.as_ref()
+        {
+            for connector in &snapshot.connectors {
+                if !connector.is_accessible || !connector.is_enabled {
+                    continue;
+                }
+                let display_name = connectors::connector_display_label(connector);
+                let description = Some(Self::connector_brief_description(connector));
+                let slug = codex_core::connectors::connector_mention_slug(connector);
+                let search_terms = vec![display_name.clone(), connector.id.clone(), slug.clone()];
+                let connector_id = connector.id.as_str();
+                mentions.push(MentionItem {
+                    display_name: display_name.clone(),
+                    description,
+                    insert_text: format!("${slug}"),
+                    search_terms,
+                    path: Some(format!("app://{connector_id}")),
+                    category_tag: Some("[App]".to_string()),
+                    sort_rank: 1,
+                });
+            }
+        }
+
+        mentions
+    }
+
+    fn connector_brief_description(connector: &AppInfo) -> String {
+        Self::connector_description(connector).unwrap_or_default()
+    }
+
+    fn connector_description(connector: &AppInfo) -> Option<String> {
+        connector
+            .description
+            .as_deref()
+            .map(str::trim)
+            .filter(|description| !description.is_empty())
+            .map(str::to_string)
+    }
+
+    fn set_has_focus(&mut self, has_focus: bool) {
+        self.has_focus = has_focus;
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub(crate) fn is_recording(&self) -> bool {
+        self.voice_state.voice.is_some()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_input_enabled(&mut self, enabled: bool, placeholder: Option<String>) {
+        self.input_enabled = enabled;
+        self.input_disabled_placeholder = if enabled { None } else { placeholder };
+
+        // Avoid leaving interactive popups open while input is blocked.
+        if !enabled && !matches!(self.active_popup, ActivePopup::None) {
+            self.active_popup = ActivePopup::None;
+        }
+    }
+
+    pub fn set_task_running(&mut self, running: bool) {
+        self.is_task_running = running;
+    }
+
+    pub(crate) fn set_context_window(&mut self, percent: Option<i64>, used_tokens: Option<i64>) {
+        if self.context_window_percent == percent && self.context_window_used_tokens == used_tokens
+        {
+            return;
+        }
+        self.context_window_percent = percent;
+        self.context_window_used_tokens = used_tokens;
+    }
+
+    pub(crate) fn set_esc_backtrack_hint(&mut self, show: bool) {
+        self.esc_backtrack_hint = show;
+        if show {
+            self.footer_mode = esc_hint_mode(self.footer_mode, self.is_task_running);
+        } else {
+            self.footer_mode = reset_mode_after_activity(self.footer_mode);
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn schedule_space_hold_timer(flag: Arc<AtomicBool>, frame: Option<FrameRequester>) {
+        const HOLD_DELAY_MILLIS: u64 = 500;
+        if let Ok(handle) = Handle::try_current() {
+            let flag_clone = flag;
+            let frame_clone = frame;
+            handle.spawn(async move {
+                tokio::time::sleep(Duration::from_millis(HOLD_DELAY_MILLIS)).await;
+                Self::complete_space_hold_timer(flag_clone, frame_clone);
+            });
+        } else {
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(HOLD_DELAY_MILLIS));
+                Self::complete_space_hold_timer(flag, frame);
+            });
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn complete_space_hold_timer(flag: Arc<AtomicBool>, frame: Option<FrameRequester>) {
+        flag.store(true, Ordering::Relaxed);
+        if let Some(frame) = frame {
+            frame.schedule_frame();
+        }
+    }
+
+    pub(crate) fn set_status_line(&mut self, status_line: Option<Line<'static>>) -> bool {
+        if self.status_line_value == status_line {
+            return false;
+        }
+        self.status_line_value = status_line;
+        true
+    }
+
+    pub(crate) fn set_status_line_enabled(&mut self, enabled: bool) -> bool {
+        if self.status_line_enabled == enabled {
+            return false;
+        }
+        self.status_line_enabled = enabled;
+        true
+    }
+
+    /// Replaces the contextual footer label for the currently viewed agent.
+    ///
+    /// Returning `false` means the value was unchanged, so callers can skip redraw work. This
+    /// field is intentionally just cached presentation state; `ChatComposer` does not infer which
+    /// thread is active on its own.
+    pub(crate) fn set_active_agent_label(&mut self, active_agent_label: Option<String>) -> bool {
+        if self.active_agent_label == active_agent_label {
+            return false;
+        }
+        self.active_agent_label = active_agent_label;
+        true
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+impl ChatComposer {
+    pub(crate) fn process_space_hold_trigger(&mut self) {
+        if self.voice_transcription_enabled()
+            && let Some(flag) = self.voice_state.space_hold_trigger.as_ref()
+            && flag.load(Ordering::Relaxed)
+            && self.voice_state.space_hold_started_at.is_some()
+            && self.voice_state.voice.is_none()
+        {
+            let _ = self.on_space_hold_timeout();
+        }
+
+        const SPACE_REPEAT_INITIAL_GRACE_MILLIS: u64 = 700;
+        const SPACE_REPEAT_IDLE_TIMEOUT_MILLIS: u64 = 250;
+        if !self.voice_state.key_release_supported && self.voice_state.voice.is_some() {
+            let now = Instant::now();
+            let initial_grace = Duration::from_millis(SPACE_REPEAT_INITIAL_GRACE_MILLIS);
+            let repeat_idle_timeout = Duration::from_millis(SPACE_REPEAT_IDLE_TIMEOUT_MILLIS);
+            if let Some(started_at) = self.voice_state.space_recording_started_at
+                && now.saturating_duration_since(started_at) >= initial_grace
+            {
+                let should_stop = match self.voice_state.space_recording_last_repeat_at {
+                    Some(last_repeat_at) => {
+                        now.saturating_duration_since(last_repeat_at) >= repeat_idle_timeout
+                    }
+                    None => true,
+                };
+                if should_stop {
+                    let _ = self.stop_recording_and_start_transcription();
+                }
+            }
+        }
+    }
+
+    /// Called when the 500ms space hold timeout elapses.
+    ///
+    /// On terminals without key-release reporting, this only transitions into voice capture if we
+    /// observed repeated Space events while pending; otherwise the keypress is treated as a typed
+    /// space.
+    pub(crate) fn on_space_hold_timeout(&mut self) -> bool {
+        if !self.voice_transcription_enabled() {
+            return false;
+        }
+        if self.voice_state.voice.is_some() {
+            return false;
+        }
+        if self.voice_state.space_hold_started_at.is_some() {
+            if !self.voice_state.key_release_supported && !self.voice_state.space_hold_repeat_seen {
+                if let Some(id) = self.voice_state.space_hold_element_id.take() {
+                    let _ = self.textarea.replace_element_by_id(&id, " ");
+                }
+                self.voice_state.space_hold_started_at = None;
+                self.voice_state.space_hold_trigger = None;
+                self.voice_state.space_hold_repeat_seen = false;
+                return true;
+            }
+
+            // Preserve the typed space when transitioning into voice capture, but
+            // avoid duplicating an existing trailing space. In either case,
+            // convert/remove the temporary named element before inserting the
+            // recording/transcribing placeholder.
+            if let Some(id) = self.voice_state.space_hold_element_id.take() {
+                let replacement = if self
+                    .textarea
+                    .named_element_range(&id)
+                    .and_then(|range| self.textarea.text()[..range.start].chars().next_back())
+                    .is_some_and(|ch| ch == ' ')
+                {
+                    ""
+                } else {
+                    " "
+                };
+                let _ = self.textarea.replace_element_by_id(&id, replacement);
+            }
+            // Clear pending state before starting capture
+            self.voice_state.space_hold_started_at = None;
+            self.voice_state.space_hold_trigger = None;
+            self.voice_state.space_hold_repeat_seen = false;
+
+            // Start voice capture
+            self.start_recording_with_placeholder()
+        } else {
+            false
+        }
+    }
+
+    /// Stop recording if active, update the placeholder, and spawn background transcription.
+    /// Returns true if the UI should redraw.
+    fn stop_recording_and_start_transcription(&mut self) -> bool {
+        let Some(vc) = self.voice_state.voice.take() else {
+            return false;
+        };
+        self.voice_state.space_recording_started_at = None;
+        self.voice_state.space_recording_last_repeat_at = None;
+        match vc.stop() {
+            Ok(audio) => {
+                // If the recording is too short, remove the placeholder immediately
+                // and skip the transcribing state entirely.
+                let total_samples = audio.data.len() as f32;
+                let samples_per_second = (audio.sample_rate as f32) * (audio.channels as f32);
+                let duration_seconds = if samples_per_second > 0.0 {
+                    total_samples / samples_per_second
+                } else {
+                    0.0
+                };
+                const MIN_DURATION_SECONDS: f32 = 1.0;
+                if duration_seconds < MIN_DURATION_SECONDS {
+                    if let Some(id) = self.voice_state.recording_placeholder_id.take() {
+                        let _ = self.textarea.replace_element_by_id(&id, "");
+                    }
+                    return true;
+                }
+
+                // Otherwise, update the placeholder to show a spinner and proceed.
+                let id = match self.voice_state.recording_placeholder_id.take() {
+                    Some(id) => id,
+                    None => self.next_id(),
+                };
+
+                let placeholder_range = self.textarea.named_element_range(&id);
+                let prompt_source = if let Some(range) = &placeholder_range {
+                    self.textarea.text()[..range.start].to_string()
+                } else {
+                    self.textarea.text().to_string()
+                };
+
+                // Initialize with first spinner frame immediately.
+                let _ = self.textarea.update_named_element_by_id(&id, "⠋");
+                // Spawn animated braille spinner until transcription finishes (or times out).
+                self.spawn_transcribing_spinner(id.clone());
+                let tx = self.app_event_tx.clone();
+                crate::voice::transcribe_async(id, audio, Some(prompt_source), tx);
+                true
+            }
+            Err(e) => {
+                tracing::error!("failed to stop voice capture: {e}");
+                true
+            }
+        }
+    }
+
+    /// Start voice capture and insert a placeholder element for the live meter.
+    /// Returns true if recording began and UI should redraw; false on failure.
+    fn start_recording_with_placeholder(&mut self) -> bool {
+        match crate::voice::VoiceCapture::start() {
+            Ok(vc) => {
+                self.voice_state.voice = Some(vc);
+                if self.voice_state.key_release_supported {
+                    self.voice_state.space_recording_started_at = None;
+                } else {
+                    self.voice_state.space_recording_started_at = Some(Instant::now());
+                }
+                self.voice_state.space_recording_last_repeat_at = None;
+                // Insert visible placeholder for the meter (no label)
+                let id = self.next_id();
+                self.textarea.insert_named_element("", id.clone());
+                self.voice_state.recording_placeholder_id = Some(id);
+                // Spawn metering animation
+                if let Some(v) = &self.voice_state.voice {
+                    let data = v.data_arc();
+                    let stop = v.stopped_flag();
+                    let sr = v.sample_rate();
+                    let ch = v.channels();
+                    let peak = v.last_peak_arc();
+                    if let Some(idref) = &self.voice_state.recording_placeholder_id {
+                        self.spawn_recording_meter(idref.clone(), sr, ch, data, peak, stop);
+                    }
+                }
+                true
+            }
+            Err(e) => {
+                self.voice_state.space_recording_started_at = None;
+                self.voice_state.space_recording_last_repeat_at = None;
+                tracing::error!("failed to start voice capture: {e}");
+                false
+            }
+        }
+    }
+
+    fn spawn_recording_meter(
+        &self,
+        id: String,
+        _sample_rate: u32,
+        _channels: u16,
+        _data: Arc<Mutex<Vec<i16>>>,
+        last_peak: Arc<std::sync::atomic::AtomicU16>,
+        stop: Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        let tx = self.app_event_tx.clone();
+        let task = move || {
+            use std::time::Duration;
+            let mut meter = crate::voice::RecordingMeterState::new();
+            loop {
+                if stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                let text = meter.next_text(last_peak.load(Ordering::Relaxed));
+                tx.send(crate::app_event::AppEvent::UpdateRecordingMeter {
+                    id: id.clone(),
+                    text,
+                });
+
+                thread::sleep(Duration::from_millis(100));
+            }
+        };
+
+        if let Ok(handle) = Handle::try_current() {
+            handle.spawn_blocking(task);
+        } else {
+            thread::spawn(task);

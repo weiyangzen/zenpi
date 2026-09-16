@@ -1,0 +1,530 @@
+{
+  "parser": "narrow line/section extraction, not a TOML parser or Cargo resolver",
+  "baseline_sections": {
+    "[package]": [
+      {
+        "line": 2,
+        "text": "name = \"zenpi\"",
+        "key": "name"
+      },
+      {
+        "line": 3,
+        "text": "version = \"0.1.0\"",
+        "key": "version"
+      },
+      {
+        "line": 4,
+        "text": "edition = \"2024\"",
+        "key": "edition"
+      },
+      {
+        "line": 5,
+        "text": "rust-version = \"1.88\"",
+        "key": "rust-version"
+      },
+      {
+        "line": 6,
+        "text": "description = \"A lightweight Rust agent with TUI and headless JSONL modes\"",
+        "key": "description"
+      },
+      {
+        "line": 7,
+        "text": "license = \"MIT\"",
+        "key": "license"
+      },
+      {
+        "line": 8,
+        "text": "repository = \"https://github.com/weiyangzen/zenpi\"",
+        "key": "repository"
+      },
+      {
+        "line": 9,
+        "text": "readme = \"README.md\"",
+        "key": "readme"
+      },
+      {
+        "line": 10,
+        "text": "keywords = [\"agent\", \"tui\", \"headless\", \"jsonl\", \"rust\"]",
+        "key": "keywords"
+      }
+    ],
+    "[features]": [
+      {
+        "line": 13,
+        "text": "default = []",
+        "key": "default"
+      },
+      {
+        "line": 14,
+        "text": "dev-fixtures = []",
+        "key": "dev-fixtures"
+      }
+    ],
+    "[dependencies]": [
+      {
+        "line": 17,
+        "text": "base64 = \"0.23\"",
+        "key": "base64"
+      },
+      {
+        "line": 18,
+        "text": "crossterm = { version = \"0.29\", features = [\"bracketed-paste\"] }",
+        "key": "crossterm"
+      },
+      {
+        "line": 19,
+        "text": "httpdate = \"1.0\"",
+        "key": "httpdate"
+      },
+      {
+        "line": 20,
+        "text": "ratatui = { version = \"0.30\", default-features = false, features = [\"crossterm\"] }",
+        "key": "ratatui"
+      },
+      {
+        "line": 21,
+        "text": "serde = { version = \"1.0\", features = [\"derive\"] }",
+        "key": "serde"
+      },
+      {
+        "line": 22,
+        "text": "serde_json = \"1.0\"",
+        "key": "serde_json"
+      },
+      {
+        "line": 23,
+        "text": "sha2 = \"0.10\"",
+        "key": "sha2"
+      },
+      {
+        "line": 24,
+        "text": "thiserror = \"2.0\"",
+        "key": "thiserror"
+      },
+      {
+        "line": 25,
+        "text": "toml = \"0.9\"",
+        "key": "toml"
+      },
+      {
+        "line": 26,
+        "text": "unicode-width = \"0.2\"",
+        "key": "unicode-width"
+      },
+      {
+        "line": 27,
+        "text": "ureq = { version = \"3.4\", default-features = true, features = [\"json\"] }",
+        "key": "ureq"
+      }
+    ],
+    "[target.'cfg(unix)'.dependencies]": [
+      {
+        "line": 29,
+        "text": "libc = \"0.2\"",
+        "key": "libc"
+      }
+    ],
+    "[dev-dependencies]": [
+      {
+        "line": 32,
+        "text": "tempfile = \"3.23\"",
+        "key": "tempfile"
+      }
+    ],
+    "[[example]]": [
+      {
+        "line": 35,
+        "text": "name = \"runtime_budget_probe\"",
+        "key": "name"
+      },
+      {
+        "line": 36,
+        "text": "path = \"tools/runtime_budget_probe.rs\"",
+        "key": "path"
+      }
+    ],
+    "[profile.release]": [
+      {
+        "line": 39,
+        "text": "opt-level = \"z\"",
+        "key": "opt-level"
+      },
+      {
+        "line": 40,
+        "text": "lto = \"thin\"",
+        "key": "lto"
+      },
+      {
+        "line": 41,
+        "text": "codegen-units = 1",
+        "key": "codegen-units"
+      },
+      {
+        "line": 42,
+        "text": "panic = \"abort\"",
+        "key": "panic"
+      }
+    ]
+  },
+  "current_sections": {
+    "[package]": [
+      {
+        "line": 2,
+        "text": "name = \"zenpi\"",
+        "key": "name"
+      },
+      {
+        "line": 3,
+        "text": "version = \"0.1.0\"",
+        "key": "version"
+      },
+      {
+        "line": 4,
+        "text": "edition = \"2024\"",
+        "key": "edition"
+      },
+      {
+        "line": 5,
+        "text": "rust-version = \"1.88\"",
+        "key": "rust-version"
+      },
+      {
+        "line": 6,
+        "text": "description = \"A lightweight Rust agent with TUI and headless JSONL modes\"",
+        "key": "description"
+      },
+      {
+        "line": 7,
+        "text": "license = \"MIT\"",
+        "key": "license"
+      },
+      {
+        "line": 8,
+        "text": "repository = \"https://github.com/weiyangzen/zenpi\"",
+        "key": "repository"
+      },
+      {
+        "line": 9,
+        "text": "readme = \"README.md\"",
+        "key": "readme"
+      },
+      {
+        "line": 10,
+        "text": "keywords = [\"agent\", \"tui\", \"headless\", \"jsonl\", \"rust\"]",
+        "key": "keywords"
+      }
+    ],
+    "[features]": [
+      {
+        "line": 13,
+        "text": "default = []",
+        "key": "default"
+      },
+      {
+        "line": 14,
+        "text": "dev-fixtures = []",
+        "key": "dev-fixtures"
+      }
+    ],
+    "[dependencies]": [
+      {
+        "line": 17,
+        "text": "base64 = \"0.23\"",
+        "key": "base64"
+      },
+      {
+        "line": 18,
+        "text": "crossterm = { version = \"0.29\", features = [\"bracketed-paste\"] }",
+        "key": "crossterm"
+      },
+      {
+        "line": 19,
+        "text": "httpdate = \"1.0\"",
+        "key": "httpdate"
+      },
+      {
+        "line": 20,
+        "text": "ignore = \"0.4\"",
+        "key": "ignore"
+      },
+      {
+        "line": 21,
+        "text": "ratatui = { version = \"0.30\", default-features = false, features = [\"crossterm\"] }",
+        "key": "ratatui"
+      },
+      {
+        "line": 22,
+        "text": "serde = { version = \"1.0\", features = [\"derive\"] }",
+        "key": "serde"
+      },
+      {
+        "line": 23,
+        "text": "serde_json = \"1.0\"",
+        "key": "serde_json"
+      },
+      {
+        "line": 24,
+        "text": "sha2 = \"0.10\"",
+        "key": "sha2"
+      },
+      {
+        "line": 25,
+        "text": "thiserror = \"2.0\"",
+        "key": "thiserror"
+      },
+      {
+        "line": 26,
+        "text": "toml = \"0.9\"",
+        "key": "toml"
+      },
+      {
+        "line": 27,
+        "text": "unicode-width = \"0.2\"",
+        "key": "unicode-width"
+      },
+      {
+        "line": 28,
+        "text": "unicode-segmentation = \"=1.13.3\"",
+        "key": "unicode-segmentation"
+      },
+      {
+        "line": 29,
+        "text": "ureq = { version = \"3.4\", default-features = true, features = [\"json\"] }",
+        "key": "ureq"
+      },
+      {
+        "line": 30,
+        "text": "yaml_serde = \"0.10\"",
+        "key": "yaml_serde"
+      }
+    ],
+    "[target.'cfg(unix)'.dependencies]": [
+      {
+        "line": 32,
+        "text": "libc = \"0.2\"",
+        "key": "libc"
+      }
+    ],
+    "[dev-dependencies]": [
+      {
+        "line": 35,
+        "text": "tempfile = \"3.23\"",
+        "key": "tempfile"
+      }
+    ],
+    "[[example]]": [
+      {
+        "line": 38,
+        "text": "name = \"runtime_budget_probe\"",
+        "key": "name"
+      },
+      {
+        "line": 39,
+        "text": "path = \"tools/runtime_budget_probe.rs\"",
+        "key": "path"
+      }
+    ],
+    "[profile.release]": [
+      {
+        "line": 42,
+        "text": "opt-level = \"z\"",
+        "key": "opt-level"
+      },
+      {
+        "line": 43,
+        "text": "lto = \"thin\"",
+        "key": "lto"
+      },
+      {
+        "line": 44,
+        "text": "strip = \"symbols\"",
+        "key": "strip"
+      },
+      {
+        "line": 45,
+        "text": "codegen-units = 1",
+        "key": "codegen-units"
+      },
+      {
+        "line": 46,
+        "text": "panic = \"abort\"",
+        "key": "panic"
+      }
+    ],
+    "[patch.crates-io]": [
+      {
+        "line": 50,
+        "text": "crossterm = { path = \"vendor/crossterm\" }",
+        "key": "crossterm"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "base64",
+      "section": "[dependencies]",
+      "line": 17,
+      "declaration": "base64 = \"0.23\"",
+      "locked_version": "0.23.1",
+      "role": "二进制文本编码依赖；本轮未展开调用者",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "crossterm",
+      "section": "[dependencies]",
+      "line": 18,
+      "declaration": "crossterm = { version = \"0.29\", features = [\"bracketed-paste\"] }",
+      "locked_version": "0.29.0",
+      "role": "终端事件/控制；显式 bracketed-paste + 默认 features；本地 patch",
+      "registry_source": false,
+      "registry_checksum": false
+    },
+    {
+      "name": "httpdate",
+      "section": "[dependencies]",
+      "line": 19,
+      "declaration": "httpdate = \"1.0\"",
+      "locked_version": "1.0.3",
+      "role": "HTTP 日期解析/格式化依赖；本轮未展开调用者",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "ignore",
+      "section": "[dependencies]",
+      "line": 20,
+      "declaration": "ignore = \"0.4\"",
+      "locked_version": "0.4.33",
+      "role": "新增；skills 片段构造 GitignoreBuilder，读取 .gitignore/.ignore/.fdignore",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "ratatui",
+      "section": "[dependencies]",
+      "line": 21,
+      "declaration": "ratatui = { version = \"0.30\", default-features = false, features = [\"crossterm\"] }",
+      "locked_version": "0.30.2",
+      "role": "TUI；本依赖 default-features=false，仅显式 crossterm backend",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "serde",
+      "section": "[dependencies]",
+      "line": 22,
+      "declaration": "serde = { version = \"1.0\", features = [\"derive\"] }",
+      "locked_version": "1.0.229",
+      "role": "序列化框架；显式 derive，默认 features 仍开启",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "serde_json",
+      "section": "[dependencies]",
+      "line": 23,
+      "declaration": "serde_json = \"1.0\"",
+      "locked_version": "1.0.151",
+      "role": "JSON；默认 features；不由此证明 JSONL 模式完整",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "sha2",
+      "section": "[dependencies]",
+      "line": 24,
+      "declaration": "sha2 = \"0.10\"",
+      "locked_version": "0.10.9",
+      "role": "哈希依赖；不能仅从声明推导安全用途和覆盖",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "thiserror",
+      "section": "[dependencies]",
+      "line": 25,
+      "declaration": "thiserror = \"2.0\"",
+      "locked_version": "2.0.20",
+      "role": "错误类型派生依赖；不意味着所有错误恢复",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "toml",
+      "section": "[dependencies]",
+      "line": 26,
+      "declaration": "toml = \"0.9\"",
+      "locked_version": "0.9.12+spec-1.1.0",
+      "role": "配置解析依赖；本轮不接收配置 owner",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "unicode-width",
+      "section": "[dependencies]",
+      "line": 27,
+      "declaration": "unicode-width = \"0.2\"",
+      "locked_version": "0.2.2",
+      "role": "显示列宽依赖；与 grapheme 边界职责不同",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "unicode-segmentation",
+      "section": "[dependencies]",
+      "line": 28,
+      "declaration": "unicode-segmentation = \"=1.13.3\"",
+      "locked_version": "1.13.3",
+      "role": "新增；精确版本约束；TUI after_edit 用 grapheme_indices(true)",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "ureq",
+      "section": "[dependencies]",
+      "line": 29,
+      "declaration": "ureq = { version = \"3.4\", default-features = true, features = [\"json\"] }",
+      "locked_version": "3.4.0",
+      "role": "HTTP；显式 default-features=true + json；lock 记录含 rustls 等",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "yaml_serde",
+      "section": "[dependencies]",
+      "line": 30,
+      "declaration": "yaml_serde = \"0.10\"",
+      "locked_version": "0.10.7",
+      "role": "新增；skills frontmatter 的 Value/from_str；解析错误映射 SkillError",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "libc",
+      "section": "[target.'cfg(unix)'.dependencies]",
+      "line": 32,
+      "declaration": "libc = \"0.2\"",
+      "locked_version": "0.2.189",
+      "role": "仅 cfg(unix) 的直接 normal 声明",
+      "registry_source": true,
+      "registry_checksum": true
+    },
+    {
+      "name": "tempfile",
+      "section": "[dev-dependencies]",
+      "line": 35,
+      "declaration": "tempfile = \"3.23\"",
+      "locked_version": "3.27.0",
+      "role": "dev-dependency；不计 normal 预算",
+      "registry_source": true,
+      "registry_checksum": true
+    }
+  ],
+  "baseline_unconditional_normal": 11,
+  "current_unconditional_normal": 14,
+  "current_target_unix_normal": 1,
+  "current_dev": 1,
+  "functions": 0,
+  "tests": 0
+}

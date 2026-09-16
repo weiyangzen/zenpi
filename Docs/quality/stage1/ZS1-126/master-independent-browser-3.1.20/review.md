@@ -1,0 +1,17 @@
+# ZS1-126 — 主控复核 C 独立异步浏览审查
+
+主控已接受这份独立审查证据作为现有异步会话浏览实现的补充验证。没有新增产品补丁，也不接受完整ZS1-126或TUI逐文件项。当前TUI SHA256仍为 `994215c7ca6cc471bb35247a04460d6c5ef52192999e4b5585ea1c818a429578`，与C所测621728B/15190行来源精确一致。
+
+主控完整读C review、68行离线verifier、全部366行独立测试、编译接线和两轮run-source-bindings，以及最终完整原始测试日志；重新读当前1564–1892行SessionBrowser所有相关结构、scanner、构造/scope/enqueue/route/command/poll/Drop。现有主控async整合已经独立检查真实run_async及TerminalGuard退出接线；本次通过当前TUI整文件字节相等确认该接线未漂移，不重新声称本次全文读15190行。
+
+八个用例有实质断言：同query的新generation与最新pending替换；可见A→B→A后的过滤/选择/草稿恢复和旧失败拒绝；同目录不同session path/ID的key隔离；当前双失败保护可见或尚在粘贴分类窗口的新草稿；scanner panic后的closed状态与最新pending恢复；无owner/overflow不派发及500ms周期边界；未消费reply时Drop断开通道再join；两个临时目录的pane/receipt分离。同步屏障控制先后，不把多次poll循环计作多个用例。测试末尾成功行与预期panic日志同时保留，panic为扫描线程关闭注入，不是隐藏失败。
+
+双目录用例注入独立receipt并实际调用SessionStore/list_sessions，没有验证真实ConfigPaths发现；生产scanner的List全局receipt/owner pane以及Search owner目录范围由完整代码阅读支持。两个读取可以独立成功/失败，不保证任一失败时两个投影均不变。path/ID注入用例测试key合同，不是完整resume端到端；双失败保护不是所有历史编辑epoch的证明。Drop用例只证明不因未读有界reply死锁，底层文件系统调用仍不可取消，最新pending和进程退出可能等待当前scan，不能推断退出时延保证。
+
+C两轮均8 passed/0 failed/0 ignored，唯一八种用例；第一次到最后仅测试格式及名字old_A→old_a修正，不计16种。C在私有完整128编译输入上追加cfg(test)模块入口，产品逻辑原字节不变；主控本次实际只运行完整包离线verifier，exit0，未复跑Cargo/PTY/HTTP，也不把C八项写作主控新跑八项。原主控68Rust、5真实浏览/termios和26分页/长回复回归仍为此前独立记录。
+
+128编译输入与当前主库对比：127相同，仅slash_actions.rs由5912…变为811b…（已接受的局部diff+env修复）。这一路径差量已在主库独立通过85项Rust及15真实host检查；SessionBrowser测试对象和实际调用的session/headless/输入恢复源码未变。该关联解释当前证据适用范围，不宣称C旧构建在所有当前输入上重新执行过。
+
+首次封存verifier因错误EOF15195而退出1，最终修正为实际15190，原manifest/read-bindings/失败日志保留在failed-first-package和commands中。使用的最终manifest为 `2292a76d56e33302bca70812af19cb99a6d6764e638e165b588c303f6a6b6071`，208payload；主控离线校验没有改范围断言、原包、主库或旧证据。当前主控补充publication和回执独立保存，避免修改已完成async integration包。
+
+尚需继续完成126全项边界、相关formal文件/目录和当前release预算；这份独立review不让蓝图自动打勾，不把异步线程存在等同于所有扫描可取消或所有性能问题已解决。

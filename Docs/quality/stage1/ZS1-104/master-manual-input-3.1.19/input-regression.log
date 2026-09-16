@@ -1,0 +1,71 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.78s
+     Running tests/stage1_input_host.rs (target/debug/deps/stage1_input_host-8357ce56818ce0e5)
+
+running 25 tests
+test acceptance101_sync_tui_probe ... ignored, PTY driver only; requires isolated root and fixture URL
+test input_host_crash_probe ... ignored, separate-process crash-window helper
+test predispatch_begin_marker_failure_returns_idle_without_losing_user_turn ... ok
+test cancelling_a_ticket_does_not_cancel_provider_or_another_ticket ... ok
+test predispatch_reservation_write_failure_releases_only_its_new_concurrency_slot ... ok
+test predispatch_budget_failure_releases_scope_and_preserves_received_inputs ... ok
+test projection_collision_fails_closed_before_new_user_admission_or_provider ... ok
+test explicit_shutdown_can_cancel_after_admission_before_any_provider_delta ... ok
+test input_receipts_remain_responsive_during_tool_approval ... ok
+test main_turn_cancel_preserves_received_follow_up_and_joins_parallel_tools ... ok
+test cancelled_turn_rejects_late_tickets_before_new_turn_or_project_owner ... ok
+test strict_queue_and_shared_slash_controls_are_local_and_validate_before_mutation ... ok
+test shared_slash_queue_preserves_payload_bytes_for_multiline_edit_roundtrip ... ok
+test resume_replaces_input_port_identity_and_never_reactivates_old_session_handles ... ok
+test parallel_batch_waits_for_every_result_before_steer_context ... ok
+test all_mode_groups_each_lane_and_keeps_follow_ups_at_would_stop ... ok
+test empty_prepare_poll_respects_all_mode ... ok
+test empty_prepare_poll_consumes_late_input_once_in_one_mode ... ok
+test nonempty_prepare_poll_freezes_even_all_mode ... ok
+test nonempty_prepare_poll_keeps_late_input_for_later_model_turns ... ok
+test serial_batch_receipts_edit_cancel_and_follow_up_use_real_owner ... ok
+test headless_jsonl_and_slash_share_busy_queue_owner_without_cancelling_tools ... ok
+test separate_process_received_applied_and_projection_crash_windows_recover_before_provider ... ok
+test ticket_and_durable_queue_capacity_are_visible_without_eviction ... ok
+test one_at_a_time_drains_full_follow_up_capacity_without_spending_tool_iterations ... ok
+
+test result: ok. 23 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.76s
+
+     Running tests/stage1_input_queue.rs (target/debug/deps/stage1_input_queue-1534330a14f94bf7)
+
+running 18 tests
+test restart_probe ... ignored, invoked only by the separate-process recovery test with a real journal
+test strict_protocol_preserves_ids_and_rejects_invalid_or_ambiguous_fields ... ok
+test stale_session_writer_does_not_publish_received_input ... ok
+test interrupted_final_append_restores_last_complete_queue_event ... ok
+test duplicate_ids_are_idempotent_and_different_payload_conflicts_after_edit ... ok
+test malformed_queue_events_fail_recovery_without_rewriting_the_journal ... ok
+test list_pages_use_receipt_sequence_and_return_real_edited_status ... ok
+test all_steering_preserves_receipt_order_not_lexicographic_ids ... ok
+test nonempty_pre_prepare_snapshot_cannot_consume_second_input ... ok
+test queue_cannot_write_into_another_session ... ok
+test saturation_preserves_previous_queue_and_journal ... ok
+test queue_cancellation_and_execution_cancellation_have_separate_effects ... ok
+test edit_uses_revision_and_applied_input_is_immutable ... ok
+test restart_in_separate_process_preserves_applied_and_pending_identities ... ok
+test transport_request_is_bound_to_the_actual_session_owner ... ok
+test long_prepare_empty_poll_can_pick_up_late_input_once ... ok
+test real_file_operations_complete_before_input_boundary_is_available ... ok
+test steer_and_follow_up_have_independent_modes_and_safe_stop_priority ... ok
+
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.24s
+

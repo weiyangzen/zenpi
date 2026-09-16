@@ -1,0 +1,2 @@
+{"created_at_ms":1789264729079,"cwd":"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/layout-viewport-integration-3.1.21/root-pty-evidence/workspace","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789264729079-56078-0","timestamp":"2026-09-13T01:58:49Z","timestamp_ms":1789264729079,"version":1}
+{"event":{"generation":1,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789264729079-56078-0","timestamp":"2026-09-13T01:58:49Z","timestamp_ms":1789264729089}

@@ -1,0 +1,15 @@
+{
+  "pid": 61920,
+  "argv": [
+    "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/output111-io319-current/bin/zenpi",
+    "--mode",
+    "headless",
+    "--session",
+    "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/session.jsonl"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first",
+  "ZENPI_HOME": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/user",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "binary_sha256": "c1f4f0e9478665ade1b3c69709ce7939a6d461330d863ed3085d19ee3014f18e"
+}

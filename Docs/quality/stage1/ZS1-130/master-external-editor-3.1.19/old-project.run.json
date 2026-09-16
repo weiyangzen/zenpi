@@ -1,0 +1,26 @@
+{
+  "name": "old-project",
+  "argv": [
+    "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+    "/Users/wangweiyang/GitHub/zenpi/tools/tui_project_workspace_smoke.py",
+    "--binary",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/bin/after",
+    "--evidence",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/actual-old-project.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T06:00:27.666854+00:00",
+  "ended_at": "2026-09-12T06:00:35.950266+00:00",
+  "elapsed_seconds": 8.283112,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 29261824,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/old-project.log",
+  "bytes": 578,
+  "sha256": "7b20b2515a671dc3f2448072fe465477190e9829326dc4472f2503ec3839e35f"
+}

@@ -1,0 +1,4 @@
+backend='openai'
+model='gpt-4.1'
+wire_api='chat_completions'
+base_url='http://127.0.0.1:64873'

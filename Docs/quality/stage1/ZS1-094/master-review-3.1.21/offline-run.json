@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    ".ops/stage1_execution/target094-current-3.1.21/root-offline/verify_packet.py",
+    ".ops/stage1_execution/target094-current-3.1.21/worker",
+    "ce2654b796b3f23f3bcc3dc50bbdc2004c49f77da610f168dbfceda0e090d407"
+  ],
+  "started_at": "2026-09-13T01:51:18.530873+00:00",
+  "ended_at": "2026-09-13T01:51:18.596476+00:00",
+  "exit_code": 0,
+  "structural_only": true,
+  "product_runs": 0
+}

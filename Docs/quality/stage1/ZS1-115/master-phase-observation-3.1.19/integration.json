@@ -1,0 +1,7 @@
+{
+  "status": "test-only-integrated",
+  "baseline_sha256": "3cd763f944b7a6dd5cbdc0959d71c5f514c240d501239773d443c87bb8e97f7a",
+  "final_sha256": "7526689d532d21e31fee36ab703909a191b08c55b3e811b1a701614be0dc0297",
+  "production_prefix_identical": true,
+  "artifacts": 33
+}

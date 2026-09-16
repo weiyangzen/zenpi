@@ -1,0 +1,541 @@
+{
+  "inputs": {
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/simple-options.ts": {
+      "captured": {
+        "bytes": 3295,
+        "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57"
+      },
+      "current": {
+        "bytes": 3295,
+        "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-responses.ts": {
+      "captured": {
+        "bytes": 13908,
+        "sha256": "dea6113f21ab782bac450fc32ac8b8c99d8fd14f41cfe4c124fc6091c03910ed"
+      },
+      "current": {
+        "bytes": 13908,
+        "sha256": "dea6113f21ab782bac450fc32ac8b8c99d8fd14f41cfe4c124fc6091c03910ed"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/pi-messages.lazy.ts": {
+      "captured": {
+        "bytes": 185,
+        "sha256": "620e55f1a498f70c8578deb6375f9433c6991c98f6c323465b1889c2f07a72d9"
+      },
+      "current": {
+        "bytes": 185,
+        "sha256": "620e55f1a498f70c8578deb6375f9433c6991c98f6c323465b1889c2f07a72d9"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openrouter-images.ts": {
+      "captured": {
+        "bytes": 6132,
+        "sha256": "c658f331cb2278e7accc925fa72eb3c3902d32d6ff37c4263b6bb6108888d440"
+      },
+      "current": {
+        "bytes": 6132,
+        "sha256": "c658f331cb2278e7accc925fa72eb3c3902d32d6ff37c4263b6bb6108888d440"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/cloudflare-ai-binding.ts": {
+      "captured": {
+        "bytes": 4604,
+        "sha256": "57f702b91453810241fd50a5629628fcc3d556e75909a37fae857d0a5d27d8fb"
+      },
+      "current": {
+        "bytes": 4604,
+        "sha256": "57f702b91453810241fd50a5629628fcc3d556e75909a37fae857d0a5d27d8fb"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/pi-messages.ts": {
+      "captured": {
+        "bytes": 13451,
+        "sha256": "c8bbdcaaa30064db24afa8e9b2fbc66f9d4be89149c170e2de94b8705e5830b4"
+      },
+      "current": {
+        "bytes": 13451,
+        "sha256": "c8bbdcaaa30064db24afa8e9b2fbc66f9d4be89149c170e2de94b8705e5830b4"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/anthropic-messages.ts": {
+      "captured": {
+        "bytes": 48616,
+        "sha256": "8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7"
+      },
+      "current": {
+        "bytes": 48616,
+        "sha256": "8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/lazy.ts": {
+      "captured": {
+        "bytes": 3203,
+        "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a"
+      },
+      "current": {
+        "bytes": 3203,
+        "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-responses.lazy.ts": {
+      "captured": {
+        "bytes": 195,
+        "sha256": "ea6bf6019f6b2f949bce4ad248ec1e0fa25dd058a009cf70fb5eb0e99b4c94db"
+      },
+      "current": {
+        "bytes": 195,
+        "sha256": "ea6bf6019f6b2f949bce4ad248ec1e0fa25dd058a009cf70fb5eb0e99b4c94db"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/bedrock-converse-stream.ts": {
+      "captured": {
+        "bytes": 48022,
+        "sha256": "b8cff28740f8a549fc5fd2d466980f8900688c01fcad3df96ba68f7eaf4fbaf3"
+      },
+      "current": {
+        "bytes": 48022,
+        "sha256": "b8cff28740f8a549fc5fd2d466980f8900688c01fcad3df96ba68f7eaf4fbaf3"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/github-copilot-headers.ts": {
+      "captured": {
+        "bytes": 1184,
+        "sha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180"
+      },
+      "current": {
+        "bytes": 1184,
+        "sha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openrouter-images.lazy.ts": {
+      "captured": {
+        "bytes": 315,
+        "sha256": "04c18f8c065779c2f705850e593cee4e0d6207a4121473540a223fc83026a8f4"
+      },
+      "current": {
+        "bytes": 315,
+        "sha256": "04c18f8c065779c2f705850e593cee4e0d6207a4121473540a223fc83026a8f4"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-completions.ts": {
+      "captured": {
+        "bytes": 62416,
+        "sha256": "5874bf0b121db117bd4eba8fffa750252f5f7617f38306c6eb1f746575896319"
+      },
+      "current": {
+        "bytes": 62416,
+        "sha256": "5874bf0b121db117bd4eba8fffa750252f5f7617f38306c6eb1f746575896319"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-codex-responses.ts": {
+      "captured": {
+        "bytes": 54470,
+        "sha256": "3e64b9ddb86b5c0ca82f1357158026d5202f60ff3afab6a8778498a27b4227b7"
+      },
+      "current": {
+        "bytes": 54470,
+        "sha256": "3e64b9ddb86b5c0ca82f1357158026d5202f60ff3afab6a8778498a27b4227b7"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/transform-messages.ts": {
+      "captured": {
+        "bytes": 7121,
+        "sha256": "cf309c00b943bc0a90ccaabb185730a3f27a3c92de6696ada3155b0185904161"
+      },
+      "current": {
+        "bytes": 7121,
+        "sha256": "cf309c00b943bc0a90ccaabb185730a3f27a3c92de6696ada3155b0185904161"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/google-generative-ai.ts": {
+      "captured": {
+        "bytes": 16027,
+        "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+      },
+      "current": {
+        "bytes": 16027,
+        "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/constrained-sampling.ts": {
+      "captured": {
+        "bytes": 9295,
+        "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb"
+      },
+      "current": {
+        "bytes": 9295,
+        "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/azure-openai-responses.lazy.ts": {
+      "captured": {
+        "bytes": 206,
+        "sha256": "de36a9a2749ac4cb45a5449356bceadb676d1a16e6d46f4fc5522a3f700aa2fd"
+      },
+      "current": {
+        "bytes": 206,
+        "sha256": "de36a9a2749ac4cb45a5449356bceadb676d1a16e6d46f4fc5522a3f700aa2fd"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/google-vertex.ts": {
+      "captured": {
+        "bytes": 18373,
+        "sha256": "ac86327759ebeb340c3c45573d754495c2d3298c5f5d19581f86de6609ff4526"
+      },
+      "current": {
+        "bytes": 18373,
+        "sha256": "ac86327759ebeb340c3c45573d754495c2d3298c5f5d19581f86de6609ff4526"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-codex-responses.lazy.ts": {
+      "captured": {
+        "bytes": 206,
+        "sha256": "89e1883f937df0992b852970f574b5e1fc2a69fefaacc89628cd1d924a8af63f"
+      },
+      "current": {
+        "bytes": 206,
+        "sha256": "89e1883f937df0992b852970f574b5e1fc2a69fefaacc89628cd1d924a8af63f"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/azure-openai-responses.ts": {
+      "captured": {
+        "bytes": 11337,
+        "sha256": "874ec8836a617c19fb337c2a8af68f591708aafb988d378578e6f0d61494c3ec"
+      },
+      "current": {
+        "bytes": 11337,
+        "sha256": "874ec8836a617c19fb337c2a8af68f591708aafb988d378578e6f0d61494c3ec"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-completions.lazy.ts": {
+      "captured": {
+        "bytes": 199,
+        "sha256": "a1defe07f6d7bd37de3933164cc88cfeb2d46cf390d0bbb52c85b280cc58d193"
+      },
+      "current": {
+        "bytes": 199,
+        "sha256": "a1defe07f6d7bd37de3933164cc88cfeb2d46cf390d0bbb52c85b280cc58d193"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/cloudflare.ts": {
+      "captured": {
+        "bytes": 842,
+        "sha256": "6333a0f78e8cd6b75e408fdeb594d5e1e02605206247c5a921c2f56dd99cf96a"
+      },
+      "current": {
+        "bytes": 842,
+        "sha256": "6333a0f78e8cd6b75e408fdeb594d5e1e02605206247c5a921c2f56dd99cf96a"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/google-shared.ts": {
+      "captured": {
+        "bytes": 15695,
+        "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436"
+      },
+      "current": {
+        "bytes": 15695,
+        "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/anthropic-messages.lazy.ts": {
+      "captured": {
+        "bytes": 199,
+        "sha256": "5d1925e8b2664c91a11ef4c73d8c400b4075597c8c4e8beb085f8e4ba137fc08"
+      },
+      "current": {
+        "bytes": 199,
+        "sha256": "5d1925e8b2664c91a11ef4c73d8c400b4075597c8c4e8beb085f8e4ba137fc08"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/mistral-conversations.lazy.ts": {
+      "captured": {
+        "bytes": 205,
+        "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86"
+      },
+      "current": {
+        "bytes": 205,
+        "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/google-generative-ai.lazy.ts": {
+      "captured": {
+        "bytes": 202,
+        "sha256": "ba7700f2e44838fb19da46f866f47f35f4e10f5068800be1ea698e9e95e1e1ce"
+      },
+      "current": {
+        "bytes": 202,
+        "sha256": "ba7700f2e44838fb19da46f866f47f35f4e10f5068800be1ea698e9e95e1e1ce"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-prompt-cache.ts": {
+      "captured": {
+        "bytes": 358,
+        "sha256": "78727b9b42d5c5cdc47d17f44d532cdf951cbee3b158cacfb3e640d8f792e8a4"
+      },
+      "current": {
+        "bytes": 358,
+        "sha256": "78727b9b42d5c5cdc47d17f44d532cdf951cbee3b158cacfb3e640d8f792e8a4"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/mistral-conversations.ts": {
+      "captured": {
+        "bytes": 30329,
+        "sha256": "b1dc3edb89b95c81c6c2b0ca3a98099f530201ae6b93469c13a08a77b5f68931"
+      },
+      "current": {
+        "bytes": 30329,
+        "sha256": "b1dc3edb89b95c81c6c2b0ca3a98099f530201ae6b93469c13a08a77b5f68931"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/openai-responses-shared.ts": {
+      "captured": {
+        "bytes": 29490,
+        "sha256": "2562ad7497bfe9cf71533b7584400751746b6a563229a615f6e23848780d2bee"
+      },
+      "current": {
+        "bytes": 29490,
+        "sha256": "2562ad7497bfe9cf71533b7584400751746b6a563229a615f6e23848780d2bee"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/google-vertex.lazy.ts": {
+      "captured": {
+        "bytes": 189,
+        "sha256": "891f0e07eaaa1bb1df97f0a2d8f067df6acbab50078242108d93b96a710c4712"
+      },
+      "current": {
+        "bytes": 189,
+        "sha256": "891f0e07eaaa1bb1df97f0a2d8f067df6acbab50078242108d93b96a710c4712"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/bedrock-converse-stream.lazy.ts": {
+      "captured": {
+        "bytes": 1148,
+        "sha256": "3ee8a1b2a2cd58927bee18ab5b4150401da810e9d5f4595822b3b10ded35de86"
+      },
+      "current": {
+        "bytes": 1148,
+        "sha256": "3ee8a1b2a2cd58927bee18ab5b4150401da810e9d5f4595822b3b10ded35de86"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/anthropic.ts": {
+      "captured": {
+        "bytes": 1934,
+        "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a"
+      },
+      "current": {
+        "bytes": 1934,
+        "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/google.ts": {
+      "captured": {
+        "bytes": 587,
+        "sha256": "2d807d5f9273ede8c23970fe0414883ab362c677df80e4603d30b621232a2036"
+      },
+      "current": {
+        "bytes": 587,
+        "sha256": "2d807d5f9273ede8c23970fe0414883ab362c677df80e4603d30b621232a2036"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/openai.ts": {
+      "captured": {
+        "bytes": 550,
+        "sha256": "1904f9511221f47bbe890dc007571add9ac16ab28cd48c4090b58f13950cbfd0"
+      },
+      "current": {
+        "bytes": 550,
+        "sha256": "1904f9511221f47bbe890dc007571add9ac16ab28cd48c4090b58f13950cbfd0"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/providers/openrouter.ts": {
+      "captured": {
+        "bytes": 982,
+        "sha256": "0985e9d352e1a9794c7ed807d81e06a254abce49aa231e7c5ccc7c4355f01d5e"
+      },
+      "current": {
+        "bytes": 982,
+        "sha256": "0985e9d352e1a9794c7ed807d81e06a254abce49aa231e7c5ccc7c4355f01d5e"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/compat.ts": {
+      "captured": {
+        "bytes": 10596,
+        "sha256": "c1212487653e4508243ddc2c420334166699470b9908326ff8f74b8aeb4fc8a5"
+      },
+      "current": {
+        "bytes": 10596,
+        "sha256": "c1212487653e4508243ddc2c420334166699470b9908326ff8f74b8aeb4fc8a5"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/models.ts": {
+      "captured": {
+        "bytes": 34837,
+        "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c"
+      },
+      "current": {
+        "bytes": 34837,
+        "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c"
+      }
+    },
+    "/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/utils/event-stream.ts": {
+      "captured": {
+        "bytes": 2878,
+        "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386"
+      },
+      "current": {
+        "bytes": 2878,
+        "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/providers/anthropic.rs": {
+      "captured": {
+        "bytes": 33692,
+        "sha256": "92b9b1f36fdfc37d6a1d1f260ed972e7e3bacd61c319ff6ba4ef757b825b4906"
+      },
+      "current": {
+        "bytes": 33692,
+        "sha256": "92b9b1f36fdfc37d6a1d1f260ed972e7e3bacd61c319ff6ba4ef757b825b4906"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/providers/google.rs": {
+      "captured": {
+        "bytes": 29333,
+        "sha256": "f0d56a364cda38b5a10bff74e68057ad76bf539000c883ee6e820c2105081890"
+      },
+      "current": {
+        "bytes": 29333,
+        "sha256": "f0d56a364cda38b5a10bff74e68057ad76bf539000c883ee6e820c2105081890"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/backend/chat_stream.rs": {
+      "captured": {
+        "bytes": 25335,
+        "sha256": "80da76080a8ccc6d54a7c7369804513c0a4371601c4e9b62a9805571471a07ba"
+      },
+      "current": {
+        "bytes": 25335,
+        "sha256": "80da76080a8ccc6d54a7c7369804513c0a4371601c4e9b62a9805571471a07ba"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/backend.rs": {
+      "captured": {
+        "bytes": 98741,
+        "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357"
+      },
+      "current": {
+        "bytes": 98741,
+        "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/providers/registry.rs": {
+      "captured": {
+        "bytes": 15905,
+        "sha256": "cf229a62681933e7c1b4058c4d2fada41dff4fcd05c4cd300e18accfe245b944"
+      },
+      "current": {
+        "bytes": 15905,
+        "sha256": "cf229a62681933e7c1b4058c4d2fada41dff4fcd05c4cd300e18accfe245b944"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/backend/transport.rs": {
+      "captured": {
+        "bytes": 21483,
+        "sha256": "d166d173c77aec88ccee1c248b74424a20c9783b6f4cada95fc762cbf3fe1cfd"
+      },
+      "current": {
+        "bytes": 21483,
+        "sha256": "d166d173c77aec88ccee1c248b74424a20c9783b6f4cada95fc762cbf3fe1cfd"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/core.rs": {
+      "captured": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      },
+      "current": {
+        "bytes": 278737,
+        "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+      }
+    },
+    "/Users/wangweiyang/GitHub/zenpi/src/headless.rs": {
+      "captured": {
+        "bytes": 368974,
+        "sha256": "521c2102519b502fbd6184f31ffb53cba8eeef840bf84d19450836429d9b49f0"
+      },
+      "current": {
+        "bytes": 370207,
+        "sha256": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
+      }
+    }
+  },
+  "exact_prior_source_contexts": [
+    {
+      "prior": {
+        "path": ".ops/stage1_execution/source017-current-3.1.21/worker/source/packages/ai/src/api/simple-options.ts",
+        "bytes": 3295,
+        "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57"
+      },
+      "current": {
+        "path": ".ops/stage1_execution/directory055-current-3.1.21/worker/source/packages/ai/src/api/simple-options.ts",
+        "bytes": 3295,
+        "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57"
+      }
+    },
+    {
+      "prior": {
+        "path": ".ops/stage1_execution/source029-current-3.1.21/worker/source/packages/ai/src/api/transform-messages.ts",
+        "bytes": 7121,
+        "sha256": "cf309c00b943bc0a90ccaabb185730a3f27a3c92de6696ada3155b0185904161"
+      },
+      "current": {
+        "path": ".ops/stage1_execution/directory055-current-3.1.21/worker/source/packages/ai/src/api/transform-messages.ts",
+        "bytes": 7121,
+        "sha256": "cf309c00b943bc0a90ccaabb185730a3f27a3c92de6696ada3155b0185904161"
+      }
+    },
+    {
+      "prior": {
+        "path": ".ops/stage1_execution/source029-current-3.1.21/worker/source/packages/ai/src/api/constrained-sampling.ts",
+        "bytes": 9295,
+        "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb"
+      },
+      "current": {
+        "path": ".ops/stage1_execution/directory055-current-3.1.21/worker/source/packages/ai/src/api/constrained-sampling.ts",
+        "bytes": 9295,
+        "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb"
+      }
+    },
+    {
+      "prior": {
+        "path": ".ops/stage1_execution/source017-current-3.1.21/worker/source/packages/ai/src/api/google-shared.ts",
+        "bytes": 15695,
+        "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436"
+      },
+      "current": {
+        "path": ".ops/stage1_execution/directory055-current-3.1.21/worker/source/packages/ai/src/api/google-shared.ts",
+        "bytes": 15695,
+        "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436"
+      }
+    }
+  ],
+  "current_children": {
+    "ZS1-016": {
+      "path": "Docs/learn/stage1_pi_mono/receipts/ZS1-016.master.json",
+      "bytes": 28866,
+      "sha256": "3174455631e29d83e0aba7ab387d1a842c2c60e9e3de62af4b26098d58958155"
+    },
+    "ZS1-017": {
+      "path": "Docs/learn/stage1_pi_mono/receipts/ZS1-017.master.json",
+      "bytes": 3155,
+      "sha256": "064cb16fbaac94fc0885d5b5b60cf5350182669681c7a4325b5092312b0b3e74"
+    },
+    "ZS1-029": {
+      "path": "Docs/learn/stage1_pi_mono/receipts/ZS1-029.master.json",
+      "bytes": 2976,
+      "sha256": "70519e6239e576f6ab467d47f1cc6c91e0a2f8c2d5f45c2d7db0e6afc418d069"
+    }
+  }
+}

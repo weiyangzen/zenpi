@@ -1,0 +1,29 @@
+{
+  "name": "evidence-tests",
+  "argv": [
+    "python3",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tools",
+    "-p",
+    "test_bench_runtime.py",
+    "-v"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T10:43:33.114136+00:00",
+  "ended_at": "2026-09-12T10:43:35.066633+00:00",
+  "elapsed_seconds": 1.9523574160000001,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 26886144,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/startup-diagnostics-20260912/evidence-tests.log",
+  "bytes": 489,
+  "sha256": "30ba810e2f0837616777a7c13c1dc414fdf1975422a552c0c12f38b9cec57d12"
+}

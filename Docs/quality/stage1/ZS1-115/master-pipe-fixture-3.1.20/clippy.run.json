@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--lib",
+    "--tests",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:29:39.107528+00:00",
+  "elapsed_seconds": 22.022819333,
+  "exit_code": 0,
+  "log_sha256": "9962799c9c0b3f9fcbc5f8c070048936805c8e4c02fb4e782eb09978ccbe6d72",
+  "log_bytes": 829
+}

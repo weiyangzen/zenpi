@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/ci-budget-evidence-integration/work/Docs/quality/stage1/ZS1-117/worker-ci-evidence320/verify.py",
+    "--frozen"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:22:12.193336+00:00",
+  "elapsed_seconds": 1.165779167,
+  "exit_code": 0,
+  "log_sha256": "51e6a914276eec1210cc17d4298328b8fd60b2f25aee13987551d02c4b6a4281",
+  "log_bytes": 4091
+}

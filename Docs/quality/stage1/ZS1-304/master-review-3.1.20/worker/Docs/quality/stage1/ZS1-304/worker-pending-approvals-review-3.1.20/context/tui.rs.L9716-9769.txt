@@ -1,0 +1,54 @@
+    fn owns(&self, project: &str) -> bool {
+        self.active
+            .as_ref()
+            .is_some_and(|job| job.project == project)
+    }
+
+    fn start(
+        &mut self,
+        state: &mut TuiState,
+        owner: Arc<Mutex<crate::core::Agent>>,
+        plan: crate::project_workspace::NewSessionPlan,
+        text: &str,
+    ) -> Result<(), String> {
+        if self.active.is_some() {
+            return Err("another new session is being prepared; retry when it finishes".into());
+        }
+        let result = Arc::new(Mutex::new(None));
+        let id = self
+            .worker
+            .try_submit((Arc::clone(&owner), plan, Arc::clone(&result)))
+            .map_err(|e| e.to_string())?;
+        self.active = Some(NewSessionJob {
+            id,
+            project: state.active_project().to_owned(),
+            owner,
+            submitted: state.bind_submitted_input(text.to_owned()),
+            result,
+            detached: false,
+        });
+        state.set_busy(true);
+        state.set_status("Preparing new session");
+        Ok(())
+    }
+
+    fn cancel_current(&self, state: &mut TuiState) -> bool {
+        let Some(job) = self
+            .active
+            .as_ref()
+            .filter(|job| job.project == state.active_project())
+        else {
+            return false;
+        };
+        match self.worker.try_cancel(job.id) {
+            Ok(()) => state.set_status("Interrupt requested"),
+            Err(error) => state.push_message(
+                MessageRole::Error,
+                format!("Cancel was not queued: {error}"),
+            ),
+        }
+        true
+    }
+
+    fn apply_event(
+        &mut self,

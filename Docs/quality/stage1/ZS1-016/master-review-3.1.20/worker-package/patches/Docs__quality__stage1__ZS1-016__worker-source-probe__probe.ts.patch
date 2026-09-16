@@ -1,0 +1,53 @@
+diff --git a/Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts b/Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-016/worker-source-probe/probe.ts
+@@ -0,0 +1,48 @@
++import assert from 'node:assert/strict';
++import {createHash} from 'node:crypto';
++import {readFileSync} from 'node:fs';
++import {stream,streamSimple} from '/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/anthropic-messages.ts';
++const path='/Users/wangweiyang/GitHub/pi-mono/packages/ai/src/api/anthropic-messages.ts';
++const sha=()=>createHash('sha256').update(readFileSync(path)).digest('hex');
++assert.equal(sha(),'8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7');
++let reply='';const requests:any[]=[];
++const server=Bun.serve({hostname:'127.0.0.1',port:0,async fetch(req){requests.push({path:new URL(req.url).pathname,headers:Object.fromEntries(req.headers),body:await req.json()});return new Response(reply,{headers:{'content-type':'text/event-stream','x-fixture':'source016'}});}});
++const model:any={id:'claude-sonnet-4-5',name:'fixture',api:'anthropic-messages',provider:'anthropic',baseUrl:`http://127.0.0.1:${server.port}`,reasoning:true,input:['text','image'],contextWindow:200000,maxTokens:4096,cost:{input:1,output:2,cacheRead:.1,cacheWrite:1.25}};
++const context:any={messages:[{role:'user',content:'hello',timestamp:0}]};
++const frame=(e:any)=>`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`;
++const start=()=>({type:'message_start',message:{id:'msg_fixture',model:model.id,usage:{input_tokens:12,output_tokens:0,cache_read_input_tokens:3,cache_creation_input_tokens:2}}});
++const end=(reason='end_turn')=>[{type:'message_delta',delta:{stop_reason:reason},usage:{output_tokens:5,output_tokens_details:{thinking_tokens:2}}},{type:'message_stop'}];
++const block=(index:number,b:any,d:any[])=>[{type:'content_block_start',index,content_block:b},...d.map(delta=>({type:'content_block_delta',index,delta})),{type:'content_block_stop',index}];
++const textEvents=()=>[start(),...block(0,{type:'text',text:'initial'},[{type:'text_delta',text:' delta'}]),...end()];
++async function run(events:any[]=textEvents(),options:any={},m:any=model,c:any=context,simple=false,raw?:string){reply=raw??events.map(frame).join('');const before=requests.length;const eventsOut:any[]=[];const s=(simple?streamSimple:stream)(m,c,{apiKey:'fixture-key',maxRetries:0,cacheRetention:'none',...options});for await(const e of s)eventsOut.push(structuredClone(e));return {result:await s.result(),events:eventsOut,request:requests[before]};}
++const records:any[]=[];
++async function check(name:string,fn:()=>unknown){await fn();records.push({name,status:'pass'});}
++try {
++await check('actual pinned SDK sends native path/auth and preserves callbacks/text/usage',async()=>{
++ let response:any;const r=await run(undefined,{onResponse:(v:any)=>response=v});assert.equal(r.request.path,'/v1/messages');assert.equal(r.request.headers['x-api-key'],'fixture-key');assert.equal(r.request.body.model,model.id);assert.equal(response.headers['x-fixture'],'source016');assert.equal(r.result.content[0].text,'initial delta');assert.equal(r.result.usage.input,12);assert.equal(r.result.usage.totalTokens,22);assert.equal(r.result.usage.reasoning,2);assert.deepEqual(r.events.map(e=>e.type),['start','text_start','text_delta','text_end','done']);
++});
++await check('thinking signature chunks and redacted opaque data survive output and same-model replay',async()=>{
++ const r=await run([start(),...block(0,{type:'thinking',thinking:'thought',signature:'sig-'},[{type:'signature_delta',signature:'tail'}]),...block(1,{type:'redacted_thinking',data:'opaque'},[]),...end()]);assert.equal(r.result.content[0].thinkingSignature,'sig-tail');assert.equal(r.result.content[1].redacted,true);
++ const replay=await run(undefined,{},model,{messages:[...context.messages,r.result,{role:'user',content:'next',timestamp:1}]});const b=replay.request.body.messages[1].content;assert.equal(b[0].signature,'sig-tail');assert.equal(b[1].data,'opaque');
++});
++await check('tool arguments stream in deltas and finalize without scratch buffer',async()=>{
++ const r=await run([start(),...block(0,{type:'tool_use',id:'t1',name:'read',input:{}},[{type:'input_json_delta',partial_json:'{"path":'},{type:'input_json_delta',partial_json:'"file"}'}]),...end('tool_use')]);assert.equal(r.result.stopReason,'toolUse');assert.deepEqual(r.result.content[0].arguments,{path:'file'});assert.equal('partialJson' in r.result.content[0],false);assert.equal(r.events.filter(e=>e.type==='toolcall_delta').length,2);
++});
++await check('complete-looking tool end before missing message_stop still yields error',async()=>{
++ const r=await run([start(),...block(0,{type:'tool_use',id:'t',name:'read',input:{}},[{type:'input_json_delta',partial_json:'{}'}]),...end('tool_use').slice(0,1)]);assert.equal(r.result.stopReason,'error');assert.match(r.result.errorMessage!,/before message_stop/);assert.ok(r.events.some(e=>e.type==='toolcall_end'));assert.equal(r.events.at(-1).type,'error');
++});
++await check('missing final reason is error even with message_stop',async()=>{const r=await run([start(),{type:'message_stop'}]);assert.equal(r.result.stopReason,'error');assert.match(r.result.errorMessage!,/without a stop reason/);});
++for(const [reason,expected]of [['end_turn','stop'],['stop_sequence','stop'],['pause_turn','stop'],['max_tokens','length'],['tool_use','toolUse'],['refusal','error'],['sensitive','error'],['new_reason','error']])await check(`terminal ${reason} maps to ${expected}`,async()=>{const r=await run([start(),...end(reason)]);assert.equal(r.result.stopReason,expected);});
++await check('unknown named frames/comments and trailing nonblank final frame are parsed',async()=>{const raw=': comment\r\n\r\nevent: ping\ndata: {}\n\n'+textEvents().map(frame).join('').trimEnd();const r=await run(undefined,{},model,context,false,raw);assert.equal(r.result.stopReason,'stop');});
++await check('source repairs invalid string escapes rather than strict JSON failure',async()=>{const events=textEvents();const raw=events.map(frame).join('').replace('initial','bad\\q');const r=await run(undefined,{},model,context,false,raw);assert.equal(r.result.stopReason,'stop');assert.equal((r.result.content[0] as any).text,'bad\\q delta');});
++await check('wrong-index content deltas are ignored by source',async()=>{const r=await run([start(),{type:'content_block_delta',index:99,delta:{type:'text_delta',text:'ignored'}},...end()]);assert.equal(r.result.stopReason,'stop');assert.equal(r.result.content.length,0);});
++await check('request payload hook replacement keeps stream true and metadata only carries user_id',async()=>{let captured:any;const r=await run(undefined,{metadata:{user_id:'fixture-user',secret_extra:'excluded'},onPayload:(p:any)=>{captured=p;return {...p,stream:false,max_tokens:17};}});assert.deepEqual(captured.metadata,{user_id:'fixture-user'});assert.equal(r.request.body.stream,true);assert.equal(r.request.body.max_tokens,17);});
++await check('simple thinking maps adaptive effort and disables thinking when omitted',async()=>{const adaptive={...model,compat:{forceAdaptiveThinking:true},thinkingLevelMap:{high:'max'}};const r=await run(undefined,{reasoning:'high'},adaptive,context,true);assert.equal(r.request.body.thinking.type,'adaptive');assert.equal(r.request.body.output_config.effort,'max');const off=await run(undefined,{},model,context,true);assert.equal(off.request.body.thinking.type,'disabled');});
++await check('unsigned thinking falls back to text or explicit empty signature compatibility',async()=>{const old:any={role:'assistant',api:model.api,provider:model.provider,model:model.id,content:[{type:'thinking',thinking:'unsigned'}],stopReason:'stop',timestamp:0};const c={messages:[old,...context.messages]};const normal=await run(undefined,{},model,c);assert.equal(normal.request.body.messages[0].content[0].type,'text');const compat=await run(undefined,{}, {...model,compat:{allowEmptySignature:true}},c);assert.equal(compat.request.body.messages[0].content[0].signature,'');});
++await check('same-model tool results retain ids and native schemas',async()=>{const c={messages:[{role:'assistant',api:model.api,provider:model.provider,model:model.id,content:[{type:'toolCall',id:'bad:id',name:'read',arguments:{}}],stopReason:'toolUse',timestamp:0},{role:'toolResult',toolCallId:'bad:id',toolName:'read',content:[{type:'text',text:'result'}],isError:false,timestamp:1}],tools:[{name:'read',description:'Read',parameters:{type:'object',properties:{path:{type:'string'}},required:['path']}}]};const r=await run(undefined,{},model,c);assert.equal(r.request.body.messages[0].content[0].id,'bad:id');assert.equal(r.request.body.messages[1].content[0].tool_use_id,'bad:id');assert.equal(r.request.body.tools[0].eager_input_streaming,true);});
++await check('cross-model tool ids are normalized together with matching results',async()=>{const c={messages:[{role:'assistant',api:'openai-completions',provider:'other',model:'other',content:[{type:'toolCall',id:'bad:id',name:'read',arguments:{}}],stopReason:'toolUse',timestamp:0},{role:'toolResult',toolCallId:'bad:id',toolName:'read',content:[{type:'text',text:'ok'}],isError:false,timestamp:1}]};const r=await run(undefined,{},model,c);assert.equal(r.request.body.messages[0].content[0].id,'bad_id');assert.equal(r.request.body.messages[1].content[0].tool_use_id,'bad_id');});
++await check('missing auth simple throws synchronously; stream encodes setup failure',async()=>{assert.throws(()=>streamSimple(model,context,{}),/No API key/);const s=stream(model,context,{});assert.equal((await s.result()).stopReason,'error');});
++await check('pre-aborted request yields aborted terminal without HTTP',async()=>{const c=new AbortController();c.abort();const before=requests.length;const r=await run(undefined,{signal:c.signal});assert.equal(r.result.stopReason,'aborted');assert.equal(requests.length,before);});
++assert.equal(sha(),'8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7');
++console.log(JSON.stringify({item:'ZS1-016',status:'[_]',source_sha256:sha(),sdk:'@anthropic-ai/sdk@0.124.0',mocked_imports:[],transport:'owned loopback HTTP server with deterministic SSE bytes',http_requests:requests.length,scenarios:records},null,2));
++} finally {server.stop(true);}

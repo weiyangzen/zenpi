@@ -6,7 +6,7 @@ use std::{
 use tempfile::tempdir;
 use zenpi::{
     backend::{Backend, BackendError, Completion, CompletionRequest},
-    context::{ContextBudget, restore_checkpoint},
+    context::{ContextBudget, restore_semantic_checkpoint},
     core::{Agent, Turn, TurnInputRequest, TurnRole},
     headless::{resume_session_view, run_headless},
     session::SessionStore,
@@ -27,6 +27,28 @@ struct CaptureBackend(Arc<Mutex<Vec<String>>>);
 
 impl Backend for CaptureBackend {
     fn complete(&self, request: CompletionRequest<'_>) -> Result<Completion, BackendError> {
+        if request
+            .metadata
+            .is_some_and(|v| v["purpose"] == "semantic_compaction")
+        {
+            let data: serde_json::Value = serde_json::from_str(&request.turns[0].content).unwrap();
+            let mut completion = Completion::text(
+                serde_json::json!({
+                    "goals":["Continue task"], "constraints":[], "decisions":[], "progress":[],
+                    "pending_tasks":["verify restart"], "critical_facts":[],
+                    "read_files":data["read_files"], "modified_files":data["modified_files"],
+                    "unresolved_tools":data["unresolved_tools"]
+                })
+                .to_string(),
+            );
+            completion.model = Some("fixture-summary".into());
+            completion.usage = Some(zenpi::backend::Usage {
+                input_tokens: 100,
+                output_tokens: 80,
+                total_tokens: 180,
+            });
+            return Ok(completion);
+        }
         self.0
             .lock()
             .unwrap()
@@ -146,18 +168,18 @@ fn compact_checkpoint_is_durable_and_reconstructs_after_restart() {
                 } else {
                     TurnRole::Assistant
                 },
-                format!("{index}:{}", "x".repeat(500)),
+                format!("{index}:{}", "x".repeat(660)),
             ))
             .unwrap();
     }
-    let mut agent = Agent::with_echo(session);
+    let mut agent = Agent::new(session, Box::new(CaptureBackend(Arc::default())));
     agent.set_context_budget(ContextBudget {
-        max_tokens: 1_500,
-        reserved_output_tokens: 300,
+        max_tokens: 4_000,
+        reserved_output_tokens: 1_000,
     });
     let report = agent.compact_context().unwrap();
     assert!(report.compacted);
-    let checkpoint = report.checkpoint.clone().unwrap();
+    let checkpoint = report.semantic_checkpoint.clone().unwrap();
     assert!(
         agent
             .session()
@@ -165,7 +187,14 @@ fn compact_checkpoint_is_durable_and_reconstructs_after_restart() {
             .iter()
             .any(|event| event["trigger"] == "manual_slash")
     );
-    let restored = restore_checkpoint(agent.history(), &checkpoint).unwrap();
+    let restored = restore_semantic_checkpoint(
+        agent.history(),
+        &checkpoint,
+        agent.session().session_id(),
+        "linear",
+        agent.context_budget(),
+    )
+    .unwrap();
     assert_eq!(restored.len(), report.prepared_turns);
 
     // A fresh agent sees only the durable journal and still reconstructs the
@@ -176,8 +205,8 @@ fn compact_checkpoint_is_durable_and_reconstructs_after_restart() {
         Box::new(CaptureBackend(captured.clone())),
     );
     reopened.set_context_budget(ContextBudget {
-        max_tokens: 1_500,
-        reserved_output_tokens: 300,
+        max_tokens: 4_000,
+        reserved_output_tokens: 1_000,
     });
     assert!(reopened.session().events().iter().any(|event| {
         event["type"] == "context_compacted" && event["trigger"] == "manual_slash"
@@ -186,7 +215,7 @@ fn compact_checkpoint_is_durable_and_reconstructs_after_restart() {
         .process(TurnInputRequest::new("after restart"))
         .unwrap();
     let ids = captured.lock().unwrap().clone();
-    assert!(ids.iter().any(|id| id.starts_with("context-")));
+    assert!(ids.iter().any(|id| id.starts_with("semantic-")));
     assert!(ids.iter().any(|id| id == "turn-19"));
     assert!(!ids.iter().any(|id| id == "turn-0"));
 }

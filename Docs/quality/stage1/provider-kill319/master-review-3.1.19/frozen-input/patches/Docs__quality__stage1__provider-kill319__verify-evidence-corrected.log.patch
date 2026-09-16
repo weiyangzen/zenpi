@@ -1,0 +1,6 @@
+diff --git a/Docs/quality/stage1/provider-kill319/verify-evidence-corrected.log b/Docs/quality/stage1/provider-kill319/verify-evidence-corrected.log
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/verify-evidence-corrected.log
+@@ -0,0 +1 @@
++{"passed_cases": ["chat/partial-first", "chat/tool-corrected", "anthropic/partial-first", "anthropic/tool-first", "google/partial-first", "google/tool-first"], "snapshot_files_verified": 128, "binary_sha256": "9334844f18ea25b6ac01dc3955a724dc8b143e462ff53438277200ea05ecf673", "result": "pass"}

@@ -1,0 +1,106 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/target-excerpts/src__providers__registry.rs-18-118.txt
+@@ -0,0 +1,101 @@
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum ReasoningLevel {
++    None,
++    Minimal,
++    Low,
++    Medium,
++    High,
++    Xhigh,
++    Max,
++    Ultra,
++}
++
++impl ReasoningLevel {
++    pub fn parse(value: &str) -> Result<Self, RegistryError> {
++        serde_json::from_value(serde_json::Value::String(value.into()))
++            .map_err(|_| RegistryError::Invalid("unknown reasoning level".into()))
++    }
++}
++
++/// Integer millionths of one USD per million text tokens. Missing prices mean
++/// unknown, not free. A quotation belongs to its own source/version snapshot.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct ModelPrice {
++    pub input_micro_usd_per_million: u64,
++    pub output_micro_usd_per_million: u64,
++    pub cached_input_micro_usd_per_million: Option<u64>,
++    pub source: String,
++    pub version: String,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case", tag = "kind")]
++pub enum FieldSource {
++    Builtin { reference: String, version: String },
++    UserOverride { version: String },
++    Conservative { version: String },
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ModelDescriptor {
++    pub provider: String,
++    pub id: String,
++    pub context_window: u64,
++    pub max_output_tokens: u64,
++    pub capabilities: ProviderCapabilities,
++    pub reasoning_levels: BTreeSet<ReasoningLevel>,
++    pub price: Option<ModelPrice>,
++    pub sources: BTreeMap<String, FieldSource>,
++}
++
++impl ModelDescriptor {
++    pub fn effective_capabilities(&self, wire: ProviderCapabilities) -> ProviderCapabilities {
++        let m = self.capabilities;
++        ProviderCapabilities {
++            text: m.text && wire.text,
++            images: m.images && wire.images,
++            files: m.files && wire.files,
++            tools: m.tools && wire.tools,
++            structured_output: m.structured_output && wire.structured_output,
++            streaming: m.streaming && wire.streaming,
++            reasoning: m.reasoning && wire.reasoning,
++        }
++    }
++
++    pub fn validate_reasoning(
++        &self,
++        wire: ProviderCapabilities,
++        effort: Option<&str>,
++    ) -> Result<(), RegistryError> {
++        if let Some(effort) = effort {
++            let level = ReasoningLevel::parse(effort)?;
++            if !self.effective_capabilities(wire).reasoning
++                || !self.reasoning_levels.contains(&level)
++            {
++                return Err(RegistryError::Unsupported("reasoning effort"));
++            }
++        }
++        Ok(())
++    }
++
++    /// Keep explicit user limits, clamp them to the selected model and reserve
++    /// the configured output tokens. This is a local estimate, not tokenization.
++    pub fn context_budget(
++        &self,
++        user: crate::context::ContextBudget,
++    ) -> crate::context::ContextBudget {
++        crate::context::ContextBudget {
++            max_tokens: user.max_tokens.min(self.context_window),
++            reserved_output_tokens: user.reserved_output_tokens.min(self.max_output_tokens),
++        }
++    }
++
++    pub fn digest(&self) -> String {
++        // All fields are finite integers, strings and ordered maps/sets.
++        format!(
++            "{:x}",
++            Sha256::digest(serde_json::to_vec(self).expect("model metadata serializes"))
++        )
++    }

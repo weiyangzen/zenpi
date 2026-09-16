@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "tools/validate_stage1_blueprint.py",
+    "--item",
+    "ZS1-023"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T14:58:50.703516+00:00",
+  "ended_at": "2026-09-12T14:58:51.293037+00:00",
+  "exit_code": 0,
+  "log_sha256": "fd97b157662f000496fe5286f00021dffce8cf5cbba562a71fdd4e49e602d821"
+}

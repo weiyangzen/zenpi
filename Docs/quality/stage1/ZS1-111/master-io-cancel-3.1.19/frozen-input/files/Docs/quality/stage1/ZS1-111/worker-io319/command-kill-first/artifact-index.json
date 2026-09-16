@@ -1,0 +1,42 @@
+[
+  {
+    "path": "effect.py",
+    "bytes": 444,
+    "sha256": "1d87f16ab26dda634fcac816a470151b41f01e910ae2b2b03e9278e2d63369e9"
+  },
+  {
+    "path": "owner-one.process.json",
+    "bytes": 698,
+    "sha256": "6cfaf09e5d4cf21ecf6f35004a0cba8a162137c947d68083660bb45c00031e5e"
+  },
+  {
+    "path": "owner-one.stderr",
+    "bytes": 66,
+    "sha256": "ddddafd4d0aac37e2ed9094c461306ea295da11dd10c13df759c3cbbf031c0db"
+  },
+  {
+    "path": "owner-one.stdin.jsonl",
+    "bytes": 154,
+    "sha256": "618808d4ac28eff02da1ccb4ebdaa63951bbf633809a4638f366e44b0cca167d"
+  },
+  {
+    "path": "owner-one.stdout.jsonl",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "release-child",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "result.json",
+    "bytes": 1065,
+    "sha256": "c3ec5e56bdfcbcf14a288ccde2671bf8a2a1c6c391d636d436f07022ed47e892"
+  },
+  {
+    "path": "user/config.toml",
+    "bytes": 15,
+    "sha256": "d46cb67a08ef25243d516df809955b8a5d56dcf959430839524775c112141313"
+  }
+]

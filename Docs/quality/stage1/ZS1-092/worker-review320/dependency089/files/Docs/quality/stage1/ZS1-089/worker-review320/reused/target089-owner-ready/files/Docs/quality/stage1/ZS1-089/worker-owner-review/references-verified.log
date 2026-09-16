@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "full_source_lines": 77,
+  "source_bytes": 2480,
+  "baseline_equals_current": true,
+  "ordered_steps": 16,
+  "script_entry_contexts": 8,
+  "references": 4,
+  "actual_local_gate_cases": 3,
+  "hosted_CI_runs": 0,
+  "workflow_modified": false,
+  "meaning": "Integrity+localcounterexample, notCI/masteracceptance"
+}

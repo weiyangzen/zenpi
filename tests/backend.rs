@@ -38,6 +38,9 @@ fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String>
     };
     let headers = String::from_utf8_lossy(&request[..header_end]);
     let expected_path = match wire_api {
+        OpenAiWireApi::GoogleGenerativeAi | OpenAiWireApi::AnthropicMessages => {
+            panic!("OpenAI fixture does not support native Messages")
+        }
         OpenAiWireApi::ChatCompletions => "/v1/chat/completions",
         OpenAiWireApi::Responses => "/v1/responses",
     };
@@ -68,7 +71,7 @@ fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String>
     }
     let body: Value = serde_json::from_slice(&request[header_end..header_end + content_length])
         .map_err(|error| error.to_string())?;
-    let expected_stream = matches!(wire_api, OpenAiWireApi::Responses);
+    let expected_stream = true;
     if body.get("model").and_then(Value::as_str) != Some("mock-model")
         || body.get("stream").and_then(Value::as_bool) != Some(expected_stream)
     {
@@ -76,6 +79,9 @@ fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String>
     }
 
     match wire_api {
+        OpenAiWireApi::GoogleGenerativeAi | OpenAiWireApi::AnthropicMessages => {
+            panic!("OpenAI fixture does not support native Messages")
+        }
         OpenAiWireApi::ChatCompletions => {
             if body.get("messages").and_then(Value::as_array).is_none() {
                 return Err(format!("chat request omitted messages: {body}"));
@@ -105,14 +111,17 @@ fn respond(mut stream: TcpStream, wire_api: OpenAiWireApi) -> Result<(), String>
         }
     }
     let payload = match wire_api {
+        OpenAiWireApi::GoogleGenerativeAi | OpenAiWireApi::AnthropicMessages => {
+            panic!("OpenAI fixture does not support native Messages")
+        }
         OpenAiWireApi::ChatCompletions => {
-            r#"{"id":"fixture","model":"mock-model","choices":[{"message":{"content":"fixture answer"}}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}"#
+            r#"{"id":"fixture","model":"mock-model","choices":[{"message":{"content":"fixture answer"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}"#
         }
         OpenAiWireApi::Responses => {
             "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_fixture\"}}\0\0\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"responses answer\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_fixture\",\"model\":\"mock-model\",\"usage\":{\"input_tokens\":4,\"output_tokens\":5,\"total_tokens\":9}}}\n\ndata: [DONE]\n"
         }
     };
-    let content_type = if expected_stream {
+    let content_type = if matches!(wire_api, OpenAiWireApi::Responses) {
         "text/event-stream"
     } else {
         "application/json"
@@ -190,7 +199,7 @@ fn capabilities_are_explicit_per_adapter() {
     assert!(responses.text && responses.tools && responses.streaming && responses.reasoning);
     let chat = ProviderCapabilities::for_wire_api(OpenAiWireApi::ChatCompletions);
     assert!(chat.text && chat.tools);
-    assert!(!chat.streaming);
+    assert!(chat.streaming);
     assert!(!chat.reasoning);
 }
 
@@ -202,19 +211,34 @@ fn retry_reuses_a_stable_idempotency_key() {
         let mut keys = Vec::new();
         for attempt in 0..2 {
             let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .map_err(|e| e.to_string())?;
             let mut request = Vec::new();
             let mut chunk = [0_u8; 4096];
-            loop {
+            let header_end = loop {
                 let count = stream.read(&mut chunk).map_err(|error| error.to_string())?;
                 if count == 0 {
-                    break;
+                    return Err("retry fixture received incomplete headers".into());
                 }
                 request.extend_from_slice(&chunk[..count]);
-                if request.windows(4).any(|part| part == b"\r\n\r\n") {
-                    break;
+                if let Some(end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                    break end + 4;
                 }
-            }
-            let headers = String::from_utf8_lossy(&request);
+                if request.len() > 64 * 1024 {
+                    return Err("retry fixture headers too large".into());
+                }
+            };
+            let headers = String::from_utf8_lossy(&request[..header_end]);
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':')
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                        .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+                })
+                .filter(|size| *size <= 1024 * 1024)
+                .ok_or("invalid retry fixture body length")?;
             let key = headers
                 .lines()
                 .find_map(|line| {
@@ -224,6 +248,16 @@ fn retry_reuses_a_stable_idempotency_key() {
                 })
                 .ok_or_else(|| "missing idempotency key".to_owned())?;
             keys.push(key);
+            // Consume the actual request before closing a 503 response. Closing
+            // with unread body bytes can race the client's write and mask the
+            // intended HTTP retry with a socket error on macOS.
+            while request.len() < header_end + content_length {
+                let count = stream.read(&mut chunk).map_err(|error| error.to_string())?;
+                if count == 0 {
+                    return Err("retry fixture received incomplete body".into());
+                }
+                request.extend_from_slice(&chunk[..count]);
+            }
             if attempt == 0 {
                 write!(
                     stream,
@@ -661,6 +695,75 @@ fn cancellation_interrupts_a_stalled_responses_body_within_poll_deadline() {
         "stalled body cancellation exceeded deadline: {:?}",
         cancelled_at.elapsed()
     );
+    canceller.join().unwrap();
+    server.join().unwrap().unwrap();
+    assert_eq!(requests.load(Ordering::Acquire), 1);
+}
+
+#[test]
+fn cancellation_interrupts_a_stalled_chat_body_without_retry() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = Arc::clone(&requests);
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let server = thread::spawn(move || -> Result<(), String> {
+        let (mut stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        server_requests.fetch_add(1, Ordering::AcqRel);
+        let _ = read_headers(&mut stream)?;
+        let partial = r#"{"id":"chat-stall","model":"mock-model","choices":["#;
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 1048576\r\nConnection: close\r\n\r\n{partial}"
+        )
+        .map_err(|error| error.to_string())?;
+        stream.flush().map_err(|error| error.to_string())?;
+        started_tx.send(()).map_err(|error| error.to_string())?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .map_err(|error| error.to_string())?;
+        let mut byte = [0_u8; 1];
+        match stream.read(&mut byte) {
+            Ok(0) => Ok(()),
+            Ok(_) => Err("cancelled Chat request unexpectedly wrote more data".into()),
+            Err(error) => Err(format!(
+                "cancelled Chat client did not close socket: {error}"
+            )),
+        }
+    });
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let flag = Arc::clone(&cancelled);
+    let canceller = thread::spawn(move || {
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        thread::sleep(Duration::from_millis(40));
+        flag.store(true, Ordering::Release);
+    });
+    let backend = OpenAiCompatibleBackend::new_with_settings_and_timeout(
+        format!("http://127.0.0.1:{port}"),
+        Some("test-key".into()),
+        "mock-model",
+        OpenAiWireApi::ChatCompletions,
+        None,
+        None,
+        Duration::from_secs(5),
+    )
+    .unwrap()
+    .with_max_retries(2)
+    .unwrap();
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(dir.path().join("cancel-stalled-chat.jsonl")).unwrap(),
+        Box::new(backend),
+    );
+    let error = agent
+        .process_with_cancel(TurnInputRequest::new("cancel stalled chat"), || {
+            cancelled.load(Ordering::Acquire)
+        })
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        zenpi::core::AgentError::Backend(BackendError::Cancelled)
+    ));
     canceller.join().unwrap();
     server.join().unwrap().unwrap();
     assert_eq!(requests.load(Ordering::Acquire), 1);

@@ -1,0 +1,57 @@
+[
+  {
+    "name": "type slash",
+    "hex": "2f",
+    "at_seconds": 0.815553458
+  },
+  {
+    "name": "type m",
+    "hex": "6d",
+    "at_seconds": 1.115754875
+  },
+  {
+    "name": "type o",
+    "hex": "6f",
+    "at_seconds": 1.418462208
+  },
+  {
+    "name": "blocked Ctrl-G",
+    "hex": "07",
+    "at_seconds": 2.082902917
+  },
+  {
+    "name": "dismiss choices",
+    "hex": "1b",
+    "at_seconds": 2.388753833
+  },
+  {
+    "name": "clear draft",
+    "hex": "15",
+    "at_seconds": 3.0516297920000004
+  },
+  {
+    "name": "ordinary Unicode",
+    "hex": "e7958cc3a9f09f9982",
+    "at_seconds": 3.411685792
+  },
+  {
+    "name": "Ctrl-U",
+    "hex": "15",
+    "at_seconds": 3.771204083
+  },
+  {
+    "name": "Ctrl-Y",
+    "hex": "19",
+    "at_seconds": 4.128999125
+  },
+  {
+    "name": "clear before exit",
+    "hex": "15",
+    "at_seconds": 4.4876686669999994
+  },
+  {
+    "name": "Ctrl-D exit",
+    "hex": "04",
+    "at_seconds": 4.839749583
+  }
+]

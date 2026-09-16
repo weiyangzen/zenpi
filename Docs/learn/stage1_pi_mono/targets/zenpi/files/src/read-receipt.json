@@ -1,0 +1,65 @@
+{
+  "item_id": "ZS1-085",
+  "path": "src/tui.rs",
+  "bytes": 675150,
+  "sha256": "db55e6368c46ff2a920c64dda907099f6981a9b5364a341d8612cea598ae48ef",
+  "read_ranges": [
+    {
+      "start": 0,
+      "end": 65536,
+      "sha256": "674d27235d0c27f33b9a59e4079ebb6652cec1367ae39fa856d2736c46cc11b4"
+    },
+    {
+      "start": 65536,
+      "end": 131072,
+      "sha256": "7b784f0b6e0e280f57ac83a914fa0f1bc6706f9fd97571ca2f67e7fb339b4e6e"
+    },
+    {
+      "start": 131072,
+      "end": 196608,
+      "sha256": "db229ffc6632ff4e688387aa9fc003b69918ae4ba87eaa8bed65970fd218e147"
+    },
+    {
+      "start": 196608,
+      "end": 262144,
+      "sha256": "01c0c85ec539898bb709f7ce0760a266f135d2ad0c814e4422d46e66e268a959"
+    },
+    {
+      "start": 262144,
+      "end": 327680,
+      "sha256": "2b426a425a734ae332b1aba9f3627f5625618b0acf4017c098a287ea0ddbe350"
+    },
+    {
+      "start": 327680,
+      "end": 393216,
+      "sha256": "e922a50760be6be0c472d80e59ac91a882ddd789541d5be39a72c47972ce0097"
+    },
+    {
+      "start": 393216,
+      "end": 458752,
+      "sha256": "6893f51dc4c494a5e1b122f8ae0ac6c68980aec661ee26550327d708ea9fb690"
+    },
+    {
+      "start": 458752,
+      "end": 524288,
+      "sha256": "2701899a4493b0f0d3d43332a6d752fe5659420a4c1bcc560e52a421a1896afd"
+    },
+    {
+      "start": 524288,
+      "end": 589824,
+      "sha256": "d2e704770ce9b52ba68d66b4b0f4b3a3e25cf7dd619d91bd80e2cbba19fa6767"
+    },
+    {
+      "start": 589824,
+      "end": 655360,
+      "sha256": "71f933bf11fa953e838bf7adb0ef401234bf56166dcdbebb987b47a09e00c351"
+    },
+    {
+      "start": 655360,
+      "end": 675150,
+      "sha256": "bef38989e35fcd4b38dc6e14addad3eee3e6eb23deb30fc584f4adc210f16359"
+    }
+  ],
+  "generated_at": "2026-09-13T12:27:13.120857+00:00",
+  "status": "candidate_only"
+}

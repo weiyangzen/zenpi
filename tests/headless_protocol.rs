@@ -590,6 +590,26 @@ fn checkpoint_pages_and_mailbox_are_local_durable_and_addressed() {
     assert_eq!(records[3]["data"]["records"].as_array().unwrap().len(), 1);
     assert_eq!(records[3]["data"]["cursor"]["next_sequence"], 1);
     assert_eq!(records[3]["data"]["has_more"], true);
+
+    let mut sender = Agent::new(
+        SessionStore::open_existing(&source_path).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    let mut reply_output = Vec::new();
+    run_headless(
+        &mut sender,
+        Cursor::new(
+            b"{\"schema_version\":2,\"type\":\"mailbox\",\"id\":\"reply\",\"mailbox\":{\"action\":\"receive\",\"after_sequence\":0,\"limit\":128}}\n",
+        ),
+        &mut reply_output,
+    )
+    .unwrap();
+    let reply_records = json_lines(&reply_output);
+    assert_eq!(reply_records[0]["success"], true);
+    assert_eq!(
+        reply_records[0]["data"]["messages"][0]["message"]["payload"]["in_reply_to"],
+        message_id
+    );
 }
 
 /// Create a domain input under the process workspace so the host's
@@ -858,6 +878,20 @@ fn async_eof_denies_unanswerable_side_effect_approval_without_hanging() {
     .unwrap();
 
     let records = json_lines(&captured.0.lock().unwrap());
+    let approval_event = records
+        .iter()
+        .find(|record| record["type"] == "event" && record["event"]["type"] == "approval_request")
+        .expect("missing approval request event");
+    assert_eq!(approval_event["event"]["block"]["kind"], "approval");
+    assert_eq!(approval_event["event"]["block"]["state"], "pending");
+    assert_eq!(
+        approval_event["event"]["block"]["approval_id"],
+        approval_event["event"]["approval"]["request_id"]
+    );
+    assert_eq!(
+        approval_event["event"]["block"]["tool"],
+        approval_event["event"]["approval"]["tool"]
+    );
     let response = records
         .iter()
         .find(|record| record["type"] == "response" && record["id"] == "approval")
@@ -1147,12 +1181,8 @@ fn async_recovery_event_does_not_overtake_turn_admission() {
         serde_json::json!({"type":"prompt","id":"recovery-prompt","text":"hello"})
     )
     .unwrap();
-    writeln!(
-        writer,
-        "{}",
-        serde_json::json!({"type":"shutdown","id":"recovery-shutdown"})
-    )
-    .unwrap();
+    // EOF drains the admitted turn. Explicit shutdown is cancellation and
+    // may legitimately prevent *any* provider event under parallel load.
     drop(writer);
     host.join().unwrap();
 
@@ -1174,6 +1204,13 @@ fn async_recovery_event_does_not_overtake_turn_admission() {
             .iter()
             .any(|record| { record["type"] == "event" && record["event"]["type"] == "error" })
     );
+    let provider_record = records
+        .iter()
+        .find(|record| record["type"] == "event" && record["event"]["type"] == "text_delta")
+        .expect("provider event record");
+    assert_eq!(provider_record["event"]["view"]["type"], "text_delta");
+    assert_eq!(provider_record["event"]["view"]["schema_version"], 1);
+    assert!(provider_record["event"]["view"]["turn_id"].is_string());
 }
 
 #[test]
@@ -2402,4 +2439,72 @@ fn read_http_body(stream: &mut TcpStream) -> Result<Value, String> {
     }
     serde_json::from_slice(&bytes[header_end..header_end + length])
         .map_err(|error| error.to_string())
+}
+
+fn exercise_steer_shell_guard(extra: Value, should_execute: bool) {
+    let root = tempdir().unwrap();
+    let mut agent = Agent::new(
+        SessionStore::open(root.path().join("journal.jsonl")).unwrap(),
+        Box::new(NoControlProvider),
+    );
+    agent.set_tools(
+        ToolRegistry::with_all_builtins().unwrap(),
+        ToolContext::new(root.path()).unwrap(),
+        SideEffectPolicy::all_builtins(),
+    );
+    agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::Never,
+        ..Default::default()
+    });
+    let mut request = serde_json::json!({"schema_version":2,"type":"steer","id":"guard-fixture","text":"!printf guard-owned > observed"});
+    request
+        .as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(format!("{request}\n")), &mut output).unwrap();
+    let records = json_lines(&output);
+    let response = records
+        .iter()
+        .find(|r| r["id"] == "guard-fixture" && r["type"] == "response")
+        .unwrap();
+    assert_eq!(
+        root.path().join("observed").exists(),
+        should_execute,
+        "incompatible steer shell fields must fail before the shell effect: {response}"
+    );
+    assert_eq!(response["success"], should_execute);
+    if should_execute {
+        assert_eq!(
+            fs::read_to_string(root.path().join("observed")).unwrap(),
+            "guard-owned"
+        );
+    } else {
+        assert_eq!(response["code"], "invalid_field");
+        assert!(response["error"].as_str().unwrap().contains("user_shell"));
+        assert!(agent.history().is_empty());
+    }
+}
+
+#[test]
+fn steer_shell_guard_rejects_attachments_before_side_effects() {
+    exercise_steer_shell_guard(
+        serde_json::json!({"attachments":[{"kind":"file","mime_type":""}]}),
+        false,
+    );
+}
+#[test]
+fn steer_shell_guard_rejects_mode_before_side_effects() {
+    exercise_steer_shell_guard(serde_json::json!({"mode":"steer"}), false);
+}
+#[test]
+fn steer_shell_guard_keeps_expected_turn_rejection_before_side_effects() {
+    exercise_steer_shell_guard(
+        serde_json::json!({"expected_turn_id":"existing-turn"}),
+        false,
+    );
+}
+#[test]
+fn steer_shell_guard_preserves_valid_owned_shell_execution() {
+    exercise_steer_shell_guard(serde_json::json!({}), true);
 }

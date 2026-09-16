@@ -1,0 +1,126 @@
+{
+  "item": "ZS1-125",
+  "full_item_accepted": false,
+  "artifacts": {
+    "inputs-after.json": {
+      "bytes": 16602,
+      "sha256": "10341d913693bd066b7b1b04860b4ef471a7e9a4dec31a31bc95a123b530b69d"
+    },
+    "tui.stdout.log": {
+      "bytes": 5142,
+      "sha256": "991c5542ec3d49b973b4996b7f22f75a009a2da496500a972c5c68ad9effd51b"
+    },
+    "clippy.stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "before-stderr.log": {
+      "bytes": 2822,
+      "sha256": "09e33e907d98263f90f32528f5162e5527f6eacd3e3f212475c6ee9e7b9a8884"
+    },
+    "debug.stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "root-package.tar.gz": {
+      "bytes": 173831,
+      "sha256": "dd74c0b95d426818c011858e93fa871bf2dfa8e6485fdf2e25b4749650d3bab2"
+    },
+    "root-render-read.json": {
+      "bytes": 756,
+      "sha256": "8fabd902c8f4f8e2c2a11037c0d3efbaed16daca529e1ee6d353e7c9f65cd716"
+    },
+    "fmt.stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "render.stdout.log": {
+      "bytes": 1898,
+      "sha256": "27cb9493312d4cdc1b624da488b4a4f463ea8415a135175eabdc4e0297d5eb5e"
+    },
+    "tui.stderr.log": {
+      "bytes": 1892,
+      "sha256": "d36fd5d3a9e6038932bd231391fc1068aab40a2c7064b407edabb45c8e0ac074"
+    },
+    "product.patch": {
+      "bytes": 2211,
+      "sha256": "247b4b1d357f41b53a0200391520e45e0a25c13a1ffbcbc83ec93d24974d8eef"
+    },
+    "inputs-before.json": {
+      "bytes": 16602,
+      "sha256": "46be0d60440db7ac5a9ed06935e47ff02d3de32a912c666fb3ecb921098c7479"
+    },
+    "clippy.stderr.log": {
+      "bytes": 829,
+      "sha256": "dcf47a1a22d4435fbd786b80ad0f7f33d88ef2355b7e0c32e4a089b15ce64ae8"
+    },
+    "before-stdout.log": {
+      "bytes": 629,
+      "sha256": "325380d7b70b137b4a445f29076c4e959e2c53f474d5a25ce5bb56ddf5e490dc"
+    },
+    "master-verification.json": {
+      "bytes": 417,
+      "sha256": "87fde1c29c11e832740a88e8328290d7e51100456df993e0fd94f4d6720ecea9"
+    },
+    "rollback.patch": {
+      "bytes": 2146,
+      "sha256": "b86ac6b64ce1c7220667140dc95187fad95a5e76e22674dde334a30da7a4531f"
+    },
+    "after-runs.json": {
+      "bytes": 1886,
+      "sha256": "d652062e55678319bd22d2716e73adb8a46cecdf3ab2a216ce31dd2393e9865f"
+    },
+    "debug.stderr.log": {
+      "bytes": 819,
+      "sha256": "fa5d771da73e3b1160427978a8b37e3ff163c0d9606a3caa72934e3f9386d530"
+    },
+    "root-before.py": {
+      "bytes": 1239,
+      "sha256": "fe4d93396302b9045bec50ee60cebebf25faef309d3c9b75a01d9b2e0c278a44"
+    },
+    "review.md": {
+      "bytes": 5358,
+      "sha256": "15a06759313df4b5e9702fcfdec0e554471bbc2bb4725a1451fbd1fe9465d367"
+    },
+    "before-run.json": {
+      "bytes": 463,
+      "sha256": "e89a16488a13149a532ed7beb01ebc4a4cb7fc7700dfd73970e9ac958f73f461"
+    },
+    "binary.json": {
+      "bytes": 104,
+      "sha256": "69f89283ddbf6c0268c1aa1dfb89ea1f70ddfc257bf66e92dc8b908ffae9d07f"
+    },
+    "after-started.json": {
+      "bytes": 51,
+      "sha256": "4e8e8b79e00af67e64b96ba06af315cb82a0ab1f4cca149af098780d1c4956a5"
+    },
+    "before-started.json": {
+      "bytes": 178,
+      "sha256": "edea82b3439cd11fe08ff9f00afd652ab6b434c15da21c0d1319eda4b247c580"
+    },
+    "render.stderr.log": {
+      "bytes": 897,
+      "sha256": "2a469ea2754b86bc4d8be31fe0b32599c6a39cb2b104c32ee39535aec4f97a75"
+    },
+    "fmt.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "root-after.py": {
+      "bytes": 2079,
+      "sha256": "0a0b083eea9cc1b4ab116865acfaafa9f90224a12d79e5539d62259f16a15026"
+    },
+    "publish.py": {
+      "bytes": 3582,
+      "sha256": "a0179cb852756aee8c3065a2218f16992ca24a5fd557afe440b70b78b390dc51"
+    },
+    "current/tests/tui_preview_graphemes.rs": {
+      "bytes": 3865,
+      "sha256": "964f5ab2853fd66234ca5d74a5f289298d3710183f4665e438c668fa0af84fad"
+    },
+    "current/src/render.rs": {
+      "bytes": 59562,
+      "sha256": "9e526c42e1394cc2aa888f9627e7e0dfaf5b5e3acd0db3187c65553884d61c0a"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/artifact-index.json b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/artifact-index.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/reused/target089-owner-ready/files/Docs/quality/stage1/ZS1-089/worker-owner-review/artifact-index.json
+@@ -0,0 +1,82 @@
++[
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/README.md",
++    "bytes": 1512,
++    "sha256": "bd6d29f35a38689e6242758254ba46ca9adddf5fe48ec6d05317a92e017abde1"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/archive-gate-counterexample.json",
++    "bytes": 877,
++    "sha256": "59915079b759e39c04934af3e3aa200ba1296cbb9eeebf3e53bb77768dd78d54"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/archive-gate-counterexample.log",
++    "bytes": 1498,
++    "sha256": "f68260af1af39bd62d1b99861296dd21ac062450ad11869ef892edbc8bb1d407"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/current-ci.yml",
++    "bytes": 2480,
++    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/external-reference.json",
++    "bytes": 442,
++    "sha256": "e92c5f988caa0558ae8505e395c4b716372b665f83ef22f930657643de1aa822"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/g-stage-main-before-integration.json",
++    "bytes": 1132,
++    "sha256": "f86e70c0415fdd3608d60d73eefac25699c140cdbd03e19a8c774e757f512707"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/g-stage-main-before-integration.log",
++    "bytes": 408,
++    "sha256": "fd4e98ca2d279a3a8f6df7fe7ca1b6f6e56a655d5976318aee2f2d673e90638f"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/input-manifest.json",
++    "bytes": 1349,
++    "sha256": "e18240a403fc435449a4c314ef9379498cf6e1e70aa3a69f4249384f7297d3cb"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/original-ci.yml",
++    "bytes": 2480,
++    "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/probe_archive_gate.py",
++    "bytes": 2381,
++    "sha256": "9708b33279b15bfcb85e1008f73980a0dc279fd94e40e5c9a6c7373749c0426b"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/references-verified.json",
++    "bytes": 851,
++    "sha256": "546d9ba8a946e15d074b3fa0fab1a3a4e5213b4f821aa3415c9134e02f2becba"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/references-verified.log",
++    "bytes": 336,
++    "sha256": "0308d3fc32c0c86d23bef882cfb35c3b4ad96615822da5404c40065ca66fe671"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/references.json",
++    "bytes": 1152,
++    "sha256": "8c1b639e8d965ba17d950fb547d7a1c4dfbf4b9e1ced7ded3ab92e0c81f5cd89"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/script-context.json",
++    "bytes": 19229,
++    "sha256": "8b0865a5bc5e64d02690a9977600e6f977aa4f459a7684f0170517b69d82ccd3"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/step-index.json",
++    "bytes": 1071,
++    "sha256": "75c0ec44ef9161462ee1e21258e50fa176de87b0c8306319fcd5d202878d135e"
++  },
++  {
++    "path": "Docs/quality/stage1/ZS1-089/worker-owner-review/verify_references.py",
++    "bytes": 2115,
++    "sha256": "f1c6442ddfef23e6c567d8d1183bab06dca602f67cf61303262bcfc4d7d7c6fe"
++  }
++]

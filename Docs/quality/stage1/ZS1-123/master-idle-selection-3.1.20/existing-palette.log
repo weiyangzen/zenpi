@@ -1,0 +1,47 @@
+Traceback (most recent call last):
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_command_palette_smoke.py", line 265, in <module>
+    if __name__=='__main__':main()
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_command_palette_smoke.py", line 248, in main
+    terminal.type_text('/reasoning ');terminal.expect(b'/reasoning high');terminal.expect(b'default omits');assert '/reasoning ultra' not in screen();terminal.cancel_picker();terminal.write(b'\x15');terminal.type_text('/reasoning high');terminal.write(b'\t');terminal.deliberate_enter();terminal.expect(b'reasoning selected: high')
+  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_project_workspace_smoke.py", line 318, in expect
+    raise AssertionError(f'missing {text!r}: {screen_text(bytes(self.output)).decode(errors="replace")}')
+AssertionError: missing b'/reasoning high':  zenpi | projects: [initial]                                                                                                     [<] [>] [+]
+ zenpi    Ready | model ux-reasoner (last gpt-4.1) | in 12 out 3 | history ~1862/64000 | /Users/wangweiyang/GitHub/zenpi/.ops/command-pty-b1
+┌ Conversation ────────────────────────────────────────┐┌ Gantt  ⋮ ────────────────────────────────────────────────────────────────────────┐
+│  775000-5 revision 0 · project 888481cb4551f6941e26b4││Blueprints 0  Goals 0  gen 0                                                      │
+│  4e485b34975f3b0597226ca55839ec9605fbcc66d7 · /schedu││No persisted Blueprint or Goal                                                    │
+│  led list                                            ││                                                                                  │
+│● /reload bad-selection.json                          ││                                                                                  │
+│● invalid turn: resource selection JSON: key must be a││                                                                                  │
+│   string at line 1 column 2                          ││                                                                                  │
+│● /skill:sample after-failure                         ││                                                                                  │
+│● REPLY_06                                            ││                                                                                  │
+│● /skill:sample after-restart                         ││                                                                                  │
+│● REPLY_07                                            ││                                                                                  │
+│● /model ux-reasoner                                  ││                                                                                  │
+│● model selected: ux-reasoner                         ││                                                                                  │
+└──────────────────────────────────────────────────────┘│                                                                                  │
+┌ Resources  ⋮ ────────────────────────────────────────┐│                                                                                  │
+│workspace                                             ││                                                                                  │
+│files 44  dirs 26                                     ││                                                                                  │
+│size 4.0 KiB  nodes 70                                ││                                                                                  │
+│truncated false                                       ││                                                                                  │
+│host                                                  ││                                                                                  │
+│cpu 16  load unavailable                              ││                                                                                  │
+│mem free unavailable                                  ││                                                                                  │
+│process unavailable                                   ││                                                                                  │
+└──────────────────────────────────────────────────────┘│                                                                                  │
+┌ Goal ────────────────────────────────────────────────┐│                                                                                  │
+│● Blueprint/Goal snapshot refreshed                   ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+│                                                      ││                                                                                  │
+└──────────────────────────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────┘
+┌ Prompt  • command palette active ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│/reasoning                                                                                                                                │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter send · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input      

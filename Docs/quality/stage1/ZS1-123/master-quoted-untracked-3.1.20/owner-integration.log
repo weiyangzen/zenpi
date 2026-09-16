@@ -1,0 +1,105 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/GitHub/zenpi)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.87s
+     Running tests/headless_protocol.rs (target/debug/deps/headless_protocol-4970f6db765b37c2)
+
+running 43 tests
+test approval_command_is_typed_and_bounded ... ok
+test checkpoint_inspection_uses_persisted_journal_identity_not_transport_sequence ... ok
+test async_reader_bounds_overlong_and_invalid_frames_without_stopping ... ok
+test cross_process_owner_lock_survives_contention_and_releases_after_kill ... ok
+test headless_common_model_and_doctor_commands_are_redacted_and_local ... ok
+test async_recovery_event_does_not_overtake_turn_admission ... ok
+test async_shutdown_acknowledges_only_after_prior_turn_terminal_response ... ok
+test protocol_v2_accepts_resume_sequence_and_v1_remains_supported ... ok
+test reconnect_process_fixture ... ok
+test async_runtime_lifecycle_events_are_correlated_ordered_and_replayable ... ok
+test in_flight_duplicate_request_id_is_suppressed_before_side_effects ... ok
+test async_eof_denies_unanswerable_side_effect_approval_without_hanging ... ok
+test headless_session_lifecycle_and_queue_slash_commands_use_typed_owner ... ok
+test async_eof_drains_an_admitted_slow_prompt_instead_of_cancelling_it ... ok
+test session_control_requests_roundtrip_into_typed_commands ... ok
+test inspection_responses_redact_paths_and_reject_domain_escape ... ok
+test session_control_validation_is_bounded_and_rejects_origin_confusion ... ok
+test disconnected_wire_preserves_unknown_or_completed_outcome_without_retry ... ok
+test mailbox_retirement_is_confirmed_and_owned_in_both_hosts ... ok
+test headless_slash_commands_are_control_plane_only ... ok
+test checkpoint_pages_and_mailbox_are_local_durable_and_addressed ... ok
+test stale_session_writers_are_rejected_without_duplicate_sequences ... ok
+test live_steer_cancels_and_reissues_without_losing_or_duplicating_input ... ok
+test steer_shell_guard_keeps_expected_turn_rejection_before_side_effects ... ok
+test malformed_frame_isolated_from_all_commands ... ok
+test reconnect_restores_terminal_events_ack_and_monotonic_sequence ... ok
+test sequential_steer_and_eof_are_safe_terminal_paths ... ok
+test unsupported_version_and_missing_id_are_rejected ... ok
+test headless_domain_put_commands_persist_and_round_trip ... ok
+test steer_shell_guard_rejects_attachments_before_side_effects ... ok
+test session_slash_list_and_open_use_real_session_owner_paths ... ok
+test steer_shell_guard_rejects_mode_before_side_effects ... ok
+test async_user_shell_runs_through_bounded_runtime_and_shutdown ... ok
+test status_snapshots_redact_session_paths_in_sync_and_async_hosts ... ok
+test shutdown_promotes_a_steer_admitted_before_the_shutdown_frame ... ok
+test resumed_session_replays_old_status_ids_but_fresh_ids_inspect_current_history ... ok
+test unowned_session_controls_are_fail_closed_without_session_or_provider_effects ... ok
+test recovery_slash_is_durable_confirmed_and_never_dispatches_retry ... ok
+test session_controls_remain_readable_while_provider_is_in_flight ... ok
+test resume_path_rejects_missing_journals_without_creating_them ... ok
+test synchronous_replay_and_control_idempotency_are_explicit ... ok
+test steer_shell_guard_preserves_valid_owned_shell_execution ... ok
+test user_shell_echo_is_explicit_and_does_not_call_provider ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s
+
+     Running tests/slash_actions.rs (target/debug/deps/slash_actions-fc6ced42d706b543)
+
+running 11 tests
+test diff_owner_rejects_escape_and_symlink_paths ... ok
+test attachment_constructor_rejects_oversized_files ... ok
+test attach_owner_stages_reference_and_consumes_it_on_next_turn ... ok
+test tui_diff_owner_keeps_hunks_as_multiline_transcript_text ... ok
+test staged_attachment_is_carried_into_a_cancel_reissue_turn ... ok
+test diff_owner_marks_binary_files_without_emitting_text ... ok
+test headless_slash_owner_actions_are_usable_before_a_prompt ... ok
+test diff_owner_supports_a_new_repository_without_head ... ok
+test diff_owner_redacts_credentials_in_patch_and_status ... ok
+test diff_owner_marks_process_output_truncated_instead_of_failing ... ok
+test diff_owner_reports_tracked_and_untracked_changes_with_bounds ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/tui_command_palette.rs (target/debug/deps/tui_command_palette-3f54e17146f78ec8)
+
+running 17 tests
+test idle_queue_refresh_preserves_the_painted_keyboard_selection ... ok
+test queue_changes_keep_unrelated_selection_and_require_paint_for_changed_choices ... ok
+test busy_palette_declares_idle_commands_and_queueable_resources ... ok
+test tab_selects_the_visible_highlight_without_guessing_an_unpainted_menu ... ok
+test slash_paths_and_negative_boundaries_do_not_mutate_draft ... ok
+test file_completion_is_cwd_bound_quoted_and_stale_query_safe ... ok
+test source_inspection_rejects_stale_or_missing_owner_metadata ... ok
+test model_catalog_arrival_requests_a_paint_without_idle_queue_updates ... ok
+test reasoning_menu_intersects_wire_capability_and_registry ... ok
+test long_unicode_provenance_keeps_filename_hash_and_real_source ... ok
+test catalog_contains_actual_explicit_resources_and_source_but_not_bodies ... ok
+test project_catalogue_isolated_and_escape_keeps_literal_input ... ok
+test bare_approval_selectors_defer_owner_changes_until_explicit_submit ... ok
+test actual_model_registry_and_effort_setter_drive_project_menu ... ok
+test session_search_and_selection_survive_idle_owner_refresh ... ok
+test completion_result_and_path_limits_remain_bounded ... ok
+test selected_source_after_sixteenth_resource_is_complete_without_body_or_draft_change ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

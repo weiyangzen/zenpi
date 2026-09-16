@@ -1,0 +1,11 @@
+# ZS1-016 complete source reuse supplement, 3.1.19
+
+No new runtime tests. Prior immutable source016-behavior-ready manifest f52b12aaea01cf39c2e9705f81cce2560d427064d9a269259379f07e409c2d8d and all14 artifacts are reused byte-exactly. Old report remains the exact prefix of the updated report; only current-authority corrections, owner maps, replay boundaries and audit findings are appended. Prior 23 source cases/24 loopback HTTP and17 target tests are historical passes, not hosted-model execution or current-main reruns. The initial source failure is preserved. package-lock pins dependencies; historical hashes for every Pi helper were not recorded, so no full historical dependency-graph claim.
+
+Current source read covers48616 bytes/1490lines with5 complete consecutive chunks. Actual source SHA8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7 matches3.1.19. New target evidence covers4 target files/10 excerpts. Historical owner drift is4of5 changed; transport.rs unchanged. The old17test result cannot certify the current19test target.
+
+verify_reuse.py checks byte identity, old immutable package, original receipts/logs, report-prefix reuse, current owner excerpts and actual G-FILE check_ranges/artifact functions. G-STAGE --item ZS1-016 was run read-only against main: structural.ok=true, exit1 missing master receipt. No acceptance was claimed or written.
+
+Main has neither this report nor the old worker-source-probe evidence. This portable supplement therefore includes the13 old evidence artifacts as exact reused additions plus the updated full report and new integrity evidence. It does not require applying the old report delta to a nonexistent main baseline. No runtime source, old frozen package, main file or checkbox is modified.
+
+Precise historical source replay command and request/replay entry points are in the appended report; they are documentation, not newly executed commands. No deep-search probe resumed. The unrelated owned inventory session40912 was normally canceled once after main explicitly authorized cleanup and is closed.

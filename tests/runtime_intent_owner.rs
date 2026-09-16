@@ -83,6 +83,74 @@ fn headless_compete_and_loop_persist_inert_typed_handoffs() {
 }
 
 #[test]
+fn runtime_intent_external_lifecycle_is_append_only_and_visible_in_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("lifecycle.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let created = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &["submit".into(), "audit".into()],
+    )
+    .unwrap();
+    let intent_id = created["intent"]["intent_id"].as_str().unwrap().to_owned();
+    let claimed = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &["claim".into(), intent_id.clone(), "worker-a".into()],
+    )
+    .unwrap();
+    assert_eq!(claimed["state"], "claimed");
+    let succeeded = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &["running".into(), intent_id.clone()],
+    )
+    .unwrap();
+    assert_eq!(succeeded["state"], "running");
+    let succeeded = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &["succeeded".into(), intent_id, "result-manifest:ok".into()],
+    )
+    .unwrap();
+    assert_eq!(succeeded["state"], "succeeded");
+    let status = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &["status".into()],
+    )
+    .unwrap();
+    assert_eq!(status["lifecycle"].as_array().unwrap().len(), 3);
+    assert_eq!(status["execution_state"], "succeeded");
+    assert_eq!(agent.session().events().len(), 3);
+    let replay = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &[
+            "succeeded".into(),
+            created["intent"]["intent_id"].as_str().unwrap().into(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(replay["idempotent_replay"], true);
+    let rollback = zenpi::runtime_intent::runtime_intent_value(
+        &mut agent,
+        RuntimeIntentKind::Compete,
+        &[
+            "running".into(),
+            created["intent"]["intent_id"].as_str().unwrap().into(),
+        ],
+    );
+    assert!(matches!(
+        rollback,
+        Err(zenpi::runtime_intent::RuntimeIntentError::InvalidLifecycle(
+            _
+        ))
+    ));
+}
+
+#[test]
 fn tui_runtime_owner_uses_the_same_durable_adapter() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("runtime.jsonl");

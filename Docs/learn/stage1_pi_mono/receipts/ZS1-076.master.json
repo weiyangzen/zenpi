@@ -1,0 +1,43 @@
+{
+  "schema_version": "stage1-receipt/v1",
+  "item_id": "ZS1-076",
+  "run_id": "zenpi-stage1-20260911",
+  "requirement_digest": "c6ac73535ea710bd7d9720e3e712a0e8d8fb78fa113bf1cccabd81020b8c5162",
+  "baseline_snapshot_sha256": "8104859f06444886ef7b56c39bc81d3f05d52c795df434b82ce9a5ff35c4668e",
+  "complete": true,
+  "attempt_id": "master-review-current",
+  "integrated_revision": "6f252a20c628e9b1ede14e2887acc04657c71d7c",
+  "validators": "G-FILE；G-STAGE --item ZS1-076",
+  "source_path": "src/config.rs",
+  "source_hash": "f5691bd3818dcaf1481a88b63cc4f3874bc6b007234059e26124b74046325d12",
+  "read_ranges": [
+    [
+      0,
+      77782
+    ]
+  ],
+  "artifacts": [
+    {
+      "path": "Docs/learn/stage1_pi_mono/targets/zenpi/files/src/config.rs_learn.md",
+      "bytes": 2640,
+      "sha256": "3a4d6504f365665d70eb09a30925794b1689145389629d8d5be158f05fc75839"
+    },
+    {
+      "path": "Docs/quality/stage1/ZS1-076/master-review-current/review.md",
+      "bytes": 439,
+      "sha256": "5227f268ea7f0124c8daefb7141f989e118f38150727d9ca54ccb1f35eb5881b"
+    }
+  ],
+  "role": "master",
+  "reviewer": "controller",
+  "manual_review": {
+    "decision": "accepted",
+    "reviewer": "controller",
+    "evidence": {
+      "path": "Docs/quality/stage1/ZS1-076/master-review-current/review.md",
+      "bytes": 439,
+      "sha256": "5227f268ea7f0124c8daefb7141f989e118f38150727d9ca54ccb1f35eb5881b"
+    },
+    "findings": "完整读取 config.rs，覆盖 precedence、workspace/profile、auth/pairing、diagnostics、BentoBox preferences、atomic writes 与 path safety。"
+  }
+}

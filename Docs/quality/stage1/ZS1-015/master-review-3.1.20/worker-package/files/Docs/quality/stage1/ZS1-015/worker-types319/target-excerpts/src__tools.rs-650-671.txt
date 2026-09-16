@@ -1,0 +1,22 @@
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum ToolResult {
+    Success {
+        call_id: String,
+        tool: String,
+        output: Value,
+    },
+    Error {
+        call_id: String,
+        tool: String,
+        error: ToolFailure,
+    },
+}
+
+impl ToolResult {
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success { .. })
+    }
+}
+
+#[derive(Debug, Error)]

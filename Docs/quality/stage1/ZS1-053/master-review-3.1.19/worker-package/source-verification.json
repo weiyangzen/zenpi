@@ -1,0 +1,121 @@
+{
+  "upstream_head": "bbb61e34aaf231639fdaaad1adbd757947034eac",
+  "all_originals_and_copies_match": true,
+  "files": [
+    {
+      "path": "packages/coding-agent/package.json",
+      "bytes": 4041,
+      "sha256": "552b6f87a540add2f6117e7584357730cceee798c2f5d7c69ac00c709d3e8750"
+    },
+    {
+      "path": "packages/coding-agent/src/config.ts",
+      "bytes": 19600,
+      "sha256": "7874d7f63a62778f4281a324f99ba4faee8dc9a5c7ae80e2c531552d199257f9"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/bash.ts",
+      "bytes": 13665,
+      "sha256": "b76645f5d7b414957c7772eb8ec75d9dee71d27320ebcbf419881451576a6eee"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/find.ts",
+      "bytes": 11178,
+      "sha256": "b06bcae6821a0e9fda1b63be613a7ce28eb0e66e1d01d16564e59e83f9ce10ea"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/grep.ts",
+      "bytes": 11550,
+      "sha256": "88be3d00217d1a1caf8a9e7bb2b8d2e6d96edfa4b790c2cf76c746ab36b8841b"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/output-accumulator.ts",
+      "bytes": 6049,
+      "sha256": "c601ddd8e10934be6f3db30696eacba7b9544f2dd1648a5ec3c9935f0d4625c3"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/path-utils.ts",
+      "bytes": 3626,
+      "sha256": "ab6f420d2388a41366113c17a25e356867820b87b02a169d044cfcf83e1997d3"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/renderers/bash.ts",
+      "bytes": 6102,
+      "sha256": "9a2a5e69d1311f02f06ec03469a1d38a9896d4c51ff527b30fd505320451e7ec"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/renderers/find.ts",
+      "bytes": 3180,
+      "sha256": "a33591e8193eb2a5591596019676899587f783149434f857eaf331edb8fabe70"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/renderers/grep.ts",
+      "bytes": 3416,
+      "sha256": "8a990da5f4305b0976ad4c245188fbf1fd5e4a3bad69b86c2ffd85bdd1115927"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts",
+      "bytes": 1870,
+      "sha256": "98c04e593457dfefdc4160fa84c4e16f1a693adad21672bdf1fbfa4912ef2f8b"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/truncate.ts",
+      "bytes": 7693,
+      "sha256": "104e61ea602c7f7894097b2771dad8c68de75c5a10ea6222e615c4ad144451c7"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/child-process.ts",
+      "bytes": 4146,
+      "sha256": "cd324f5b9a1abadd85ab5a331750d475c8bd51ec65cae091ad9b416245ec85d4"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/management-http.ts",
+      "bytes": 3004,
+      "sha256": "2195b345fdd5c607f87a55b93e7d00c6d70d7dcfe2989b08bbd9f39b529a756a"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/paths.ts",
+      "bytes": 4880,
+      "sha256": "a687cdb54b82216673fea5be1210c48e64ffa8398d64cfabf2bd7dba5c9d4210"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/shell.ts",
+      "bytes": 7512,
+      "sha256": "7ae7fe532fecdf90af48beeae1f0bb465f2f83123d5326e86a559fef4b1568c2"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/text.ts",
+      "bytes": 404,
+      "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/tools-manager.ts",
+      "bytes": 13294,
+      "sha256": "cfd082080d10a6209d7994ac7829c29dbb39694bdf3fe549e907c28cfc506a17"
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/3302-find-path-glob.test.ts",
+      "bytes": 3127,
+      "sha256": "d9bb34b773d7865109e41ac09146fa3c2c670cc594bb5a350e2d8e30230939db"
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/3303-find-nested-gitignore.test.ts",
+      "bytes": 3587,
+      "sha256": "40748b486bf64c9feaacb3e0f411ffec5fdc145cca3dad0f62c680e0673b959f"
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/5208-late-bash-output.test.ts",
+      "bytes": 1024,
+      "sha256": "9d6fc0d457e6d7470246d821deec9937d428e86fdad6858d05e7d5c956802f8c"
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/5303-bash-output-truncation.test.ts",
+      "bytes": 2861,
+      "sha256": "d38754f1abadb955553f0d2ce3276f580fb07ca9b937e0d4abe3b6226d2e3b87"
+    },
+    {
+      "path": "packages/coding-agent/test/suite/regressions/6104-find-root-relativization.test.ts",
+      "bytes": 3593,
+      "sha256": "5868521c64a301d49b018b82749f74b69bbe26c35a68122816398fbf7d33ea63"
+    }
+  ]
+}

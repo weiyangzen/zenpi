@@ -1,0 +1,152 @@
+diff --git a/Docs/quality/stage1/provider-kill319/chat/partial-first/artifact-index.json b/Docs/quality/stage1/provider-kill319/chat/partial-first/artifact-index.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/provider-kill319/chat/partial-first/artifact-index.json
+@@ -0,0 +1,147 @@
++[
++  {
++    "path": "after-kill.parsed-journal.json",
++    "bytes": 1577,
++    "sha256": "302a1fc0600529b1708771a56c388eb0e2324c6c2d039971e5e4d2faafe7a7af"
++  },
++  {
++    "path": "after-kill.session.jsonl",
++    "bytes": 1243,
++    "sha256": "286077bb754897c1f6b94e4619cd07dd6f095aaf31c42b61d3ecaefcd51e6a81"
++  },
++  {
++    "path": "after-kill.session.jsonl.reconnect",
++    "bytes": 5294,
++    "sha256": "426f722d66dbf61dc45d8e569b7ff64cca5074a19bc94e6f34e1ce230e621a59"
++  },
++  {
++    "path": "http-request-0.json",
++    "bytes": 9469,
++    "sha256": "2526e033de84a300b73e1d45d84846909af1a5ed9bd01707f7cfaec6737e5527"
++  },
++  {
++    "path": "http-request-1.json",
++    "bytes": 9564,
++    "sha256": "363f6ce426cafe712d59e8b6a0078e93332bf14b64fdb5921cad9621e2c71946"
++  },
++  {
++    "path": "http-response-0.sse",
++    "bytes": 491,
++    "sha256": "2a0d396143218b986e2d001aae6454b171e5653444c77fef05c09b1ed1d204a1"
++  },
++  {
++    "path": "http-response-1.sse",
++    "bytes": 351,
++    "sha256": "1bcee0c64feb4cba83d022571304e16643e34f9a01481168f63fe70bc3f288c4"
++  },
++  {
++    "path": "http-server-result.json",
++    "bytes": 70,
++    "sha256": "9f92009a9a6af9405ff05b724dcdd06055b677b67b013903aa8b06749a76fefc"
++  },
++  {
++    "path": "input.txt",
++    "bytes": 23,
++    "sha256": "cab104654345482e9124c8ae7a03f48b463f9db6ef864c8abc7a01252e3a9cd3"
++  },
++  {
++    "path": "owner-one.exit.json",
++    "bytes": 68,
++    "sha256": "694ef295b34b8748a33d4035664f6c71a82c7057a79159e0ffeb786ae938da5d"
++  },
++  {
++    "path": "owner-one.process.json",
++    "bytes": 687,
++    "sha256": "2ae8469d35e976eb58fc688cdbd92e034610d3f4d1823b3266fe8853b57ea178"
++  },
++  {
++    "path": "owner-one.stderr",
++    "bytes": 0,
++    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
++  },
++  {
++    "path": "owner-one.stdin.jsonl",
++    "bytes": 94,
++    "sha256": "2b559df19c751fc648c3ee14f2e20401911cdb662e81c03a3da89f0b8b378bd0"
++  },
++  {
++    "path": "owner-one.stdout.jsonl",
++    "bytes": 3240,
++    "sha256": "e7e7e980f31ac4617b449fb12e4ebc83bc52a63ef4226c68cddba1347dff2107"
++  },
++  {
++    "path": "owner-three.exit.json",
++    "bytes": 68,
++    "sha256": "2cace3e9f6e47319789671cd5d582788a21adcaf1f1cf6263d6f3c6f40184dd7"
++  },
++  {
++    "path": "owner-three.process.json",
++    "bytes": 687,
++    "sha256": "56e1ed16da90941c1c4880c2da70a38f7efec6bb05774f929320083ca40e71a6"
++  },
++  {
++    "path": "owner-three.stderr",
++    "bytes": 0,
++    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
++  },
++  {
++    "path": "owner-three.stdin.jsonl",
++    "bytes": 193,
++    "sha256": "78be4aa373d334f10a60d7e2a6429d3985276af365bc4d4a0ed0ab6ce4277f87"
++  },
++  {
++    "path": "owner-three.stdout.jsonl",
++    "bytes": 966,
++    "sha256": "3a06d30b74e5267c964de440d697b50cc3a55e53078682c58928cec634036bb6"
++  },
++  {
++    "path": "owner-two.exit.json",
++    "bytes": 68,
++    "sha256": "d773539d13fd065db404af717035ef2ae7780f4dd882310fa57517d6f1917168"
++  },
++  {
++    "path": "owner-two.process.json",
++    "bytes": 687,
++    "sha256": "34a612e84003411b0563be9c3d30fe118bcf1d0292cbac96c68cf1f527c06c9d"
++  },
++  {
++    "path": "owner-two.stderr",
++    "bytes": 0,
++    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
++  },
++  {
++    "path": "owner-two.stdin.jsonl",
++    "bytes": 1234,
++    "sha256": "a39e6dd11c1adab57a132514fde1425e10770134018c5bcc4cf184cbc96b4514"
++  },
++  {
++    "path": "owner-two.stdout.jsonl",
++    "bytes": 15563,
++    "sha256": "d34a46dfec43dc0d4e2e1e34611634bd82b1e5bcc7f23504197082823132494e"
++  },
++  {
++    "path": "recovery-inspect.json",
++    "bytes": 1053,
++    "sha256": "b64e0b8422c7098bbb09541dfc45a8dfe54a4734c784aad5bee34104ea790a36"
++  },
++  {
++    "path": "result.json",
++    "bytes": 751,
++    "sha256": "13352ec967a1bd9e1535331c3e7000c9af4155517e3f2553643b4f61c78454f6"
++  },
++  {
++    "path": "session.jsonl",
++    "bytes": 3809,
++    "sha256": "e49747dab6907cf2351f334467913347fac6fc3d1f0b8d4862c1ccf5f0391ac3"
++  },
++  {
++    "path": "session.jsonl.reconnect",
++    "bytes": 24052,
++    "sha256": "bc463688d93585b9c312a6f1b341d3615701f7c927ab947cb7d8aa2ad198a755"
++  },
++  {
++    "path": "user/config.toml",
++    "bytes": 95,
++    "sha256": "79093a12aeba1973f9943a9510030425235c885230715530f9ef27d5304a8bf0"
++  }
++]

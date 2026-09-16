@@ -1,0 +1,206 @@
+[
+  {
+    "api": 1,
+    "pipe": "stdout",
+    "stop": "cancel",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 214,
+    "phase_times": {
+      "host-start": 1988639.803498,
+      "python-parent-entry": 1988639.894228,
+      "fork-start": 1988639.894625,
+      "fork-return": 1988639.902851,
+      "python-holder-entry": 1988639.903311,
+      "escaped-ready": 1988639.903866,
+      "host-return": 1988640.005976
+    },
+    "host_start_to_escaped_ready_ms": 100.368
+  },
+  {
+    "api": 2,
+    "pipe": "stdout",
+    "stop": "panic",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 222,
+    "phase_times": {
+      "host-start": 1988639.803915,
+      "python-parent-entry": 1988639.894763,
+      "fork-start": 1988639.895293,
+      "fork-return": 1988639.903288,
+      "python-holder-entry": 1988639.903749,
+      "escaped-ready": 1988639.904419,
+      "host-return": 1988640.01206
+    },
+    "host_start_to_escaped_ready_ms": 100.504
+  },
+  {
+    "api": 2,
+    "pipe": "stdout",
+    "stop": "revoke",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 224,
+    "phase_times": {
+      "host-start": 1988639.803224,
+      "python-parent-entry": 1988639.89411,
+      "fork-start": 1988639.894581,
+      "fork-return": 1988639.902803,
+      "python-holder-entry": 1988639.903311,
+      "escaped-ready": 1988639.903869,
+      "host-return": 1988640.003449
+    },
+    "host_start_to_escaped_ready_ms": 100.645
+  },
+  {
+    "api": 1,
+    "pipe": "stdin",
+    "stop": "cancel",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 219,
+    "phase_times": {
+      "host-start": 1988640.014994,
+      "python-parent-entry": 1988640.118527,
+      "fork-start": 1988640.119032,
+      "fork-return": 1988640.125474,
+      "python-holder-entry": 1988640.12607,
+      "escaped-ready": 1988640.126693,
+      "host-return": 1988640.221569
+    },
+    "host_start_to_escaped_ready_ms": 111.699
+  },
+  {
+    "api": 2,
+    "pipe": "stdin",
+    "stop": "revoke",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 215,
+    "phase_times": {
+      "host-start": 1988640.021926,
+      "python-parent-entry": 1988640.118517,
+      "fork-start": 1988640.119028,
+      "fork-return": 1988640.125323,
+      "python-holder-entry": 1988640.125863,
+      "escaped-ready": 1988640.126565,
+      "host-return": 1988640.227079
+    },
+    "host_start_to_escaped_ready_ms": 104.639
+  },
+  {
+    "api": 2,
+    "pipe": "stdin",
+    "stop": "panic",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 219,
+    "phase_times": {
+      "host-start": 1988640.021832,
+      "python-parent-entry": 1988640.118635,
+      "fork-start": 1988640.119025,
+      "fork-return": 1988640.125462,
+      "python-holder-entry": 1988640.126008,
+      "escaped-ready": 1988640.126542,
+      "host-return": 1988640.228372
+    },
+    "host_start_to_escaped_ready_ms": 104.71
+  },
+  {
+    "api": 2,
+    "pipe": "stdout",
+    "stop": "cancel",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 213,
+    "phase_times": {
+      "host-start": 1988640.235349,
+      "python-parent-entry": 1988640.32494,
+      "fork-start": 1988640.325334,
+      "fork-return": 1988640.327943,
+      "python-holder-entry": 1988640.32843,
+      "escaped-ready": 1988640.328942,
+      "host-return": 1988640.439191
+    },
+    "host_start_to_escaped_ready_ms": 93.593
+  },
+  {
+    "api": 1,
+    "pipe": "stdout",
+    "stop": "timeout",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 812,
+    "phase_times": {
+      "host-start": 1988639.803494,
+      "python-parent-entry": 1988639.894774,
+      "fork-start": 1988639.895293,
+      "fork-return": 1988639.903391,
+      "python-holder-entry": 1988639.903798,
+      "escaped-ready": 1988639.904421,
+      "host-return": 1988640.603989
+    },
+    "host_start_to_escaped_ready_ms": 100.927
+  },
+  {
+    "api": 2,
+    "pipe": "stdin",
+    "stop": "cancel",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 218,
+    "phase_times": {
+      "host-start": 1988640.451908,
+      "python-parent-entry": 1988640.553828,
+      "fork-start": 1988640.554185,
+      "fork-return": 1988640.556969,
+      "python-holder-entry": 1988640.557425,
+      "escaped-ready": 1988640.557941,
+      "host-return": 1988640.658022
+    },
+    "host_start_to_escaped_ready_ms": 106.033
+  },
+  {
+    "api": 1,
+    "pipe": "stdin",
+    "stop": "timeout",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 827,
+    "phase_times": {
+      "host-start": 1988640.610883,
+      "python-parent-entry": 1988640.700341,
+      "fork-start": 1988640.700738,
+      "fork-return": 1988640.703436,
+      "python-holder-entry": 1988640.70386,
+      "escaped-ready": 1988640.704377,
+      "host-return": 1988641.430901
+    },
+    "host_start_to_escaped_ready_ms": 93.494
+  },
+  {
+    "api": 2,
+    "pipe": "stdout",
+    "stop": "timeout",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 817,
+    "phase_times": {
+      "host-start": 1988641.444722,
+      "python-parent-entry": 1988641.542953,
+      "fork-start": 1988641.543302,
+      "fork-return": 1988641.546144,
+      "python-holder-entry": 1988641.546594,
+      "escaped-ready": 1988641.547139,
+      "host-return": 1988642.246916
+    },
+    "host_start_to_escaped_ready_ms": 102.417
+  },
+  {
+    "api": 2,
+    "pipe": "stdin",
+    "stop": "timeout",
+    "outer_timeout": "false",
+    "outer_elapsed_ms": 839,
+    "phase_times": {
+      "host-start": 1988642.264535,
+      "python-parent-entry": 1988642.375773,
+      "fork-start": 1988642.37613,
+      "fork-return": 1988642.378826,
+      "python-holder-entry": 1988642.379246,
+      "escaped-ready": 1988642.379778,
+      "host-return": 1988643.094832
+    },
+    "host_start_to_escaped_ready_ms": 115.243
+  }
+]

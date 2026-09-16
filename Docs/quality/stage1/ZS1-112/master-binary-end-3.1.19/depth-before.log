@@ -1,0 +1,34 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/stage1_search.rs (target/debug/deps/stage1_search-06c5d622989d3c74)
+
+running 1 test
+
+thread 'pure_depth_cutoff_is_reported_by_search_and_find' (28363771) panicked at tests/stage1_search.rs:857:9:
+assertion `left == right` failed: {"context":[],"engine":"ripgrep","file_limit":256,"files_visited":0,"hidden":false,"ignore":true,"matches":[],"max_depth":64,"max_file_bytes":1048576,"query":"depth_only_needle","regex":true,"truncated":false,"truncation_reasons":[]}
+  left: Bool(false)
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test pure_depth_cutoff_is_reported_by_search_and_find ... FAILED
+
+failures:
+
+failures:
+    pure_depth_cutoff_is_reported_by_search_and_find
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.14s
+
+error: test failed, to rerun pass `--test stage1_search`

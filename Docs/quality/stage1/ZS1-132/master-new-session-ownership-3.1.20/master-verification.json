@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-12T09:41:27.925402+00:00",
+  "item": "ZS1-132",
+  "increment_integrated": true,
+  "complete": false,
+  "changed_product_paths": [
+    "src/tui.rs",
+    "tools/tui_session_new_smoke.py"
+  ],
+  "binary_sha256": "9e76676bc87d7a859409954ae5d19ebc0560070a4685096f2dff87ea15e918dc",
+  "binary_kind": "debug/default-feature native aarch64 CLI",
+  "candidate_inputs": 225,
+  "rust_tests": 121,
+  "actual_groups": 20,
+  "tui_processes": 7,
+  "jsonl_processes": 11,
+  "http_requests": 31,
+  "root_product_hashes": {
+    "src/tui.rs": "93a68354f529aed3259b41aa36c10edf3e0c3694b8b0bfbcdd58a0f498778ce8",
+    "tools/tui_session_new_smoke.py": "fd57ed342a2ba77ccf723e288c47f45f27ed09c03a7756fbe36d4bd43e6bfdfc"
+  },
+  "preserved_root_drift": [
+    "tools/generate_stage1_gantt.py",
+    "tools/stage1_gantt.html"
+  ],
+  "review": "Docs/quality/stage1/ZS1-132/master-new-session-ownership-3.1.20/review.md",
+  "blueprint_counts": {
+    "[x]": 19,
+    "[_]": 0,
+    "[ ]": 93
+  }
+}

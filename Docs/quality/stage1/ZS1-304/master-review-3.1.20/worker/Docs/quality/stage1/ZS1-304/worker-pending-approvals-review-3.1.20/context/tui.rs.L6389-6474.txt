@@ -1,0 +1,86 @@
+        }
+        if let Some(browser) = self.transcript_browser.as_mut() {
+            browser.render(frame);
+        }
+        self.render_approval(frame);
+    }
+
+    fn render_workspace_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.project_hits.clear();
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let plus_width = area.width.min(4);
+        let navigation_width = if area.width >= 16 { 8 } else { 0 };
+        let limit = area.right() - plus_width - navigation_width;
+        let prefix = if area.width > 40 {
+            truncate_to_width(" zenpi | projects: ", usize::from(limit - area.x))
+        } else {
+            String::new()
+        };
+        frame.render_widget(
+            Paragraph::new(prefix.clone()),
+            Rect::new(area.x, area.y, limit - area.x, 1),
+        );
+        let mut x = area.x + UnicodeWidthStr::width(prefix.as_str()) as u16;
+        // Center the retained viewport on the selected tab; plus stays visible.
+        let start = if area.width < 90 {
+            self.active_project
+        } else {
+            self.active_project.saturating_sub(1)
+        };
+        for index in start..self.project_tabs.len() {
+            if x >= limit {
+                break;
+            }
+            let label = self.project_label(index);
+            let text = truncate_to_width(
+                &format!(
+                    "{}{}{} ",
+                    if index == self.active_project {
+                        "["
+                    } else {
+                        " "
+                    },
+                    label,
+                    if index == self.active_project {
+                        "]"
+                    } else {
+                        " "
+                    }
+                ),
+                usize::from(limit - x).min(32),
+            );
+            let width = UnicodeWidthStr::width(text.as_str()) as u16;
+            if width == 0 {
+                break;
+            }
+            let rect = Rect::new(x, area.y, width, 1);
+            frame.render_widget(
+                Paragraph::new(text).style(Style::default().fg(if index == self.active_project {
+                    Color::Cyan
+                } else {
+                    Color::White
+                })),
+                rect,
+            );
+            self.project_hits.push((rect, index));
+            x += width;
+        }
+        if navigation_width > 0 {
+            for (offset, label, index) in [(0, " [<]", usize::MAX), (4, " [>]", usize::MAX - 1)] {
+                let rect = Rect::new(limit + offset, area.y, 4, 1);
+                frame.render_widget(
+                    Paragraph::new(label).style(Style::default().fg(Color::Cyan)),
+                    rect,
+                );
+                self.project_hits.push((rect, index));
+            }
+        }
+        let rect = Rect::new(area.right() - plus_width, area.y, plus_width, 1);
+        frame.render_widget(
+            Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
+            rect,
+        );
+        self.project_hits.push((rect, self.project_tabs.len()));
+    }

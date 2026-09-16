@@ -1,0 +1,133 @@
+warning: unnecessary parentheses around closure body
+  --> vendor/crossterm/src/terminal/sys/unix.rs:87:50
+   |
+87 |     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+   |                                                  ^                            ^
+   |
+   = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+   |
+87 -     let file = File::open("/dev/tty").map(|file| (FileDesc::Owned(file.into())));
+87 +     let file = File::open("/dev/tty").map(|file| FileDesc::Owned(file.into()));
+   |
+
+warning: `crossterm` (lib) generated 1 warning (run `cargo fix --lib -p crossterm` to apply 1 suggestion)
+   Compiling zenpi v0.1.0 (/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/build-context)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.53s
+     Running unittests src/lib.rs (/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target117-pipe-fixture-3.1.20/cargo-target/debug/deps/zenpi-3ab8d8bb60969eba)
+
+running 1 test
+interpreted_fixture_setup interpreter=python3 source_bytes=978 source_sha256=25075adb29dd1c7d3c1312a24cc28fe7c9a23168deaf45f24903d022e5bf8135
+api=1 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=817 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988679.946899000 pid=20642 helper-entry
+1988679.951514000 pid=20642 host-start
+1988680.756549000 pid=20642 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.81s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28940346) panicked at src/extension_runtime.rs:1044:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpuAZeFm/fixture" bytes=120 truncated=false phases=1988679.946899000 pid=20642 helper-entry
+1988679.951514000 pid=20642 host-start
+1988680.756549000 pid=20642 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=978 source_sha256=25075adb29dd1c7d3c1312a24cc28fe7c9a23168deaf45f24903d022e5bf8135
+api=1 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=851 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988680.767382000 pid=20645 helper-entry
+1988680.768618000 pid=20645 host-start
+1988681.602840000 pid=20645 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.84s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28940360) panicked at src/extension_runtime.rs:1044:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpAKAO0f/fixture" bytes=120 truncated=false phases=1988680.767382000 pid=20645 helper-entry
+1988680.768618000 pid=20645 host-start
+1988681.602840000 pid=20645 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=978 source_sha256=25075adb29dd1c7d3c1312a24cc28fe7c9a23168deaf45f24903d022e5bf8135
+api=2 pipe=stdout stop=timeout outer_timeout=false elapsed_ms=816 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988681.619665000 pid=20650 helper-entry
+1988681.620752000 pid=20650 host-start
+1988682.427072000 pid=20650 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.81s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28940380) panicked at src/extension_runtime.rs:1044:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpvLradL/fixture" bytes=120 truncated=false phases=1988681.619665000 pid=20650 helper-entry
+1988681.620752000 pid=20650 host-start
+1988682.427072000 pid=20650 host-return
+
+interpreted_fixture_setup interpreter=python3 source_bytes=978 source_sha256=25075adb29dd1c7d3c1312a24cc28fe7c9a23168deaf45f24903d022e5bf8135
+api=2 pipe=stdin stop=timeout outer_timeout=false elapsed_ms=844 fixture_pids=["", ""] status=exit status: 101 stdout=
+running 1 test
+actual_host_outcome=Ok(Err(CommandTimeout(800))) phases=1988682.439644000 pid=20653 helper-entry
+1988682.441038000 pid=20653 host-start
+1988683.276431000 pid=20653 host-return
+
+test extension_runtime::pipe_deadline_tests::pipe_probe_child ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::pipe_probe_child
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.84s
+
+ stderr=
+thread 'extension_runtime::pipe_deadline_tests::pipe_probe_child' (28940397) panicked at src/extension_runtime.rs:1044:9:
+fixture never escaped
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+fixture_phase_snapshot dir="/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/.tmpRd99A2/fixture" bytes=120 truncated=false phases=1988682.439644000 pid=20653 helper-entry
+1988682.441038000 pid=20653 host-start
+1988683.276431000 pid=20653 host-return
+
+
+thread 'extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded' (28940344) panicked at src/extension_runtime.rs:956:9:
+escaped pipe timeout failures: [(1, "stdout"), (1, "stdin"), (2, "stdout"), (2, "stdin")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded ... FAILED
+
+failures:
+
+failures:
+    extension_runtime::pipe_deadline_tests::escaped_pipe_timeout_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 95 filtered out; finished in 3.34s
+
+error: test failed, to rerun pass `--lib`

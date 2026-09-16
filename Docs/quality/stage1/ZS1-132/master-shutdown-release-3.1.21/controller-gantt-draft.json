@@ -1,0 +1,8 @@
+{
+  "changed_by_controller_only": true,
+  "reason": "defer documentation generator update until captured-input build checks complete",
+  "before_sha256": "95dbdd43b5063c4c1eb94242f43013ef342d4c6384e1b54f59f32e104d5a2b1d",
+  "draft_sha256": "a3aaacaa5b10a8bedabbe7bc14342ae355cfea05e08bb4a5a8b68fc77d874ee4",
+  "draft_path": ".ops/stage1_execution/gantt-after-shutdown321.py.pending",
+  "product_files_changed_by_this_action": []
+}

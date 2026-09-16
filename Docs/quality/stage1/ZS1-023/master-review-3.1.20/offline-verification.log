@@ -1,0 +1,119 @@
+{
+  "passed": true,
+  "manifest_sha256": "3f0aadf8cc8f0d6908dfef2a0eb909f7da3228415b5620ea494fb10cb7f497e3",
+  "artifacts": 46,
+  "report_sha256": "4b6aa687510ec08d24a8c4cb9ccea83150210accb9db66ebd7d8076860794e57",
+  "patch_sha256": "f0f42280107c411dc845bddfa8a5cb5cbf066436418b8c31a89a1ce161dc4c2f",
+  "operations": [
+    {
+      "argv": [
+        "git",
+        "init",
+        "--quiet"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.818917+00:00",
+      "ended_at": "2026-09-12T14:55:54.833735+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--numstat",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source023-master/worker/candidate.patch"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.833971+00:00",
+      "ended_at": "2026-09-12T14:55:54.843144+00:00",
+      "exit_code": 0,
+      "stdout": "193\t0\tDocs/learn/stage1_pi_mono/files/packages/coding-agent/src/core/extensions/runner.ts_learn.md\n",
+      "stdout_sha256": "b439aa6cf0e40f9ecb99bd81c01c2355dbe911adaad8c61c59c1ac4e77e1dd51",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source023-master/worker/candidate.patch"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.843189+00:00",
+      "ended_at": "2026-09-12T14:55:54.852102+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "phase": "forward-check",
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source023-master/worker/candidate.patch"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.852227+00:00",
+      "ended_at": "2026-09-12T14:55:54.861841+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "phase": "forward",
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source023-master/worker/candidate.patch"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.861964+00:00",
+      "ended_at": "2026-09-12T14:55:54.871367+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "phase": "reverse-check",
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--reverse",
+        "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/source023-master/worker/candidate.patch"
+      ],
+      "cwd": "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zs1-023-replay-dq1vtg44",
+      "started_at": "2026-09-12T14:55:54.871510+00:00",
+      "ended_at": "2026-09-12T14:55:54.881592+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "phase": "reverse",
+      "exact_bytes": true,
+      "sentinel_preserved": true
+    }
+  ],
+  "semantic_acceptance": false,
+  "gstage": "structural passed; missing master receipt; provisional",
+  "product_executions": 0
+}

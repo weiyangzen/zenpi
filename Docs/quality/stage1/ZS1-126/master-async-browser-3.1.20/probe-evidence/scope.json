@@ -1,0 +1,16 @@
+{
+  "task": "ZS1-126",
+  "kind": "PTY probe prepared only",
+  "version": "3.1.20",
+  "product_files_changed": [],
+  "prior_ready_modified": false,
+  "PTY_run": false,
+  "HTTP_run": false,
+  "Cargo_run": false,
+  "gate_126_accepted": false,
+  "gate_085_accepted": false,
+  "worker_head": "4dbd330d0a8cf58576109713f774969babd499ed",
+  "binary_checked": "1d7b2e61ecc9096ad0f5e6cd3f3c03c6820cafe8371d9201de3497bb6b4e8f58",
+  "checks": "CLI help/inspect once; pure offline selfcheck; sandbox /usr/bin/true and /bin/cat only",
+  "created_at": "2026-09-12T13:02:00.468319+00:00"
+}

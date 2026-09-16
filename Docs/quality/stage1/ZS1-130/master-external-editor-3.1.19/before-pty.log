@@ -1,0 +1,15 @@
+{
+  "started": "2026-09-12T05:46:44.348289+00:00",
+  "binary": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/bin/before",
+  "binary_sha256": "9b05e734985411c518021a1defb8e71cd2a0c78e064fdaaec77eef6912ba1da3",
+  "binary_bytes": 5980288,
+  "platform": "darwin",
+  "mode": "before",
+  "checks": {
+    "ctrl_g_does_not_start_editor_on_fixed_before": true
+  },
+  "status": "passed",
+  "http_requests": 0,
+  "tui_processes": 1,
+  "ended": "2026-09-12T05:46:46.359527+00:00"
+}

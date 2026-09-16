@@ -1,0 +1,27 @@
+diff --git a/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.json
+@@ -0,0 +1,22 @@
++{
++  "name": "source-verified",
++  "argv": [
++    "python3",
++    "Docs/quality/stage1/ZS1-015/worker-types319/verify_source.py"
++  ],
++  "cwd": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi",
++  "started_at": "2026-09-12T06:35:04.933527+00:00",
++  "ended_at": "2026-09-12T06:35:05.003893+00:00",
++  "elapsed_seconds": 0.07025675,
++  "exit_code": 0,
++  "environment_overrides": {
++    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
++  },
++  "HOME_preserved": true,
++  "CODEX_HOME_preserved": true,
++  "maxrss_command_tree_observed": 20217856,
++  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
++  "output": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/ZS1-015/worker-types319/source-verified.log",
++  "bytes": 949,
++  "sha256": "48029c7603a0c482f7e1ecc6149b3ad819a84c6b86294e61a65b3eb25afe0d5e"
++}

@@ -1,0 +1,79 @@
+{
+  "index": 3,
+  "command": [
+    "/usr/bin/time",
+    "-l",
+    "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi",
+    "--mode",
+    "headless",
+    "--session",
+    "/var/folders/zh/sdgyp1m967jc7703v5f9pzw40000gn/T/zenpi-bench-728k9b_0/session-3.jsonl"
+  ],
+  "marks": [
+    {
+      "label": "parent_launch_begin",
+      "monotonic_ns": 160009291
+    },
+    {
+      "label": "wrapper_Popen_returned",
+      "monotonic_ns": 161535958,
+      "wrapper_pid": 28567
+    },
+    {
+      "label": "shutdown_input_supplied",
+      "monotonic_ns": 161543250
+    },
+    {
+      "label": "stdout_first_bytes_observed",
+      "monotonic_ns": 199491833
+    },
+    {
+      "label": "stdout_chunk_observed",
+      "monotonic_ns": 199499958,
+      "bytes": 144
+    },
+    {
+      "label": "stderr_first_bytes_observed",
+      "monotonic_ns": 199896833
+    },
+    {
+      "label": "stderr_chunk_observed",
+      "monotonic_ns": 199898291,
+      "bytes": 514
+    },
+    {
+      "label": "stderr_chunk_observed",
+      "monotonic_ns": 199907083,
+      "bytes": 263
+    },
+    {
+      "label": "stderr_eof_observed",
+      "monotonic_ns": 200108291
+    },
+    {
+      "label": "stdout_eof_observed",
+      "monotonic_ns": 200122791
+    },
+    {
+      "label": "wrapper_exit_reaped",
+      "monotonic_ns": 200140875,
+      "returncode": 0
+    }
+  ],
+  "parent_capture_end_ns": 200141166,
+  "elapsed_ms": 40.131875,
+  "returncode": 0,
+  "timeout": false,
+  "success_frame": true,
+  "peak_rss_bytes": [
+    5193728
+  ],
+  "unavailable_boundaries": [
+    "successful target exec",
+    "Rust main/core entry",
+    "configuration completion",
+    "session initialization completion",
+    "headless entry",
+    "target exit (distinct from wrapper exit)"
+  ]
+}

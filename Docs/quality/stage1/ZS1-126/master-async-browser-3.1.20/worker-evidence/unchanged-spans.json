@@ -1,0 +1,98 @@
+[
+  {
+    "before_first": 1,
+    "before_last": 1564,
+    "after_first": 1,
+    "after_last": 1564,
+    "bytes": 52699,
+    "sha256": "23a24443e257910a5bd65b67f925a7402399b3f216214792cc459df2d5f6a417"
+  },
+  {
+    "before_first": 1568,
+    "before_last": 1689,
+    "after_first": 1890,
+    "after_last": 2011,
+    "bytes": 5820,
+    "sha256": "ffffa2c7bb818a12257251712785953c74212d148b6353d9ae78f8b47dd4ff28"
+  },
+  {
+    "before_first": 1690,
+    "before_last": 1790,
+    "after_first": 2013,
+    "after_last": 2113,
+    "bytes": 3653,
+    "sha256": "ffef5bb4c976e7f1baa697507259dc94035364f235e65520b88f48ccf99d645b"
+  },
+  {
+    "before_first": 1791,
+    "before_last": 1829,
+    "after_first": 2115,
+    "after_last": 2153,
+    "bytes": 1367,
+    "sha256": "9e36f8daa81bd1d8b70d054fc66dc09b2dbca5056a5d95b0243e9bfca9d1e5b8"
+  },
+  {
+    "before_first": 1832,
+    "before_last": 6747,
+    "after_first": 2157,
+    "after_last": 7072,
+    "bytes": 197755,
+    "sha256": "99ad864fe1fc21986ad423c017548d36a1e96952c47e32f2d683aea9211c6818"
+  },
+  {
+    "before_first": 6748,
+    "before_last": 6815,
+    "after_first": 7094,
+    "after_last": 7161,
+    "bytes": 2851,
+    "sha256": "7be241c8f6b2626e36a3d2c64bfdeb48575e5c4a1635e7d9d0f9e052964d9044"
+  },
+  {
+    "before_first": 6816,
+    "before_last": 10830,
+    "after_first": 7163,
+    "after_last": 11177,
+    "bytes": 164343,
+    "sha256": "f18a12cf4060ba3143ab0bcf9cbd8aca0a0e2228525c52686902165eb080feb7"
+  },
+  {
+    "before_first": 10831,
+    "before_last": 11014,
+    "after_first": 11179,
+    "after_last": 11362,
+    "bytes": 8689,
+    "sha256": "d868e9b8bdb9d21a8def615572ff96105791b108144b149255cd88256a48eb78"
+  },
+  {
+    "before_first": 11016,
+    "before_last": 11211,
+    "after_first": 11367,
+    "after_last": 11562,
+    "bytes": 9140,
+    "sha256": "0788ecb7233e7f15b6bfa2a139a01fe3bc5b98af039764cdf397385b509c563a"
+  },
+  {
+    "before_first": 11212,
+    "before_last": 12173,
+    "after_first": 11566,
+    "after_last": 12527,
+    "bytes": 52356,
+    "sha256": "4c67e0a505224e03348b6b047dd5a90a8a59bb5deec1bcdeefbd2bfc293749b1"
+  },
+  {
+    "before_first": 12174,
+    "before_last": 12478,
+    "after_first": 12532,
+    "after_last": 12836,
+    "bytes": 18375,
+    "sha256": "ddde213e49ef5ec3702e7647fe85fd3c5d62a7e494b7e3e3e36cbff2cfe0cd65"
+  },
+  {
+    "before_first": 12479,
+    "before_last": 14461,
+    "after_first": 12838,
+    "after_last": 14820,
+    "bytes": 74087,
+    "sha256": "6b28600328305ca77a1777e5e7b3773d6b15718bac585d7725719da052fd00dd"
+  }
+]

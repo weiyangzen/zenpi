@@ -102,6 +102,11 @@ pub enum SlashCommand {
         id: String,
         reference: String,
     },
+    /// Import a bounded result manifest produced by an external Learn owner.
+    LearnImport {
+        id: String,
+        path: String,
+    },
     /// Inspect a validated Learn checkpoint. This is deliberately a
     /// read-only recovery projection until an external owner supplies a
     /// worker; it never pretends to resume model execution locally.
@@ -203,7 +208,11 @@ pub enum RecoveryAction {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionAction {
+    New,
     List,
+    Search {
+        query: String,
+    },
     Agents,
     Inspect {
         path: String,
@@ -354,6 +363,14 @@ pub enum BlueprintAction {
     Run { target: String },
     /// Queue one declarative task for an external b3ehive owner.
     Handoff { target: String },
+    /// List durable queued external-worker claims without mutating state.
+    Handoffs,
+    /// Import a validated external worker result manifest for one receipt.
+    Import { target: String, path: String },
+    /// Freeze host authority and baseline before external worker file changes.
+    Prepare { target: String, path: String },
+    /// Run frozen host validators and accept one imported candidate.
+    Accept { target: String, claim: String },
     /// Open a blueprint path in the host's resource view.
     Open { path: String },
 }
@@ -384,11 +401,15 @@ impl SlashCommand {
             Self::Learn { .. } => "learn",
             Self::LearnPut { .. } => "learn",
             Self::LearnEvidence { .. } => "learn",
+            Self::LearnImport { .. } => "learn",
             Self::LearnResume { .. } => "learn",
             Self::History { .. } => "history",
             Self::Resources { .. } => "resources",
             Self::Layout { .. } => "layout",
             Self::Pane { .. } => "pane",
+            Self::Session {
+                action: SessionAction::New,
+            } => "new",
             Self::Session { .. } => "session",
             Self::Mailbox { .. } => "mailbox",
             Self::Resume { .. } => "resume",
@@ -425,6 +446,7 @@ impl SlashCommand {
                 | Self::Learn { .. }
                 | Self::LearnPut { .. }
                 | Self::LearnEvidence { .. }
+                | Self::LearnImport { .. }
                 | Self::LearnResume { .. }
                 | Self::Layout { .. }
                 | Self::Pane { .. }
@@ -462,6 +484,13 @@ const EXIT_ALIASES: &[&str] = &["quit", "q"];
 /// deliberately listed so clients can complete them, while their route keeps
 /// execution in the b3ehive runtime rather than the local agent core.
 pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
+    SlashCommandSpec {
+        name: "new",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/new",
+        summary: "start a fresh conversation in the current project",
+    },
     SlashCommandSpec {
         name: "yolo",
         aliases: NO_ALIASES,
@@ -501,8 +530,8 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "goal",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/goal <instruction> | /goal put <json-path>",
-        summary: "inspect or persist a bounded b3ehive goal",
+        usage: "/goal [show|list|status|run|resume|cancel|transition|create GOAL_ID BLUEPRINT[@VERSION]] [STATE] | /goal put <json-path>",
+        summary: "inspect, run, resume, cancel, or persist a bounded b3ehive goal",
     },
     SlashCommandSpec {
         name: "plan",
@@ -536,14 +565,14 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "blueprint",
         aliases: BLUEPRINT_ALIASES,
         route: SlashRoute::Local,
-        usage: "/blueprint [show|status|validate|put|run|handoff|open]",
+        usage: "/blueprint [show|status|validate|put|run|handoff|handoffs|import|open]",
         summary: "inspect and control the first-class blueprint",
     },
     SlashCommandSpec {
         name: "learn",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/learn [show] | /learn put <json-path> | /learn evidence <id> <ref> | /learn resume <id>",
+        usage: "/learn [show] | /learn put <json-path> | /learn evidence <id> <ref> | /learn import <id> <manifest> | /learn resume <id>",
         summary: "inspect, evidence, or validate a first-class learn target",
     },
     SlashCommandSpec {
@@ -790,6 +819,32 @@ pub enum InputRoute {
     UserShell(String),
 }
 
+/// Resource candidates are resolved by the Agent against its admitted snapshot.
+/// This is not permission to submit unknown slash text to a provider. Built-in
+/// names and aliases remain reserved, including malformed built-in arguments.
+pub fn resource_input_candidate(input: &str) -> bool {
+    let Some(body) = input.strip_prefix('/') else {
+        return false;
+    };
+    let name = body.split_whitespace().next().unwrap_or("");
+    !name.is_empty() && spec(name).is_none()
+}
+
+pub fn resource_control(input: &str) -> Option<&'static str> {
+    if input
+        .strip_prefix("/reload")
+        .is_some_and(|tail| tail.starts_with(char::is_whitespace))
+    {
+        return Some("reload");
+    }
+    match input.trim() {
+        "/reload" => Some("reload"),
+        "/skills" => Some("skills"),
+        "/templates" => Some("templates"),
+        _ => None,
+    }
+}
+
 /// Classify one user input without executing it.
 pub fn route_input(input: &str) -> Result<InputRoute, SlashError> {
     let trimmed = input.trim();
@@ -1005,6 +1060,13 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
             };
             SlashCommand::Yolo { enabled }
         }
+        "new" => unit_command(
+            args,
+            "new",
+            SlashCommand::Session {
+                action: SessionAction::New,
+            },
+        )?,
         "approval" | "approvals" => {
             let mode = args.first().cloned().unwrap_or_else(|| "ask".into());
             if args.len() > 1 {
@@ -1356,6 +1418,48 @@ fn parse_blueprint(args: &[String]) -> Result<BlueprintAction, SlashError> {
                 target: args[1].clone(),
             })
         }
+        "handoffs" | "queue" => {
+            if args.len() > 1 {
+                return Err(SlashError::UnexpectedArgument {
+                    command: "blueprint",
+                });
+            }
+            Ok(BlueprintAction::Handoffs)
+        }
+        "prepare" | "accept" => {
+            if args.len() != 3 {
+                return Err(SlashError::MissingArgument {
+                    command: "blueprint prepare <target> <request-file> | blueprint accept <target> <claim-digest>",
+                });
+            }
+            if action_lower == "prepare" {
+                Ok(BlueprintAction::Prepare {
+                    target: args[1].clone(),
+                    path: args[2].clone(),
+                })
+            } else {
+                Ok(BlueprintAction::Accept {
+                    target: args[1].clone(),
+                    claim: args[2].clone(),
+                })
+            }
+        }
+        "import" => {
+            if args.len() < 3 {
+                return Err(SlashError::MissingArgument {
+                    command: "blueprint import",
+                });
+            }
+            if args.len() > 3 {
+                return Err(SlashError::UnexpectedArgument {
+                    command: "blueprint",
+                });
+            }
+            Ok(BlueprintAction::Import {
+                target: args[1].clone(),
+                path: args[2].clone(),
+            })
+        }
         "open" => {
             if args.len() < 2 {
                 return Err(SlashError::MissingArgument {
@@ -1418,6 +1522,15 @@ fn parse_learn(args: &[String]) -> Result<SlashCommand, SlashError> {
             reference: args[2].clone(),
         });
     }
+    if action.eq_ignore_ascii_case("import") {
+        if args.len() != 3 || args[1].trim().is_empty() || args[2].trim().is_empty() {
+            return Err(SlashError::MissingLearnArgument { action: "import" });
+        }
+        return Ok(SlashCommand::LearnImport {
+            id: args[1].clone(),
+            path: args[2].clone(),
+        });
+    }
     if action.eq_ignore_ascii_case("resume") {
         if args.len() < 2 {
             return Err(SlashError::MissingLearnArgument { action: "resume" });
@@ -1462,6 +1575,14 @@ fn parse_session(args: &[String]) -> Result<SessionAction, SlashError> {
                 return Err(SlashError::UnexpectedSessionArgument { action: "list" });
             }
             Ok(SessionAction::List)
+        }
+        "search" => {
+            if args.len() != 2 || args[1].trim().is_empty() || args[1].len() > 256 {
+                return Err(SlashError::MissingSessionPath { action: "search" });
+            }
+            Ok(SessionAction::Search {
+                query: args[1].clone(),
+            })
         }
         "agents" => {
             if args.len() > 1 {
@@ -1831,6 +1952,163 @@ fn tokenize(input: &str) -> Result<Vec<String>, SlashError> {
         tokens.push(current);
     }
     Ok(tokens)
+}
+
+/// Public output commands share the same typed current-session owner as JSONL.
+pub fn output_control(input: &str) -> Option<Result<crate::protocol::OutputAction, String>> {
+    if input.split_whitespace().next() != Some("/output") {
+        return None;
+    }
+    Some((|| {
+        use crate::protocol::OutputAction as A;
+        if input.len() > MAX_SLASH_INPUT_BYTES || input.contains('\0') {
+            return Err("output command exceeds bounds".into());
+        }
+        let args = tokenize(input).map_err(|e| e.to_string())?;
+        let args: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
+        let action=match args.as_slice(){
+            ["read",artifact,call,offset,length]=>A::Read{artifact_id:(*artifact).into(),call_id:(*call).into(),offset:offset.parse().map_err(|_|"invalid output offset")?,length:length.parse().map_err(|_|"invalid output length")?},
+            ["cleanup","--yes"]=>A::Cleanup{call_id:None,confirm:true},
+            ["cleanup",call,"--yes"]=>A::Cleanup{call_id:Some((*call).into()),confirm:true},
+            _=>return Err("Usage: /output read <artifact-id> <call-id> <offset> <length> | /output cleanup [call-id] --yes".into()),
+        };
+        action.validate().map_err(|e| e.to_string())?;
+        Ok(action)
+    })())
+}
+
+/// Bounded tree navigation grammar; both hosts route it before prompt admission.
+pub fn tree_control(input: &str) -> Option<Result<crate::protocol::TreeAction, String>> {
+    if input.split_whitespace().next() != Some("/tree") {
+        return None;
+    }
+    Some((|| {
+        use crate::protocol::TreeAction as A;
+        if input.len() > MAX_SLASH_INPUT_BYTES || input.contains('\0') {
+            return Err("tree command exceeds bounds".into());
+        }
+        let args = tokenize(input).map_err(|e| e.to_string())?;
+        let args: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
+        let leaf = |s: &str| (s != "root").then(|| s.to_owned());
+        let action = match args.as_slice() {
+            [] | ["list"] => A::List { cursor: 0, limit: 32 },
+            ["list", cursor] => A::List { cursor: cursor.parse().map_err(|_| "invalid tree cursor")?, limit: 32 },
+            ["list", cursor, limit] => A::List { cursor: cursor.parse().map_err(|_| "invalid tree cursor")?, limit: limit.parse().map_err(|_| "invalid tree limit")? },
+            ["enable"] => A::Enable {},
+            ["select", id] => A::Select { leaf: leaf(id) },
+            ["fork", id, destination] => A::Fork { leaf: leaf(id), destination: (*destination).into() },
+            ["name", id, name] => A::Annotate { entry_id: (*id).into(), annotation: crate::session_tree::TreeAnnotation { name: Some((*name).into()), summary: None } },
+            _ => return Err("Usage: /tree [list [cursor [limit]]|enable|select <entry-id|root>|fork <entry-id|root> <path>|name <entry-id> <name>]".into()),
+        };
+        action.validate().map_err(|e| e.to_string())?;
+        Ok(action)
+    })())
+}
+
+/// Shared queue control grammar, checked by hosts before ordinary slash routing.
+/// This control never becomes model text or an explicit local shell request.
+pub fn input_queue_control(
+    input: &str,
+) -> Option<Result<crate::protocol::InputQueueAction, String>> {
+    let input_bytes = input.len();
+    let input = input.trim_start();
+    let tail = input.strip_prefix("/input")?;
+    if !tail.is_empty() && !tail.starts_with(char::is_whitespace) {
+        return None;
+    }
+    Some((|| {
+        use crate::{
+            input_queue::{InputKind, QueueMode},
+            protocol::InputQueueAction as A,
+        };
+        if input_bytes > MAX_SLASH_INPUT_BYTES || input.contains('\0') {
+            return Err("input queue command exceeds bounds or contains NUL".into());
+        }
+        let (verb, rest) = tail
+            .trim_start()
+            .split_once(char::is_whitespace)
+            .unwrap_or((tail.trim_start(), ""));
+        let rest = rest.trim_start();
+        let lane = |text| match text {
+            "steer" => Ok(InputKind::Steer),
+            "follow-up" | "follow_up" => Ok(InputKind::FollowUp),
+            _ => Err("lane must be steer or follow-up".to_string()),
+        };
+        let action = match verb {
+            "" | "list" => A::List {
+                after_sequence: if rest.is_empty() {
+                    None
+                } else {
+                    Some(
+                        rest.trim()
+                            .parse()
+                            .map_err(|_| "list cursor must be an integer")?,
+                    )
+                },
+                limit: 32,
+            },
+            "steer" | "follow-up" | "follow_up" => {
+                let (id, text) = rest
+                    .split_once(char::is_whitespace)
+                    .ok_or("use /input steer ID TEXT or /input follow-up ID TEXT")?;
+                A::Enqueue {
+                    input_id: id.into(),
+                    kind: lane(verb)?,
+                    text: text.into(),
+                }
+            }
+            "edit" => {
+                let (id, rest) = rest
+                    .split_once(char::is_whitespace)
+                    .ok_or("use /input edit ID REVISION TEXT")?;
+                let (revision, text) = rest
+                    .trim_start()
+                    .split_once(char::is_whitespace)
+                    .ok_or("use /input edit ID REVISION TEXT")?;
+                A::Edit {
+                    input_id: id.into(),
+                    expected_revision: revision
+                        .parse()
+                        .map_err(|_| "revision must be an integer")?,
+                    text: text.into(),
+                }
+            }
+            "cancel" => {
+                if rest.split_whitespace().count() != 1 {
+                    return Err("use /input cancel ID".into());
+                }
+                A::Cancel {
+                    input_id: rest.trim().into(),
+                }
+            }
+            "mode" => {
+                let (kind, mode) = rest
+                    .split_once(char::is_whitespace)
+                    .ok_or("use /input mode LANE one-at-a-time|all")?;
+                A::Configure {
+                    kind: lane(kind)?,
+                    mode: match mode.trim() {
+                        "one-at-a-time" => QueueMode::OneAtATime,
+                        "all" => QueueMode::All,
+                        _ => return Err("mode must be one-at-a-time or all".into()),
+                    },
+                }
+            }
+            _ => return Err("use /input list|steer|follow-up|edit|cancel|mode".into()),
+        };
+        action.validate().map_err(|e| e.to_string())?;
+        Ok(action)
+    })())
+}
+
+/// These host controls run in the existing cancellable resource job lane.
+pub fn external_evidence_control(input: &str) -> bool {
+    matches!(
+        parse(input),
+        Ok(Some(SlashCommand::Blueprint {
+            action: BlueprintAction::Prepare { .. } | BlueprintAction::Accept { .. }
+        }))
+    )
 }
 
 #[cfg(test)]

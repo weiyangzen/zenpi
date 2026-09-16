@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "env",
+    "CARGO_TARGET_DIR=/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-3.1.20/cargo-target",
+    "cargo",
+    "+stable-aarch64-apple-darwin",
+    "test",
+    "--offline",
+    "--locked",
+    "--lib",
+    "session_browser",
+    "--no-run"
+  ],
+  "cwd": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-3.1.20/build",
+  "started_at": "2026-09-12T12:21:14.322354+00:00",
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "network": "Cargo offline; no HTTP/PTY",
+  "source_sha256": "96868b90d535c531e51c22988b1af77d0f39a209c99ef2b2f1f05f2e68033bd6",
+  "status": "finished",
+  "exit_code": 0,
+  "elapsed_seconds": 9.887419625,
+  "ended_at": "2026-09-12T12:21:24.210426+00:00",
+  "log": "candidate-build.log",
+  "bytes": 1901,
+  "sha256": "8dba032f9908fff37ace6189eb6e8d171f3a7eced361ef4e00b9ed64da25a98c"
+}

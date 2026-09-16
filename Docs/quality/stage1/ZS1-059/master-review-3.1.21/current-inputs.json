@@ -1,0 +1,1651 @@
+{
+  "inputs": [
+    {
+      "path": "packages/ai/package.json",
+      "bytes": 2713,
+      "sha256": "79c019578384ef625eec40d1b3eb7292f561ba7f31f96e19e5bbfac511f90050",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/api/lazy.ts",
+      "bytes": 3203,
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/context.ts",
+      "bytes": 1345,
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/credential-store.ts",
+      "bytes": 2353,
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/helpers.ts",
+      "bytes": 2043,
+      "sha256": "2799858cc159794451870b86d2e2f50e2bd9453900f31b8ab50bb4ed8ca4a5fc",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/oauth/load.ts",
+      "bytes": 2937,
+      "sha256": "2efc92129803bd2eddacaaedfc4328c24c694b2d1916b30606fcc4fceeceacef",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/resolve.ts",
+      "bytes": 6779,
+      "sha256": "08dfcdcbd74dbae5b011b105b9b335321fea816ce262758729a2b29a630bd1b9",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/auth/types.ts",
+      "bytes": 8284,
+      "sha256": "82e2209fd3291978afd7f77b10d81d8d411fd82d0e3ac52121cb41f735946ba5",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/bedrock-provider.ts",
+      "bytes": 140,
+      "sha256": "427a4e76812ea4ac42133e7f41e75df99e0edaff883659c96a0e4ec78f670f9f",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/bun-oauth.ts",
+      "bytes": 911,
+      "sha256": "27818a6489809c8b38cea6ca5a75ede67cbb17e3cd48de450a1d04300e95333d",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/cli.ts",
+      "bytes": 4295,
+      "sha256": "e04e6cd5f0e9da829d10b9b285592d5170d59eff29ae985aecf3f5f9bd15cb2d",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/compat.ts",
+      "bytes": 10596,
+      "sha256": "c1212487653e4508243ddc2c420334166699470b9908326ff8f74b8aeb4fc8a5",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/compat/extension-oauth-types.ts",
+      "bytes": 1131,
+      "sha256": "52065af0c8958696c9e37852d5005bf410679f4afba1b92a6e107e9320c44ff3",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/env-api-keys.ts",
+      "bytes": 7560,
+      "sha256": "6876b915ffe1342f8be69ef1f75721c8a265a332a1bbbf5afe36b6f80b332552",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/image-models.generated.ts",
+      "bytes": 21014,
+      "sha256": "a3a3142b9d4c503477ea4fe76c7b3144f8d6d53044b099fffc316cf37dc4c883",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/image-models.ts",
+      "bytes": 1667,
+      "sha256": "58f11488a6623fe8528153235f9216c249d70e146b0f99f8b22db8d88a49ae74",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/images-api-registry.ts",
+      "bytes": 1640,
+      "sha256": "604636b0a4b59d1798d79aad48a1dfdd96ee79e3f16b16cdc54dbd1b81c44ffe",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/images-models.ts",
+      "bytes": 9380,
+      "sha256": "9a3a2bf47263e577925850b182d2b508d0bbf0e1437124b1240bff95b8deeb3a",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/images.ts",
+      "bytes": 727,
+      "sha256": "de83a96c1eb420cfb1b6f4e3ce8430f19b2312399d195fb786c76ebae4111dcf",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/index.ts",
+      "bytes": 2343,
+      "sha256": "51a82f426d1a313d0566df07d449627699dce6a28ce83b9ad4e87655e28c8ab5",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/legacy-api-aliases.ts",
+      "bytes": 6009,
+      "sha256": "784ae74c00b3cf2836b6ed930519b5d7d3aa1a7a4e7ace933af3bdad77df67e3",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/model-catalog.ts",
+      "bytes": 920,
+      "sha256": "49ea2292bcc7a1cec41dde2c7e263ecd7f5fd6784084619f6e5f85323fb43452",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/models-store.ts",
+      "bytes": 1662,
+      "sha256": "9b5b110a2cbd1b558f7facf4441b0b4b6824b033d34c9062add35e642a138fdf",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/models.generated.ts",
+      "bytes": 6569,
+      "sha256": "d37f49ca5a7dc0f2981e8c52473359ed7c11192c24cc54573bf83e3a0a17a149",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/models.ts",
+      "bytes": 34837,
+      "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/oauth.ts",
+      "bytes": 281,
+      "sha256": "1250a2a276dc310849e64a0fd306a896d42e47ad0fc8d9394279eaee4e11cdff",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/all.ts",
+      "bytes": 6251,
+      "sha256": "6f2107bd324c85133d5b4ca39f8247c1e07ed7b660849b94e8c546072b9fa552",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/anthropic.ts",
+      "bytes": 1934,
+      "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/google.ts",
+      "bytes": 587,
+      "sha256": "2d807d5f9273ede8c23970fe0414883ab362c677df80e4603d30b621232a2036",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/images/register-builtins.ts",
+      "bytes": 1725,
+      "sha256": "8c8bd4e614b8b733c0a4232f7cc974bf38c5a4bb6b9615c732e3b794ff1d908f",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/openai.ts",
+      "bytes": 550,
+      "sha256": "1904f9511221f47bbe890dc007571add9ac16ab28cd48c4090b58f13950cbfd0",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/providers/openrouter.ts",
+      "bytes": 982,
+      "sha256": "0985e9d352e1a9794c7ed807d81e06a254abce49aa231e7c5ccc7c4355f01d5e",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/session-resources.ts",
+      "bytes": 671,
+      "sha256": "3e6d76f038d6b7fe515ede0b6650d41a7df16eb4b3a9f1aa91c9de329ff092e2",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/types.ts",
+      "bytes": 37411,
+      "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/utils/abort.ts",
+      "bytes": 1374,
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/utils/diagnostics.ts",
+      "bytes": 1377,
+      "sha256": "d22b4f96a00f032220ff0cc27458c7a525dcec948bdbd2bbb67b4d7598cb395d",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/utils/event-stream.ts",
+      "bytes": 2878,
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "evidence": "source-identities.json"
+    },
+    {
+      "path": "packages/ai/src/utils/provider-env.ts",
+      "bytes": 1718,
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+      "evidence": "source-identities.json"
+    }
+  ],
+  "direct_inventory": [
+    {
+      "name": "api",
+      "path": "packages/ai/src/api",
+      "kind": "directory",
+      "formal_item": "ZS1-055",
+      "direct_children": [
+        {
+          "name": "anthropic-messages.lazy.ts",
+          "path": "packages/ai/src/api/anthropic-messages.lazy.ts",
+          "kind": "file",
+          "bytes": 199,
+          "sha256": "5d1925e8b2664c91a11ef4c73d8c400b4075597c8c4e8beb085f8e4ba137fc08",
+          "lines": 4
+        },
+        {
+          "name": "anthropic-messages.ts",
+          "path": "packages/ai/src/api/anthropic-messages.ts",
+          "kind": "file",
+          "bytes": 48616,
+          "sha256": "8e105cc5b2dd304547ed613b70de4740c4db93cee830dc452c2de945052b12b7",
+          "lines": 1490
+        },
+        {
+          "name": "azure-openai-responses.lazy.ts",
+          "path": "packages/ai/src/api/azure-openai-responses.lazy.ts",
+          "kind": "file",
+          "bytes": 206,
+          "sha256": "de36a9a2749ac4cb45a5449356bceadb676d1a16e6d46f4fc5522a3f700aa2fd",
+          "lines": 4
+        },
+        {
+          "name": "azure-openai-responses.ts",
+          "path": "packages/ai/src/api/azure-openai-responses.ts",
+          "kind": "file",
+          "bytes": 11337,
+          "sha256": "874ec8836a617c19fb337c2a8af68f591708aafb988d378578e6f0d61494c3ec",
+          "lines": 338
+        },
+        {
+          "name": "bedrock-converse-stream.lazy.ts",
+          "path": "packages/ai/src/api/bedrock-converse-stream.lazy.ts",
+          "kind": "file",
+          "bytes": 1148,
+          "sha256": "3ee8a1b2a2cd58927bee18ab5b4150401da810e9d5f4595822b3b10ded35de86",
+          "lines": 30
+        },
+        {
+          "name": "bedrock-converse-stream.ts",
+          "path": "packages/ai/src/api/bedrock-converse-stream.ts",
+          "kind": "file",
+          "bytes": 48022,
+          "sha256": "b8cff28740f8a549fc5fd2d466980f8900688c01fcad3df96ba68f7eaf4fbaf3",
+          "lines": 1325
+        },
+        {
+          "name": "cloudflare-ai-binding.ts",
+          "path": "packages/ai/src/api/cloudflare-ai-binding.ts",
+          "kind": "file",
+          "bytes": 4604,
+          "sha256": "57f702b91453810241fd50a5629628fcc3d556e75909a37fae857d0a5d27d8fb",
+          "lines": 90
+        },
+        {
+          "name": "cloudflare.ts",
+          "path": "packages/ai/src/api/cloudflare.ts",
+          "kind": "file",
+          "bytes": 842,
+          "sha256": "6333a0f78e8cd6b75e408fdeb594d5e1e02605206247c5a921c2f56dd99cf96a",
+          "lines": 15
+        },
+        {
+          "name": "constrained-sampling.ts",
+          "path": "packages/ai/src/api/constrained-sampling.ts",
+          "kind": "file",
+          "bytes": 9295,
+          "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+          "lines": 277
+        },
+        {
+          "name": "github-copilot-headers.ts",
+          "path": "packages/ai/src/api/github-copilot-headers.ts",
+          "kind": "file",
+          "bytes": 1184,
+          "sha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180",
+          "lines": 37
+        },
+        {
+          "name": "google-generative-ai.lazy.ts",
+          "path": "packages/ai/src/api/google-generative-ai.lazy.ts",
+          "kind": "file",
+          "bytes": 202,
+          "sha256": "ba7700f2e44838fb19da46f866f47f35f4e10f5068800be1ea698e9e95e1e1ce",
+          "lines": 4
+        },
+        {
+          "name": "google-generative-ai.ts",
+          "path": "packages/ai/src/api/google-generative-ai.ts",
+          "kind": "file",
+          "bytes": 16027,
+          "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757",
+          "lines": 526
+        },
+        {
+          "name": "google-shared.ts",
+          "path": "packages/ai/src/api/google-shared.ts",
+          "kind": "file",
+          "bytes": 15695,
+          "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436",
+          "lines": 453
+        },
+        {
+          "name": "google-vertex.lazy.ts",
+          "path": "packages/ai/src/api/google-vertex.lazy.ts",
+          "kind": "file",
+          "bytes": 189,
+          "sha256": "891f0e07eaaa1bb1df97f0a2d8f067df6acbab50078242108d93b96a710c4712",
+          "lines": 4
+        },
+        {
+          "name": "google-vertex.ts",
+          "path": "packages/ai/src/api/google-vertex.ts",
+          "kind": "file",
+          "bytes": 18373,
+          "sha256": "ac86327759ebeb340c3c45573d754495c2d3298c5f5d19581f86de6609ff4526",
+          "lines": 598
+        },
+        {
+          "name": "lazy.ts",
+          "path": "packages/ai/src/api/lazy.ts",
+          "kind": "file",
+          "bytes": 3203,
+          "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+          "lines": 98
+        },
+        {
+          "name": "mistral-conversations.lazy.ts",
+          "path": "packages/ai/src/api/mistral-conversations.lazy.ts",
+          "kind": "file",
+          "bytes": 205,
+          "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86",
+          "lines": 4
+        },
+        {
+          "name": "mistral-conversations.ts",
+          "path": "packages/ai/src/api/mistral-conversations.ts",
+          "kind": "file",
+          "bytes": 30329,
+          "sha256": "b1dc3edb89b95c81c6c2b0ca3a98099f530201ae6b93469c13a08a77b5f68931",
+          "lines": 938
+        },
+        {
+          "name": "openai-codex-responses.lazy.ts",
+          "path": "packages/ai/src/api/openai-codex-responses.lazy.ts",
+          "kind": "file",
+          "bytes": 206,
+          "sha256": "89e1883f937df0992b852970f574b5e1fc2a69fefaacc89628cd1d924a8af63f",
+          "lines": 4
+        },
+        {
+          "name": "openai-codex-responses.ts",
+          "path": "packages/ai/src/api/openai-codex-responses.ts",
+          "kind": "file",
+          "bytes": 54470,
+          "sha256": "3e64b9ddb86b5c0ca82f1357158026d5202f60ff3afab6a8778498a27b4227b7",
+          "lines": 1657
+        },
+        {
+          "name": "openai-completions.lazy.ts",
+          "path": "packages/ai/src/api/openai-completions.lazy.ts",
+          "kind": "file",
+          "bytes": 199,
+          "sha256": "a1defe07f6d7bd37de3933164cc88cfeb2d46cf390d0bbb52c85b280cc58d193",
+          "lines": 4
+        },
+        {
+          "name": "openai-completions.ts",
+          "path": "packages/ai/src/api/openai-completions.ts",
+          "kind": "file",
+          "bytes": 62416,
+          "sha256": "5874bf0b121db117bd4eba8fffa750252f5f7617f38306c6eb1f746575896319",
+          "lines": 1717
+        },
+        {
+          "name": "openai-prompt-cache.ts",
+          "path": "packages/ai/src/api/openai-prompt-cache.ts",
+          "kind": "file",
+          "bytes": 358,
+          "sha256": "78727b9b42d5c5cdc47d17f44d532cdf951cbee3b158cacfb3e640d8f792e8a4",
+          "lines": 8
+        },
+        {
+          "name": "openai-responses-shared.ts",
+          "path": "packages/ai/src/api/openai-responses-shared.ts",
+          "kind": "file",
+          "bytes": 29490,
+          "sha256": "2562ad7497bfe9cf71533b7584400751746b6a563229a615f6e23848780d2bee",
+          "lines": 793
+        },
+        {
+          "name": "openai-responses.lazy.ts",
+          "path": "packages/ai/src/api/openai-responses.lazy.ts",
+          "kind": "file",
+          "bytes": 195,
+          "sha256": "ea6bf6019f6b2f949bce4ad248ec1e0fa25dd058a009cf70fb5eb0e99b4c94db",
+          "lines": 4
+        },
+        {
+          "name": "openai-responses.ts",
+          "path": "packages/ai/src/api/openai-responses.ts",
+          "kind": "file",
+          "bytes": 13908,
+          "sha256": "dea6113f21ab782bac450fc32ac8b8c99d8fd14f41cfe4c124fc6091c03910ed",
+          "lines": 390
+        },
+        {
+          "name": "openrouter-images.lazy.ts",
+          "path": "packages/ai/src/api/openrouter-images.lazy.ts",
+          "kind": "file",
+          "bytes": 315,
+          "sha256": "04c18f8c065779c2f705850e593cee4e0d6207a4121473540a223fc83026a8f4",
+          "lines": 10
+        },
+        {
+          "name": "openrouter-images.ts",
+          "path": "packages/ai/src/api/openrouter-images.ts",
+          "kind": "file",
+          "bytes": 6132,
+          "sha256": "c658f331cb2278e7accc925fa72eb3c3902d32d6ff37c4263b6bb6108888d440",
+          "lines": 196
+        },
+        {
+          "name": "pi-messages.lazy.ts",
+          "path": "packages/ai/src/api/pi-messages.lazy.ts",
+          "kind": "file",
+          "bytes": 185,
+          "sha256": "620e55f1a498f70c8578deb6375f9433c6991c98f6c323465b1889c2f07a72d9",
+          "lines": 4
+        },
+        {
+          "name": "pi-messages.ts",
+          "path": "packages/ai/src/api/pi-messages.ts",
+          "kind": "file",
+          "bytes": 13451,
+          "sha256": "c8bbdcaaa30064db24afa8e9b2fbc66f9d4be89149c170e2de94b8705e5830b4",
+          "lines": 441
+        },
+        {
+          "name": "simple-options.ts",
+          "path": "packages/ai/src/api/simple-options.ts",
+          "kind": "file",
+          "bytes": 3295,
+          "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57",
+          "lines": 95
+        },
+        {
+          "name": "transform-messages.ts",
+          "path": "packages/ai/src/api/transform-messages.ts",
+          "kind": "file",
+          "bytes": 7121,
+          "sha256": "cf309c00b943bc0a90ccaabb185730a3f27a3c92de6696ada3155b0185904161",
+          "lines": 223
+        }
+      ]
+    },
+    {
+      "name": "auth",
+      "path": "packages/ai/src/auth",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "context.ts",
+          "path": "packages/ai/src/auth/context.ts",
+          "kind": "file",
+          "bytes": 1345,
+          "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+          "lines": 45
+        },
+        {
+          "name": "credential-store.ts",
+          "path": "packages/ai/src/auth/credential-store.ts",
+          "kind": "file",
+          "bytes": 2353,
+          "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+          "lines": 67
+        },
+        {
+          "name": "helpers.ts",
+          "path": "packages/ai/src/auth/helpers.ts",
+          "kind": "file",
+          "bytes": 2043,
+          "sha256": "2799858cc159794451870b86d2e2f50e2bd9453900f31b8ab50bb4ed8ca4a5fc",
+          "lines": 59
+        },
+        {
+          "name": "oauth",
+          "path": "packages/ai/src/auth/oauth",
+          "kind": "directory"
+        },
+        {
+          "name": "resolve.ts",
+          "path": "packages/ai/src/auth/resolve.ts",
+          "kind": "file",
+          "bytes": 6779,
+          "sha256": "08dfcdcbd74dbae5b011b105b9b335321fea816ce262758729a2b29a630bd1b9",
+          "lines": 205
+        },
+        {
+          "name": "types.ts",
+          "path": "packages/ai/src/auth/types.ts",
+          "kind": "file",
+          "bytes": 8284,
+          "sha256": "82e2209fd3291978afd7f77b10d81d8d411fd82d0e3ac52121cb41f735946ba5",
+          "lines": 240
+        }
+      ]
+    },
+    {
+      "name": "bedrock-provider.ts",
+      "path": "packages/ai/src/bedrock-provider.ts",
+      "kind": "file",
+      "bytes": 140,
+      "sha256": "427a4e76812ea4ac42133e7f41e75df99e0edaff883659c96a0e4ec78f670f9f",
+      "lines": 6,
+      "formal_item": null
+    },
+    {
+      "name": "bun-oauth.ts",
+      "path": "packages/ai/src/bun-oauth.ts",
+      "kind": "file",
+      "bytes": 911,
+      "sha256": "27818a6489809c8b38cea6ca5a75ede67cbb17e3cd48de450a1d04300e95333d",
+      "lines": 21,
+      "formal_item": null
+    },
+    {
+      "name": "cli.ts",
+      "path": "packages/ai/src/cli.ts",
+      "kind": "file",
+      "bytes": 4295,
+      "sha256": "e04e6cd5f0e9da829d10b9b285592d5170d59eff29ae985aecf3f5f9bd15cb2d",
+      "lines": 119,
+      "formal_item": null
+    },
+    {
+      "name": "compat",
+      "path": "packages/ai/src/compat",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "extension-oauth-types.ts",
+          "path": "packages/ai/src/compat/extension-oauth-types.ts",
+          "kind": "file",
+          "bytes": 1131,
+          "sha256": "52065af0c8958696c9e37852d5005bf410679f4afba1b92a6e107e9320c44ff3",
+          "lines": 45
+        }
+      ]
+    },
+    {
+      "name": "compat.ts",
+      "path": "packages/ai/src/compat.ts",
+      "kind": "file",
+      "bytes": 10596,
+      "sha256": "c1212487653e4508243ddc2c420334166699470b9908326ff8f74b8aeb4fc8a5",
+      "lines": 298,
+      "formal_item": null
+    },
+    {
+      "name": "env-api-keys.ts",
+      "path": "packages/ai/src/env-api-keys.ts",
+      "kind": "file",
+      "bytes": 7560,
+      "sha256": "6876b915ffe1342f8be69ef1f75721c8a265a332a1bbbf5afe36b6f80b332552",
+      "lines": 188,
+      "formal_item": null
+    },
+    {
+      "name": "image-models.generated.ts",
+      "path": "packages/ai/src/image-models.generated.ts",
+      "kind": "file",
+      "bytes": 21014,
+      "sha256": "a3a3142b9d4c503477ea4fe76c7b3144f8d6d53044b099fffc316cf37dc4c883",
+      "lines": 789,
+      "formal_item": null
+    },
+    {
+      "name": "image-models.ts",
+      "path": "packages/ai/src/image-models.ts",
+      "kind": "file",
+      "bytes": 1667,
+      "sha256": "58f11488a6623fe8528153235f9216c249d70e146b0f99f8b22db8d88a49ae74",
+      "lines": 42,
+      "formal_item": null
+    },
+    {
+      "name": "images-api-registry.ts",
+      "path": "packages/ai/src/images-api-registry.ts",
+      "kind": "file",
+      "bytes": 1640,
+      "sha256": "604636b0a4b59d1798d79aad48a1dfdd96ee79e3f16b16cdc54dbd1b81c44ffe",
+      "lines": 53,
+      "formal_item": null
+    },
+    {
+      "name": "images-models.ts",
+      "path": "packages/ai/src/images-models.ts",
+      "kind": "file",
+      "bytes": 9380,
+      "sha256": "9a3a2bf47263e577925850b182d2b508d0bbf0e1437124b1240bff95b8deeb3a",
+      "lines": 275,
+      "formal_item": null
+    },
+    {
+      "name": "images.ts",
+      "path": "packages/ai/src/images.ts",
+      "kind": "file",
+      "bytes": 727,
+      "sha256": "de83a96c1eb420cfb1b6f4e3ce8430f19b2312399d195fb786c76ebae4111dcf",
+      "lines": 21,
+      "formal_item": null
+    },
+    {
+      "name": "index.ts",
+      "path": "packages/ai/src/index.ts",
+      "kind": "file",
+      "bytes": 2343,
+      "sha256": "51a82f426d1a313d0566df07d449627699dce6a28ce83b9ad4e87655e28c8ab5",
+      "lines": 48,
+      "formal_item": null
+    },
+    {
+      "name": "legacy-api-aliases.ts",
+      "path": "packages/ai/src/legacy-api-aliases.ts",
+      "kind": "file",
+      "bytes": 6009,
+      "sha256": "784ae74c00b3cf2836b6ed930519b5d7d3aa1a7a4e7ace933af3bdad77df67e3",
+      "lines": 108,
+      "formal_item": null
+    },
+    {
+      "name": "model-catalog.ts",
+      "path": "packages/ai/src/model-catalog.ts",
+      "kind": "file",
+      "bytes": 920,
+      "sha256": "49ea2292bcc7a1cec41dde2c7e263ecd7f5fd6784084619f6e5f85323fb43452",
+      "lines": 27,
+      "formal_item": null
+    },
+    {
+      "name": "models-store.ts",
+      "path": "packages/ai/src/models-store.ts",
+      "kind": "file",
+      "bytes": 1662,
+      "sha256": "9b5b110a2cbd1b558f7facf4441b0b4b6824b033d34c9062add35e642a138fdf",
+      "lines": 45,
+      "formal_item": null
+    },
+    {
+      "name": "models.generated.ts",
+      "path": "packages/ai/src/models.generated.ts",
+      "kind": "file",
+      "bytes": 6569,
+      "sha256": "d37f49ca5a7dc0f2981e8c52473359ed7c11192c24cc54573bf83e3a0a17a149",
+      "lines": 124,
+      "formal_item": null
+    },
+    {
+      "name": "models.ts",
+      "path": "packages/ai/src/models.ts",
+      "kind": "file",
+      "bytes": 34837,
+      "sha256": "7b4d831c10ad2bf0a24f231cf2a12e84b59d6001337ac33fb18d6d4fc7da1c6c",
+      "lines": 957,
+      "formal_item": null
+    },
+    {
+      "name": "oauth.ts",
+      "path": "packages/ai/src/oauth.ts",
+      "kind": "file",
+      "bytes": 281,
+      "sha256": "1250a2a276dc310849e64a0fd306a896d42e47ad0fc8d9394279eaee4e11cdff",
+      "lines": 10,
+      "formal_item": null
+    },
+    {
+      "name": "providers",
+      "path": "packages/ai/src/providers",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "all.ts",
+          "path": "packages/ai/src/providers/all.ts",
+          "kind": "file",
+          "bytes": 6251,
+          "sha256": "6f2107bd324c85133d5b4ca39f8247c1e07ed7b660849b94e8c546072b9fa552",
+          "lines": 155
+        },
+        {
+          "name": "amazon-bedrock.models.ts",
+          "path": "packages/ai/src/providers/amazon-bedrock.models.ts",
+          "kind": "file",
+          "bytes": 410,
+          "sha256": "9c9cbe9b1c977177454ed12dc48c521fdc88d257ee1b92bc3805aa77eaf9b982",
+          "lines": 8
+        },
+        {
+          "name": "amazon-bedrock.ts",
+          "path": "packages/ai/src/providers/amazon-bedrock.ts",
+          "kind": "file",
+          "bytes": 3333,
+          "sha256": "e32611e8d2d4e71ee5d0ba426da60c0aecf42d1bc34ccc3d0d49ce877c621a8c",
+          "lines": 90
+        },
+        {
+          "name": "ant-ling.models.ts",
+          "path": "packages/ai/src/providers/ant-ling.models.ts",
+          "kind": "file",
+          "bytes": 386,
+          "sha256": "da223d56dbe033f48b96ed451591498cb7ffa8d4851785ea9ad7542377f6c855",
+          "lines": 8
+        },
+        {
+          "name": "ant-ling.ts",
+          "path": "packages/ai/src/providers/ant-ling.ts",
+          "kind": "file",
+          "bytes": 575,
+          "sha256": "20ba100f8a9150f809fc42bf60f1d23840cc358d636793f1ec9fddf0e9feb2a7",
+          "lines": 15
+        },
+        {
+          "name": "anthropic.models.ts",
+          "path": "packages/ai/src/providers/anthropic.models.ts",
+          "kind": "file",
+          "bytes": 390,
+          "sha256": "35fb58e216e45b3d1319b610f3f3021ef30e699a9e44250cbfcbefeeaaea2ff7",
+          "lines": 8
+        },
+        {
+          "name": "anthropic.ts",
+          "path": "packages/ai/src/providers/anthropic.ts",
+          "kind": "file",
+          "bytes": 1934,
+          "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a",
+          "lines": 59
+        },
+        {
+          "name": "azure-openai-responses.models.ts",
+          "path": "packages/ai/src/providers/azure-openai-responses.models.ts",
+          "kind": "file",
+          "bytes": 442,
+          "sha256": "9d0525eab9472b48dee748f7c6d2f3b65f25467389ff1facbf34dc2d40732717",
+          "lines": 8
+        },
+        {
+          "name": "azure-openai-responses.ts",
+          "path": "packages/ai/src/providers/azure-openai-responses.ts",
+          "kind": "file",
+          "bytes": 628,
+          "sha256": "76e9f5cde761fcd516370d4d99519e4658e0db1029518746d0d0c0550ce54fa5",
+          "lines": 14
+        },
+        {
+          "name": "baseten.models.ts",
+          "path": "packages/ai/src/providers/baseten.models.ts",
+          "kind": "file",
+          "bytes": 382,
+          "sha256": "c3844bac330f9b0d04eef4349a37dbd6cbe5b6782b9f6726277148526c03ea0a",
+          "lines": 8
+        },
+        {
+          "name": "baseten.ts",
+          "path": "packages/ai/src/providers/baseten.ts",
+          "kind": "file",
+          "bytes": 572,
+          "sha256": "c3833be0c64c4d5c96810403e23e966bb779bf2c045619b6fbac18ff27ac92f5",
+          "lines": 15
+        },
+        {
+          "name": "cerebras.models.ts",
+          "path": "packages/ai/src/providers/cerebras.models.ts",
+          "kind": "file",
+          "bytes": 386,
+          "sha256": "45412b6f921b67cf7b82276bac1d8b95f164c5bf2ff3297b950f94f773162c57",
+          "lines": 8
+        },
+        {
+          "name": "cerebras.ts",
+          "path": "packages/ai/src/providers/cerebras.ts",
+          "kind": "file",
+          "bytes": 575,
+          "sha256": "457fc35499abea92be4ad7add4f08502d069293380be61bf05b11ae5352bce4f",
+          "lines": 15
+        },
+        {
+          "name": "cloudflare-ai-gateway.models.ts",
+          "path": "packages/ai/src/providers/cloudflare-ai-gateway.models.ts",
+          "kind": "file",
+          "bytes": 438,
+          "sha256": "c90e50ce6cd8b536e893ca7180a5b9731581d76b31125aff5bdfc62bd17efe26",
+          "lines": 8
+        },
+        {
+          "name": "cloudflare-ai-gateway.ts",
+          "path": "packages/ai/src/providers/cloudflare-ai-gateway.ts",
+          "kind": "file",
+          "bytes": 1404,
+          "sha256": "6f19bdcb965750aa1367f1c09eb883da16526644ad3a3cbcb60da8b53ca418ff",
+          "lines": 27
+        },
+        {
+          "name": "cloudflare-auth.ts",
+          "path": "packages/ai/src/providers/cloudflare-auth.ts",
+          "kind": "file",
+          "bytes": 3505,
+          "sha256": "d0532efb4f00126286d71dbce6fcb95e581cd9477467dc4bd20f1df1a466f03e",
+          "lines": 103
+        },
+        {
+          "name": "cloudflare-stream.ts",
+          "path": "packages/ai/src/providers/cloudflare-stream.ts",
+          "kind": "file",
+          "bytes": 1153,
+          "sha256": "866117c0e12f6bba9da36842271d0208b200364dc785dc968fa5d31b6da6594b",
+          "lines": 28
+        },
+        {
+          "name": "cloudflare-workers-ai.models.ts",
+          "path": "packages/ai/src/providers/cloudflare-workers-ai.models.ts",
+          "kind": "file",
+          "bytes": 438,
+          "sha256": "95da6a78965178d952b46a4de4e2ea52723ac051ad37583537a3b79e4033ecde",
+          "lines": 8
+        },
+        {
+          "name": "cloudflare-workers-ai.ts",
+          "path": "packages/ai/src/providers/cloudflare-workers-ai.ts",
+          "kind": "file",
+          "bytes": 671,
+          "sha256": "5ab1575a34fd66e35706fcae8a38516d7c2e427521b7f8680e1f756d8420ec9c",
+          "lines": 15
+        },
+        {
+          "name": "data-json.d.ts",
+          "path": "packages/ai/src/providers/data-json.d.ts",
+          "kind": "file",
+          "bytes": 74,
+          "sha256": "d30c397c753fb4c6a608ab2e2d95e50c763a369b591bcc2bd6e02147016f8aff",
+          "lines": 4
+        },
+        {
+          "name": "deepseek.models.ts",
+          "path": "packages/ai/src/providers/deepseek.models.ts",
+          "kind": "file",
+          "bytes": 386,
+          "sha256": "afce9b250edda8c9df66e800cfa791f1a2c2546503956c45c5262204265624cf",
+          "lines": 8
+        },
+        {
+          "name": "deepseek.ts",
+          "path": "packages/ai/src/providers/deepseek.ts",
+          "kind": "file",
+          "bytes": 573,
+          "sha256": "4d4ac9870d3dcdb13a90627a95598314459f5cc2f8a122f802fab3b0d2840fee",
+          "lines": 15
+        },
+        {
+          "name": "faux.ts",
+          "path": "packages/ai/src/providers/faux.ts",
+          "kind": "file",
+          "bytes": 21191,
+          "sha256": "83f09999c95c355b4befcb47019836a1b3636593cd72b96f540108db0b5f570a",
+          "lines": 708
+        },
+        {
+          "name": "fireworks.models.ts",
+          "path": "packages/ai/src/providers/fireworks.models.ts",
+          "kind": "file",
+          "bytes": 390,
+          "sha256": "68f77ac268a3e643944401e96fdc71abe7b34e1ccc3c50f885eb3e236b4fb45e",
+          "lines": 8
+        },
+        {
+          "name": "fireworks.ts",
+          "path": "packages/ai/src/providers/fireworks.ts",
+          "kind": "file",
+          "bytes": 769,
+          "sha256": "72dbb53e3bb8b0bc6c42dd7937ec11dd0126efe3176f11153b1d599a0c7776af",
+          "lines": 19
+        },
+        {
+          "name": "github-copilot.models.ts",
+          "path": "packages/ai/src/providers/github-copilot.models.ts",
+          "kind": "file",
+          "bytes": 410,
+          "sha256": "6bd4c4ae054ea91fe4c9eea8c8372901584e851532352cb621a9e9de6ecece5c",
+          "lines": 8
+        },
+        {
+          "name": "github-copilot.ts",
+          "path": "packages/ai/src/providers/github-copilot.ts",
+          "kind": "file",
+          "bytes": 1524,
+          "sha256": "9f898d669b65e9650009e4e45518fc207416c94ca9570276ef9bd7f13fde8f3b",
+          "lines": 34
+        },
+        {
+          "name": "google-vertex.models.ts",
+          "path": "packages/ai/src/providers/google-vertex.models.ts",
+          "kind": "file",
+          "bytes": 406,
+          "sha256": "964109cc69cadf77329846f4fb4baf6c86b00995f33a813230c5a9e54573e93e",
+          "lines": 8
+        },
+        {
+          "name": "google-vertex.ts",
+          "path": "packages/ai/src/providers/google-vertex.ts",
+          "kind": "file",
+          "bytes": 3734,
+          "sha256": "5e321e6d5b80824752ca96e7c9aba8a3fccce722a1793a40d5341a0406ef4878",
+          "lines": 100
+        },
+        {
+          "name": "google.models.ts",
+          "path": "packages/ai/src/providers/google.models.ts",
+          "kind": "file",
+          "bytes": 378,
+          "sha256": "cdb63f50fae431dc67c6627ae7a5b9580039b9807f014f838ebe568b11831d27",
+          "lines": 8
+        },
+        {
+          "name": "google.ts",
+          "path": "packages/ai/src/providers/google.ts",
+          "kind": "file",
+          "bytes": 587,
+          "sha256": "2d807d5f9273ede8c23970fe0414883ab362c677df80e4603d30b621232a2036",
+          "lines": 15
+        },
+        {
+          "name": "groq.models.ts",
+          "path": "packages/ai/src/providers/groq.models.ts",
+          "kind": "file",
+          "bytes": 370,
+          "sha256": "41fbe59a9104788078b57b490ebf2312291905e579a67ceaeff803ff41ffc9c0",
+          "lines": 8
+        },
+        {
+          "name": "groq.ts",
+          "path": "packages/ai/src/providers/groq.ts",
+          "kind": "file",
+          "bytes": 547,
+          "sha256": "a8bbced4fbc37370892fec68fb7f03cf634d08d134d9f003fa63edb5a8b60873",
+          "lines": 15
+        },
+        {
+          "name": "huggingface.models.ts",
+          "path": "packages/ai/src/providers/huggingface.models.ts",
+          "kind": "file",
+          "bytes": 398,
+          "sha256": "0da3c6e72a35d04571f1800989c3731df686a8ab1291065b6dd8855966f0e675",
+          "lines": 8
+        },
+        {
+          "name": "huggingface.ts",
+          "path": "packages/ai/src/providers/huggingface.ts",
+          "kind": "file",
+          "bytes": 594,
+          "sha256": "51c4af194c9989ab033c5b3303831ec9e2df999f51d9fa40ab6d28f632e8ff43",
+          "lines": 15
+        },
+        {
+          "name": "images",
+          "path": "packages/ai/src/providers/images",
+          "kind": "directory"
+        },
+        {
+          "name": "kimi-coding.models.ts",
+          "path": "packages/ai/src/providers/kimi-coding.models.ts",
+          "kind": "file",
+          "bytes": 398,
+          "sha256": "57ca50b17d1e96ba8f064b63adfe9773c2e494d7495c52336769ef6b86a7e2ff",
+          "lines": 8
+        },
+        {
+          "name": "kimi-coding.ts",
+          "path": "packages/ai/src/providers/kimi-coding.ts",
+          "kind": "file",
+          "bytes": 833,
+          "sha256": "ef864d572eef11900f24bb6a5dc620982bd9c39fac600970deec55466348f8b0",
+          "lines": 24
+        },
+        {
+          "name": "minimax-cn.models.ts",
+          "path": "packages/ai/src/providers/minimax-cn.models.ts",
+          "kind": "file",
+          "bytes": 394,
+          "sha256": "25dd4d8e980898f274a3c787a59e6e7570d596330c7f833f080b780817cdea74",
+          "lines": 8
+        },
+        {
+          "name": "minimax-cn.ts",
+          "path": "packages/ai/src/providers/minimax-cn.ts",
+          "kind": "file",
+          "bytes": 598,
+          "sha256": "ae3170234556ef355f7cffcfc666888992ae50caa8daf07352f22bac69cca0ba",
+          "lines": 15
+        },
+        {
+          "name": "minimax.models.ts",
+          "path": "packages/ai/src/providers/minimax.models.ts",
+          "kind": "file",
+          "bytes": 382,
+          "sha256": "e80186fef0f1b647990f029281604c435da5d8ceb659d3f6a79681cdb03c3b41",
+          "lines": 8
+        },
+        {
+          "name": "minimax.ts",
+          "path": "packages/ai/src/providers/minimax.ts",
+          "kind": "file",
+          "bytes": 573,
+          "sha256": "d571a6a8b5a47daf40b034a2dae4ac902a252fbd44b073c4caee8eeb1d7035b5",
+          "lines": 15
+        },
+        {
+          "name": "mistral.models.ts",
+          "path": "packages/ai/src/providers/mistral.models.ts",
+          "kind": "file",
+          "bytes": 382,
+          "sha256": "949f1e72e32a0028beb855db2642f13783c8697c4be236e9061c241f1d698a51",
+          "lines": 8
+        },
+        {
+          "name": "mistral.ts",
+          "path": "packages/ai/src/providers/mistral.ts",
+          "kind": "file",
+          "bytes": 575,
+          "sha256": "dfcd087d7317d6a6cd1acf701547567435f5eaf0c1cc1d8eb89eed7e977c2fb3",
+          "lines": 15
+        },
+        {
+          "name": "moonshotai-cn.models.ts",
+          "path": "packages/ai/src/providers/moonshotai-cn.models.ts",
+          "kind": "file",
+          "bytes": 406,
+          "sha256": "059db388929164d03595ead666c3bcf56e8e078be072dc2d4d3a784b9e207cc2",
+          "lines": 8
+        },
+        {
+          "name": "moonshotai-cn.ts",
+          "path": "packages/ai/src/providers/moonshotai-cn.ts",
+          "kind": "file",
+          "bytes": 608,
+          "sha256": "da8ec0ed30a2cf42972cead61a93b1fcb64380095f9d062ee4ed9e4807ebd5bc",
+          "lines": 15
+        },
+        {
+          "name": "moonshotai.models.ts",
+          "path": "packages/ai/src/providers/moonshotai.models.ts",
+          "kind": "file",
+          "bytes": 394,
+          "sha256": "ddafd640693869455756b31e87d09df13388531cf8e0421bd3618d8836ac5eb2",
+          "lines": 8
+        },
+        {
+          "name": "moonshotai.ts",
+          "path": "packages/ai/src/providers/moonshotai.ts",
+          "kind": "file",
+          "bytes": 591,
+          "sha256": "2e269cca0231ebdbd2a58848ab3d19b0a43697e132b48a679e3c1b0cd4897665",
+          "lines": 15
+        },
+        {
+          "name": "nvidia.models.ts",
+          "path": "packages/ai/src/providers/nvidia.models.ts",
+          "kind": "file",
+          "bytes": 378,
+          "sha256": "15b8e279632a231d1794aec8083f00c17ac94cd5e89717393dd48fc182c0e4b4",
+          "lines": 8
+        },
+        {
+          "name": "nvidia.ts",
+          "path": "packages/ai/src/providers/nvidia.ts",
+          "kind": "file",
+          "bytes": 568,
+          "sha256": "73c981d27b364f83a32983d19f4ded346acf6af7eb4a653334622f891aedf860",
+          "lines": 15
+        },
+        {
+          "name": "openai-codex.models.ts",
+          "path": "packages/ai/src/providers/openai-codex.models.ts",
+          "kind": "file",
+          "bytes": 402,
+          "sha256": "11045582d310b854c4a55e510e3628b8a8652efab918f9f017541b9261db474f",
+          "lines": 8
+        },
+        {
+          "name": "openai-codex.ts",
+          "path": "packages/ai/src/providers/openai-codex.ts",
+          "kind": "file",
+          "bytes": 739,
+          "sha256": "c63a59ad55921466182f2033240178fca715faf09dd7fd9878533829ca90a70f",
+          "lines": 22
+        },
+        {
+          "name": "openai.models.ts",
+          "path": "packages/ai/src/providers/openai.models.ts",
+          "kind": "file",
+          "bytes": 378,
+          "sha256": "9424770fdbf0ca5f3307c6b20217686d8c448379fd8548ac1c362ad678ac7898",
+          "lines": 8
+        },
+        {
+          "name": "openai.ts",
+          "path": "packages/ai/src/providers/openai.ts",
+          "kind": "file",
+          "bytes": 550,
+          "sha256": "1904f9511221f47bbe890dc007571add9ac16ab28cd48c4090b58f13950cbfd0",
+          "lines": 15
+        },
+        {
+          "name": "opencode-go.models.ts",
+          "path": "packages/ai/src/providers/opencode-go.models.ts",
+          "kind": "file",
+          "bytes": 398,
+          "sha256": "db2994d632b02692e3cb1a9c7fde97e5b7e4f77719f7d530c9a2cb2628aee52d",
+          "lines": 8
+        },
+        {
+          "name": "opencode-go.ts",
+          "path": "packages/ai/src/providers/opencode-go.ts",
+          "kind": "file",
+          "bytes": 1079,
+          "sha256": "7262ef8f8961f5228e4574780092e7d0ae38d888ced223bbe3ffb53fbda78253",
+          "lines": 21
+        },
+        {
+          "name": "opencode-headers.ts",
+          "path": "packages/ai/src/providers/opencode-headers.ts",
+          "kind": "file",
+          "bytes": 1080,
+          "sha256": "57a97177294665039f40a34cf421514ecd41527d5042f5185639557b6a7d80a1",
+          "lines": 25
+        },
+        {
+          "name": "opencode.models.ts",
+          "path": "packages/ai/src/providers/opencode.models.ts",
+          "kind": "file",
+          "bytes": 386,
+          "sha256": "ddbfa6ca1f40c0ed1bf96904d3e0ecdb9b8298a4fb8d12a084cd4e1669a6596c",
+          "lines": 8
+        },
+        {
+          "name": "opencode.ts",
+          "path": "packages/ai/src/providers/opencode.ts",
+          "kind": "file",
+          "bytes": 1184,
+          "sha256": "4d8c13e0b45aaf0ccfad2c86e210d17ae919afca658d40a286229249096871e7",
+          "lines": 25
+        },
+        {
+          "name": "openrouter-images.ts",
+          "path": "packages/ai/src/providers/openrouter-images.ts",
+          "kind": "file",
+          "bytes": 780,
+          "sha256": "921e057fa1880412c29a849505ddd7dbe466996d78087c0c0628437ec2051880",
+          "lines": 22
+        },
+        {
+          "name": "openrouter.models.ts",
+          "path": "packages/ai/src/providers/openrouter.models.ts",
+          "kind": "file",
+          "bytes": 394,
+          "sha256": "101afc36afce8bdac7f893b8c2b1dffddc13caf7774c1a371f37e82e69a87b90",
+          "lines": 8
+        },
+        {
+          "name": "openrouter.ts",
+          "path": "packages/ai/src/providers/openrouter.ts",
+          "kind": "file",
+          "bytes": 982,
+          "sha256": "0985e9d352e1a9794c7ed807d81e06a254abce49aa231e7c5ccc7c4355f01d5e",
+          "lines": 27
+        },
+        {
+          "name": "qwen-token-plan-cn.models.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan-cn.models.ts",
+          "kind": "file",
+          "bytes": 426,
+          "sha256": "cf75bfef4683dd80f98a33cc8894d5b0a37930c13907f29b08e33a745b7d48f0",
+          "lines": 8
+        },
+        {
+          "name": "qwen-token-plan-cn.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan-cn.ts",
+          "kind": "file",
+          "bytes": 692,
+          "sha256": "1869aabbff4baaa12faef00071aab0a5b1b1d38d43f16ce735137fc0e13fa897",
+          "lines": 15
+        },
+        {
+          "name": "qwen-token-plan-individual.models.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan-individual.models.ts",
+          "kind": "file",
+          "bytes": 458,
+          "sha256": "a12f1307cece97d0a582b6ce09f34cef310012052bcb59582324fc26fbeab99c",
+          "lines": 8
+        },
+        {
+          "name": "qwen-token-plan-individual.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan-individual.ts",
+          "kind": "file",
+          "bytes": 749,
+          "sha256": "0336ecc9c677d9e295a4832fbc84d9197f58e0468fcd00daff3aec491b896375",
+          "lines": 15
+        },
+        {
+          "name": "qwen-token-plan.models.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan.models.ts",
+          "kind": "file",
+          "bytes": 414,
+          "sha256": "5a45908ccd14785c3aca0307f12e4e462702b0d469ea06bd90ba20b848c918c7",
+          "lines": 8
+        },
+        {
+          "name": "qwen-token-plan.ts",
+          "path": "packages/ai/src/providers/qwen-token-plan.ts",
+          "kind": "file",
+          "bytes": 673,
+          "sha256": "c26b85ab529779c4c2e61f6dd749592b515ec25b121b49dc81989d8a767d51f5",
+          "lines": 15
+        },
+        {
+          "name": "radius-config.ts",
+          "path": "packages/ai/src/providers/radius-config.ts",
+          "kind": "file",
+          "bytes": 3339,
+          "sha256": "1f82a7db25753be09374792ae0a3cd63417739018fb69b3212ad8b3b9eb11c21",
+          "lines": 96
+        },
+        {
+          "name": "radius.ts",
+          "path": "packages/ai/src/providers/radius.ts",
+          "kind": "file",
+          "bytes": 2573,
+          "sha256": "a65c0513e1999b318425a49117ebed6f38970702454730287287b644d4825f7f",
+          "lines": 82
+        },
+        {
+          "name": "together.models.ts",
+          "path": "packages/ai/src/providers/together.models.ts",
+          "kind": "file",
+          "bytes": 386,
+          "sha256": "09e3a5b9a2afbced7314acb8bfd7f2d77a17283dab78a49ca786a04b466f9d15",
+          "lines": 8
+        },
+        {
+          "name": "together.ts",
+          "path": "packages/ai/src/providers/together.ts",
+          "kind": "file",
+          "bytes": 575,
+          "sha256": "cbf232b1bfe5753bba855f0a95e2c4d180db8155121effcbdffc955fe090738c",
+          "lines": 15
+        },
+        {
+          "name": "vercel-ai-gateway.models.ts",
+          "path": "packages/ai/src/providers/vercel-ai-gateway.models.ts",
+          "kind": "file",
+          "bytes": 422,
+          "sha256": "3c4227acdc66f716f4a0af4f84d1ba1e8582384763f6850ed9dcc2fdadee10c5",
+          "lines": 8
+        },
+        {
+          "name": "vercel-ai-gateway.ts",
+          "path": "packages/ai/src/providers/vercel-ai-gateway.ts",
+          "kind": "file",
+          "bytes": 640,
+          "sha256": "57b77111d50a2238128f56b7f4cc0680415b58c7d3d2eb51cc9f88e508b40343",
+          "lines": 15
+        },
+        {
+          "name": "xai.models.ts",
+          "path": "packages/ai/src/providers/xai.models.ts",
+          "kind": "file",
+          "bytes": 366,
+          "sha256": "8d0a7bf9fd4fc8a0030d9cf93dab88421625bf250030a6d3b2397eea48ea2298",
+          "lines": 8
+        },
+        {
+          "name": "xai.ts",
+          "path": "packages/ai/src/providers/xai.ts",
+          "kind": "file",
+          "bytes": 764,
+          "sha256": "841c361fc5ebb2d91c3f6aa46ce008f354ea287cce36ed2105ae815b7e5e9831",
+          "lines": 24
+        },
+        {
+          "name": "xiaomi-token-plan-ams.models.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-ams.models.ts",
+          "kind": "file",
+          "bytes": 438,
+          "sha256": "26bc2100a4471d0605e768b8aff2e82aedce9c880622b5c7046ac6e32c14fb8b",
+          "lines": 8
+        },
+        {
+          "name": "xiaomi-token-plan-ams.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-ams.ts",
+          "kind": "file",
+          "bytes": 690,
+          "sha256": "59d03fc70eca720f8ca9a9f676aedaf241524dac26c179a78e2e30aabe116e0f",
+          "lines": 15
+        },
+        {
+          "name": "xiaomi-token-plan-cn.models.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-cn.models.ts",
+          "kind": "file",
+          "bytes": 434,
+          "sha256": "bcd190721ecfe6233f2d66e86e68f68e2a9d14a8d6afe27132131e5721793093",
+          "lines": 8
+        },
+        {
+          "name": "xiaomi-token-plan-cn.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-cn.ts",
+          "kind": "file",
+          "bytes": 681,
+          "sha256": "255528bca12e929f0f683bcbf5a6b8ef0de779bb484b128bdda23bf2fb80caa8",
+          "lines": 15
+        },
+        {
+          "name": "xiaomi-token-plan-sgp.models.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-sgp.models.ts",
+          "kind": "file",
+          "bytes": 438,
+          "sha256": "26f56144eac6a3e7d6c86d558a348dc96cea1bb7ec655beea04dc6088e67d761",
+          "lines": 8
+        },
+        {
+          "name": "xiaomi-token-plan-sgp.ts",
+          "path": "packages/ai/src/providers/xiaomi-token-plan-sgp.ts",
+          "kind": "file",
+          "bytes": 690,
+          "sha256": "536da73a1588741c6a70809b5e94ab5a1ba2b8e81f24116e3ed734d6bc60b5e8",
+          "lines": 15
+        },
+        {
+          "name": "xiaomi.models.ts",
+          "path": "packages/ai/src/providers/xiaomi.models.ts",
+          "kind": "file",
+          "bytes": 378,
+          "sha256": "326ec2a587d3f83a92aea6dd9548b317ba91ce9dd8dccdfd83ea14035897dcef",
+          "lines": 8
+        },
+        {
+          "name": "xiaomi.ts",
+          "path": "packages/ai/src/providers/xiaomi.ts",
+          "kind": "file",
+          "bytes": 562,
+          "sha256": "d0d20dbcbcecca8b02948df1506ffa474461565546f7c24dfce44aebebef2344",
+          "lines": 15
+        },
+        {
+          "name": "zai-coding-cn.models.ts",
+          "path": "packages/ai/src/providers/zai-coding-cn.models.ts",
+          "kind": "file",
+          "bytes": 406,
+          "sha256": "b96ff0b9ebb1792993256178de1b6c89741a651dfd07a7735c38dd05bfc25708",
+          "lines": 8
+        },
+        {
+          "name": "zai-coding-cn.ts",
+          "path": "packages/ai/src/providers/zai-coding-cn.ts",
+          "kind": "file",
+          "bytes": 632,
+          "sha256": "89ff82b1f7b1a7e3427498598ce03574d76217f1c38b0d1731be82b6d8ff87a7",
+          "lines": 15
+        },
+        {
+          "name": "zai.models.ts",
+          "path": "packages/ai/src/providers/zai.models.ts",
+          "kind": "file",
+          "bytes": 366,
+          "sha256": "9ff2f0e33f4299651cd265543d6387ee3d9ef2715ab7315dfaf5e67130c14125",
+          "lines": 8
+        },
+        {
+          "name": "zai.ts",
+          "path": "packages/ai/src/providers/zai.ts",
+          "kind": "file",
+          "bytes": 546,
+          "sha256": "489a48539c3abc291315dad6f8b7c5554f5f3f9bf8b2a11a60d4ab2cbd3c2f74",
+          "lines": 15
+        }
+      ]
+    },
+    {
+      "name": "session-resources.ts",
+      "path": "packages/ai/src/session-resources.ts",
+      "kind": "file",
+      "bytes": 671,
+      "sha256": "3e6d76f038d6b7fe515ede0b6650d41a7df16eb4b3a9f1aa91c9de329ff092e2",
+      "lines": 24,
+      "formal_item": null
+    },
+    {
+      "name": "types.ts",
+      "path": "packages/ai/src/types.ts",
+      "kind": "file",
+      "bytes": 37411,
+      "sha256": "f2edab10f093a15ba2cdeaaf4fa1634d76ee943e6f62b2f44bdb2d14321834e0",
+      "lines": 881,
+      "formal_item": "ZS1-015"
+    },
+    {
+      "name": "utils",
+      "path": "packages/ai/src/utils",
+      "kind": "directory",
+      "formal_item": null,
+      "direct_children": [
+        {
+          "name": "abort-signals.ts",
+          "path": "packages/ai/src/utils/abort-signals.ts",
+          "kind": "file",
+          "bytes": 1116,
+          "sha256": "320d17e2354c4e66afccf48337d79d1cdb78bc3c42a6f5be993702175711f4ab",
+          "lines": 41
+        },
+        {
+          "name": "abort.ts",
+          "path": "packages/ai/src/utils/abort.ts",
+          "kind": "file",
+          "bytes": 1374,
+          "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+          "lines": 50
+        },
+        {
+          "name": "assistant-message-frame.ts",
+          "path": "packages/ai/src/utils/assistant-message-frame.ts",
+          "kind": "file",
+          "bytes": 18794,
+          "sha256": "e3db9eb5fb4a56f6c45b43ff6a5ef87347c8c19f28b0cbdf389b1ddf1928a6e9",
+          "lines": 490
+        },
+        {
+          "name": "deferred-tools.ts",
+          "path": "packages/ai/src/utils/deferred-tools.ts",
+          "kind": "file",
+          "bytes": 1409,
+          "sha256": "cab1dbf6c0b40a64e2db3079dd3efa23786ad4cdae64abdedc04b1088a301d65",
+          "lines": 39
+        },
+        {
+          "name": "diagnostics.ts",
+          "path": "packages/ai/src/utils/diagnostics.ts",
+          "kind": "file",
+          "bytes": 1377,
+          "sha256": "d22b4f96a00f032220ff0cc27458c7a525dcec948bdbd2bbb67b4d7598cb395d",
+          "lines": 45
+        },
+        {
+          "name": "error-body.ts",
+          "path": "packages/ai/src/utils/error-body.ts",
+          "kind": "file",
+          "bytes": 6444,
+          "sha256": "7170181ae6926709fe4ab7ac6b5b51c46ffe906868a7aac3c7627cb28ad77c09",
+          "lines": 149
+        },
+        {
+          "name": "estimate.ts",
+          "path": "packages/ai/src/utils/estimate.ts",
+          "kind": "file",
+          "bytes": 5155,
+          "sha256": "8334f683185cc11d7e867f30963dfc4b9d89c3db79e852364e89a24cb89b316a",
+          "lines": 143
+        },
+        {
+          "name": "event-stream.ts",
+          "path": "packages/ai/src/utils/event-stream.ts",
+          "kind": "file",
+          "bytes": 2878,
+          "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+          "lines": 110
+        },
+        {
+          "name": "hash.ts",
+          "path": "packages/ai/src/utils/hash.ts",
+          "kind": "file",
+          "bytes": 540,
+          "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+          "lines": 13
+        },
+        {
+          "name": "headers.ts",
+          "path": "packages/ai/src/utils/headers.ts",
+          "kind": "file",
+          "bytes": 624,
+          "sha256": "db52ff4621bef3e5a6b6ace56fd0ff09063ae840517c16b1690c60f89f85e106",
+          "lines": 18
+        },
+        {
+          "name": "json-parse.ts",
+          "path": "packages/ai/src/utils/json-parse.ts",
+          "kind": "file",
+          "bytes": 2774,
+          "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+          "lines": 124
+        },
+        {
+          "name": "node-http-proxy.ts",
+          "path": "packages/ai/src/utils/node-http-proxy.ts",
+          "kind": "file",
+          "bytes": 4175,
+          "sha256": "a13ab6556d127e6fb097147b209c68e47aed8e724e2774e7dd7df21ff91d9d5b",
+          "lines": 161
+        },
+        {
+          "name": "overflow.ts",
+          "path": "packages/ai/src/utils/overflow.ts",
+          "kind": "file",
+          "bytes": 9922,
+          "sha256": "ed4c74d82619562b2a760ef7953cfd39f6f88e0980d42e27945f8aa81a57a61d",
+          "lines": 180
+        },
+        {
+          "name": "pi-user-agent.ts",
+          "path": "packages/ai/src/utils/pi-user-agent.ts",
+          "kind": "file",
+          "bytes": 682,
+          "sha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e",
+          "lines": 19
+        },
+        {
+          "name": "provider-env.ts",
+          "path": "packages/ai/src/utils/provider-env.ts",
+          "kind": "file",
+          "bytes": 1718,
+          "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+          "lines": 52
+        },
+        {
+          "name": "provider-retry.ts",
+          "path": "packages/ai/src/utils/provider-retry.ts",
+          "kind": "file",
+          "bytes": 4034,
+          "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699",
+          "lines": 125
+        },
+        {
+          "name": "retry.ts",
+          "path": "packages/ai/src/utils/retry.ts",
+          "kind": "file",
+          "bytes": 8904,
+          "sha256": "951d8343bf5c67163135161a3af57191666d206da36cb85f956490c237b6f16c",
+          "lines": 240
+        },
+        {
+          "name": "sanitize-unicode.ts",
+          "path": "packages/ai/src/utils/sanitize-unicode.ts",
+          "kind": "file",
+          "bytes": 1167,
+          "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+          "lines": 25
+        },
+        {
+          "name": "sleep.ts",
+          "path": "packages/ai/src/utils/sleep.ts",
+          "kind": "file",
+          "bytes": 403,
+          "sha256": "c6d01d46a40b0aa99d3308a5ecec37417f434bdc839ea8f8853f776e2fb1981c",
+          "lines": 14
+        },
+        {
+          "name": "text.ts",
+          "path": "packages/ai/src/utils/text.ts",
+          "kind": "file",
+          "bytes": 470,
+          "sha256": "442d027929fa6db4aa19638d64b55838ccada6c07f350610c53a521cd620ddf3",
+          "lines": 12
+        },
+        {
+          "name": "typebox-helpers.ts",
+          "path": "packages/ai/src/utils/typebox-helpers.ts",
+          "kind": "file",
+          "bytes": 789,
+          "sha256": "caf756258ce20c793dc8002cb8130a8efce18a7b5262ba0c54832b96f5a76e9f",
+          "lines": 24
+        },
+        {
+          "name": "uuid.ts",
+          "path": "packages/ai/src/utils/uuid.ts",
+          "kind": "file",
+          "bytes": 1880,
+          "sha256": "234a48d4b999e69188fdfa49173ccfa7887d947e443ef206cc30219515105a1f",
+          "lines": 45
+        },
+        {
+          "name": "validation.ts",
+          "path": "packages/ai/src/utils/validation.ts",
+          "kind": "file",
+          "bytes": 9902,
+          "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7",
+          "lines": 350
+        }
+      ]
+    }
+  ],
+  "current_children": {
+    "ZS1-015": {
+      "path": "Docs/learn/stage1_pi_mono/receipts/ZS1-015.master.json",
+      "bytes": 18627,
+      "sha256": "1a1a6a5cb7f12af210b99396dd874bb7d17c5328dcf0677b1827ca315ec4c854"
+    },
+    "ZS1-055": {
+      "path": "Docs/learn/stage1_pi_mono/receipts/ZS1-055.master.json",
+      "bytes": 3404,
+      "sha256": "c7eec1535568bc8dd2baa29653d0ae44f834090cbb588ccd68fc46516cf07c27"
+    }
+  }
+}

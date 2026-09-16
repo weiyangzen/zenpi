@@ -1,0 +1,108 @@
+{
+  "active": 0,
+  "metadata": {
+    "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845": {
+      "approval_mode": "always",
+      "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial",
+      "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial/l/m-owner.jsonl"
+    }
+  },
+  "project_name": "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845",
+  "project_state": [
+    {
+      "draft": {
+        "cursor": 0,
+        "history": [
+          "/session search needle126",
+          "/session list"
+        ],
+        "input": "",
+        "next_paste_id": 1,
+        "paste_folds": [],
+        "presets": {
+          "project": {
+            "capabilities": {
+              "browser": false,
+              "terminal": false
+            },
+            "collapsed": [],
+            "focused": null,
+            "ratios": {
+              "center": 45,
+              "left": 30,
+              "right": 25
+            },
+            "row_weights": {},
+            "tab": "project"
+          }
+        },
+        "reasoning_folded": true,
+        "scroll": 0
+      },
+      "layout": {
+        "capabilities": {
+          "browser": false,
+          "terminal": false
+        },
+        "collapsed": [],
+        "focused": "session_list",
+        "ratios": {
+          "center": 45,
+          "left": 30,
+          "right": 25
+        },
+        "row_weights": {},
+        "tab": "session"
+      },
+      "messages": [
+        {
+          "role": "User",
+          "text": "owner body"
+        },
+        {
+          "role": "User",
+          "text": "/session search needle126"
+        },
+        {
+          "role": "System",
+          "text": "session search:\n{\"accepted\":true,\"action\":\"search\",\"command\":\"session\",\"count\":2,\"matches\":[{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./l/b.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"B126\",\"turn_count\":1},\"snippets\":[\"needle126\"]},{\"matches\":1,\"session\":{\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"next_seq\":2,\"path\":\"./l/c.jsonl\",\"recovery_warnings\":0,\"runtime_in"
+        },
+        {
+          "role": "User",
+          "text": "/session list"
+        },
+        {
+          "role": "System",
+          "text": "sessions:\n{\"accepted\":true,\"action\":\"list\",\"command\":\"session\",\"durable\":true,\"receipt\":{\"sessions\":[{\"archived\":false,\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"last_activity_ms\":1789171200000,\"next_seq\":2,\"path\":\"./g/sessions/G126.jsonl\",\"recovery_warnings\":0,\"runtime_intent_count\":0,\"session_id\":\"G126\",\"turn_count\":1}]},\"route\":\"local\",\"sessions\":[{\"archived\":false,\"created_at_ms\":1789171200000,\"event_count\":0,\"handoff_count\":0,\"handoff_record_count\":0,\"last_activity_"
+        }
+      ],
+      "metadata": {
+        "approval_mode": "always",
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial",
+        "session_path": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial/l/m-owner.jsonl"
+      },
+      "name": "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845"
+    }
+  ],
+  "projects": [
+    "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845"
+  ],
+  "scheduled_inputs": [],
+  "schema_version": 3,
+  "session_cursors": {
+    "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845": {
+      "next_sequence": 4,
+      "session_id": "O126"
+    }
+  },
+  "workspace": {
+    "active": "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845",
+    "schema_version": 1,
+    "tabs": [
+      {
+        "cwd": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/async-session-browser-integration/actual-pty-receiver/fixture/initial",
+        "id": "01f728d518c1d78d14c5b9152ca3ebe10f4f9f809bdb5efc177792a026308845"
+      }
+    ]
+  }
+}

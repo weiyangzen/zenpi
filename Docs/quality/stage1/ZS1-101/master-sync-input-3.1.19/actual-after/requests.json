@@ -1,0 +1,24 @@
+[
+  {
+    "max_completion_tokens": 4096,
+    "messages": [
+      {
+        "content": "\nCommunication preference: INTJ (Analysts). Treat this MBTI label only as a requested writing style, not a diagnosis or identity. Coding/work style: Architecture, systems thinking, and precise tradeoffs. Be reflective and concise. Explain patterns and possibilities. Make reasoning and tradeoffs explicit. Organize clear next steps. Never change permissions, factual accuracy, or task requirements for this style.\n\n",
+        "role": "system"
+      },
+      {
+        "content": "normal explicit user prompt",
+        "role": "user"
+      },
+      {
+        "content": "durable pending payload",
+        "role": "user"
+      }
+    ],
+    "model": "fixture",
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    }
+  }
+]

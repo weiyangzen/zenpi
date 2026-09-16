@@ -1,0 +1,2393 @@
+{
+  "schema": "zs1-017-independent-source321-ready/v1",
+  "item": "ZS1-017",
+  "status": "[_]",
+  "authority_version": "3.1.21",
+  "authority_digest": "3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d",
+  "baseline_snapshot_sha256": "92b06c4b1dcdca7614d226ce5f41205646a9e63967789d2b6ed4ee272d240884",
+  "run_id": "zenpi-stage1-20260911",
+  "scope": "single file independent understanding and necessary current mapping only; no sibling/parent/product acceptance",
+  "source": {
+    "path": "packages/ai/src/api/google-generative-ai.ts",
+    "bytes": 16027,
+    "lines": 526,
+    "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757",
+    "read_ranges": [
+      [
+        0,
+        6110
+      ],
+      [
+        6110,
+        11521
+      ],
+      [
+        11521,
+        16027
+      ]
+    ]
+  },
+  "candidate": {
+    "path": "files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+    "bytes": 18512,
+    "sha256": "769f73a1cd40fbdfdb2eed50c871442cdfe4d15489870a3961adf0be179a4e4b"
+  },
+  "runtime_executions_this_round": 0,
+  "historical_counts": {
+    "source_cases": 17,
+    "source_http_requests": 20,
+    "target_tests": 17,
+    "current_target_test_definitions": 19
+  },
+  "protected_original_ready_files": 5258,
+  "frozen_at": "2026-09-12T17:35:12.502982+00:00",
+  "payload_count": 469,
+  "payload_bytes": 12177362,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1975,
+      "sha256": "3c8b17c2f29a22dbd97121898a5bf0ef9af0d87d4d6913e1691e633d36faac8d"
+    },
+    {
+      "path": "authority/Docs/execution/active_requirement.json",
+      "bytes": 9853,
+      "sha256": "80c656106ee8a441ef1c32523b07eaf418e36ab58be5bbb35eef9f7bcb74387f"
+    },
+    {
+      "path": "authority/Docs/learn/stage1_pi_mono/file_learn_index.tsv",
+      "bytes": 4407,
+      "sha256": "07560772d541dba650641cf875be1abe278ca6affec8dedb41e0897b09097bde"
+    },
+    {
+      "path": "authority/Docs/learn/stage1_pi_mono/source_manifest.tsv",
+      "bytes": 7225,
+      "sha256": "ba8154f7697961b32997977c5b984512478519c7d5286b095a586ad6caa214e2"
+    },
+    {
+      "path": "authority/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "bytes": 153896,
+      "sha256": "2bb12c5f41ba8b290fb0a6f74cac1a98bab8faa095775f2463991e58003b246d"
+    },
+    {
+      "path": "capture.json",
+      "bytes": 217,
+      "sha256": "58eb19cf1bf0b92698e1a9d7dd7af9b797ea2bfa9bad620d01efc58fe1b4f629"
+    },
+    {
+      "path": "context-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 633,
+      "sha256": "067a47ed8e03af6cb4c1838043952d1b0f96f8683c3ee623367485dc1c96d5dc"
+    },
+    {
+      "path": "context-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 388,
+      "sha256": "4293dcc13b0627144fe54e979cde9e23140e7e6b0b3d7b25a71d158009b9fb52"
+    },
+    {
+      "path": "context-excerpts/src__backend.rs-1219-1302.txt",
+      "bytes": 3765,
+      "sha256": "228691f8ed3a3fa8fe0c7428ff37da358a6c60db202b4bfbaac7708f55a512e0"
+    },
+    {
+      "path": "context-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 643,
+      "sha256": "a3ff2447c2e59fdceca18923bdf75cb7aa20ff2a1ae52256cd666d1686b7b5cc"
+    },
+    {
+      "path": "context-excerpts/src__backend.rs-1587-1702.txt",
+      "bytes": 4900,
+      "sha256": "f0b4524b42ffd896818dbeda43accc518d478a77a89d87596fb7b50c1673da83"
+    },
+    {
+      "path": "context-excerpts/src__backend__transport.rs-308-328.txt",
+      "bytes": 652,
+      "sha256": "80c76b83e47e81bd489d98b07ae63a26d561b0e0bac38f84f71ebe2e3b199fef"
+    },
+    {
+      "path": "context-excerpts/src__backend__transport.rs-411-468.txt",
+      "bytes": 1806,
+      "sha256": "b8ab7893f82affd2a1939b69305f6feb8a5e982e2603318b2548deef8c57c27d"
+    },
+    {
+      "path": "context-excerpts/src__backend__transport.rs-58-103.txt",
+      "bytes": 1612,
+      "sha256": "236dd8f5921fedd53df72ad148973579fe02b2f1de3d6960f237fe00bd82c451"
+    },
+    {
+      "path": "context-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 1295,
+      "sha256": "78fe56ed1fc7e758dfe3cea22e71b369d063d2a22c195418074a2a68cf235aeb"
+    },
+    {
+      "path": "context-excerpts/src__headless.rs-2610-2688.txt",
+      "bytes": 2579,
+      "sha256": "cdfc50c85843599666393efd111df2643101c2c1e971b06dd7ad9b8ce6f8500f"
+    },
+    {
+      "path": "context-excerpts/src__providers__registry.rs-245-290.txt",
+      "bytes": 1775,
+      "sha256": "9df9387a80eb0ffe5460ac3a3dbc94690cda8e02205104bd2e8ad5698fdd6962"
+    },
+    {
+      "path": "context-excerpts/tests__headless_domain_owner.rs-330-407.txt",
+      "bytes": 3136,
+      "sha256": "bd3de7cc521f5a3ab224b626adda9eb4651a7a7afa2742ac1a6ed97cc8a9fb09"
+    },
+    {
+      "path": "context-excerpts/tests__stage1_gemini.rs-107-145.txt",
+      "bytes": 1243,
+      "sha256": "f009d970003a0bc179575db2b8ae484870bbae2facf38fbee78c9b5b3461ce1e"
+    },
+    {
+      "path": "context-excerpts/tests__stage1_gemini.rs-415-476.txt",
+      "bytes": 2201,
+      "sha256": "7003aec8db6315e1ea9f3e98815a530dd495e8259f24b3bdd5bb359b54654bd5"
+    },
+    {
+      "path": "context-excerpts/tests__stage1_gemini.rs-880-971.txt",
+      "bytes": 3453,
+      "sha256": "95291413ebd341dbc3888666a277cee9f150ac62dd7a2bf0203922ffd89fccaa"
+    },
+    {
+      "path": "context-reading-ledger.json",
+      "bytes": 6350,
+      "sha256": "022fc50a1abb487bde08a26675f6ff9cc8a26e1674c7ccf892d170a3abe0e7dc"
+    },
+    {
+      "path": "files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 18512,
+      "sha256": "769f73a1cd40fbdfdb2eed50c871442cdfe4d15489870a3961adf0be179a4e4b"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 4622,
+      "sha256": "91750012d64d0b8e2de62aa83ee46cc9d39c9604bc5dc2db7f80d60a2363d44f"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-behavior-ready/candidate.patch",
+      "bytes": 44300,
+      "sha256": "95e67c10ad7e4e5c80ce7a773bed11f8905ea4321f5fd27a89b7183405875d6c"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 7702,
+      "sha256": "fa2853bce8507405711530960e8f9cf994271a7bba96c5156dea4dfec5676cc1"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 571,
+      "sha256": "fa399ce433e8cd1a02b3775078b4d36b5d365e087c97e7facdc58781e6564912"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 1871,
+      "sha256": "0445e0d3879d271f1ce2f807052933af369f3c120138eb4431ab2b583f1cdd30"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 118,
+      "sha256": "9b61fcd3aaec9f00b326cd75631083823fc7a3e33eb80cbe53b09697fdf293d7"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 937,
+      "sha256": "23ad41e7fe0a33137b786e75ef9486871fdc470edb9640339e46a923e4af39b8"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 17587,
+      "sha256": "4a9c85348ef374e7e54c585d376ab6329e9b86f8a5cc858d71e26faed3fcaf38"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 59,
+      "sha256": "364c717c8eaf1ade667adb6bea06dd48b72b79f0fa6c9a1350cd870d9987f505"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 9094,
+      "sha256": "aec2b272926225ce8c72505d82953ad95d81fa68d31d105fdb50030af1f17cf1"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 935,
+      "sha256": "adc27e320b55363d9a9c1962c4f2e552553cefae965bb24490ddb06ada4e0516"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 2197,
+      "sha256": "ba0f6e777e3d236bb36d09f9b9708aaf41d75aaff562d8f2e6220194817e7d6e"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 896,
+      "sha256": "baa88a3973f0f7037bcbc4f2afee73e68126fda7fbddfa22a9ec16650973de97"
+    },
+    {
+      "path": "historical/source017-behavior-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 1659,
+      "sha256": "d5373c17720831ea4079d63c58a9f926bbb39ea7d601eceadb5a587c31862472"
+    },
+    {
+      "path": "historical/source017-behavior-ready/manifest.json",
+      "bytes": 7522,
+      "sha256": "1c0da066885a3531ba40fdd33c7a23114837470585ba54d69c63a2b0593b7dbe"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__learn__stage1_pi_mono__files__packages__ai__src__api__google-generative-ai.ts_learn.md.patch",
+      "bytes": 4710,
+      "sha256": "bc36619f14e37dc1804218f28dbc99ceb6b90f953659bf690fbd1d14b312674e"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__README.md.patch",
+      "bytes": 820,
+      "sha256": "04f0af351a772a7857006d43374d0783140dd5a57e7c1012508848b836eb4fa0"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__artifact-index.json.patch",
+      "bytes": 2200,
+      "sha256": "0650c7fbcc5c7142f22285175fdedb6e96d344093f0f43e5b1f24b616943c183"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__install.log.patch",
+      "bytes": 373,
+      "sha256": "412412435a378620fb1ba0bbf83618dd984d671ef9b5ce4c2e293f654a82e27b"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__owner-hashes.json.patch",
+      "bytes": 1240,
+      "sha256": "124014f9738c1136178526e411e326de102f955c2bd2092c562a2774bda93fe4"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package-lock.json.patch",
+      "bytes": 18335,
+      "sha256": "63f4ee15a087c1fca83e3c99e603606b902491b1556e9840c8211e73b2c315d6"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package.json.patch",
+      "bytes": 319,
+      "sha256": "d54659ff7777899604657d4f5bdc845e71dbe44b8b9c23057ad7c2ce54ec1e0d"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__probe.ts.patch",
+      "bytes": 9370,
+      "sha256": "9f5e31e25490153caef12e59f0235c2feac64da38275ba6ca92597fba2b6666a"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.json.patch",
+      "bytes": 1233,
+      "sha256": "eb01da535b3022d712081b8c2c4cd577aa776e21dd0b402223789040a4e12d26"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.log.patch",
+      "bytes": 2547,
+      "sha256": "50379f5b0e32f12139971ee54bc9027b72935c179c6874f15f7c4b52ded09dca"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.json.patch",
+      "bytes": 1198,
+      "sha256": "b1d14dad64952efb31be7fefef2e314ff6281802360594a441a14c412b47bf8a"
+    },
+    {
+      "path": "historical/source017-behavior-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.log.patch",
+      "bytes": 1955,
+      "sha256": "736ef04ebf0c6b28a0be61f21eb324ff250d5399b5b71655a0ee091cffb7714f"
+    },
+    {
+      "path": "historical/source017-behavior-ready/run_candidate_probe.py",
+      "bytes": 1243,
+      "sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-015-receipt.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-015-report.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-016-receipt.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-016-report.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/active_requirement.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/baseline-state.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/core-context-delta.patch",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/current-google.rs",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/tools/validate_blueprint.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/tools/validate_stage1_blueprint.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-disposition.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/google-generative-ai.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/google-shared-retry-context.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gstage-main.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/gstage-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/integrity-final.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/integrity-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/preparation-note.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-candidate.patch",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-manifest.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-report.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/read-0001-0265.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/read-0266-0526.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/report-final.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/reused-payloads.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/source-coverage.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/supplement.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/symbol-inventory.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-drift.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1587-1702.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-308-328.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-411-468.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-58-103.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-1-75.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-185-435.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-436-759.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__registry.rs-245-290.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/tests__stage1_gemini.rs-880-971.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-references.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-main-delta320/verify_delta.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/google-generative-ai.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/historical-owner-drift.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/input-manifest.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/prior-report.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0001-0240.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0241-0526.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/reused-evidence.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-143-269.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-49-75.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-490-583.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-584-683.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-689-758.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-75-142.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-107-145.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-415-476.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-882-938.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-references.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/verify_reuse.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/candidate.patch",
+      "bytes": 2987767,
+      "sha256": "c55e83024c3ede6071e2cab610a124b5fd1500c4f529c8a425b551ce7531ba86"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 32406,
+      "sha256": "485c17e1e492d77bef21ac8b41801d5f3238c706214f6d829d5ce808430d4c23"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-015-receipt.json",
+      "bytes": 18533,
+      "sha256": "98ed6f249ae25806c6de04f57da915390163ec7a9603aabd59b9f1225ed4eb64"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-015-report.md",
+      "bytes": 27229,
+      "sha256": "c0042f56d30decd5ba00a5f8d92f5ceae8067b8821fa7ebf81c998e0ae5a7727"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-016-receipt.json",
+      "bytes": 28782,
+      "sha256": "bc3afc54317085446cf1c705352cd7c694331d4539ae87a76abb2a5571476d8e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/accepted-016-report.md",
+      "bytes": 33278,
+      "sha256": "e6cab9cb19a55b5d3b6b576393542b981852156363bca62aebffbab83728c58e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/active_requirement.json",
+      "bytes": 9516,
+      "sha256": "e65740c7df5925f141461d786a076a4b775761392a5f7f8cbcc7b79fa086f837"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/artifact-index.json",
+      "bytes": 9198,
+      "sha256": "0906ce2105281fe218c05e6bd3ba3418c61c5e9a46ab869198502e5924c8a046"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/baseline-state.json",
+      "bytes": 2067518,
+      "sha256": "4e33df52b1f8da06bcb5cb701ce7c69abacefa4c5885e5e26aae13bc0ad8d6fa"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/core-context-delta.patch",
+      "bytes": 5837,
+      "sha256": "031a960802cd57eb16cec6de11e298d6a149a343ec65b374580d6e98ba6f1bfb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/current-google.rs",
+      "bytes": 29333,
+      "sha256": "f0d56a364cda38b5a10bff74e68057ad76bf539000c883ee6e820c2105081890"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/Docs/stage_1_v3_pi_mono_blueprint.md",
+      "bytes": 146422,
+      "sha256": "b3b623125d1ebbed1c6df1414b0d687ec48629fd6e0e7dbcdd3ce3cc05f96ab2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/tools/validate_blueprint.py",
+      "bytes": 27223,
+      "sha256": "2d103963fd98885690762c8ebf12eeb766c28a4bf08433f042a917a3e4c8cc9d"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-context/tools/validate_stage1_blueprint.py",
+      "bytes": 44597,
+      "sha256": "d04fa4e6fcf1b768adc26d82944468a568a8477d739f34290a42f429110cb185"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gate-disposition.json",
+      "bytes": 446,
+      "sha256": "334241db1736348895b8026c831797787ad5397abc1813c96c2b893446c7d3de"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/google-generative-ai.ts",
+      "bytes": 16027,
+      "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/google-shared-retry-context.txt",
+      "bytes": 1025,
+      "sha256": "bc7e38bc08f541bac9519d407c521a7bc53b4d0b39da79d1e4dd52a494c44ab2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gstage-main.json",
+      "bytes": 930,
+      "sha256": "96865dbb7dab5748a55e302810d51134a15e7afcdcf2d038038beca604f53c39"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/gstage-main.log",
+      "bytes": 408,
+      "sha256": "7006622e80e458e030f0d63b1e5033f6bd6279845b948ab937a3b20ccf1d5fb5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/integrity-final.json",
+      "bytes": 840,
+      "sha256": "ec117baf38d768dbdbdc6930cc2fd2af3bc54f3f61abef00a12ad5e80f7e0ea1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/integrity-final.log",
+      "bytes": 712,
+      "sha256": "0841b963be6c4301d96e5a7972616cec02f7a9a9ddf5d09d01a50c6184a4671e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/preparation-note.txt",
+      "bytes": 472,
+      "sha256": "06166789da497e3b5bdaa6906c2cfcfb6e4281ebaac44f755dea275462ccaa07"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-candidate.patch",
+      "bytes": 165970,
+      "sha256": "a0c40c4af9bc234365947e1100d6ed7763c1d1164a488233e1e7bd1f01634700"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-manifest.json",
+      "bytes": 25901,
+      "sha256": "a7875c319828ff456d97e50a5477c930fc0f9473745f2095169ed96c399bc0fd"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/prior-report.md",
+      "bytes": 20705,
+      "sha256": "555192ff2fb817aa4a7aa6e61d80da14de9214b4cbdce6f61478a5f140303a4b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/read-0001-0265.txt",
+      "bytes": 8407,
+      "sha256": "30da47011b9c77bc9a9d34e832a7e551e729abcbefbf4f95b22e2d15c4306d41"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/read-0266-0526.txt",
+      "bytes": 7620,
+      "sha256": "6b66e2d57b24f8ed68d6b536bca64ea9c96f6c94b97cd688d57f414508c7caec"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/report-final.json",
+      "bytes": 345,
+      "sha256": "795a6322d20bd1bd96eb9542aaa799f73d672194158b21c1db29ab5fda33e4fb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/reused-payloads.json",
+      "bytes": 9918,
+      "sha256": "81ef01f6822acc51e8c7ed443351167efbf5b8920373aac5048be99d400eeb66"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/source-coverage.json",
+      "bytes": 986,
+      "sha256": "0ab43a44d20215638a6909ba4ea294a499385e3fcc66eface66d00b6fc442973"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/supplement.md",
+      "bytes": 11701,
+      "sha256": "9f510133d8a2c7075ac501993e00178ae343d9613e54c9d0c694da7dbad4df80"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/symbol-inventory.json",
+      "bytes": 558,
+      "sha256": "b54462ca39fd77a08dcbbc972b8eac67281623373b59a0f62d3c479e055b57e1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-drift.json",
+      "bytes": 1326,
+      "sha256": "eef98cf28d3b3c29bdd91765d0cb07680abca358386b6af05400b3b4df39c3f5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 633,
+      "sha256": "067a47ed8e03af6cb4c1838043952d1b0f96f8683c3ee623367485dc1c96d5dc"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 388,
+      "sha256": "4293dcc13b0627144fe54e979cde9e23140e7e6b0b3d7b25a71d158009b9fb52"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 643,
+      "sha256": "a3ff2447c2e59fdceca18923bdf75cb7aa20ff2a1ae52256cd666d1686b7b5cc"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend.rs-1587-1702.txt",
+      "bytes": 4900,
+      "sha256": "f0b4524b42ffd896818dbeda43accc518d478a77a89d87596fb7b50c1673da83"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-308-328.txt",
+      "bytes": 652,
+      "sha256": "80c76b83e47e81bd489d98b07ae63a26d561b0e0bac38f84f71ebe2e3b199fef"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-411-468.txt",
+      "bytes": 1806,
+      "sha256": "b8ab7893f82affd2a1939b69305f6feb8a5e982e2603318b2548deef8c57c27d"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__backend__transport.rs-58-103.txt",
+      "bytes": 1612,
+      "sha256": "236dd8f5921fedd53df72ad148973579fe02b2f1de3d6960f237fe00bd82c451"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 1295,
+      "sha256": "78fe56ed1fc7e758dfe3cea22e71b369d063d2a22c195418074a2a68cf235aeb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-1-75.txt",
+      "bytes": 2452,
+      "sha256": "5c690c222dc0ee816bd24455d6d11a24eec9249d471125d9182d403bfcfe83a7"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-185-435.txt",
+      "bytes": 9789,
+      "sha256": "3bc49d8e847b6a2582dbfdf7b19ce45a4bc2df28eb60eb9ad878080864ad56ca"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__google.rs-436-759.txt",
+      "bytes": 13079,
+      "sha256": "e791e7eae07b752c87aec0813fe9be8c6a6a53ad97cdc91c7cb79adbee8d058f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/src__providers__registry.rs-245-290.txt",
+      "bytes": 1775,
+      "sha256": "9df9387a80eb0ffe5460ac3a3dbc94690cda8e02205104bd2e8ad5698fdd6962"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-excerpts/tests__stage1_gemini.rs-880-971.txt",
+      "bytes": 3453,
+      "sha256": "95291413ebd341dbc3888666a277cee9f150ac62dd7a2bf0203922ffd89fccaa"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/target-references.json",
+      "bytes": 5796,
+      "sha256": "f87a6f9a90a3a078df16a7ab4335dc37b31a26afa72f40e34ee69b8d1b38b533"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-main-delta320/verify_delta.py",
+      "bytes": 4823,
+      "sha256": "be70ac9368e98c03007d8b5c07677375347c3b91a6805acdc01b7439155d37ad"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/README.md",
+      "bytes": 1764,
+      "sha256": "f8ea1c4332d75da540cf83b8245e03a208b6db5c1628648d176467349bbaa9a8"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/artifact-index.json",
+      "bytes": 5460,
+      "sha256": "afa48f668c8ae4116ea551750c2dc102e27d70d96792cd444157c73b6f5904c8"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/google-generative-ai.ts",
+      "bytes": 16027,
+      "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.json",
+      "bytes": 933,
+      "sha256": "7e6243a4fc198c4c5dd2b9dbddf85b78d82480cdf9132e650f0e4e1a37733701"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.log",
+      "bytes": 408,
+      "sha256": "7006622e80e458e030f0d63b1e5033f6bd6279845b948ab937a3b20ccf1d5fb5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/historical-owner-drift.json",
+      "bytes": 2310,
+      "sha256": "2e6ecdd70f9bdc20702341d3015a51bf51c8dd108b1a741ed3497dfe7d346422"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/input-manifest.json",
+      "bytes": 1185,
+      "sha256": "e4aa3bfa495750ce836394799c09bdaa9ff29ae95f780358b0e743bf29114d39"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.json",
+      "bytes": 838,
+      "sha256": "e920cb7a3e1375d5bab80b038a8e54a1b0ba1cb7e3a89b31b0eb1060d97c2ec5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.log",
+      "bytes": 812,
+      "sha256": "aa51c64dabb939f9862d0350fd1ddc5ee09fe92afe223b680f8c251ba3b6b142"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/prior-report.md",
+      "bytes": 7702,
+      "sha256": "fa2853bce8507405711530960e8f9cf994271a7bba96c5156dea4dfec5676cc1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0001-0240.txt",
+      "bytes": 7885,
+      "sha256": "8ede6194eb96c57a33d5ceddc4e48439948b9f846b9e9ccbedadcdec4bfd16ed"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0241-0526.txt",
+      "bytes": 8142,
+      "sha256": "49e4c9daf43b3e2471037515f6d6394b32e54c4256322d818cf36669fc5f4d8e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/reused-evidence.json",
+      "bytes": 4688,
+      "sha256": "7ee87443c4f0355c1bd94df50e044b785fb9b614284ca135dbf02243a434387b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 633,
+      "sha256": "067a47ed8e03af6cb4c1838043952d1b0f96f8683c3ee623367485dc1c96d5dc"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 388,
+      "sha256": "4293dcc13b0627144fe54e979cde9e23140e7e6b0b3d7b25a71d158009b9fb52"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 643,
+      "sha256": "a3ff2447c2e59fdceca18923bdf75cb7aa20ff2a1ae52256cd666d1686b7b5cc"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 1295,
+      "sha256": "78fe56ed1fc7e758dfe3cea22e71b369d063d2a22c195418074a2a68cf235aeb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-143-269.txt",
+      "bytes": 4471,
+      "sha256": "3cd9430aee40bda7d2f7d2112ba8e0a39531fc5362a902889f6fed609bd42b01"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-49-75.txt",
+      "bytes": 980,
+      "sha256": "1356d7cbe6b97912d62b61f208cde27ac1e3c401289f428bbfaeba5d0703488c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-490-583.txt",
+      "bytes": 4239,
+      "sha256": "c896ff447d4b28764dfbc6079084ec5ca840319b6cb34db540b8b058facf63c2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-584-683.txt",
+      "bytes": 3991,
+      "sha256": "516972158d9db374e46d542d1afb971369490efbbffe360f65a7b08606769138"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-689-758.txt",
+      "bytes": 2882,
+      "sha256": "b5eb2aac9150937766de7c7c24818de24ba3cbc97b525c45c534e46198d90384"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-75-142.txt",
+      "bytes": 2528,
+      "sha256": "e6391328c3c5f5db516b540b9a8b6218ffbe36790a0250dd32126663d670adf2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-107-145.txt",
+      "bytes": 1243,
+      "sha256": "f009d970003a0bc179575db2b8ae484870bbae2facf38fbee78c9b5b3461ce1e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-415-476.txt",
+      "bytes": 2201,
+      "sha256": "7003aec8db6315e1ea9f3e98815a530dd495e8259f24b3bdd5bb359b54654bd5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-882-938.txt",
+      "bytes": 2242,
+      "sha256": "2f906b5ed5aec402f21053ee39b8826579d50ca1934e12e3e69a4cad4d5d02ed"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-references.json",
+      "bytes": 5238,
+      "sha256": "d8842b7153f8f38a2cc43d73d6ae9c585545a2afb02d9181f91834acaea5f110"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/verify_reuse.py",
+      "bytes": 3176,
+      "sha256": "2fb5ea09f5e3736828ff59c65851045144b9c86ec5290c4430b7378f171ac37b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 571,
+      "sha256": "fa399ce433e8cd1a02b3775078b4d36b5d365e087c97e7facdc58781e6564912"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 1871,
+      "sha256": "0445e0d3879d271f1ce2f807052933af369f3c120138eb4431ab2b583f1cdd30"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 118,
+      "sha256": "9b61fcd3aaec9f00b326cd75631083823fc7a3e33eb80cbe53b09697fdf293d7"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 937,
+      "sha256": "23ad41e7fe0a33137b786e75ef9486871fdc470edb9640339e46a923e4af39b8"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 17587,
+      "sha256": "4a9c85348ef374e7e54c585d376ab6329e9b86f8a5cc858d71e26faed3fcaf38"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 59,
+      "sha256": "364c717c8eaf1ade667adb6bea06dd48b72b79f0fa6c9a1350cd870d9987f505"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 9094,
+      "sha256": "aec2b272926225ce8c72505d82953ad95d81fa68d31d105fdb50030af1f17cf1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 935,
+      "sha256": "adc27e320b55363d9a9c1962c4f2e552553cefae965bb24490ddb06ada4e0516"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 2197,
+      "sha256": "ba0f6e777e3d236bb36d09f9b9708aaf41d75aaff562d8f2e6220194817e7d6e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 896,
+      "sha256": "baa88a3973f0f7037bcbc4f2afee73e68126fda7fbddfa22a9ec16650973de97"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 1659,
+      "sha256": "d5373c17720831ea4079d63c58a9f926bbb39ea7d601eceadb5a587c31862472"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/manifest.json",
+      "bytes": 53828,
+      "sha256": "fc8d81b93e86aa0875f0d4352555576cdd1ad1c7ef154ea4cae5b7c6d44087a3"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__learn__stage1_pi_mono__files__packages__ai__src__api__google-generative-ai.ts_learn.md.patch",
+      "bytes": 32879,
+      "sha256": "a2ee07affbf50943acc8e8657771127d7e7dab17191e59a8f8dfb3a5f06eec75"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__accepted-015-receipt.json.patch",
+      "bytes": 18829,
+      "sha256": "31a5a43f911e4e32005c09df22faf3a1959a8450b8a22ff17d2d6dc1e9488910"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__accepted-015-report.md.patch",
+      "bytes": 27645,
+      "sha256": "077fe2ab7a911d44e80da9d66843ac26d648008b5927f52796d7d4973fca880c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__accepted-016-receipt.json.patch",
+      "bytes": 29078,
+      "sha256": "0419eae272e772447983c38ae789de7981ca2da32962d3478e5738a73d7010a2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__accepted-016-report.md.patch",
+      "bytes": 33710,
+      "sha256": "3dd166bc4fcffa36340f9f604c08f7daeb84eb82be9ffe61e4fda98d8b998fab"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__active_requirement.json.patch",
+      "bytes": 9806,
+      "sha256": "85f4c0a1965d91b39cdde804b626d1edfd1d99a198160caf1c296d605c0d5817"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__artifact-index.json.patch",
+      "bytes": 9706,
+      "sha256": "513129f02d98e53b0c714298be211a60ed5cb46fdc1e8bce779ee0f2bb0f61d7"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__baseline-state.json.patch",
+      "bytes": 2078226,
+      "sha256": "949e747123662b64c5377c201c384269651569fefa81ccba332fae75d2db6b07"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__core-context-delta.patch.patch",
+      "bytes": 6273,
+      "sha256": "c6f11230059e8aa234f4d04d8f9967892f27a678e7a2bb8e0718f108fefa41e4"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__current-google.rs.patch",
+      "bytes": 30367,
+      "sha256": "14512c6ceee92698ae128d4cd9a2de47714106c2144ecdd56ee148455ef054f0"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gate-context__Docs__stage_1_v3_pi_mono_blueprint.md.patch",
+      "bytes": 147401,
+      "sha256": "0958a6c1d26f3815f9fd8c944f9f207e183ca5c415af8f05ac44582c0387da88"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gate-context__tools__validate_blueprint.py.patch",
+      "bytes": 28158,
+      "sha256": "3d4ef94ea6b1ce4d097a915fb4c4047eb24e864e5db7e8719c3c75675d5d2ce6"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gate-context__tools__validate_stage1_blueprint.py.patch",
+      "bytes": 45758,
+      "sha256": "6fa108de88bf1d02c63b5c9c1d7caac9004026ab74b9923513517f28f45588fb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gate-disposition.json.patch",
+      "bytes": 747,
+      "sha256": "b543667ab9d4fb35fb74bbd4e8aa61491561a0e555e76066dfce38780cb81fef"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__google-generative-ai.ts.patch",
+      "bytes": 16846,
+      "sha256": "159e345c76ec001ea6ac11f53904dbbf9ec4323246fc6de8f601e91dbe0be159"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__google-shared-retry-context.txt.patch",
+      "bytes": 1375,
+      "sha256": "612667c8982549b1dc6b8f15c20fd3effc1d4164a2713180c6732ef365e36084"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gstage-main.json.patch",
+      "bytes": 1228,
+      "sha256": "e67a6ab91f675313ca5a1a52ccd0d1420e1c0c389880be30d01fbe062366526f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__gstage-main.log.patch",
+      "bytes": 690,
+      "sha256": "9a3d62d6e4a4b20a5b43de1c9cce8806c175ee5ee461c929147e8ae6ed484ddf"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__integrity-final.json.patch",
+      "bytes": 1145,
+      "sha256": "c92d6deb1ed280099e29e868a4155c481df25c27f7181a9db2464428b55d1fa1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__integrity-final.log.patch",
+      "bytes": 1022,
+      "sha256": "d4110cbcf5c5b8b7fc00bb1a1d89eccb2e82ee134721c6c1de7953be843b5c55"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__preparation-note.txt.patch",
+      "bytes": 753,
+      "sha256": "f51c587fdb9f839edb73897603bcf6ea58973dcdaefc53c26ae3210d02dac915"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__prior-candidate.patch.patch",
+      "bytes": 169670,
+      "sha256": "38aa283ceb30216a9dd34c8c481bba754b15d3df8d50f9e4b5a54686f4257953"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__prior-manifest.json.patch",
+      "bytes": 26697,
+      "sha256": "0637573ceac5be6cceefa0c3b0031bde382b19b7d63e081638cade7c110840d7"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__prior-report.md.patch",
+      "bytes": 21062,
+      "sha256": "2c6643abec093651a2779045c65d12554bc6a104ebf5e582eb09d4aa21480a1c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__read-0001-0265.txt.patch",
+      "bytes": 8950,
+      "sha256": "df5c1a353766856949fb47e4af58981de403e91b1a0eecc784c081ba0fb7a19b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__read-0266-0526.txt.patch",
+      "bytes": 8159,
+      "sha256": "08f24d891f8de1a9290754ac442b87b11687fe243e85f40a2c63956424421228"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__report-final.json.patch",
+      "bytes": 626,
+      "sha256": "0d04b0620ec7b7899f660eb05968f54b17e55408cc56e7be4b5203c5bb8e5941"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__reused-payloads.json.patch",
+      "bytes": 10484,
+      "sha256": "7840a6551003310fa5607981d232f7c6115938b5fc18fd4a5ad15df3de54f3f2"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__source-coverage.json.patch",
+      "bytes": 1296,
+      "sha256": "ae63fb2d6d9f9ccb92a0fac82a50a602294bfba5107c96d8dee2cec33b0454a9"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__supplement.md.patch",
+      "bytes": 12018,
+      "sha256": "25087f74eda0eb927f6152639a6d42889a10c8701354a7994dd0d2a3d0a3cc9a"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__symbol-inventory.json.patch",
+      "bytes": 886,
+      "sha256": "b3f8c04cbcc0a71d6fcdb7e67e7fa7000a5aaf6c84db7daae312c7c461930a3c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-drift.json.patch",
+      "bytes": 1634,
+      "sha256": "df082f749d2469e4e047f13d9055653a7ac52666b09eb90566994b7e3eb1cecd"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend.rs-1036-1050.txt.patch",
+      "bytes": 1006,
+      "sha256": "3dfb3becb70c8a651a3bfd177c73c42e38f0179a71d3d2d09f49c20566f21056"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend.rs-1209-1218.txt.patch",
+      "bytes": 756,
+      "sha256": "4d365063bc8d95d3400c0fe610ac098851864b131a5d1fa9f8008b927a4ee758"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend.rs-1303-1320.txt.patch",
+      "bytes": 1019,
+      "sha256": "67bde1388441e1f2ee78e1f5d24c3ac8b9d439807e998fa119feeaea45fedd5b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend.rs-1587-1702.txt.patch",
+      "bytes": 5375,
+      "sha256": "0be8ede2be07d1fd7a1adbd0f6c3a3135068a9f0282f9a0bd7843a25beb5bb8f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend__transport.rs-308-328.txt.patch",
+      "bytes": 1058,
+      "sha256": "86e0a3e1ccfd81a84d413435d81436fcc7487a88f7a3d0029fa2033b3a356c51"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend__transport.rs-411-468.txt.patch",
+      "bytes": 2249,
+      "sha256": "fd87bb9592c48495831afcb2519a3997960e4d68dca256c2fbc198051568fae0"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__backend__transport.rs-58-103.txt.patch",
+      "bytes": 2040,
+      "sha256": "c329e62159d15d28cec58746953f22d7625159b9923f3289c24592ebfcff2e2a"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__core.rs-3855-3882.txt.patch",
+      "bytes": 1672,
+      "sha256": "e504174fa746983fb1a8a2b2e78cd799f1da8f0d04bb07c2f402b6785b2303d1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__providers__google.rs-1-75.txt.patch",
+      "bytes": 2900,
+      "sha256": "46d07d1618dba655f59df2df32042c718e5dfc387f27176ad5947d36c63a3ddd"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__providers__google.rs-185-435.txt.patch",
+      "bytes": 10423,
+      "sha256": "130dda59d7a234904f0e1ecce8c50ed6f7f5c26341250227a49ce40ce96f536e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__providers__google.rs-436-759.txt.patch",
+      "bytes": 13786,
+      "sha256": "18cb5b37d7043c9e1b0d3c1db322e5a671ae52be48e735088f8c68710a8f9f44"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__src__providers__registry.rs-245-290.txt.patch",
+      "bytes": 2209,
+      "sha256": "1efdb36272c750595cef0e6fcc525a5baec8d2d904cfbcb7635af74d404db3bb"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-excerpts__tests__stage1_gemini.rs-880-971.txt.patch",
+      "bytes": 3921,
+      "sha256": "5974aacb4f23a013e2dcb84b8a39c791093859e30152eddd939a2482a90f654e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__target-references.json.patch",
+      "bytes": 6240,
+      "sha256": "526822746437ce8c21769adc6858762a68fe73852916cf35af3b19a3f3c0eb28"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-main-delta320__verify_delta.py.patch",
+      "bytes": 5141,
+      "sha256": "d9ef299193caf774c566089b1e493ff401fa05c68a20c5b42741f0946d054d77"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__README.md.patch",
+      "bytes": 2007,
+      "sha256": "4124e993cf439cb96846051cdc53f51687d5a9914fd22580f441dcfef656a83a"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__artifact-index.json.patch",
+      "bytes": 5863,
+      "sha256": "4c814501cc80cb9196c8095fc6bc8b43ae7c8f0b4d600cd9e35467f3cf684f50"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__google-generative-ai.ts.patch",
+      "bytes": 16831,
+      "sha256": "32b8777b3bfa8d11dfaa7d58fbbb1db5fc19328fe36e452d3739b0e8f39210fc"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__gstage-main.json.patch",
+      "bytes": 1216,
+      "sha256": "5470ef4167713bf940f081a803647d7d7321651b5343f14c61f4b1e11df430f1"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__gstage-main.log.patch",
+      "bytes": 675,
+      "sha256": "9ba620652e78f8c468e87da3b2fb1c49dfe871f0c45e3ed1bfe7d8e045b1bf68"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__historical-owner-drift.json.patch",
+      "bytes": 2655,
+      "sha256": "68f00775d45042b86bc5fb939b5980f344f35ad82367f4b27d02f72c7d14fa0f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__input-manifest.json.patch",
+      "bytes": 1483,
+      "sha256": "be04c6cad4350aae76beca201527c4bb098e0c18c81997e68dd3504128598b85"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__integrity-final.json.patch",
+      "bytes": 1128,
+      "sha256": "19f77513e067427d6d7b65f70be030482669db76e770b2b3e2cf676d0b813f53"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__integrity-final.log.patch",
+      "bytes": 1103,
+      "sha256": "7f8b63d24b2abe3f62a9121a4610b6e069c317b3114020fe903e7fb6f896692f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__prior-report.md.patch",
+      "bytes": 7988,
+      "sha256": "4eb87759c72d2f217bf8c09d3c5235fa77aab01e881dccf87400e25410f1abcd"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__read-0001-0240.txt.patch",
+      "bytes": 8388,
+      "sha256": "41923b8bf9e734ae324990994c8b7a631ac35383092e51be6e21ca9df9abc36e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__read-0241-0526.txt.patch",
+      "bytes": 8691,
+      "sha256": "8154939bece31d43e11edbf13fc65aa7adc2dfc414ecd4ffa7ba1908fd813ae4"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__reused-evidence.json.patch",
+      "bytes": 5034,
+      "sha256": "bfb178174506cd2769f6e1b0e336ded4934c3534d1dd0516aa0951e430f571ff"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1036-1050.txt.patch",
+      "bytes": 991,
+      "sha256": "f322faa80409918e97b1f543d3656f3bf11eff64f6f966e5d991571faa8b0454"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1209-1218.txt.patch",
+      "bytes": 741,
+      "sha256": "04efb470dbfb7a9ac8957bb93349e355d25f19f1d0b184d005dedf935f63e05f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1303-1320.txt.patch",
+      "bytes": 1004,
+      "sha256": "4c778b500f07ae4c18b74528684c045dcfd3bb08ffe2140f13ac5ec3d098a041"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__core.rs-3855-3882.txt.patch",
+      "bytes": 1657,
+      "sha256": "d2d7db72c50b10e14c7d5b263cbb15a767e1ab1e5f87de9c6ee540097b95873e"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-143-269.txt.patch",
+      "bytes": 4966,
+      "sha256": "8bc45ec48c73334cc6857459f9df93a510c7d878d30a88612fee5bf23b9fc840"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-49-75.txt.patch",
+      "bytes": 1368,
+      "sha256": "f33ff2943cef97484cb87c7227eb3415cbcdc4c9261b4727fde17508b08ed284"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-490-583.txt.patch",
+      "bytes": 4700,
+      "sha256": "f0dbbb765e238b7ec2682d7f663bd0e4a5f779b9b1100e126952f2b4e481478c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-584-683.txt.patch",
+      "bytes": 4459,
+      "sha256": "1e6d8917ac7df5987caf785f792b463116321e2491d943994a1735f113e46986"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-689-758.txt.patch",
+      "bytes": 3319,
+      "sha256": "9345e32550fda1de0e70a2fa93e2d97a66b56d2ad77019c26dab0ba3146f6231"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-75-142.txt.patch",
+      "bytes": 2960,
+      "sha256": "20e877a3a5613a41249fc991b5541f09f9ccf3917e50303f9be05772f783e10c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-107-145.txt.patch",
+      "bytes": 1643,
+      "sha256": "7823e9f1eb1e9e14f51dfd6547446bc8cd958e7d3f936967d76f07df33d3bec5"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-415-476.txt.patch",
+      "bytes": 2624,
+      "sha256": "54012dd1be673e705af906dba79d0b54d158ebe95db9231234561c15aa8fbe4c"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-882-938.txt.patch",
+      "bytes": 2660,
+      "sha256": "4c0dd78967baa43e1e8a47bc4a9338f3f8ab8c6c7ada7eaf94cce426cd8a5150"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-references.json.patch",
+      "bytes": 5651,
+      "sha256": "2d34ae83c523b47c9863498a633567b74a1e6349e89686d6dbf85d598872818b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__verify_reuse.py.patch",
+      "bytes": 3453,
+      "sha256": "0fa2fb47558de8f01c9b1cd913d30059592efaa1fa891785bd89eb68516664bf"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__README.md.patch",
+      "bytes": 820,
+      "sha256": "04f0af351a772a7857006d43374d0783140dd5a57e7c1012508848b836eb4fa0"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__artifact-index.json.patch",
+      "bytes": 2200,
+      "sha256": "0650c7fbcc5c7142f22285175fdedb6e96d344093f0f43e5b1f24b616943c183"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__install.log.patch",
+      "bytes": 373,
+      "sha256": "412412435a378620fb1ba0bbf83618dd984d671ef9b5ce4c2e293f654a82e27b"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__owner-hashes.json.patch",
+      "bytes": 1240,
+      "sha256": "124014f9738c1136178526e411e326de102f955c2bd2092c562a2774bda93fe4"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package-lock.json.patch",
+      "bytes": 18335,
+      "sha256": "63f4ee15a087c1fca83e3c99e603606b902491b1556e9840c8211e73b2c315d6"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package.json.patch",
+      "bytes": 319,
+      "sha256": "d54659ff7777899604657d4f5bdc845e71dbe44b8b9c23057ad7c2ce54ec1e0d"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__probe.ts.patch",
+      "bytes": 9370,
+      "sha256": "9f5e31e25490153caef12e59f0235c2feac64da38275ba6ca92597fba2b6666a"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.json.patch",
+      "bytes": 1233,
+      "sha256": "eb01da535b3022d712081b8c2c4cd577aa776e21dd0b402223789040a4e12d26"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.log.patch",
+      "bytes": 2547,
+      "sha256": "50379f5b0e32f12139971ee54bc9027b72935c179c6874f15f7c4b52ded09dca"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.json.patch",
+      "bytes": 1198,
+      "sha256": "b1d14dad64952efb31be7fefef2e314ff6281802360594a441a14c412b47bf8a"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.log.patch",
+      "bytes": 1955,
+      "sha256": "736ef04ebf0c6b28a0be61f21eb324ff250d5399b5b71655a0ee091cffb7714f"
+    },
+    {
+      "path": "historical/source017-main-delta320-ready/run_candidate_probe.py",
+      "bytes": 1243,
+      "sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/google-generative-ai.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/historical-owner-drift.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/input-manifest.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/prior-report.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0001-0240.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0241-0526.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/reused-evidence.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-143-269.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-49-75.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-490-583.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-584-683.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-689-758.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-75-142.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-107-145.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-415-476.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-882-938.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/target-references.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-reuse320/verify_reuse.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/base/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/candidate.patch",
+      "bytes": 165970,
+      "sha256": "a0c40c4af9bc234365947e1100d6ed7763c1d1164a488233e1e7bd1f01634700"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/learn/stage1_pi_mono/files/packages/ai/src/api/google-generative-ai.ts_learn.md",
+      "bytes": 20705,
+      "sha256": "555192ff2fb817aa4a7aa6e61d80da14de9214b4cbdce6f61478a5f140303a4b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/README.md",
+      "bytes": 1764,
+      "sha256": "f8ea1c4332d75da540cf83b8245e03a208b6db5c1628648d176467349bbaa9a8"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/artifact-index.json",
+      "bytes": 5460,
+      "sha256": "afa48f668c8ae4116ea551750c2dc102e27d70d96792cd444157c73b6f5904c8"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/google-generative-ai.ts",
+      "bytes": 16027,
+      "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.json",
+      "bytes": 933,
+      "sha256": "7e6243a4fc198c4c5dd2b9dbddf85b78d82480cdf9132e650f0e4e1a37733701"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/gstage-main.log",
+      "bytes": 408,
+      "sha256": "7006622e80e458e030f0d63b1e5033f6bd6279845b948ab937a3b20ccf1d5fb5"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/historical-owner-drift.json",
+      "bytes": 2310,
+      "sha256": "2e6ecdd70f9bdc20702341d3015a51bf51c8dd108b1a741ed3497dfe7d346422"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/input-manifest.json",
+      "bytes": 1185,
+      "sha256": "e4aa3bfa495750ce836394799c09bdaa9ff29ae95f780358b0e743bf29114d39"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.json",
+      "bytes": 838,
+      "sha256": "e920cb7a3e1375d5bab80b038a8e54a1b0ba1cb7e3a89b31b0eb1060d97c2ec5"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/integrity-final.log",
+      "bytes": 812,
+      "sha256": "aa51c64dabb939f9862d0350fd1ddc5ee09fe92afe223b680f8c251ba3b6b142"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/prior-report.md",
+      "bytes": 7702,
+      "sha256": "fa2853bce8507405711530960e8f9cf994271a7bba96c5156dea4dfec5676cc1"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0001-0240.txt",
+      "bytes": 7885,
+      "sha256": "8ede6194eb96c57a33d5ceddc4e48439948b9f846b9e9ccbedadcdec4bfd16ed"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/read-0241-0526.txt",
+      "bytes": 8142,
+      "sha256": "49e4c9daf43b3e2471037515f6d6394b32e54c4256322d818cf36669fc5f4d8e"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/reused-evidence.json",
+      "bytes": 4688,
+      "sha256": "7ee87443c4f0355c1bd94df50e044b785fb9b614284ca135dbf02243a434387b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1036-1050.txt",
+      "bytes": 633,
+      "sha256": "067a47ed8e03af6cb4c1838043952d1b0f96f8683c3ee623367485dc1c96d5dc"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1209-1218.txt",
+      "bytes": 388,
+      "sha256": "4293dcc13b0627144fe54e979cde9e23140e7e6b0b3d7b25a71d158009b9fb52"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__backend.rs-1303-1320.txt",
+      "bytes": 643,
+      "sha256": "a3ff2447c2e59fdceca18923bdf75cb7aa20ff2a1ae52256cd666d1686b7b5cc"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__core.rs-3855-3882.txt",
+      "bytes": 1295,
+      "sha256": "78fe56ed1fc7e758dfe3cea22e71b369d063d2a22c195418074a2a68cf235aeb"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-143-269.txt",
+      "bytes": 4471,
+      "sha256": "3cd9430aee40bda7d2f7d2112ba8e0a39531fc5362a902889f6fed609bd42b01"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-49-75.txt",
+      "bytes": 980,
+      "sha256": "1356d7cbe6b97912d62b61f208cde27ac1e3c401289f428bbfaeba5d0703488c"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-490-583.txt",
+      "bytes": 4239,
+      "sha256": "c896ff447d4b28764dfbc6079084ec5ca840319b6cb34db540b8b058facf63c2"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-584-683.txt",
+      "bytes": 3991,
+      "sha256": "516972158d9db374e46d542d1afb971369490efbbffe360f65a7b08606769138"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-689-758.txt",
+      "bytes": 2882,
+      "sha256": "b5eb2aac9150937766de7c7c24818de24ba3cbc97b525c45c534e46198d90384"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/src__providers__google.rs-75-142.txt",
+      "bytes": 2528,
+      "sha256": "e6391328c3c5f5db516b540b9a8b6218ffbe36790a0250dd32126663d670adf2"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-107-145.txt",
+      "bytes": 1243,
+      "sha256": "f009d970003a0bc179575db2b8ae484870bbae2facf38fbee78c9b5b3461ce1e"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-415-476.txt",
+      "bytes": 2201,
+      "sha256": "7003aec8db6315e1ea9f3e98815a530dd495e8259f24b3bdd5bb359b54654bd5"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-excerpts/tests__stage1_gemini.rs-882-938.txt",
+      "bytes": 2242,
+      "sha256": "2f906b5ed5aec402f21053ee39b8826579d50ca1934e12e3e69a4cad4d5d02ed"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/target-references.json",
+      "bytes": 5238,
+      "sha256": "d8842b7153f8f38a2cc43d73d6ae9c585545a2afb02d9181f91834acaea5f110"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-reuse320/verify_reuse.py",
+      "bytes": 3176,
+      "sha256": "2fb5ea09f5e3736828ff59c65851045144b9c86ec5290c4430b7378f171ac37b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/README.md",
+      "bytes": 571,
+      "sha256": "fa399ce433e8cd1a02b3775078b4d36b5d365e087c97e7facdc58781e6564912"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/artifact-index.json",
+      "bytes": 1871,
+      "sha256": "0445e0d3879d271f1ce2f807052933af369f3c120138eb4431ab2b583f1cdd30"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/install.log",
+      "bytes": 118,
+      "sha256": "9b61fcd3aaec9f00b326cd75631083823fc7a3e33eb80cbe53b09697fdf293d7"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/owner-hashes.json",
+      "bytes": 937,
+      "sha256": "23ad41e7fe0a33137b786e75ef9486871fdc470edb9640339e46a923e4af39b8"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package-lock.json",
+      "bytes": 17587,
+      "sha256": "4a9c85348ef374e7e54c585d376ab6329e9b86f8a5cc858d71e26faed3fcaf38"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/package.json",
+      "bytes": 59,
+      "sha256": "364c717c8eaf1ade667adb6bea06dd48b72b79f0fa6c9a1350cd870d9987f505"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/probe.ts",
+      "bytes": 9094,
+      "sha256": "aec2b272926225ce8c72505d82953ad95d81fa68d31d105fdb50030af1f17cf1"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.json",
+      "bytes": 935,
+      "sha256": "adc27e320b55363d9a9c1962c4f2e552553cefae965bb24490ddb06ada4e0516"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/source-native.log",
+      "bytes": 2197,
+      "sha256": "ba0f6e777e3d236bb36d09f9b9708aaf41d75aaff562d8f2e6220194817e7d6e"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.json",
+      "bytes": 896,
+      "sha256": "baa88a3973f0f7037bcbc4f2afee73e68126fda7fbddfa22a9ec16650973de97"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/files/Docs/quality/stage1/ZS1-017/worker-source-probe/target-native.log",
+      "bytes": 1659,
+      "sha256": "d5373c17720831ea4079d63c58a9f926bbb39ea7d601eceadb5a587c31862472"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/manifest.json",
+      "bytes": 25901,
+      "sha256": "a7875c319828ff456d97e50a5477c930fc0f9473745f2095169ed96c399bc0fd"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__learn__stage1_pi_mono__files__packages__ai__src__api__google-generative-ai.ts_learn.md.patch",
+      "bytes": 21122,
+      "sha256": "89461fd916de768179ee95cd76abe82e3ce9274aec427e30b512b8cc6e12cd7b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__README.md.patch",
+      "bytes": 2007,
+      "sha256": "4124e993cf439cb96846051cdc53f51687d5a9914fd22580f441dcfef656a83a"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__artifact-index.json.patch",
+      "bytes": 5863,
+      "sha256": "4c814501cc80cb9196c8095fc6bc8b43ae7c8f0b4d600cd9e35467f3cf684f50"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__google-generative-ai.ts.patch",
+      "bytes": 16831,
+      "sha256": "32b8777b3bfa8d11dfaa7d58fbbb1db5fc19328fe36e452d3739b0e8f39210fc"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__gstage-main.json.patch",
+      "bytes": 1216,
+      "sha256": "5470ef4167713bf940f081a803647d7d7321651b5343f14c61f4b1e11df430f1"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__gstage-main.log.patch",
+      "bytes": 675,
+      "sha256": "9ba620652e78f8c468e87da3b2fb1c49dfe871f0c45e3ed1bfe7d8e045b1bf68"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__historical-owner-drift.json.patch",
+      "bytes": 2655,
+      "sha256": "68f00775d45042b86bc5fb939b5980f344f35ad82367f4b27d02f72c7d14fa0f"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__input-manifest.json.patch",
+      "bytes": 1483,
+      "sha256": "be04c6cad4350aae76beca201527c4bb098e0c18c81997e68dd3504128598b85"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__integrity-final.json.patch",
+      "bytes": 1128,
+      "sha256": "19f77513e067427d6d7b65f70be030482669db76e770b2b3e2cf676d0b813f53"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__integrity-final.log.patch",
+      "bytes": 1103,
+      "sha256": "7f8b63d24b2abe3f62a9121a4610b6e069c317b3114020fe903e7fb6f896692f"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__prior-report.md.patch",
+      "bytes": 7988,
+      "sha256": "4eb87759c72d2f217bf8c09d3c5235fa77aab01e881dccf87400e25410f1abcd"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__read-0001-0240.txt.patch",
+      "bytes": 8388,
+      "sha256": "41923b8bf9e734ae324990994c8b7a631ac35383092e51be6e21ca9df9abc36e"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__read-0241-0526.txt.patch",
+      "bytes": 8691,
+      "sha256": "8154939bece31d43e11edbf13fc65aa7adc2dfc414ecd4ffa7ba1908fd813ae4"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__reused-evidence.json.patch",
+      "bytes": 5034,
+      "sha256": "bfb178174506cd2769f6e1b0e336ded4934c3534d1dd0516aa0951e430f571ff"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1036-1050.txt.patch",
+      "bytes": 991,
+      "sha256": "f322faa80409918e97b1f543d3656f3bf11eff64f6f966e5d991571faa8b0454"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1209-1218.txt.patch",
+      "bytes": 741,
+      "sha256": "04efb470dbfb7a9ac8957bb93349e355d25f19f1d0b184d005dedf935f63e05f"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__backend.rs-1303-1320.txt.patch",
+      "bytes": 1004,
+      "sha256": "4c778b500f07ae4c18b74528684c045dcfd3bb08ffe2140f13ac5ec3d098a041"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__core.rs-3855-3882.txt.patch",
+      "bytes": 1657,
+      "sha256": "d2d7db72c50b10e14c7d5b263cbb15a767e1ab1e5f87de9c6ee540097b95873e"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-143-269.txt.patch",
+      "bytes": 4966,
+      "sha256": "8bc45ec48c73334cc6857459f9df93a510c7d878d30a88612fee5bf23b9fc840"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-49-75.txt.patch",
+      "bytes": 1368,
+      "sha256": "f33ff2943cef97484cb87c7227eb3415cbcdc4c9261b4727fde17508b08ed284"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-490-583.txt.patch",
+      "bytes": 4700,
+      "sha256": "f0dbbb765e238b7ec2682d7f663bd0e4a5f779b9b1100e126952f2b4e481478c"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-584-683.txt.patch",
+      "bytes": 4459,
+      "sha256": "1e6d8917ac7df5987caf785f792b463116321e2491d943994a1735f113e46986"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-689-758.txt.patch",
+      "bytes": 3319,
+      "sha256": "9345e32550fda1de0e70a2fa93e2d97a66b56d2ad77019c26dab0ba3146f6231"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__src__providers__google.rs-75-142.txt.patch",
+      "bytes": 2960,
+      "sha256": "20e877a3a5613a41249fc991b5541f09f9ccf3917e50303f9be05772f783e10c"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-107-145.txt.patch",
+      "bytes": 1643,
+      "sha256": "7823e9f1eb1e9e14f51dfd6547446bc8cd958e7d3f936967d76f07df33d3bec5"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-415-476.txt.patch",
+      "bytes": 2624,
+      "sha256": "54012dd1be673e705af906dba79d0b54d158ebe95db9231234561c15aa8fbe4c"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-excerpts__tests__stage1_gemini.rs-882-938.txt.patch",
+      "bytes": 2660,
+      "sha256": "4c0dd78967baa43e1e8a47bc4a9338f3f8ab8c6c7ada7eaf94cce426cd8a5150"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__target-references.json.patch",
+      "bytes": 5651,
+      "sha256": "2d34ae83c523b47c9863498a633567b74a1e6349e89686d6dbf85d598872818b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-reuse320__verify_reuse.py.patch",
+      "bytes": 3453,
+      "sha256": "0fa2fb47558de8f01c9b1cd913d30059592efaa1fa891785bd89eb68516664bf"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__README.md.patch",
+      "bytes": 820,
+      "sha256": "04f0af351a772a7857006d43374d0783140dd5a57e7c1012508848b836eb4fa0"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__artifact-index.json.patch",
+      "bytes": 2200,
+      "sha256": "0650c7fbcc5c7142f22285175fdedb6e96d344093f0f43e5b1f24b616943c183"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__install.log.patch",
+      "bytes": 373,
+      "sha256": "412412435a378620fb1ba0bbf83618dd984d671ef9b5ce4c2e293f654a82e27b"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__owner-hashes.json.patch",
+      "bytes": 1240,
+      "sha256": "124014f9738c1136178526e411e326de102f955c2bd2092c562a2774bda93fe4"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package-lock.json.patch",
+      "bytes": 18335,
+      "sha256": "63f4ee15a087c1fca83e3c99e603606b902491b1556e9840c8211e73b2c315d6"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__package.json.patch",
+      "bytes": 319,
+      "sha256": "d54659ff7777899604657d4f5bdc845e71dbe44b8b9c23057ad7c2ce54ec1e0d"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__probe.ts.patch",
+      "bytes": 9370,
+      "sha256": "9f5e31e25490153caef12e59f0235c2feac64da38275ba6ca92597fba2b6666a"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.json.patch",
+      "bytes": 1233,
+      "sha256": "eb01da535b3022d712081b8c2c4cd577aa776e21dd0b402223789040a4e12d26"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__source-native.log.patch",
+      "bytes": 2547,
+      "sha256": "50379f5b0e32f12139971ee54bc9027b72935c179c6874f15f7c4b52ded09dca"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.json.patch",
+      "bytes": 1198,
+      "sha256": "b1d14dad64952efb31be7fefef2e314ff6281802360594a441a14c412b47bf8a"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/patches/Docs__quality__stage1__ZS1-017__worker-source-probe__target-native.log.patch",
+      "bytes": 1955,
+      "sha256": "736ef04ebf0c6b28a0be61f21eb324ff250d5399b5b71655a0ee091cffb7714f"
+    },
+    {
+      "path": "historical/source017-reuse320-ready/run_candidate_probe.py",
+      "bytes": 1243,
+      "sha256": "aab9048eba829c9f102992ef0c9b61cf425fcea4013bd1bb1842eca8a1fa6ac8"
+    },
+    {
+      "path": "historical-inventory.json",
+      "bytes": 96658,
+      "sha256": "6bebc23dea23e4a57af9d1808d3c414a29aaa3332e72bb10f47fa3ec71873940"
+    },
+    {
+      "path": "input-inventory.json",
+      "bytes": 4153,
+      "sha256": "a19ae5fbf646395334803e60e751c599a870f1be58b3330c0ca8e8c6568ffb40"
+    },
+    {
+      "path": "offline-audit-final.json",
+      "bytes": 5505,
+      "sha256": "a9e0067b4f747a7d86d49917848bae85686fafc6d8aaf256df22eb8071767596"
+    },
+    {
+      "path": "offline-audit-initial.json",
+      "bytes": 5505,
+      "sha256": "fa1c1b152020c4178d72daf24514da0f17ab0b10544ffc4f425bf59e1c165634"
+    },
+    {
+      "path": "old-ready-inventory.json",
+      "bytes": 1261690,
+      "sha256": "2715eb74cbde97d94c931f11e7c3ff801094dd6873cbf4beb17342a7d0ea6544"
+    },
+    {
+      "path": "read-source-0001-0190.ts",
+      "bytes": 6110,
+      "sha256": "f45648e1a97b7003c06ec82e3f4a26ecb1a81b292a39fb5df193b78c1d05c50b"
+    },
+    {
+      "path": "read-source-0191-0365.ts",
+      "bytes": 5411,
+      "sha256": "56fea9d5ac11303c3c9b6cfe5f229a67a6da43061697f1d725aef4e9a726c4ee"
+    },
+    {
+      "path": "read-source-0366-0526.ts",
+      "bytes": 4506,
+      "sha256": "193f7af343aef30c95ac3338a866f7865358de8398d3104e5f378e5518b80e1c"
+    },
+    {
+      "path": "reading-ledger.json",
+      "bytes": 1111,
+      "sha256": "d18ddcbca9bbf145aba1ba137ebc0dff200c8b1807c434dcebee3693492abd40"
+    },
+    {
+      "path": "report-body.md",
+      "bytes": 18512,
+      "sha256": "769f73a1cd40fbdfdb2eed50c871442cdfe4d15489870a3961adf0be179a4e4b"
+    },
+    {
+      "path": "source/packages/ai/src/api/google-generative-ai.ts",
+      "bytes": 16027,
+      "sha256": "1395c3f2a90bf701b8b5fc1b6f7de8d323193ed339e07a60630900099a543757"
+    },
+    {
+      "path": "source/packages/ai/src/api/google-shared.ts",
+      "bytes": 15695,
+      "sha256": "7244f109a63e0eb32737ee6910e18d4805c992b8e00c6b58f9830bceb95e2436"
+    },
+    {
+      "path": "source/packages/ai/src/api/simple-options.ts",
+      "bytes": 3295,
+      "sha256": "3a9ab7fa885d3a9c73a1aee8c8bf8bd7d205740edef0f0a5219714fd16e38e57"
+    },
+    {
+      "path": "source/packages/ai/src/utils/event-stream.ts",
+      "bytes": 2878,
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386"
+    },
+    {
+      "path": "target/src/backend/transport.rs",
+      "bytes": 21483,
+      "sha256": "d166d173c77aec88ccee1c248b74424a20c9783b6f4cada95fc762cbf3fe1cfd"
+    },
+    {
+      "path": "target/src/backend.rs",
+      "bytes": 98741,
+      "sha256": "d11105597a7e4260c67c9ce7796394687b4219617a6ebfdfeca637ae469c3357"
+    },
+    {
+      "path": "target/src/core.rs",
+      "bytes": 278737,
+      "sha256": "52311b129c0bb467abac36de216f5bc97bf3c4c42d03dcd6170a717339c2a869"
+    },
+    {
+      "path": "target/src/headless.rs",
+      "bytes": 368974,
+      "sha256": "521c2102519b502fbd6184f31ffb53cba8eeef840bf84d19450836429d9b49f0"
+    },
+    {
+      "path": "target/src/providers/google.rs",
+      "bytes": 29333,
+      "sha256": "f0d56a364cda38b5a10bff74e68057ad76bf539000c883ee6e820c2105081890"
+    },
+    {
+      "path": "target/src/providers/registry.rs",
+      "bytes": 15905,
+      "sha256": "cf229a62681933e7c1b4058c4d2fada41dff4fcd05c4cd300e18accfe245b944"
+    },
+    {
+      "path": "target/tests/headless_domain_owner.rs",
+      "bytes": 15243,
+      "sha256": "6f121e2ea3e1f7f0ffc19d8470f94662163b1eb1e78cd3a71c97975ad06361e6"
+    },
+    {
+      "path": "target/tests/stage1_gemini.rs",
+      "bytes": 35033,
+      "sha256": "0b89fa8b1587cfbd1ed36fb53b7280d79586acd3323da1e2b4280cb033d85367"
+    },
+    {
+      "path": "verify_offline.py",
+      "bytes": 10613,
+      "sha256": "7b485a8b5eaf1b98b084b0e06e2c57886e149aba3d594a12d3ffde9fd6e2f4e2"
+    }
+  ]
+}

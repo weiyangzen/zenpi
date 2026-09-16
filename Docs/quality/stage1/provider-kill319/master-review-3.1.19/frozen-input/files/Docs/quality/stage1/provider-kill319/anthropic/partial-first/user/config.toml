@@ -1,0 +1,4 @@
+backend='anthropic'
+base_url='http://127.0.0.1:55069'
+model='claude-sonnet-4-6'
+model_reasoning_effort='high'

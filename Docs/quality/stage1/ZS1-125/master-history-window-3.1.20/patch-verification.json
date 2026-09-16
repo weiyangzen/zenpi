@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "files": [
+    "src/tui.rs",
+    "tests/tui_transcript_ux.rs",
+    "tools/tui_transcript_ux_smoke.py"
+  ],
+  "commands": [
+    [
+      "git",
+      "init",
+      "-q"
+    ],
+    [
+      "git",
+      "apply",
+      "--check",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/transcript-tail-integration/product.patch"
+    ],
+    [
+      "git",
+      "apply",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/transcript-tail-integration/product.patch"
+    ],
+    [
+      "git",
+      "apply",
+      "--reverse",
+      "--check",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/transcript-tail-integration/product.patch"
+    ],
+    [
+      "git",
+      "apply",
+      "--reverse",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/transcript-tail-integration/product.patch"
+    ]
+  ],
+  "exact_forward_reverse_bytes": true,
+  "sentinel_preserved": true,
+  "sha256": "91fabeaa547db706709bf1efe0779b9d631ad9c7b874468e1ffe86b3001e990e"
+}

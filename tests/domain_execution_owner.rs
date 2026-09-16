@@ -1,11 +1,12 @@
 use std::fs;
 
+use sha2::Digest;
 use tempfile::tempdir;
 use zenpi::{
     b3::ResourceBudget,
     domain_execution::{
         BlueprintExecutor, ExecutionError, ExecutionReceipt, ExecutionStatus, ExecutionStore,
-        HandoffStore, RunOutcome, deterministic_cost,
+        ExternalResultManifest, HandoffStore, RunOutcome, deterministic_cost,
     },
     domains::{Blueprint, BlueprintItem, BlueprintTask, Goal, GoalStatus},
 };
@@ -73,10 +74,10 @@ fn external_handoff_is_bounded_idempotent_and_never_marks_work_done() {
         None,
     )
     .unwrap();
-    let owner = BlueprintExecutor::new(execution);
+    let mut owner = BlueprintExecutor::new(execution);
 
     let first = owner
-        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .admit_external_handoff(&mut handoffs, &goal, &blueprint)
         .unwrap();
     assert!(!first.already_queued);
     assert_eq!(first.request.item_id, "build");
@@ -89,11 +90,12 @@ fn external_handoff_is_bounded_idempotent_and_never_marks_work_done() {
         vec!["cargo test --locked"]
     );
     first.request.validate_against(&goal, &blueprint).unwrap();
-    assert!(owner.store().receipts().is_empty());
+    assert_eq!(owner.store().receipts().len(), 1);
+    assert_eq!(owner.store().receipts()[0].status, ExecutionStatus::Running);
     assert_eq!(goal.status, GoalStatus::Queued);
 
     let retry = owner
-        .handoff_next(&mut handoffs, &goal, &blueprint)
+        .admit_external_handoff(&mut handoffs, &goal, &blueprint)
         .unwrap();
     assert!(retry.already_queued);
     assert_eq!(retry.request, first.request);
@@ -408,4 +410,212 @@ fn store_rejects_duplicate_goal_blueprint_item_attempt_even_with_new_execution_i
     assert_eq!(store.receipts().len(), 1);
     assert_eq!(store.receipts()[0].execution_id, "first-execution-id");
     assert_eq!(ExecutionStore::open(&path).unwrap().receipts().len(), 1);
+}
+
+#[test]
+fn external_manifest_checksum_is_strict_lowercase_sha256() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("execution.json");
+    let (blueprint, goal) = fixture();
+    let item = &blueprint.items[0];
+    let mut store = ExecutionStore::open(&path).unwrap();
+    store
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "terminal-external".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest,
+            item_id: item.id.clone(),
+            attempt: 1,
+            status: ExecutionStatus::Succeeded,
+            cost: deterministic_cost(item),
+            evidence: "external result pending".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
+            error: None,
+        })
+        .unwrap();
+    let uppercase = "A".repeat(64);
+    assert!(
+        store
+            .attach_external_manifest("terminal-external", uppercase)
+            .is_err()
+    );
+}
+
+#[test]
+fn external_manifest_import_binds_identity_and_acceptance_digest() {
+    let dir = tempdir().unwrap();
+    let execution_path = dir.path().join("execution.json");
+    let manifest_path = dir.path().join("result.json");
+    let (blueprint, goal) = fixture();
+    let item = &blueprint.items[0];
+    let mut store = ExecutionStore::open(&execution_path).unwrap();
+    store
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "external-import".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: item.id.clone(),
+            attempt: 1,
+            status: ExecutionStatus::Succeeded,
+            cost: deterministic_cost(item),
+            evidence: "external result pending".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
+            error: None,
+        })
+        .unwrap();
+    let manifest = ExternalResultManifest {
+        execution_id: "external-import".into(),
+        claim_digest: {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(b"zenpi-blueprint-claim-v1\0");
+            for part in [
+                goal.id.as_str(),
+                blueprint.digest.as_str(),
+                item.id.as_str(),
+            ] {
+                hasher.update(part.as_bytes());
+                hasher.update([0]);
+            }
+            hasher.update(1u32.to_be_bytes());
+            format!("{:x}", hasher.finalize())
+        },
+        blueprint_digest: blueprint.digest.clone(),
+        item_id: item.id.clone(),
+        status: ExecutionStatus::Succeeded,
+        acceptance_passed: true,
+        acceptance_evidence: vec!["cargo test --all-targets: passed".into()],
+    };
+    fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    assert_eq!(
+        store
+            .import_external_manifest(&manifest_path, &blueprint.digest)
+            .unwrap(),
+        zenpi::domain_execution::ExecutionStoreChange::Updated
+    );
+    assert!(!store.receipts()[0].external_work_executed);
+    assert!(store.receipts()[0].manifest_checksum.is_none());
+    assert!(!store.is_master_accepted(&store.receipts()[0]));
+    let candidate = store.external_evidence("external-import").unwrap();
+    assert_eq!(
+        candidate.status,
+        zenpi::domain_execution::EvidenceStatus::Candidate
+    );
+    assert_eq!(
+        candidate
+            .candidate
+            .as_ref()
+            .unwrap()
+            .declaration
+            .acceptance_evidence,
+        vec!["cargo test --all-targets: passed"]
+    );
+    assert_eq!(store.receipts()[0].evidence, "external result pending");
+    assert_eq!(
+        store
+            .import_external_manifest(&manifest_path, &blueprint.digest)
+            .unwrap(),
+        zenpi::domain_execution::ExecutionStoreChange::Unchanged
+    );
+}
+
+#[test]
+fn external_manifest_cannot_promote_failed_local_receipt() {
+    let dir = tempdir().unwrap();
+    let execution_path = dir.path().join("execution.json");
+    let manifest_path = dir.path().join("result.json");
+    let (blueprint, goal) = fixture();
+    let item = &blueprint.items[0];
+    let mut store = ExecutionStore::open(&execution_path).unwrap();
+    store
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "failed-external".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: item.id.clone(),
+            attempt: 1,
+            status: ExecutionStatus::Failed,
+            cost: deterministic_cost(item),
+            evidence: "local failure".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
+            error: Some("failed".into()),
+        })
+        .unwrap();
+    let claim_digest = {
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(b"zenpi-blueprint-claim-v1\0");
+        for part in [
+            goal.id.as_str(),
+            blueprint.digest.as_str(),
+            item.id.as_str(),
+        ] {
+            hasher.update(part.as_bytes());
+            hasher.update([0]);
+        }
+        hasher.update(1u32.to_be_bytes());
+        format!("{:x}", hasher.finalize())
+    };
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec(&ExternalResultManifest {
+            execution_id: "failed-external".into(),
+            claim_digest,
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: item.id.clone(),
+            status: ExecutionStatus::Succeeded,
+            acceptance_passed: true,
+            acceptance_evidence: vec!["external check passed".into()],
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(
+        store
+            .import_external_manifest(&manifest_path, &blueprint.digest)
+            .is_err()
+    );
+    assert!(!store.receipts()[0].external_work_executed);
+}
+
+#[test]
+fn goal_cancellation_marks_running_external_attempt_terminal() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("execution.json");
+    let (blueprint, goal) = fixture();
+    let item = &blueprint.items[0];
+    let mut store = ExecutionStore::open(&path).unwrap();
+    store
+        .upsert_receipt(ExecutionReceipt {
+            execution_id: "cancel-running".into(),
+            goal_id: goal.id.clone(),
+            blueprint_id: blueprint.id.clone(),
+            blueprint_version: blueprint.version.clone(),
+            blueprint_digest: blueprint.digest.clone(),
+            item_id: item.id.clone(),
+            attempt: 1,
+            status: ExecutionStatus::Running,
+            cost: deterministic_cost(item),
+            evidence: "external_owner_pending external_work_executed=false".into(),
+            external_work_executed: false,
+            manifest_checksum: None,
+            error: None,
+        })
+        .unwrap();
+    assert_eq!(
+        store.cancel_running_for_goal(&goal.id).unwrap(),
+        zenpi::domain_execution::ExecutionStoreChange::Updated
+    );
+    assert_eq!(store.receipts()[0].status, ExecutionStatus::Cancelled);
+    assert_eq!(
+        store.cancel_running_for_goal(&goal.id).unwrap(),
+        zenpi::domain_execution::ExecutionStoreChange::Unchanged
+    );
 }

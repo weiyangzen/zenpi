@@ -1,0 +1,12 @@
+fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
+    match options.backend.as_str() {
+        "echo" if options.backend_explicit && cfg!(feature = "dev-fixtures") => {
+            Ok(Box::new(EchoBackend))
+        }
+        "echo" => Err(ZenpiError::arguments(
+            "echo is a test fixture; rebuild with --features dev-fixtures and pass --backend echo",
+        )),
+        "openai" | "anthropic" | "google" => {
+            let effective = crate::config::resolve_workspace(
+                &crate::config::ConfigOverrides {
+                    profile: options.profile.clone(),

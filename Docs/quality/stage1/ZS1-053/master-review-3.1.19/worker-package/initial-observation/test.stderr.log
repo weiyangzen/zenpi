@@ -1,0 +1,19 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  directory.test.ts > D053-02 real rg regex literal ignore hidden and context behavior stays distinct from file discovery
+AssertionError: expected 'kept.txt:2: alpha1\nignored.txt:1: al…' not to contain 'ignored.txt'
+
+- Expected
++ Received
+
+- ignored.txt
++ kept.txt:2: alpha1
++ ignored.txt:1: alpha3
++ .hidden.txt:1: alpha2
+
+ ❯ directory.test.ts:34:206
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

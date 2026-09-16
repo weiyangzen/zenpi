@@ -1,0 +1,7 @@
+# ZS1-089 complete workflow review [_]
+
+Currentandoriginal77lines2480B SHA5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6 exactmatch. Fullfileandall16orderedsteps reviewed;reportdidnotexistlocal/main. Authority3.1.16;116integrated/122scratchonly attribution. Scriptcontextincludesentryavailability/hash andboundedinspectedexcerpts, notfullsiblingreview. Workflowstillnamesv1/v2validators and no explicitcurrentstage1checker. Job/toolchain/OS/action/feature/defaultshell/cancel/upload/fixtureandproductionpackage boundaries explicit.
+
+Three actual local shell-gate cases: cleanpass,forbidden-namefail,checksum-matchingmalformedarchivewronglypasses. Exactcapturedlines76–77,actualbash/tar/grep/shasum,no mockedexitcodes,noGitHub/Linuxrun,no release.sh invocation. Counterexample reportedtomainbeforefix;nocode/workflowfixinpackage. Originalprobe script references recorded .ops/target089-base/current-ci.yml; identicalinput includedhereascurrent-ci.yml. HOME/CODEX_HOME preserved. OtherlegacyCI smoke scripts changeHOME/removeCODEX_HOME;notrunbythisreview. Onlythissmallgateprobe executed;historicalRust/budgetevidence isnotCIpass.
+
+Integritychecks fullrange/sourcebaseline/steps/scriptentrycontext/referencehash andactualreceipt. OfficialGitHubsyntaxURL checkedforunspecifiedbash-e semantics;donotassumepipefail. G-STAGEseparateread-only check/missingmaster isnotacceptance. Mainaloneaccepts. Reverse removesnewreport/new089evidence;unchangedworkflow/source/sharedmain/frozenpackages retained.

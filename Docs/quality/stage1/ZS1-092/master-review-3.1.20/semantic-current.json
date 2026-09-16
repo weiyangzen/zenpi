@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "key": "ZS1-092",
+  "captured_at": "2026-09-12T14:06:00.296713+00:00",
+  "children_accepted": [
+    "ZS1-089"
+  ],
+  "physical_entries": [
+    "ci.yml",
+    "release.yml"
+  ],
+  "formal_files": [
+    "ZS1-089"
+  ],
+  "formal_directories": [],
+  "old_report_prefix_bytes": 11196,
+  "old_report_prefix_unchanged": true,
+  "current_report_sha256": "509c37c5de87f730f2ff4d98ce8e9089d40d8dd22e79398d84d4974ff9290171",
+  "report_patch_operations": [
+    {
+      "flags": [
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "flags": [],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "flags": [
+        "--reverse",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "flags": [
+        "--reverse"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "new_behavior_runs": 0
+}

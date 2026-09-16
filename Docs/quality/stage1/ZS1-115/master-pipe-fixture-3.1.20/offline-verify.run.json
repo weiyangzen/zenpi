@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    ".ops/stage1_execution/extension-fixture-integration/worker-evidence/verify.py"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T12:27:41.458395+00:00",
+  "elapsed_seconds": 0.139159792,
+  "exit_code": 0,
+  "log_sha256": "52ae5d9742e59e8fc2a94fd07fef6a2cdc521694780dcfbaeccd1ed98ddbe82b",
+  "log_bytes": 557
+}

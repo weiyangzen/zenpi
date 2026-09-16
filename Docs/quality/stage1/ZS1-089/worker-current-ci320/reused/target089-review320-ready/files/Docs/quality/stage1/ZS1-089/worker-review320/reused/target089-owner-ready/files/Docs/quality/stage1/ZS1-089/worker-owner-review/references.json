@@ -1,0 +1,26 @@
+[
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/extension115-native-fixture-ready/manifest.json",
+    "bytes": 12679,
+    "sha256": "5310564998d526a927cba97d6e4853edf4319043bf61978896ac0f2682977a78",
+    "scope": "Local17case/lint evidence only; noUbuntuCIclaim"
+  },
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/extension115-pipe-ready/manifest.json",
+    "bytes": 24758,
+    "sha256": "7e2157de5a1fece65b1aba807a0aadb4788e433004b54ff65b75d59b95b60856",
+    "scope": "Historical8budgetgate localreceipt context"
+  },
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/extension115-pipe-ready/files/Docs/quality/stage1/ZS1-115/worker-pipe-deadline/final-summary.json",
+    "bytes": 4395,
+    "sha256": "16e920eb9aa7808fd6f6da9d106f7532ed172d508366a1a5820510760de6495b",
+    "scope": "Budgetcaps/results with originalscope"
+  },
+  {
+    "path": "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/.ops/target088-owner-ready/manifest.json",
+    "bytes": 8872,
+    "sha256": "fb1f67bc9fd57b649ebd9e2d7bdda563466ec669fdf856ba9a69eada7c0fa5ba",
+    "scope": "Preceding088independentfreeze"
+  }
+]

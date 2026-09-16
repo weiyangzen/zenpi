@@ -1,0 +1,12 @@
+[
+  {
+    "packet": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/source025-ready",
+    "manifest_sha256": "58a752dac6819680c143981e99999fe72dc0feab3434ac01aa56fb2dfc371691",
+    "rerun": false
+  },
+  {
+    "packet": "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/source027-ready",
+    "manifest_sha256": "1141df1b9aa6c1864763979b2f02ba753e6ba53b6f121c82dd5eddb6ce88431a",
+    "rerun": false
+  }
+]

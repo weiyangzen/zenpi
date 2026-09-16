@@ -1,0 +1,87 @@
+[
+  {
+    "argv": [
+      "python3",
+      "tools/stage1_host_smoke.py",
+      "--binary",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+      "--case",
+      "project-checkpoints",
+      "--report-dir",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-project-checkpoints"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T15:16:54.373484+00:00",
+    "ended_at": "2026-09-12T15:17:03.416265+00:00",
+    "exit_code": 0,
+    "log_sha256": "48f61ba22377e4f96cb413d9406b869670382faa6e67bd1a589714eadb755726"
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/stage1_host_smoke.py",
+      "--binary",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+      "--case",
+      "tui-session-resume",
+      "--report-dir",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-tui-session-resume"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T15:17:03.417227+00:00",
+    "ended_at": "2026-09-12T15:17:18.501960+00:00",
+    "exit_code": 0,
+    "log_sha256": "233130713bd4c336084d5369d3d32f80c98a6a712a4904810177074b7b787ef7"
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/stage1_host_smoke.py",
+      "--binary",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+      "--case",
+      "commands",
+      "--report-dir",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-commands"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T15:17:18.502757+00:00",
+    "ended_at": "2026-09-12T15:17:50.391029+00:00",
+    "exit_code": 0,
+    "log_sha256": "13567217ebdc13adf009de6103f98c0a9b190dab3e73579b73c3249e2bfab025"
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/stage1_host_smoke.py",
+      "--binary",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+      "--case",
+      "approval",
+      "--report-dir",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-approval"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T15:17:50.391711+00:00",
+    "ended_at": "2026-09-12T15:18:03.415942+00:00",
+    "exit_code": 0,
+    "log_sha256": "5533261f928c07e4d2fd7363310b45d9e94d01421026930b9e6e2b9108291f69"
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/stage1_host_smoke.py",
+      "--binary",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/zenpi",
+      "--case",
+      "transcript",
+      "--report-dir",
+      "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/release-diff-20260912/remaining-transcript"
+    ],
+    "cwd": "/Users/wangweiyang/GitHub/zenpi",
+    "started_at": "2026-09-12T15:18:03.417336+00:00",
+    "ended_at": "2026-09-12T15:18:10.822092+00:00",
+    "exit_code": 0,
+    "log_sha256": "78f308c56cbac2d35b4392707a6170972f50d921f3389acab7866e3f629d3514"
+  }
+]

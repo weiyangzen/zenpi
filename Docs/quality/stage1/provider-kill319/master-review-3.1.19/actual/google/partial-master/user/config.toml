@@ -1,0 +1,4 @@
+backend='google'
+base_url='http://127.0.0.1:56596'
+model='gemini-2.5-flash'
+model_reasoning_effort='high'

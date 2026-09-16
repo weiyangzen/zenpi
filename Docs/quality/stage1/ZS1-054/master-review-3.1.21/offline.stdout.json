@@ -1,0 +1,208 @@
+{
+  "schema_version": "zs1-054-offline-review/v1",
+  "root": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/harness054-current-3.1.21/worker",
+  "passed": true,
+  "checks": [
+    {
+      "name": "historical054 manifest identity",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "59 historical payloads and exact60-file set",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "27 historical source copies and live identities",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "12 direct files and7 direct directories",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all direct file identities current",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory compaction",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory env",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory execution",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory runtime",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory session",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory tools",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "physical next-level inventory utils",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no frozen direct files and exactly050051 children",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "accepted receipt050",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact identities050",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "accepted receipt051",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact identities051",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "accepted receipt013",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "artifact identities013",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "child leaf closure",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "012 full-read chain exact via050 archive",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "three target context identities reused from accepted050",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "050 canonical exact previous report plus master appendix",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "12 necessary upstream context identities current",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical context excerpt structural.ts",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "historical context excerpt agent-harness.ts",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "only fixture representation assertion changed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "saved fixture patch exact",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "initial3pass1fail and corrected4pass",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "initial failure onlyD05403",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "initial observation subset equals final",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "four actual boundary observations",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "requirement baseline version binding unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "050051054057061 scoped records unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "4737 older ready files unchanged",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "only054 candidate and old report verbatim",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready payload identities",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ready exact artifact set",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "candidate": {
+    "bytes": 22916,
+    "sha256": "d6ed82e57d1984d6061c49546ed5de7e9639d241ab12d788f9b171348d2e4295"
+  },
+  "runtime_executions_this_round": 0,
+  "scope_note": "Local054 consistency audit only. Unrelated global checkbox/Gantt drift does not fail this directory; relevant item records, leaf chains and actual source/context identities remain checked. Global G-STAGE policy unchanged.",
+  "authority_observation": {
+    "captured_snapshot": "2bb12c5f41ba8b290fb0a6f74cac1a98bab8faa095775f2463991e58003b246d",
+    "final_captured_snapshot": "2bb12c5f41ba8b290fb0a6f74cac1a98bab8faa095775f2463991e58003b246d",
+    "live_snapshot_at_audit": "f6051bcd7a92627bc410d7ac9c0197adfc8501d5bbe6c7cbb9a82fc605e82eff"
+  }
+}

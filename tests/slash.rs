@@ -17,6 +17,14 @@ fn core_slash_commands_parse_to_typed_values() {
         })
     );
     assert_eq!(parse("/models").unwrap(), Some(SlashCommand::Models));
+    assert_eq!(
+        parse("/session search mailbox").unwrap(),
+        Some(SlashCommand::Session {
+            action: SessionAction::Search {
+                query: "mailbox".into()
+            }
+        })
+    );
     assert_eq!(parse("/doctor").unwrap(), Some(SlashCommand::Doctor));
     assert_eq!(
         parse("/blueprint validate \"Docs/Blueprint v2.md\"").unwrap(),
@@ -27,12 +35,45 @@ fn core_slash_commands_parse_to_typed_values() {
         })
     );
     assert_eq!(
+        parse("/blueprint import plan@v1 result.json").unwrap(),
+        Some(SlashCommand::Blueprint {
+            action: BlueprintAction::Import {
+                target: "plan@v1".into(),
+                path: "result.json".into(),
+            },
+        })
+    );
+    assert_eq!(
+        parse("/blueprint handoffs").unwrap(),
+        Some(SlashCommand::Blueprint {
+            action: BlueprintAction::Handoffs,
+        })
+    );
+    assert_eq!(
         parse("/learn src/core.rs").unwrap(),
         Some(SlashCommand::Learn {
             target: Some("src/core.rs".into()),
         })
     );
     assert!(parse("/goal ship it").unwrap().unwrap().is_first_class());
+    assert_eq!(
+        parse("/goal cancel goal-1").unwrap(),
+        Some(SlashCommand::Goal {
+            instruction: "cancel goal-1".into(),
+        })
+    );
+    assert_eq!(
+        parse("/goal resume goal-1").unwrap(),
+        Some(SlashCommand::Goal {
+            instruction: "resume goal-1".into(),
+        })
+    );
+    assert_eq!(
+        parse("/goal run goal-1").unwrap(),
+        Some(SlashCommand::Goal {
+            instruction: "run goal-1".into(),
+        })
+    );
     assert!(!parse("/status").unwrap().unwrap().is_first_class());
     assert_eq!(
         parse("/yolo").unwrap(),
@@ -171,7 +212,11 @@ fn history_default_and_completion_are_bounded() {
     assert_eq!(complete("/go"), vec!["goal"]);
     assert!(complete("/").contains(&"blueprint"));
     assert_eq!(spec("/BP").map(|entry| entry.name), Some("blueprint"));
-    assert!(help(None).unwrap().contains("/goal <instruction>"));
+    assert!(
+        help(None)
+            .unwrap()
+            .contains("/goal [show|list|status|run|resume|cancel")
+    );
     assert!(help(Some("loop")).unwrap().contains("b3ehive runtime"));
     assert!(help(Some("missing")).is_none());
     assert!(help(Some("doctor")).unwrap().contains("redacted"));
@@ -421,6 +466,41 @@ fn local_dispatch_updates_view_without_creating_a_turn() {
 }
 
 #[test]
+fn tui_mailbox_receive_labels_correlated_replies() {
+    use zenpi::session::SessionMailbox;
+    let dir = tempdir().unwrap();
+    let sender = SessionStore::open(dir.path().join("sender.jsonl")).unwrap();
+    let recipient = SessionStore::open(dir.path().join("recipient.jsonl")).unwrap();
+    let mailbox = SessionMailbox::open(sender.path()).unwrap();
+    mailbox
+        .enqueue(
+            &recipient,
+            "reply-1",
+            serde_json::json!({"in_reply_to":"request-1","succeeded":true,"result":{"ok":true}}),
+            1000,
+            1,
+        )
+        .unwrap();
+    let mut agent = Agent::with_echo(sender);
+    let mut state = TuiState::default();
+    dispatch_slash_command(
+        SlashCommand::Mailbox {
+            action: zenpi::slash::MailboxAction::List {
+                after_sequence: 0,
+                limit: 10,
+            },
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(
+        state
+            .messages()
+            .any(|message| message.text.contains("correlated result received"))
+    );
+}
+
+#[test]
 fn dispatch_cancel_and_exit_are_control_actions() {
     let mut state = TuiState::default();
     assert_eq!(
@@ -520,9 +600,7 @@ fn approval_slash_commands_mutate_configured_agent_policy() {
     let directory = tempdir().unwrap();
     let active = SessionStore::open(directory.path().join("active.jsonl")).unwrap();
     let mut agent = Agent::with_echo(active);
-    agent.set_attachment_workspace(
-        zenpi::tools::ToolContext::new(directory.path().to_path_buf()).unwrap(),
-    );
+    agent.set_attachment_workspace(zenpi::tools::ToolContext::new(directory.path()).unwrap());
     let mut state = TuiState::default();
     dispatch_slash_command(
         SlashCommand::Yolo { enabled: true },

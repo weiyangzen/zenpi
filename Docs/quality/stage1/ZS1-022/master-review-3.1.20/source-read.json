@@ -1,0 +1,43 @@
+{
+  "path": "/Users/wangweiyang/GitHub/pi-mono/packages/coding-agent/src/core/extensions/types.ts",
+  "sha256": "96e20f8038027f0b0172f311b6b9d9ddf42123b2f5b2a018f533af026fd3371e",
+  "bytes": 63623,
+  "lines": 1797,
+  "complete_root_read_lines": [
+    [
+      1,
+      450
+    ],
+    [
+      451,
+      900
+    ],
+    [
+      901,
+      1350
+    ],
+    [
+      1351,
+      1797
+    ]
+  ],
+  "read_ranges": [
+    [
+      0,
+      16483
+    ],
+    [
+      16483,
+      31020
+    ],
+    [
+      31020,
+      46547
+    ],
+    [
+      46547,
+      63623
+    ]
+  ],
+  "note": "Root full source read, report1-70 preceding turn and71-183 this turn; bounded caller fragments only."
+}

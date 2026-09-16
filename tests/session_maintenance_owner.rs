@@ -206,6 +206,27 @@ fn session_maintenance_rejects_overwrite_traversal_and_invalid_sources() {
 }
 
 #[test]
+fn session_maintenance_refuses_export_with_reconnect_sidecar() {
+    let directory = tempdir().unwrap();
+    let source_path = directory.path().join("source.jsonl");
+    seed_session(&source_path);
+    // A reconnect WAL is a transport-owned sidecar and cannot be copied to a
+    // new session because it is bound to the source session identity.
+    fs::write(
+        format!("{}.reconnect", source_path.display()),
+        b"transport-owner-marker\n",
+    )
+    .unwrap();
+    let error = session_maintenance_view(&SessionAction::Export {
+        source: source_path.display().to_string(),
+        destination: directory.path().join("export.jsonl").display().to_string(),
+    })
+    .unwrap_err();
+    assert!(error.contains("active reconnect WAL"));
+    assert!(!directory.path().join("export.jsonl").exists());
+}
+
+#[test]
 fn headless_and_tui_dispatch_execute_typed_session_maintenance_locally() {
     let directory = tempdir().unwrap();
     let source_path = directory.path().join("source.jsonl");

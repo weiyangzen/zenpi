@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/tui-key-dispatch-integration-3.1.21/root_pty_witness.py",
+    "before"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T23:39:55.266340+00:00",
+  "ended_at": "2026-09-12T23:40:00.420904+00:00",
+  "exit_code": 0,
+  "log": {
+    "bytes": 1129,
+    "sha256": "a62e57d99c03cef2de0ee54c263f5c3091011e3e28ea1d7a8bc6705cb3bde361"
+  }
+}

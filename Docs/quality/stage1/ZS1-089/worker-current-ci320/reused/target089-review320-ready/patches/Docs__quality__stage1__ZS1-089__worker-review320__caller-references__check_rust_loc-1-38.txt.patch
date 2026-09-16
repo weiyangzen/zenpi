@@ -1,0 +1,43 @@
+diff --git a/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_rust_loc-1-38.txt b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_rust_loc-1-38.txt
+new file mode 100644
+--- /dev/null
++++ b/Docs/quality/stage1/ZS1-089/worker-review320/caller-references/check_rust_loc-1-38.txt
+@@ -0,0 +1,38 @@
++#!/usr/bin/env python3
++"""Report zenpi's physical Rust source line inventory.
++
++The checker deliberately counts physical lines, rather than attempting to
++classify comments, whitespace, or generated-looking source.  This makes the
++budget deterministic and cheap to run in a clean checkout.  Only ``.rs``
++files below the four source roots are considered:
++
++    src/ tests/ examples/ benches/
++
++Vendored subdirectories are excluded even when nested below one of those
++roots.  Build output remains excluded because it is outside the source roots.
++
++The report is informational by default. An optional ``--max-lines`` argument
++can apply an ad-hoc aggregate limit, but the execution Blueprint's acceptance
++rule is per-item ``Estimated LOC < 5000`` and is checked by
++``validate_blueprint.py``. The human-readable form is intended for local use;
++``--json`` is suitable for CI and evidence records.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import sys
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Iterable
++
++
++DEFAULT_LIMIT: int | None = None
++SOURCE_ROOTS = ("src", "tests", "examples", "benches")
++EXCLUDED_DIRECTORIES = {"target", "vendor", "vendored"}
++EXIT_OK = 0
++EXIT_EXCEEDED = 1
++EXIT_USAGE = 2
++

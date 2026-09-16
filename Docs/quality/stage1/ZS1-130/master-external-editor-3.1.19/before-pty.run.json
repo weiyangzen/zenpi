@@ -1,0 +1,29 @@
+{
+  "name": "before-pty",
+  "argv": [
+    "env",
+    "PYTHONPATH=/Users/wangweiyang/GitHub/zenpi/tools",
+    "python3",
+    ".ops/stage1_execution/external-editor-integration/frozen-input/final/tools/tui_external_editor_smoke.py",
+    "--binary",
+    ".ops/stage1_execution/external-editor-integration/bin/before",
+    "--before",
+    "--evidence",
+    ".ops/stage1_execution/external-editor-integration/actual-before.json"
+  ],
+  "cwd": "/Users/wangweiyang/GitHub/zenpi",
+  "started_at": "2026-09-12T05:46:44.275713+00:00",
+  "ended_at": "2026-09-12T05:46:46.396579+00:00",
+  "elapsed_seconds": 2.120699417,
+  "exit_code": 0,
+  "environment_overrides": {
+    "RUSTUP_TOOLCHAIN": "stable-aarch64-apple-darwin"
+  },
+  "HOME_preserved": true,
+  "CODEX_HOME_preserved": true,
+  "maxrss_command_tree_observed": 28966912,
+  "maxrss_note": "macOS bytes; build/tool tree, not product-only runtime",
+  "output": "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/external-editor-integration/before-pty.log",
+  "bytes": 507,
+  "sha256": "95cdf144143f2428b00bb58b80c56abe35ef9bf76dab03a67d2a9af33ab7c5ab"
+}

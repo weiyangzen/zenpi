@@ -1,0 +1,36 @@
+from pathlib import Path
+import datetime,hashlib,json,os,shutil,subprocess
+R=Path(__file__).resolve().parents[3];D=Path(__file__).resolve().parent;W=D/'worker'
+def meta(p):
+ b=p.read_bytes();return dict(bytes=len(b),sha256=hashlib.sha256(b).hexdigest())
+def dump(p,x):p.write_text(json.dumps(x,ensure_ascii=False,indent=2)+'\n')
+expected={x['path']:{k:x[k] for k in ['bytes','sha256']} for x in json.loads((W/'initial-inputs.json').read_text())['files']}
+def audit(label):
+ actual={p:meta(R/p) for p in expected};dump(D/(label+'-inputs.json'),actual);assert actual==expected,'main input drift'
+def run(name,args,code=0):
+ assert not (D/(name+'.run.json')).exists();audit(name+'-before')
+ env=os.environ.copy();env['CARGO_BUILD_JOBS']='2';env['CARGO_TARGET_DIR']=str(R/'target');env['PYTHONDONTWRITEBYTECODE']='1'
+ start=datetime.datetime.now(datetime.timezone.utc).isoformat()
+ with (D/(name+'.log')).open('xb') as log:p=subprocess.run(args,cwd=R,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=600)
+ dump(D/(name+'.run.json'),dict(argv=args,cwd=str(R),env_overrides={k:env[k] for k in ['CARGO_BUILD_JOBS','CARGO_TARGET_DIR','PYTHONDONTWRITEBYTECODE']},started_at=start,ended_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),exit_code=p.returncode,log=meta(D/(name+'.log'))))
+ print(name,p.returncode,flush=True);audit(name+'-after');assert p.returncode==code,name
+CARGO=['cargo','+stable-aarch64-apple-darwin'];assert not (D/'binaries').exists();audit('initial');(D/'binaries').mkdir()
+run('before-build',CARGO+['build','--locked','--offline','--bin','zenpi']);shutil.copy2(R/'target/debug/zenpi',D/'binaries/before-zenpi')
+test='tests/tui_command_palette.rs';product='src/tui.rs'
+assert (R/test).read_bytes()==(W/'before'/test).read_bytes()
+(R/test).write_bytes((W/'before/regression-tests.rs').read_bytes());expected[test]=meta(R/test)
+run('before-negative',CARGO+['test','--locked','--offline','--test','tui_command_palette','file_completion_'],101)
+assert '1 passed; 2 failed;' in (D/'before-negative.log').read_text()
+assert (R/product).read_bytes()==(W/'before'/product).read_bytes()
+(R/product).write_bytes((W/'project'/product).read_bytes());expected[product]=meta(R/product)
+(R/test).write_bytes((D/'root-candidate'/test).read_bytes());expected[test]=meta(R/test)
+run('worker-short-terminal-negative',CARGO+['test','--locked','--offline','--test','tui_command_palette','file_completion_partial_menu_keeps_candidates_in_short_terminals'],101)
+assert '0 passed; 1 failed;' in (D/'worker-short-terminal-negative.log').read_text()
+(R/product).write_bytes((D/'root-candidate'/product).read_bytes());expected[product]=meta(R/product)
+run('root-targeted',CARGO+['test','--locked','--offline','--lib','--test','tui_command_palette','file_completion_'])
+suites=['tui_composer','tui_bentobox','layout','layout_persistence','tui_project_workspace','project_workspace','tui_interaction','tui_command_palette','tui_approval_focus','tui_busy_diff']
+run('after-regression',CARGO+['test','--locked','--offline']+sum((['--test',t] for t in suites),[]))
+run('owned-format',['rustup','run','stable-aarch64-apple-darwin','rustfmt','--edition','2024','--check',product,test])
+run('after-build',CARGO+['build','--locked','--offline','--bin','zenpi']);shutil.copy2(R/'target/debug/zenpi',D/'binaries/after-zenpi')
+dump(D/'integration-result.json',dict(product_changes={p:meta(R/p) for p in [product,test]},binaries={p.name:meta(p) for p in (D/'binaries').iterdir()},passed=True,scope='File completion status plus short-terminal candidate visibility; no full123/release/budget acceptance.'))
+print('integration complete',flush=True)

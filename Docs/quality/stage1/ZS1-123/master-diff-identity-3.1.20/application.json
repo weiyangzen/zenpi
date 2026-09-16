@@ -1,0 +1,37 @@
+{
+  "operations": [
+    {
+      "patch": "C-product.patch",
+      "flags": [
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "patch": "C-product.patch",
+      "flags": [],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "patch": "followup.patch",
+      "flags": [
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "patch": "followup.patch",
+      "flags": [],
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "changed": [
+    "src/slash_actions.rs"
+  ],
+  "other_inputs_unchanged": 179,
+  "source_after": "811bde9af190b2e439542c0a89dd8e8a1f76bbcf8eb6aa3ad3b16143447ec30b"
+}

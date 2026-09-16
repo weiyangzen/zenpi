@@ -1,0 +1,1 @@
+Only drift is one Gantt REPAIRS123 label/evidence path reflecting prior root diff integration. Exact diff fully inspected; it is not a Cargo input or runtime owner. All other222 captured inputs matched, including exact811b current owner. Preparation verifier0 and exact product patch applied once; all222 other current captured inputs unchanged. No Cargo ran in failed attempt0.

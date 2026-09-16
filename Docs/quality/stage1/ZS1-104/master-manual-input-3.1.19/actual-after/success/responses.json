@@ -1,0 +1,124 @@
+[
+  {
+    "event": {
+      "queued": false,
+      "runtime_job_id": 1,
+      "type": "request_accepted"
+    },
+    "project": {
+      "cwd": "/Users/wangweiyang/GitHub/zenpi",
+      "project_id": "6ba5afa13735038f9d2edc7d4bd117b9d764a304c33a317748f11c4f753bc139",
+      "session_id": "session-1789189339934-52695-13"
+    },
+    "request_id": "compact",
+    "schema_version": 2,
+    "sequence": 0,
+    "type": "event"
+  },
+  {
+    "event": {
+      "runtime_job_id": 1,
+      "type": "request_started"
+    },
+    "project": {
+      "cwd": "/Users/wangweiyang/GitHub/zenpi",
+      "project_id": "6ba5afa13735038f9d2edc7d4bd117b9d764a304c33a317748f11c4f753bc139",
+      "session_id": "session-1789189339934-52695-13"
+    },
+    "request_id": "compact",
+    "schema_version": 2,
+    "sequence": 1,
+    "type": "event"
+  },
+  {
+    "code": "ok",
+    "command": "input_queue",
+    "data": {
+      "duplicate": false,
+      "input": {
+        "applied_parent_id": null,
+        "applied_turn_id": null,
+        "id": "during-manual-summary",
+        "kind": "steer",
+        "revision": 0,
+        "sequence": 0,
+        "status": "received",
+        "submitted_sha256": "ca2a35f5ad4c039a5b5460d5f12fffe479c3cbd13f55498a3887b747276028ed",
+        "text": "keep after cancellation"
+      },
+      "result": "input"
+    },
+    "id": "queue",
+    "project": {
+      "cwd": "/Users/wangweiyang/GitHub/zenpi",
+      "project_id": "6ba5afa13735038f9d2edc7d4bd117b9d764a304c33a317748f11c4f753bc139",
+      "session_id": "session-1789189339934-52695-13"
+    },
+    "schema_version": 2,
+    "success": true,
+    "type": "response"
+  },
+  {
+    "code": "ok",
+    "command": "compact",
+    "data": {
+      "accepted": true,
+      "already_recorded": false,
+      "checkpoint": null,
+      "command": "compact",
+      "compacted": true,
+      "durable": true,
+      "estimated_tokens_after": 1839,
+      "estimated_tokens_before": 3445,
+      "marker_sequence": 24,
+      "next_sequence": 25,
+      "prepared_turns": 6,
+      "route": "local",
+      "semantic_checkpoint": {
+        "covered_sha256": "c911fc0f4ddb4ac86a047a21f0f9bdb23821843380bd1350db0203b134e9bfd3",
+        "modified_files": [
+          "output.txt"
+        ],
+        "read_files": [
+          "约束.txt"
+        ],
+        "retained_ids": [
+          "old-5",
+          "old-6",
+          "old-7",
+          "old-8",
+          "old-9"
+        ],
+        "schema_version": 2,
+        "source": {
+          "branch_id": "linear",
+          "records": 13,
+          "session_id": "session-1789189339934-52695-13",
+          "sha256": "b1d724a4d39c7ff42a6e3e12723364a029fa7c6ad05015a31139996632ef3d5a",
+          "tip_id": "old-9"
+        },
+        "source_end": 8,
+        "summary": "{\"goals\":[\"Improve project tabs\"],\"constraints\":[\"Keep BentoBox and Unicode paths\"],\"decisions\":[\"Use the existing owner\"],\"progress\":[\"Read constraints and wrote output\"],\"pending_tasks\":[\"verify restart\"],\"critical_facts\":[\"No unknown tool outcome is completed\"],\"read_files\":[\"约束.txt\"],\"modified_files\":[\"output.txt\"],\"unresolved_tools\":[]}",
+        "summary_model": "summary-test",
+        "summary_provider": "fixture",
+        "summary_sha256": "6cc7ceb49d56210fefb5529c5c4df3ab65fe4ec8f48cfc1f796f88b56d152a10",
+        "summary_usage": {
+          "input_tokens": 210,
+          "output_tokens": 130,
+          "total_tokens": 340
+        },
+        "unresolved_calls": []
+      },
+      "source_turns": 13
+    },
+    "id": "compact",
+    "project": {
+      "cwd": "/Users/wangweiyang/GitHub/zenpi",
+      "project_id": "6ba5afa13735038f9d2edc7d4bd117b9d764a304c33a317748f11c4f753bc139",
+      "session_id": "session-1789189339934-52695-13"
+    },
+    "schema_version": 2,
+    "success": true,
+    "type": "response"
+  }
+]
