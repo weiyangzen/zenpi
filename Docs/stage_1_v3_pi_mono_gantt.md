@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-17T15:29:10+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-17T15:31:24+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `9805b51841f92ac26e1022b733ef28dc786d02ce23739e5fbac47e1a0484ec21`
-- 生成时间：2026-09-17T15:29:10+08:00
+- blueprint digest: `8642a466ad5b6c40d0c67e4a40276e2e769ce234b94bf7ec894e31e45f8f4c6f`
+- 生成时间：2026-09-17T15:31:24+08:00
 
-清单项 `[x]` **128/129** · `[_]` **0** · `[ ]` **1**。按清单项计数，不是代码完成率。
+清单项 `[x]` **129/129** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -17,7 +17,7 @@
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
 | L3 | 35 | 35 | 0 | 0 |
-| L5 | 2 | 1 | 0 | 1 |
+| L5 | 2 | 2 | 0 | 0 |
 | L6 | 1 | 1 | 0 | 0 |
 
 ## 依赖层级 Gantt
@@ -159,7 +159,7 @@ gantt
     ZS1-128 Codex交互矩阵与BentoBox完整回归 :done, ZS1-128, 15, 1s
     section L5
     ZS1-117 生产入口、边界故障与轻量预算验收 :done, ZS1-117, 14, 1s
-    ZS1-143 Runtime 3 用例验收：/blueprint /execute /lear :ZS1-143, 15, 1s
+    ZS1-143 Runtime 3 用例验收：/blueprint /execute /lear :done, ZS1-143, 15, 1s
     section L6
     ZS1-199 Master 集成验收与阶段交付 :done, ZS1-199, 16, 1s
 ```
@@ -266,7 +266,7 @@ gantt
 | ZS1-140 | [x] | L3 | ZS1-121 | — | TUI 一层 project tab：增/减/调位置/重命名/每项目风格 |
 | ZS1-141 | [x] | L3 | ZS1-140 | — | 一层 tab 增加工作文件夹支持本地与 SSH 远端 |
 | ZS1-142 | [x] | L3 | ZS1-140 | — | TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号单击新建、长按双 logo） |
-| ZS1-143 | [·] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | — | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
+| ZS1-143 | [x] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | — | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
 | ZS1-144 | [x] | L3 | ZS1-119 | — | 命令补齐：/execute /explore /addloop 的语义与实现 |
 | ZS1-145 | [x] | L3 | ZS1-140 | — | TUI 区域补齐：arch 架构区与 execution 执行区（BentoBox 可调） |
 | ZS1-199 | [x] | L6 | ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | — | Master 集成验收与阶段交付 |
