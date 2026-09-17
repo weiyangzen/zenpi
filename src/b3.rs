@@ -1086,6 +1086,8 @@ impl ResourceLease {
 pub enum RuntimeIntentKind {
     Compete,
     Loop,
+    Execute,
+    Explore,
 }
 
 impl RuntimeIntentKind {
@@ -1093,6 +1095,8 @@ impl RuntimeIntentKind {
         match self {
             Self::Compete => "compete",
             Self::Loop => "loop",
+            Self::Execute => "execute",
+            Self::Explore => "explore",
         }
     }
 }

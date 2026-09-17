@@ -190,6 +190,15 @@ pub enum SlashCommand {
     Sync {
         requirement: String,
     },
+    /// Dispatch one bounded Blueprint/domain execution target to the external
+    /// execution owner.
+    Execute {
+        args: Vec<String>,
+    },
+    /// Dispatch an automatic research loop to the external owner.
+    Explore {
+        args: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -385,7 +394,11 @@ impl SlashCommand {
     /// Return the routing boundary for this command.
     pub const fn route(&self) -> SlashRoute {
         match self {
-            Self::Compete { .. } | Self::Loop { .. } | Self::Sync { .. } => SlashRoute::Runtime,
+            Self::Compete { .. }
+            | Self::Loop { .. }
+            | Self::Sync { .. }
+            | Self::Execute { .. }
+            | Self::Explore { .. } => SlashRoute::Runtime,
             _ => SlashRoute::Local,
         }
     }
@@ -432,6 +445,8 @@ impl SlashCommand {
             Self::Compete { .. } => "compete",
             Self::Loop { .. } => "loop",
             Self::Sync { .. } => "sync",
+            Self::Execute { .. } => "execute",
+            Self::Explore { .. } => "explore",
         }
     }
 
@@ -461,6 +476,8 @@ impl SlashCommand {
                 | Self::Mailbox { .. }
                 | Self::Recovery { .. }
                 | Self::Sync { .. }
+                | Self::Execute { .. }
+                | Self::Explore { .. }
                 | Self::Project { .. }
         )
     }
@@ -711,9 +728,9 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
     },
     SlashCommandSpec {
         name: "loop",
-        aliases: NO_ALIASES,
+        aliases: &["addloop"],
         route: SlashRoute::Runtime,
-        usage: "/loop [start] <task...> | /loop status",
+        usage: "/loop (/addloop) [start] <task...> | /loop status",
         summary: "persist a bounded request for an external loop owner",
     },
     SlashCommandSpec {
@@ -722,6 +739,20 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Runtime,
         usage: "/sync <requirement...>",
         summary: "sync a requirement into the single-authority blueprint and queue its execution",
+    },
+    SlashCommandSpec {
+        name: "execute",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Runtime,
+        usage: "/execute [start] <blueprint-target...> | /execute status",
+        summary: "dispatch a bounded Blueprint/domain execution target to an external owner",
+    },
+    SlashCommandSpec {
+        name: "explore",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Runtime,
+        usage: "/explore [start] <research-question...> | /explore status",
+        summary: "dispatch an automatic research loop to an external owner",
     },
 ];
 
@@ -1149,7 +1180,13 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         "compete" => SlashCommand::Compete {
             args: args.to_vec(),
         },
-        "loop" => SlashCommand::Loop {
+        "loop" | "addloop" => SlashCommand::Loop {
+            args: args.to_vec(),
+        },
+        "execute" => SlashCommand::Execute {
+            args: args.to_vec(),
+        },
+        "explore" => SlashCommand::Explore {
             args: args.to_vec(),
         },
         "sync" => {

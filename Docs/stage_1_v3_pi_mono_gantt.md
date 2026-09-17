@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-17T13:07:13+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-17T13:10:38+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `c5d798785a44cc734acc5aeed2d14e93c125c1640a85f60aca339a0d09448964`
-- 生成时间：2026-09-17T13:07:13+08:00
+- blueprint digest: `dcd3c3004109f81876258681ad8a07595416f4362989bb3dd61ab04bd16f41d0`
+- 生成时间：2026-09-17T13:10:38+08:00
 
-清单项 `[x]` **123/129** · `[_]` **0** · `[ ]` **6**。按清单项计数，不是代码完成率。
+清单项 `[x]` **124/129** · `[_]` **0** · `[ ]` **5**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 35 | 30 | 0 | 5 |
+| L3 | 35 | 31 | 0 | 4 |
 | L5 | 2 | 1 | 0 | 1 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -143,7 +143,7 @@ gantt
     ZS1-140 TUI 一层 project tab：增/减/调位置/重命名/每项目风格 :ZS1-140, 5, 1s
     ZS1-141 一层 tab 增加工作文件夹支持本地与 SSH 远端 :ZS1-141, 6, 1s
     ZS1-142 TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号 :ZS1-142, 6, 1s
-    ZS1-144 命令补齐：/execute /explore /addloop 的语义与实现 :ZS1-144, 13, 1s
+    ZS1-144 命令补齐：/execute /explore /addloop 的语义与实现 :done, ZS1-144, 13, 1s
     ZS1-145 TUI 区域补齐：arch 架构区与 execution 执行区（BentoBo :ZS1-145, 6, 1s
     ZS1-120 项目身份、cwd与持久化owner :done, ZS1-120, 3, 1s
     ZS1-121 顶部+目录picker与真实项目分页接线 :done, ZS1-121, 4, 1s
@@ -266,8 +266,8 @@ gantt
 | ZS1-140 | [·] | L3 | ZS1-121 | — | TUI 一层 project tab：增/减/调位置/重命名/每项目风格 |
 | ZS1-141 | [·] | L3 | ZS1-140 | ZS1-140 | 一层 tab 增加工作文件夹支持本地与 SSH 远端 |
 | ZS1-142 | [·] | L3 | ZS1-140 | ZS1-140 | TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号单击新建、长按双 logo） |
-| ZS1-143 | [·] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | ZS1-140,ZS1-142,ZS1-144,ZS1-145 | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
-| ZS1-144 | [·] | L3 | ZS1-119 | — | 命令补齐：/execute /explore /addloop 的语义与实现 |
+| ZS1-143 | [·] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | ZS1-140,ZS1-142,ZS1-145 | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
+| ZS1-144 | [x] | L3 | ZS1-119 | — | 命令补齐：/execute /explore /addloop 的语义与实现 |
 | ZS1-145 | [·] | L3 | ZS1-140 | ZS1-140 | TUI 区域补齐：arch 架构区与 execution 执行区（BentoBox 可调） |
 | ZS1-199 | [x] | L6 | ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | — | Master 集成验收与阶段交付 |
 | ZS1-300 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/chat_composer.rs |

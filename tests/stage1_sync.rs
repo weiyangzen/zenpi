@@ -68,3 +68,44 @@ fn sync_appends_once_and_is_idempotent() {
         Err(zenpi::sync::SyncError::Empty)
     ));
 }
+
+#[test]
+fn parse_execute_explore_and_addloop_alias() {
+    match zenpi::slash::parse("/execute start BP-1").unwrap() {
+        Some(SlashCommand::Execute { args }) => assert_eq!(args, vec!["start", "BP-1"]),
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/explore why sse stalls").unwrap() {
+        Some(SlashCommand::Explore { args }) => assert_eq!(args, vec!["why", "sse", "stalls"]),
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/addloop start audit").unwrap() {
+        Some(SlashCommand::Loop { args }) => assert_eq!(args, vec!["start", "audit"]),
+        other => panic!("unexpected: {other:?}"),
+    }
+    assert_eq!(SlashCommand::Execute { args: vec![] }.name(), "execute");
+    assert_eq!(SlashCommand::Explore { args: vec![] }.name(), "explore");
+    assert!(zenpi::slash::complete("exe").contains(&"execute"));
+    assert!(zenpi::slash::complete("expl").contains(&"explore"));
+}
+
+#[test]
+fn execute_and_explore_persist_inert_runtime_intents() {
+    use zenpi::b3::RuntimeIntentKind;
+    use zenpi::core::Agent;
+    use zenpi::session::SessionStore;
+    let dir = tempdir().unwrap();
+    let mut agent = Agent::with_echo(SessionStore::open(dir.path().join("i.jsonl")).unwrap());
+    for (kind, args) in [
+        (RuntimeIntentKind::Execute, vec!["start".to_string(), "BP-1".to_string()]),
+        (RuntimeIntentKind::Explore, vec!["research".to_string(), "topic".to_string()]),
+    ] {
+        let value = zenpi::runtime_intent::runtime_intent_value(&mut agent, kind, &args).unwrap();
+        assert_eq!(value["zenpi_started"], false, "{value}");
+        assert_eq!(value["accepted"], true, "{value}");
+    }
+    assert!(agent.history().is_empty());
+    let kinds: Vec<_> = agent.session().runtime_intents().iter().map(|i| i.kind).collect();
+    assert!(kinds.contains(&RuntimeIntentKind::Execute));
+    assert!(kinds.contains(&RuntimeIntentKind::Explore));
+}
