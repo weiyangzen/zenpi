@@ -184,6 +184,12 @@ pub enum SlashCommand {
     Loop {
         args: Vec<String>,
     },
+    /// Sync one user requirement into the single-authority blueprint and queue
+    /// its execution. This is a host control-plane action; parsing only keeps
+    /// the raw requirement text.
+    Sync {
+        requirement: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -379,7 +385,7 @@ impl SlashCommand {
     /// Return the routing boundary for this command.
     pub const fn route(&self) -> SlashRoute {
         match self {
-            Self::Compete { .. } | Self::Loop { .. } => SlashRoute::Runtime,
+            Self::Compete { .. } | Self::Loop { .. } | Self::Sync { .. } => SlashRoute::Runtime,
             _ => SlashRoute::Local,
         }
     }
@@ -425,6 +431,7 @@ impl SlashCommand {
             Self::Exit => "exit",
             Self::Compete { .. } => "compete",
             Self::Loop { .. } => "loop",
+            Self::Sync { .. } => "sync",
         }
     }
 
@@ -453,6 +460,7 @@ impl SlashCommand {
                 | Self::Session { .. }
                 | Self::Mailbox { .. }
                 | Self::Recovery { .. }
+                | Self::Sync { .. }
                 | Self::Project { .. }
         )
     }
@@ -707,6 +715,13 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Runtime,
         usage: "/loop [start] <task...> | /loop status",
         summary: "persist a bounded request for an external loop owner",
+    },
+    SlashCommandSpec {
+        name: "sync",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Runtime,
+        usage: "/sync <requirement...>",
+        summary: "sync a requirement into the single-authority blueprint and queue its execution",
     },
 ];
 
@@ -1137,6 +1152,13 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         "loop" => SlashCommand::Loop {
             args: args.to_vec(),
         },
+        "sync" => {
+            let requirement = args.join(" ");
+            if requirement.trim().is_empty() {
+                return Err(SlashError::MissingArgument { command: "sync" });
+            }
+            SlashCommand::Sync { requirement }
+        }
         other => return Err(SlashError::UnknownCommand(other.to_owned())),
     };
     Ok(Some(parsed))
