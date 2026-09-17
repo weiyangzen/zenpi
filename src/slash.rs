@@ -208,6 +208,12 @@ pub enum ProjectAction {
     Open { name: String },
     Select { name: String },
     Close { name: String },
+    /// Move a project tab to a zero-based position.
+    Move { name: String, index: usize },
+    /// Rename a project tab.
+    Rename { old: String, new: String },
+    /// Set a project tab's display style from a small named palette.
+    Style { name: String, style: String },
 }
 
 /// Recovery decisions require explicit host confirmation and never dispatch work.
@@ -1093,6 +1099,26 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
             [action, name] if action.eq_ignore_ascii_case("close") => SlashCommand::Project {
                 action: ProjectAction::Close {
                     name: name.trim().to_owned(),
+                },
+            },
+            [action, name, value] if action.eq_ignore_ascii_case("move") => SlashCommand::Project {
+                action: ProjectAction::Move {
+                    name: name.trim().to_owned(),
+                    index: value.trim().parse::<usize>().map_err(|_| {
+                        SlashError::UnexpectedArgument { command: "project" }
+                    })?,
+                },
+            },
+            [action, old, new] if action.eq_ignore_ascii_case("rename") => SlashCommand::Project {
+                action: ProjectAction::Rename {
+                    old: old.trim().to_owned(),
+                    new: new.trim().to_owned(),
+                },
+            },
+            [action, name, style] if action.eq_ignore_ascii_case("style") => SlashCommand::Project {
+                action: ProjectAction::Style {
+                    name: name.trim().to_owned(),
+                    style: style.trim().to_owned(),
                 },
             },
             _ => return Err(SlashError::UnexpectedArgument { command: "project" }),

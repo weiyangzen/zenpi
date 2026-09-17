@@ -590,3 +590,54 @@ fn session_list_borders_and_empty_rows_do_not_change_selection() {
         );
     }
 }
+
+#[test]
+fn layer1_project_tabs_move_rename_and_style() {
+    use zenpi::slash::{ProjectAction, SlashCommand};
+    // Parsing exposes the three new layer-1 operations.
+    match zenpi::slash::parse("/project move alpha 2").unwrap() {
+        Some(SlashCommand::Project { action: ProjectAction::Move { name, index } }) => {
+            assert_eq!(name, "alpha");
+            assert_eq!(index, 2);
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/project rename alpha beta").unwrap() {
+        Some(SlashCommand::Project { action: ProjectAction::Rename { old, new } }) => {
+            assert_eq!((old.as_str(), new.as_str()), ("alpha", "beta"));
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/project style alpha green").unwrap() {
+        Some(SlashCommand::Project { action: ProjectAction::Style { name, style } }) => {
+            assert_eq!((name.as_str(), style.as_str()), ("alpha", "green"));
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    assert!(matches!(
+        zenpi::slash::parse("/project move alpha x"),
+        Err(zenpi::slash::SlashError::UnexpectedArgument { command: "project" })
+    ));
+
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("alpha"));
+    assert!(state.open_project_tab("beta"));
+    assert!(state.open_project_tab("gamma"));
+    let order = |s: &TuiState| s.project_tabs().to_vec();
+    // "default" is the initial tab; move alpha (index 1) to the end.
+    let alpha_index = state.project_index("alpha").unwrap();
+    assert!(state.move_project_tab("alpha", state.project_tabs().len() - 1));
+    assert_eq!(order(&state).last().unwrap(), "alpha");
+    assert!(state.move_project_tab("beta", 0));
+    assert_eq!(order(&state)[0], "beta");
+    assert_eq!(state.active_project(), "gamma", "active project follows by name");
+    let _ = alpha_index;
+
+    assert!(state.rename_project_tab("beta", "beta-2"));
+    assert!(state.project_index("beta-2").is_some());
+
+    assert!(state.style_project_tab("alpha", "green"));
+    assert!(state.style_project_tab("alpha", "CYAN"));
+    assert!(!state.style_project_tab("alpha", "chartreuse"));
+    assert!(!state.style_project_tab("missing", "green"));
+}
