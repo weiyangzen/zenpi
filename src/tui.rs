@@ -7912,6 +7912,8 @@ impl TuiState {
         let title = format!(" {}  ⋮ ", workspace_pane_title(id));
         let content = match id {
             PaneId::Gantt => self.gantt_pane_content(),
+            PaneId::Arch => self.arch_pane_content(),
+            PaneId::Execution => self.execution_pane_content(),
             PaneId::Resources => self.resource_pane_content(),
             PaneId::SessionList => self.session_browser_content(),
             PaneId::ReplayControls => self.replay_pane_content(),
@@ -8204,6 +8206,33 @@ impl TuiState {
         };
         bound_gantt_pane_content(content)
     }
+
+    /// Architecture projection: the active BentoBox tab and its pane/column
+    /// structure, so the layout itself is inspectable without leaving the TUI.
+    fn arch_pane_content(&self) -> String {
+        let preset = self.workspace_layout.preset();
+        let mut lines = vec![format!("tab {}", preset.tab)];
+        for spec in &preset.panes {
+            lines.push(format!(
+                "  {:<22} {:?} row{} optional={}",
+                spec.id.as_str(),
+                spec.column,
+                spec.row,
+                PaneId::is_optional(spec.id)
+            ));
+        }
+        bound_gantt_pane_content(lines.join("\n"))
+    }
+
+    /// Execution projection: the external owner plus the Blueprint/Goal
+    /// snapshot the host already holds.
+    fn execution_pane_content(&self) -> String {
+        let mut lines = vec![
+            "owner: external (b3ehive); zenpi persists intents only".to_owned(),
+            self.gantt_pane_content(),
+        ];
+        bound_gantt_pane_content(lines.join("\n"))
+    }
 }
 
 fn bound_gantt_pane_content(content: String) -> String {
@@ -8337,6 +8366,8 @@ fn workspace_pane_title(id: PaneId) -> &'static str {
         PaneId::Resources => "Resources",
         PaneId::GoalConversation => "Goal",
         PaneId::Gantt => "Gantt",
+        PaneId::Arch => "Arch",
+        PaneId::Execution => "Execution",
         PaneId::Browser => "Browser",
         PaneId::Terminal => "Terminal",
         PaneId::LearnConversation => "Conversation",

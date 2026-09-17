@@ -1491,6 +1491,8 @@ fn parse_pane_name(value: &str) -> Result<PaneId, SlashError> {
         "resources" | "resource" => PaneId::Resources,
         "goal_conversation" | "goal" => PaneId::GoalConversation,
         "gantt" | "board" => PaneId::Gantt,
+        "arch" | "architecture" => PaneId::Arch,
+        "execution" | "exec" => PaneId::Execution,
         "browser" | "web" => PaneId::Browser,
         "terminal" | "pty" => PaneId::Terminal,
         "learn_conversation" | "learn" => PaneId::LearnConversation,
