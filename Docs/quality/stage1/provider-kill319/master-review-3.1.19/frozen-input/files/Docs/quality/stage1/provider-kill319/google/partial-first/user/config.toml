@@ -1,4 +1,0 @@
-backend='google'
-base_url='http://127.0.0.1:55187'
-model='gemini-2.5-flash'
-model_reasoning_effort='high'

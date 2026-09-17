@@ -111,3 +111,38 @@ jobs:
               fi
             fi
           done
+
+  stage1-host:
+    name: Stage 1 production host smoke and bounds
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build the production release binary
+        run: cargo build --release --locked
+
+      - name: Run the Stage 1 host smoke matrix
+        run: |
+          rm -rf Docs/quality/stage1/ZS1-117
+          python3 tools/stage1_host_smoke.py \
+            --binary target/release/zenpi \
+            --report-dir Docs/quality/stage1/ZS1-117
+
+      - name: Run the Stage 1 host bounds and restart test
+        run: cargo test --locked --test stage1_host
+
+      - name: Upload Stage 1 host evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage1-host-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Docs/quality/stage1/ZS1-117
+          if-no-files-found: warn

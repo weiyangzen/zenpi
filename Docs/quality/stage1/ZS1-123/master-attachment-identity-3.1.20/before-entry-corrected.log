@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/probe.py", line 131, in <module>
-    assert all(checks.values()), [key for key, passed in checks.items() if not passed]
-AssertionError: ['jsonl_0_receipt_identity', 'jsonl_0_exact_bytes', 'jsonl_0_filename', 'jsonl_durable_identity', 'tui_0_exact_bytes', 'tui_0_filename', 'tui_durable_identity']

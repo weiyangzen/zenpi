@@ -1,9 +1,0 @@
-{
-  "src/config.rs": "521b6bdd8e7d2dc3f45096757f9a0afd89378c3a76175bbee3998eda69ffe92c",
-  "src/external_editor.rs": null,
-  "src/lib.rs": "3d6a3b6902330ad2bdc4f4f6342730b1590cd9dac90d9a1ddf3e743df1bb5ff8",
-  "src/tui.rs": "c65b548abd191462dab0f14e3056bf45fa92b378e968eca3a5844041f7aad6e8",
-  "tests/config.rs": "088fe172abad20e8be8dca330b3e5fa2a5359c90b57de522774a3e602e2e2c8c",
-  "tests/tui_composer.rs": "366571a6ebc205f8544b6d3e19a575e6a841403a9406b57c7479b03750dd0564",
-  "tools/tui_external_editor_smoke.py": null
-}

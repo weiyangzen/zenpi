@@ -1,6 +1,6 @@
 # Stage 1 execution route
 
-Operator override: three independent Codex sessions, gpt-6-astra/high; no subagents. The controller integrates and accepts each item. Existing dirty baseline and BentoBox remain protected.
+Operator override: multiple independent execution sessions; no subagents. The controller integrates and accepts each item. Existing dirty baseline and BentoBox remain protected.
 
 EstimatorPolicy: semantic runtime and filesystem changes require complete per-file review, distinct per-directory synthesis, local behavioral fixtures, and actual host entry checks. Worker candidates with unresolved dependencies remain provisional; current session and path assignments are in claims.json. The 256 KiB review/chunk cap and master-only acceptance are hard invariants.
 

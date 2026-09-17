@@ -1,6 +1,0 @@
-data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "search-call-319", "type": "function", "function": {"name": "find", "arguments": "{\"pattern\": \"**/*.rs\", \"path\": \"fixture\", \"ignore\": true, \"hidden\": true}"}}]}, "finish_reason": null}]}
-
-data: {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]}
-
-data: [DONE]
-

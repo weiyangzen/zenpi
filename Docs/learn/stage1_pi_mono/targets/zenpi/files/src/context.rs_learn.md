@@ -1,12 +1,20 @@
-# ZS1-073 — 当前 src/context.rs 完整逐文件复核，3.1.21
+# ZS1-073 — 当前 src/context.rs 完整逐文件复核，3.1.21（3.1.22 源冻结重签复核）
 
 Worker 候选，主控独立验收待定。唯一 owned：`Docs/learn/stage1_pi_mono/targets/zenpi/files/src/context.rs_learn.md`。本轮只读研究、私有报告交付，产品运行 **0**；没有 Cargo、PTY、HTTP、旧 runner、release、117/131、FIFO、DTrace、预算或预热执行，没有产品修复。文中测试均是本轮实际读取的测试源码或明确标为历史的日志；所有新增行为判据均未在本轮运行。离线冻结审计如执行，仅验证证据结构，不计作产品测试或接受门禁。
 
-当前 subject：**30,013 字节 / 807 行**，SHA256 `256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229`。本轮按 **1–300、301–600、601–807** 顺序完整阅读全部内容；没有内嵌测试、`#[cfg(test)]` 或测试模块，内嵌测试数 0。随后全文读取当前三个外部测试文件共 **1,497 行**，包括所有 helper 和条件编译分支；见 reading-ledger.json 的实际阅读记录。初始 capture/chunk-plan 的 unread 状态原样保留，不能拿初始登记冒充完成阅读。
+当前 subject（3.1.22 重冻结权威身份，绑定 blueprint 第 3 节表格与“源冻结重签声明”）：**30,066 字节 / 808 行**，SHA256 `fc1138b9d5b3696a10135e70210c9aeb01ecea942dc8c0f19d6885607a835997`。本轮按 **1–300、301–600、601–808** 顺序完整阅读全部内容；没有内嵌测试、`#[cfg(test)]` 或测试模块，内嵌测试数 0。随后全文读取当前三个外部测试文件共 **1,582 行**，包括所有 helper 和条件编译分支；见 reading-ledger.json 的实际阅读记录。初始 capture/chunk-plan 的 unread 状态原样保留，不能拿初始登记冒充完成阅读。
 
-冻结登记基线仍是 **8,199 字节 / 246 行**，SHA256 `bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909`。基线原文件、旧压缩文件及差异另存；本轮没有以当前 hash 覆盖 blueprint/source_manifest/file index 的基线，也不把旧基线阅读重新计作本轮全文阅读。当前 subject 与三个旧候选记录的扩展实现相同，新增 **21,814 字节 / 561 行**；相同 hash 只证明这一个文件的身份，不证明整个宿主闭包或全部测试未变。
+冻结登记基线仍是 **8,199 字节 / 246 行**，SHA256 `bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909`。基线原文件、旧压缩文件及差异另存；本轮没有以当前 hash 覆盖 blueprint/source_manifest/file index 的基线，也不把旧基线阅读重新计作本轮全文阅读。当前 subject 与三个旧候选记录的扩展实现相同，相对冻结基线新增 **21,867 字节 / 562 行**；相同 hash 只证明这一个文件的身份，不证明整个宿主闭包或全部测试未变。
 
 任务捕获 authority **3.1.21**，requirement `3456abcbbebbc4e0ab383c319851b0a6e71b19ee9b3c060a6e212f61a89c9d9d`，snapshot `aa9412fe226f42c2dc6898b09cf94ba34e76ee26f268abd4d43d13fad57e7dc1`，主控状态 50/121。正式依赖只有 ZS1-001；012/013 为源比较上下文。三个 accepted master receipt 与其中 **123 个 artifact 引用**均另存，身份核验不冒称这些 artifact 全文语义阅读。073 接受、claims、blueprint 与 master receipt 仍归主控。
+
+## 3.1.22 源冻结重签复核（2026-09-17，非阻塞绑定）
+
+- 权威绑定：Blueprint `Docs/stage_1_v3_pi_mono_blueprint.md` 第 3 节 `ZS1-073` 行给出当前 worktree 字节数 `30066`、SHA256 `fc1138b9d5b3696a10135e70210c9aeb01ecea942dc8c0f19d6885607a835997`；本文件按“源冻结重签声明”绑定该表格指纹，而非下面历史段落内嵌的旧 subject 指纹。读前独立复核：`src/context.rs` 实测 30,066 字节、808 行、`fc1138b9…`，与表格一致；git 状态 clean，提交 `52d02ac`（"Astra 6 Commit"）；冻结基线 8,199 字节 / `bc4ce799…` 可在祖先 `6f252a20` / `536eb72` 解析，基线绑定真实。
+- 旧 subject 身份：`30013` 字节 / 807 行 / SHA256 `256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229`，对应可达 git blob `0ff942ee90358f8149378f1383aea9ee94c1dbf5`（`git cat-file -p 0ff942ee | shasum -a 256` 复算得 `256d9ac…`）。历史段落中凡出现 `256d9ac` / `30013` / `807` / `1047` / `1497` / `28 个 #[test]`（及其 `25 普通` 拆分）均视为被本重签声明取代，只作历史一致性记录。
+- 精确语义差异（唯一一处）：`diff -u <(git cat-file -p 0ff942ee) src/context.rs` 只有一处新增，即当前源码第 759 行在 `validate_summary_completion` 的 annotations status 黑名单加入 `| "deferred"`（前一行 `| "aborted"`，后一行 `| "cancelled"`）。此后所有行号自旧 759 起 +1：旧 `733–767` → 现 `733–768`，旧 `768–807` → 现 `769–808`。除该 token 外两版本逐字节相同，本报告其余函数/分支结论继续成立。
+- 该差异使旧报告“deferred 不在 strict Completion 黑名单、与 failed-context 不对称未修”的断语失效，已在下面表格与段落按现源码更正。重签后 semantic 测试从旧 38,971 字节 / 1047 行 / `797df796…` 变为 42,443 字节 / 1132 行 / `a9ca5d8396af6ae2a4ae212607f17d66ae8204b19905bd0cec64dd7579e61a7e`，新增两个 deferred 注解产品测试（下列，均本轮只读未运行）。
+- 门禁替代说明：本声明项 validators 为 `G-FILE；G-STAGE --item ZS1-073`。`python3 tools/validate_stage1_blueprint.py --item ZS1-073` 在本 worktree 不可达：`Docs/execution/active_requirement.json` 采用 execution-cron 的 `active-requirement/1` schema 且缺末尾换行，validator 以 `incomplete JSON record (missing final newline)` 提前中止；这是门禁 harness/selector 缺失，不是本文件内容矛盾。已执行最接近的等价核验：validator 自带单测全过、用其 `parse()` 复核本项契约（单 owned path、G-FILE、loc 0、target scope、`fc1138b9…`/30066）、实测源哈希与报告产物哈希、并逐段比对本报告结论与现源码。语义真值仍须 master 独立复验。
 
 ## 旧证据保全与这次的差异
 
@@ -14,7 +22,7 @@ Worker 候选，主控独立验收待定。唯一 owned：`Docs/learn/stage1_pi_
 
 旧 3.1.16 实测是 4 context + 8 checkpoint + 12 semantic + 5 probe = **29 项顶层通过、0 失败**，两个 ignored 子进程 helper 不重复加总。负向断言中的预期 Err/取消不等于被删除的失败，原 stderr 和嵌套输出均保留。旧 refresh 的单次离线 exit 0 及原 stdout/stderr 也保持原样；这些都不是这次的新通过。
 
-这次当前 `tests/context.rs` 是 2301 B / 77 行，`tests/stage1_context_checkpoint.rs` 是 11776 B / 373 行，两个文件身份与旧包对应内容相符；当前 `tests/stage1_semantic_compaction.rs` 已是 **38971 B / 1047 行**，SHA256 `797df7962c8c50d0f82609e8624ab2d5c8021f8fe6e197b8d9569005bb19cbdd`，包含手动压缩队列恢复的新 parent/helper。当前三文件的静态声明合计 **28 个 #[test]：25 个普通测试声明 + 3 个 ignored helper**，其中 Unix 限定项按源码平台条件解释。声明数不是运行数；本轮一项也没执行。旧 29 不能改成当前闭包的通过数量。
+这次当前 `tests/context.rs` 是 2301 B / 77 行（SHA256 `0cf5a72cbe2d94a348688f5680b6a052b1215880a7f864d7eb4ca2295088cfd8`），`tests/stage1_context_checkpoint.rs` 是 11776 B / 373 行（SHA256 `efb00e5ad9066defbc3925ef6b665d03e9dc6106d5afa3e250cfcd35709a8628`），两个文件身份与旧包对应内容相符；当前 `tests/stage1_semantic_compaction.rs` 已是 **42443 B / 1132 行**，SHA256 `a9ca5d8396af6ae2a4ae212607f17d66ae8204b19905bd0cec64dd7579e61a7e`，新增 `actual_http_deferred_summary_annotation_preserves_previous_checkpoint` 与 `actual_http_valid_summary_annotation_allows_checkpoint_progress` 两个 deferred 注解产品测试，并包含手动压缩队列恢复的新 parent/helper。当前三文件的静态声明合计 **30 个 #[test]：27 个普通测试声明 + 3 个 ignored helper**，其中 Unix 限定项按源码平台条件解释。声明数不是运行数；本轮一项也没执行。旧 29 不能改成当前闭包的通过数量。
 
 ## 责任边界和完整数据流
 
@@ -50,8 +58,8 @@ context 是纯计算层：`turns → estimate / legacy prepare`，或 `完整选
 | 626–658 restore semantic新增与投影 | 全当前ancestry再校验；prefix内System保留，插入summary System（hash前24字符ID、prefix末时间、source/文件/unresolved元数据），追加tail且过滤failed Assistant。估算最终输出<=available才返回。 | 原checkpoint允许合法追加，而finalize不允许source变化。追加坏parent或重复result拒；旧unresolved元数据仍是checkpoint快照，追加结果不会重写它。过滤failed assistant若其他普通记录parent指向它，输出不另行检查父节点是否还在；不能声称投影总是完整parent图。 |
 | 660–676 SemanticSummary / instructions | 必需九数组：六语义组、read_files、modified_files、unresolved_tools；unknown字段拒。指令要求只总结、保持要求和未完成项，不把unknown当完成。 | 缺组、额外键、markdown fences、错误元素类型应拒；合法JSON/非空section不证明事实正确。System角色摘要是provider输入设计，并非不可信文字天然失去指令效果。 |
 | 682–725 summary_request_data | 当前skeleton必须等于plan；previous存在时用MAX/0预算restore，要求previous.end<new.end；发送previous_summary字符串+新增覆盖records（id/parent/role/content/metadata，省timestamp，过滤failed assistant），附当前plan文件/未解决对象。 | 首轮null；次轮不得重发已覆盖前缀（当前HTTP测试源码断言）；stale/跨branch/不推进拒。MAX只是完整性验证，不是实际请求额度。先构造完整records Vec/JSON字符串，无流式或单独字节/行数上限。 |
-| 733–767 validate completion外层 | usage必须Some，input/output>0、output<=limit；input+output checked_add不能溢出，total>=sum（可大于）。拒任何Some refusal、toolcalls、空/超64KiB content；annotations truncated=true，或四种status键含length/max_tokens/error/aborted/cancelled/incomplete时拒。 | current invalid-summary源码覆盖主要11种场景；补u64加法溢出、总量不足、空refusal、顶层与非字符串annotation值。deferred不在该黑名单，旧probe确认可过；与failed-context规则差异保留未修。 |
-| 768–807 strict JSON /规范返回 | 六语义组不可全空；八字符串组每组<=64条，每项trim非空、<=4096 UTF-8字节且无NUL。read/modified/unresolved必须与plan精确逐项、顺序相同。serde规范编码后返text和usage。 | 64/65条、4096/4097B、仅空白、NUL、改文件顺序/遗漏call分别判定；非NUL控制字符并非统一拒；unresolved_tools未套八字符串组64条限制，但有整体content字节限制和精确对象比较。规范化编码可能改变字节长度；finalize/restore再次检查64KiB。 |
+| 733–768 validate completion外层 | usage必须Some，input/output>0、output<=limit；input+output checked_add不能溢出，total>=sum（可大于）。拒任何Some refusal、toolcalls、空/超64KiB content；annotations truncated=true，或四种status键含length/max_tokens/error/aborted/deferred/cancelled/incomplete时拒。 | current invalid-summary源码覆盖主要11种场景；补u64加法溢出、总量不足、空refusal、顶层与非字符串annotation值。deferred 现已列入该黑名单（现源码第759行），由新增 `actual_http_deferred_summary_annotation_preserves_previous_checkpoint`（四种status键正判）与 `actual_http_valid_summary_annotation_allows_checkpoint_progress`（良性注解反判）覆盖；旧 probe 的“deferred 可过”只对重签前 subject `256d9ac` 成立，属非阻塞历史差异。 |
+| 769–808 strict JSON /规范返回 | 六语义组不可全空；八字符串组每组<=64条，每项trim非空、<=4096 UTF-8字节且无NUL。read/modified/unresolved必须与plan精确逐项、顺序相同。serde规范编码后返text和usage。 | 64/65条、4096/4097B、仅空白、NUL、改文件顺序/遗漏call分别判定；非NUL控制字符并非统一拒；unresolved_tools未套八字符串组64条限制，但有整体content字节限制和精确对象比较。规范化编码可能改变字节长度；finalize/restore再次检查64KiB。 |
 
 ## token、字节、字符、行与临时内存不能混用
 
@@ -111,8 +119,10 @@ core4894–4910在有semantic checkpoint时恢复provider输入，否则返回�
 | semantic / killed_summary_process_preserves_previous_commit_and_requires_explicit_recovery | 先有效cp，第二请求started后kill+wait非成功；重开旧cp、recovery非空、普通process拒、HTTP2。未断言自动恢复。 |
 | semantic / manual_compaction_accepts_durable_queue_input_before_http_cancellation + manual_compaction_queue_case | Unix父对cancel=true/false都执行辅助case：阻塞summary，先收queue响应，再cancel或放行，compact success==!cancel、HTTP1、重开cp presence对应结果；queue response成功，恢复input Received，port不preparing、idle list拒；可按环境变量导出证据。两case不加顶层数量。 |
 | semantic / manual_summary_queue_recovery_probe | ignored独立进程读同journal，input Received/text精确，applied event数0。父检查子退出成功并打印结果；这是新增声明，旧12项历史semantic日志没有它的这次通过。 |
+| semantic / actual_http_deferred_summary_annotation_preserves_previous_checkpoint | 对 `finish_reason` / `stop_reason` / `stopReason` / `status` 四键分别注入 value=`"deferred"` 的 `summary_state` annotation（首请求成功后）：第二次 `compact_context` 必须 Err、旧 checkpoint 逐字节不变、drop 后重开仍等于 before、且不重试（HTTP=2）；任一键失败即测试失败。这是 strict Completion 黑名单含 deferred 的正向产品判据。 |
+| semantic / actual_http_valid_summary_annotation_allows_checkpoint_progress | 良性 `url_citation` annotation（title 含 “deferred” 字样）不得触发 deferred 拒绝：第二次 compact 成功、`second.source_end > first.source_end`、重开后 checkpoint 等于 second、HTTP=2。这是防止字符串误伤的负向判据。 |
 
-当前源码既没有等同完整模型计量的token测试，也没有在本轮运行取消延迟/内存上界/所有Unicode极限/日志写失败后的checkpoint一致性。上表和函数判据使缺口可运行、可审查，不补造结果。旧五probe全文保留，它们证明旧闭包对fit-cancel、legacy孤立parent/无预算restore、低层plain/zero usage、System call parent、deferred接受的实际观察；当前context同hash提供本文件对应关系，当前消费者顺序另由新阅读支持。
+当前源码既没有等同完整模型计量的token测试，也没有在本轮运行取消延迟/内存上界/所有Unicode极限/日志写失败后的checkpoint一致性。上表和函数判据使缺口可运行、可审查，不补造结果。旧五probe全文保留，它们证明旧闭包对fit-cancel、legacy孤立parent/无预算restore、低层plain/zero usage、System call parent、deferred接受的实际观察；这些 probe 针对重签前 subject `256d9ac`（blob `0ff942ee`），当前权威 subject 为 `fc1138b9…` 且两者仅差 annotations 黑名单中加入的 `deferred` 一个 token（非阻塞历史差异）；当前消费者顺序另由新阅读支持。
 
 ## 与 pi 源实现的精确比较
 
@@ -133,7 +143,7 @@ ready下 learn-report.md 是本项完整新候选，旧三份报告及完整包�
 reading-ledger标明本轮实际完整source、三个完整测试、有界消费者和上游阅读，不以索引/hash代替语义阅读。manifest记录全部payload，唯一新纯Python verifier完整静态阅读后最多执行一次，stdout/stderr/result在包外原样保存，失败也不重跑；结构PASS不等于G-FILE/G-STAGE或完整当前行为验收。070两缺陷及全部冻结payload、072完整包、117 fixture和既有worker非.ops文件的身份另受保护。提交精确manifest/report/patch/rollback/阅读身份给主控后停止。
 
 
-## 主控独立逐文件验收 — ZS1-073 / 3.1.21
+## 主控独立逐文件验收 — ZS1-073 / 3.1.21（历史记录，已被上方 3.1.22 重签复核取代）
 
 主控本轮顺序完整读取当前src/context.rs L1–280、281–560、561–807至EOF（3741ab/5bad3a/9b1233），30013 B / SHA256 256d9ac1657e272ba61ebfbc242ece2970ed0607f3ebb1583b1711f18b7bf229；另外完整读冻结baseline246行8199 B / bc4ce7999a0f4d162effece8c6f839aca3a230e97675a1d7908fca5d6a7fe909（682cce）。完整133行34074 B候选分1–45、46–95、96–EOF读完（ff8bfb/367837/a80c3a）；README和新auditor全文已读。本项不把hash、chunk账或旧报告当作此次全文阅读。
 
@@ -145,7 +155,7 @@ semantic skeleton要求合法唯一ID、parent先出现、cut在完整User起点
 
 prepare从最近完整User向前找满足tail token下限且skeleton有效的切点；keep_recent是下限，并无拆分单个大turn的fallback。finalize重新构造整个skeleton要求与plan完全相同，再填摘要并restore预算验证，前后查cancel；不调用strict Completion校验。restore允许原记录后合法追加，先验证旧source再验证全ancestry，保留prefix System、插入summary System和非failed tail。摘要内unresolved元数据仍是checkpoint时快照，新增tool结果不回写它；过滤failed assistant后也没有重新保证投影parent完整。
 
-summary_request_data必须与plan同源，previous要合法且cut前进，发送旧summary和新增covered记录及精确文件/未解决列表。failed过滤包含deferred；strict Completion黑名单当前没有deferred，两者不对称，尚待本轮产品反例，不在G-FILE中伪称已修。strict层拒空/超64KiB/拒绝/工具调用/缺usage/零input-output/输出超限/和式溢出或不足及已知未完成状态；九数组schema严格、六语义组不可全空、八字符串组各至多64条且单项4096字节/非空/无NUL；文件和unresolved要精确相等。合法结构和SHA都不证明自然语言保真或抗注入。
+summary_request_data必须与plan同源，previous要合法且cut前进，发送旧summary和新增covered记录及精确文件/未解决列表。failed过滤包含deferred；strict Completion黑名单现已加入deferred（现源码第759行），原先的不对称已收敛，并由新增 `actual_http_deferred_summary_annotation_preserves_previous_checkpoint`（四种status键分别注入，必须拒绝、逐字节保留旧checkpoint、不重试HTTP=2、重开一致）与 `actual_http_valid_summary_annotation_allows_checkpoint_progress`（良性 url_citation 的 title 含 “deferred” 字样不误伤，checkpoint 可推进）覆盖。strict层拒空/超64KiB/拒绝/工具调用/缺usage/零input-output/输出超限/和式溢出或不足及已知未完成状态；九数组schema严格、六语义组不可全空、八字符串组各至多64条且单项4096字节/非空/无NUL；文件和unresolved要精确相等。合法结构和SHA都不证明自然语言保真或抗注入。
 
 主控完整读当前tests/context.rs77行、tests/stage1_context_checkpoint.rs373行以及tests/stage1_semantic_compaction.rs1047行共1497行（1e9112/1c73ae/682cce/738728/285957），含所有helper、Unix条件与结束段。28个声明=25普通+3ignored helper；这次没有执行它们，不能把旧29行为结果或新29结构检查套到当前测试。真实HTTP、source/branch/tamper、两进程恢复、取消、队列、unknown工具和native保留各自断言的范围已核，UnixStream不是PTY，人工截journal至commit也不是fsync中断试验。
 

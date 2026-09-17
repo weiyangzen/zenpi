@@ -1,9 +1,0 @@
-{
-  "operation": "first negative-control source injection",
-  "observed_error": "Traceback (most recent call last): File \"<stdin>\", line 5, in <module>; AssertionError",
-  "cause": "end anchor matched the formatted async branch inner let directory, so the intended slice contained no return",
-  "source_modified": false,
-  "subsequent_cargo_run": "negative-sync-reconnected.run.json",
-  "interpretation": "Cargo ran the unchanged final candidate and passed; this is NOT a negative-control failure witness",
-  "failed_assertion": "assert x.count('            return;\\n')==1"
-}

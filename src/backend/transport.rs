@@ -570,7 +570,10 @@ mod dns {
         cancel: &Cancellation,
     ) -> Result<Vec<SocketAddr>, ureq::Error> {
         let host = CString::new(host).map_err(|_| ureq::Error::HostNotFound)?;
-        let end = deadline(timeout);
+        // A host without records for one address family must not pin the query
+        // until the global request deadline; bound the wait even when the
+        // caller supplied no per-stage timeout.
+        let end = deadline(timeout).or_else(|| Some(Instant::now() + Duration::from_secs(10)));
         let mut states = [
             Box::new(State {
                 port,
@@ -604,6 +607,12 @@ mod dns {
             queries.push(Query(raw));
         }
         while states.iter().any(|s| !s.done) {
+            // Return as soon as one family has yielded addresses; waiting for a
+            // family that has no records (for example an IPv6 query on an
+            // A-only host) only stalls the request.
+            if states.iter().any(|s| s.done && !s.addresses.is_empty()) {
+                break;
+            }
             cancel.check()?;
             let wait = remaining(end, timeout.reason)?;
             let mut fds = [libc::pollfd {

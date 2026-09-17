@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/probe.py", line 98, in <module>
-    assert value['success'], value
-AssertionError: {'project': {'project_id': '43e617b528840712dfe36f11923df669dbb6d06ae0524e1795e8f4abaf4459d0', 'cwd': '/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/attachment-identity-integration/before-entry.fixture/jsonl/initial', 'session_id': 'session-1789215460299-25108-0'}, 'schema_version': 2, 'id': 'attach-0', 'type': 'response', 'command': 'attach', 'success': False, 'error': 'workspace path denied: notereport.txt', 'code': 'attachment_error'}

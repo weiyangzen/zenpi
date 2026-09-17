@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_command_palette_smoke.py", line 265, in <module>
-    if __name__=='__main__':main()
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_command_palette_smoke.py", line 131, in main
-    if args.idle_selection_only:return idle_selection_smoke(binary,args.evidence)
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_command_palette_smoke.py", line 126, in idle_selection_smoke
-    assert result['ok'], result['checks']
-AssertionError: {'delayed_tab_accepts_second_persona': False, 'delayed_enter_opens_second_search_hit': False, 'navigation_makes_no_provider_requests': True, 'terminal_restored': True}

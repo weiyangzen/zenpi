@@ -1,1 +1,0 @@
-deny this private selfcheck file; not user data

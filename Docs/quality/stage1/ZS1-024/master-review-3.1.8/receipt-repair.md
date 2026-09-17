@@ -1,1 +1,0 @@
-Initial receipt validation rejected the zero-byte first probe stdout artifact. The failed probe stderr and code remain attached; empty stdout remains on disk but is omitted from artifact references as required by the checker. No behavior or acceptance requirement changed.

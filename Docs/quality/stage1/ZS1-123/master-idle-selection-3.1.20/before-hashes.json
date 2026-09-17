@@ -1,5 +1,0 @@
-{
-  "src/tui.rs": "d2a98934d4931a5aa202e542acd556bdda5667f0e60df11a68731dacf00eccf1",
-  "tests/tui_command_palette.rs": "3bf46fa713dd2ab4252330106c2430f2a34ae9c967419fa42c26595b9000d5ec",
-  "tools/tui_command_palette_smoke.py": "27239c26b7154f10a8890d6acfbb17f8f063d2e119bbe3accf4442893dedd96a"
-}

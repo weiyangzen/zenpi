@@ -1,9 +1,0 @@
-diff --git a/Docs/quality/stage1/provider-kill319/chat/tool-first/user/config.toml b/Docs/quality/stage1/provider-kill319/chat/tool-first/user/config.toml
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/provider-kill319/chat/tool-first/user/config.toml
-@@ -0,0 +1,4 @@
-+backend='openai'
-+base_url='http://127.0.0.1:54911'
-+model='gpt-4.1'
-+wire_api='chat_completions'

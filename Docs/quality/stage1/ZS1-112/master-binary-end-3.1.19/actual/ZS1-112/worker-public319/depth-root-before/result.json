@@ -1,7 +1,0 @@
-{
-  "passed": false,
-  "case": "depth",
-  "failure": "Traceback (most recent call last):\n  File \"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/actual/ZS1-112/worker-public319/public_probe.py\", line 45, in run\n    elif case=='depth':h.require(out['truncated'] is True and 'depth_limit' in out['truncation_reasons'],f'depth results falsely complete: {out}')\n  File \"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/search112-public-integration/actual/provider-kill319/kill_probe.py\", line 15, in require\n    if not condition: raise AssertionError(message)\nAssertionError: depth results falsely complete: {'context': [], 'engine': 'ripgrep', 'file_limit': 256, 'files_visited': 0, 'hidden': False, 'ignore': True, 'matches': [], 'max_depth': 64, 'max_file_bytes': 1048576, 'query': 'depth_only_needle', 'regex': True, 'truncated': False, 'truncation_reasons': []}\n",
-  "binary_sha256": "7a374a3b0764c7a4db9b3b53e36dc07d3d8b17b80f5711805a932a2090e60774",
-  "script_sha256": "4f9a2b011ad7a332b78aa9b2082dad7b6d2556d4a5028459c43c94f2d9fb88cf"
-}

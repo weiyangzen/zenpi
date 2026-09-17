@@ -1,5 +1,0 @@
-# ZS1-019: requirement delta review 3.1.18
-
-Controller reviewed the complete external-editor contract, source/caller/terminal/dependency observations, and the complete 3.1.17 to 3.1.18 delta. All original worker/master receipts and their referenced artifact hashes were checked before retaining this unchanged acceptance. The 110-item requirement adds ZS1-130, an independently bounded external editor implementation and actual PTY validation, and makes 128 depend on it. The 56 frozen source/target/reference files and 25 directories are unchanged, as are all ten accepted obligations.
-
-No source tests or product execution are newly accepted by this rebind. New Unix terminal/file/process/identity behavior remains unimplemented and unaccepted. Platform receipts must name their actually executed platform. Windows remains an explicit generic UX platform gap, not a passed or silently implemented capability. Existing canonical input, kill/yank, project identity, BentoBox and resource gates remain required.

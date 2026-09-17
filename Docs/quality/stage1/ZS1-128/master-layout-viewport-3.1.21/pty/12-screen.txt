@@ -1,7 +1,0 @@
- zenpi | projects: [workspace]                   [<] [>] [+]
- zenpi    Ready | model gpt-4.1 | tokens — | history ~0/1280
-┌ Resources  ⋮ ────────────────────────────────────────────┐
-┌ Prompt · Ctrl-R history · Ctrl-J newline ────────────────┐
-│                                                          │
-└──────────────────────────────────────────────────────────┘
- Enter send · Ctrl-J newline · Ctrl-R history · Ctrl-C stop 

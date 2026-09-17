@@ -1,8 +1,0 @@
-[
-  {
-    "path": "tools/generate_stage1_gantt.py",
-    "worker_sha256": "821935ac587b947631c7f001d13b897d4d787fd9ca292e3b4e291b505c23c349",
-    "root_sha256": "fa76eb953eecd0f603d8822956b0c926b0883c5a693ab9c69fe264b3b6fe3300",
-    "reason": "presentation evidence label changed; not Rust runtime input"
-  }
-]

@@ -222,7 +222,7 @@ def main():
     for columns in (42,1,140):
      fcntl.ioctl(terminal.fd,termios.TIOCSWINSZ,struct.pack('HHHH',40,columns,0,0));drain(terminal.fd,terminal.output,.08)
      assert draft()==command
-    terminal.expect(b'Resource source');terminal.write(b'\r');terminal.wait(lambda:b'\x1b]52;c;' in bytes(terminal.output[offset:]))
+    terminal.expect(b'Resource source');terminal.write(b'\r');terminal.wait(lambda:b'\x1b]52;c;' in bytes(terminal.output[offset:]) and b'\x07' in bytes(terminal.output[offset:]).split(b'\x1b]52;c;',1)[1])
     payload=bytes(terminal.output[offset:]).split(b'\x1b]52;c;',1)[1].split(b'\x07',1)[0];copied=base64.b64decode(payload).decode()
     assert json.dumps(str(path.resolve()),ensure_ascii=False) in copied and hashlib.sha256(path.read_bytes()).hexdigest() in copied
     terminal.wait(lambda:'Inspect / copy transcript blocks' not in screen());assert draft()==command and len(requests)==before

@@ -1,6 +1,0 @@
-diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/ZS1-111/worker-io319/command-kill-first/owner-one.stderr
-@@ -0,0 +1 @@
-+zenpi: invalid arguments: unsupported production provider backend

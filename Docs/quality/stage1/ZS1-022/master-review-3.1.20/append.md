@@ -1,6 +1,0 @@
-
-## Independent master qualification — 2026-09-12 / 3.1.20
-
-The controller completed the whole1797-line subject and full report review, with bounded current owner contexts. Seven non-blueprint context full hashes and all18 saved fragments still match; only blueprint checkbox snapshot has advanced, with requirement digest unchanged. The full earlier report is retained. Historical13 helper cases and historical product hook tests were inspected, not rerun or counted as current runtime passes. Source-only022 acceptance is separate from023/052 and product115/117.
-
-Upstream callback isolation has an additional condition: runner613–617 emitError invokes listeners without a catch. Thus emitToolResult/emitContext/emitInput's handler catches do not guarantee continuation if an error listener throws. Loader175–242 marks the runtime stale before invoking unsubscriptions; a throwing unsubscribe can stop remaining cleanup. Agent-session875–901 catches abort-hook errors only, not all subsequent invalidation/resource cleanup. These observations qualify any broad cleanup/continuation wording above. Target Unix OwnedChild attempts group/direct kill and wait but ignores their errors; source reading alone does not prove successful OS cleanup or detached descendant containment. No product or protocol behavior is changed by this report.

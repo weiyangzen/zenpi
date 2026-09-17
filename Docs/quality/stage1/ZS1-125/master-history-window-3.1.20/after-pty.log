@@ -1,1 +1,0 @@
-{"ok": true, "checks": {"long_history_reading_anchor_stays_put": true, "latest_reply_visible_beyond_18000_rows": true, "old_journal_and_new_reply_preserved": true, "exactly_four_provider_calls": true, "terminal_restored": true}, "http": 4}

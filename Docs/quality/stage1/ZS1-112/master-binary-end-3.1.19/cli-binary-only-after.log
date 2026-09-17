@@ -1,7 +1,0 @@
-binary PASS
-regex-context PASS
-ignore-off PASS
-literal-glob PASS
-find-glob PASS
-match-limit PASS
-rgignore-depth PASS

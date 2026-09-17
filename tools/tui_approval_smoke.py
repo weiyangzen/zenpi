@@ -342,6 +342,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     result = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'checks': {}}
     try:
+        Path('.ops').mkdir(exist_ok=True)
         with TemporaryDirectory(prefix='approval-pty-', dir=Path('.ops').resolve()) as raw:
             root = Path(raw)
             config = root / 'fixture'

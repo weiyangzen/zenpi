@@ -1,9 +1,0 @@
-{
-  "authority_version": "3.1.17",
-  "requirement_digest": "4b4bbb809fc660d55186317e9e12cfdccc7f3a2ba4567dc94b93d96858584f1a",
-  "captured_at": "2026-09-10T23:12:04.380424+00:00",
-  "path": "/Users/wangweiyang/GitHub/zenpi/.github/workflows/ci.yml",
-  "bytes": 2480,
-  "sha256": "5d7173fa20a0de949e53525018dad07718a9e4a9d24a5fcd137b056af31792d6",
-  "scope": "117 archive check only; original089 frozen report unchanged"
-}

@@ -76,10 +76,12 @@ fn exact_identity_and_partial_sources_never_infer_from_names_or_wire() {
         );
         assert_eq!(unknown.context_window, 32768);
         assert_eq!(unknown.max_output_tokens, 4096);
+        // Provider openness: uncatalogued models default to the open wire
+        // capability set rather than a closed text-only profile.
         assert!(
-            !unknown.capabilities.tools
-                && !unknown.capabilities.images
-                && !unknown.capabilities.streaming
+            unknown.capabilities.tools
+                && unknown.capabilities.images
+                && unknown.capabilities.streaming
         );
         assert!(unknown.price.is_none());
         assert!(
@@ -250,7 +252,13 @@ fn unsupported_attachment_and_reasoning_do_not_open_http_or_append_turn() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    let backend = strict(&url, "unknown", OpenAiWireApi::Responses, &[]);
+    // An explicit restrictive override still closes capabilities even though
+    // the uncatalogued default is now open.
+    let restricted = [override_entry(json!({
+        "provider":"openai","id":"unknown","version":"fixture-v1",
+        "images":false,"files":false,"tools":false,"structured_output":false
+    }))];
+    let backend = strict(&url, "unknown", OpenAiWireApi::Responses, &restricted);
     let input = serde_json::from_value::<InputAttachment>(
         json!({"kind":"image","mime_type":"image/png","url":"https://example.test/image.png"}),
     )
@@ -387,6 +395,15 @@ fn server(
                         json!({"type":"response.completed","response":response})
                     ),
                 )
+            } else if !responses && request["stream"] == true {
+                (
+                    "text/event-stream",
+                    format!(
+                        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+                        json!({"id":"chunk","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"},"finish_reason":null}]}),
+                        json!({"id":"chunk","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}})
+                    ),
+                )
             } else {
                 ("application/json", response.to_string())
             };
@@ -521,25 +538,26 @@ impl Drop for Cli {
 }
 
 #[test]
-fn actual_headless_unknown_is_finite_text_only_and_models_query_is_local() {
+fn actual_headless_unknown_is_open_and_models_query_is_local() {
     let dir = tempdir().unwrap();
-    let (url, requests, server) = server(1, false);
+    let (url, requests, server) = server(2, false);
     let mut cli = Cli::start(dir.path(), &url, "nonexistent-model", "", "chat");
     let query = cli.command("query", "/models");
     assert_eq!(query["success"], true, "{query}");
     let text = query.to_string();
-    assert!(text.contains("32768") && text.contains("conservative"));
+    assert!(text.contains("32768"));
     assert!(requests.try_recv().is_err());
-    let denied=cli.request(json!({"type":"prompt","id":"denied","text":"image","attachments":[{"kind":"image","mime_type":"image/png","url":"https://example.test/image.png"}]}));
-    assert_eq!(denied["success"], false, "{denied}");
-    assert!(denied.to_string().contains("attachment"));
-    assert!(requests.try_recv().is_err());
+    // Provider openness: an uncatalogued model accepts images and opens HTTP
+    // instead of being rejected as text-only.
+    let accepted=cli.request(json!({"type":"prompt","id":"image","text":"image","attachments":[{"kind":"image","mime_type":"image/png","url":"https://example.test/image.png"}]}));
+    assert_eq!(accepted["success"], true, "{accepted}");
+    let _ = requests.recv_timeout(Duration::from_secs(5)).unwrap();
     let response = cli.command("turn", "hello");
     assert_eq!(response["success"], true, "{response}");
     let sent = requests.recv_timeout(Duration::from_secs(5)).unwrap();
     assert_eq!(sent["model"], "nonexistent-model");
-    assert_eq!(sent["stream"], false);
-    assert!(sent.get("tools").is_none());
+    assert_eq!(sent["stream"], true);
+    assert!(sent["tools"].as_array().is_some_and(|tools| !tools.is_empty()));
     assert_eq!(sent["max_completion_tokens"], 4096);
     server.join().unwrap();
 }
@@ -744,9 +762,13 @@ fn text_only_model_cannot_execute_unsolicited_tools_from_either_wire() {
             write!(stream,"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).unwrap();
             stream.flush().unwrap();
         });
+        let text_only = [override_entry(json!({
+            "provider":"openai","id":"unlisted","version":"fixture-v1",
+            "tools":false,"streaming":false
+        }))];
         let mut agent = Agent::new(
             SessionStore::open(dir.path().join("session.jsonl")).unwrap(),
-            Box::new(strict(&url, "unlisted", wire, &[])),
+            Box::new(strict(&url, "unlisted", wire, &text_only)),
         );
         agent.set_tools(
             zenpi::tools::ToolRegistry::with_all_builtins().unwrap(),

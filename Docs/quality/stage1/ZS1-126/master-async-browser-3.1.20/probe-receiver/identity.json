@@ -1,6 +1,0 @@
-{
-  "before_sha256": "707078a424367f0addf209875854d1f50ed4f40b61204972312b47dd298e80de",
-  "after_sha256": "7527c7929bba67b1e8508dcc487a5917fdee0fe9e6d634f212b94d7e2f6b1f64",
-  "reason": "Hold controlling session owner through post-application termios observation; original macOS ENOTTY failure retained.",
-  "product_changed": false
-}

@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/wangweiyang/.codex/worktrees/ff51/zenpi/Docs/quality/stage1/provider-kill319/verify_evidence.py", line 23, in <module>
-    assert hashlib.sha256(json.dumps(data,ensure_ascii=False,separators=(',',':'),sort_keys=True).encode()).hexdigest()==r['sha256']
-AssertionError

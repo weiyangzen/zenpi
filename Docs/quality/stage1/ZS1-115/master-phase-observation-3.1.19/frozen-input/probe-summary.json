@@ -1,7 +1,0 @@
-{
-  "status": "observation-negative-passed",
-  "cases": 10,
-  "watchdog_negative_before_exit": 1,
-  "watchdog_negative_after_exit": 1,
-  "note": "Both intentional watchdog cases remain failed; only parent phase retention changes. Exact extracted watchdog/phase Rust code; not a full crate/product pipe test."
-}

@@ -46,7 +46,7 @@ Windows 等无 bracketed paste 的终端会把粘贴拆成快速 Char/Enter 事�
 
 ### 测试与未闭合边界
 
-源文件包含 136 个 `#[test]` 声明和 172 个非测试函数；函数索引按行绑定保存。测试主要覆盖 textarea 元素范围、prompt expansion、slash parsing、history、paste burst、attachment pruning、remote image selection、mention binding、footer layout 和 voice state。没有运行任何测试。未运行意味着不能宣称键盘时序、跨平台 cfg、真实终端粘贴、音频设备、线程取消、Unicode 光标边界或渲染像素行为已通过。
+源文件包含 136 个 `#[test]` 声明和 173 个非测试函数；函数索引按行绑定保存。测试主要覆盖 textarea 元素范围、prompt expansion、slash parsing、history、paste burst、attachment pruning、remote image selection、mention binding、footer layout 和 voice state。没有运行任何测试。未运行意味着不能宣称键盘时序、跨平台 cfg、真实终端粘贴、音频设备、线程取消、Unicode 光标边界或渲染像素行为已通过。
 
 消费者映射：zenpi 自己的 `src/tui.rs`、`src/headless.rs`、`src/slash.rs` 只能借鉴“输入事件→上层结果”的边界；它们不自动获得 Codex 的 popup、history、attachment、voice 或 kill-buffer 语义。Codex 的 `UserShell`/审批/工具执行在更高层，不能把 composer 中的 `!` 文本或 Tab queue 解释为已授权命令。外部报告、旧候选、ZS1-098 锁文件和其他 owner 均未借用为本报告证据。
 

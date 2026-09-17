@@ -1,5 +1,0 @@
-# ZS1-024 independent source-file acceptance
-
-Controller read the complete frozen 222-line /6049-byte output-accumulator.ts and the complete worker report. It independently executed the original TypeScript implementation with nine behavior groups, including decoder flush, actual raw spill bytes, rolling-tail trimming, single-line truncation and failed output-file creation. The initial newline expectation failed; inspection of the actual context-only truncateTail branch explained the result, and the corrected probe passed. Both attempts are preserved. No source file was modified.
-
-The accepted per-file report enumerates every member, maps behavior to the actual Rust owners and named executed tests, and states source limitations and target differences. Source finish does not await close/sync/hash; a fullOutputPath is not completeness proof. Target host progress forwarding, safe public output retrieval and lifecycle cleanup remain unfinished. This acceptance covers only source understanding for ZS1-024, not product item111, the unreviewed truncate dependency, sibling bash/grep/find files or directory closure.

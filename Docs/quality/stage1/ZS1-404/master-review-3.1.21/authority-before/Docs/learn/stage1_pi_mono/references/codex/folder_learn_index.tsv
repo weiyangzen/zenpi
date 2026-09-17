@@ -1,6 +1,0 @@
-item_id	folder_path	folder_artifact	depends	status
-ZS1-350	.	Docs/learn/stage1_pi_mono/references/codex/current_folder_learn.md	ZS1-351	[ ]
-ZS1-351	codex-rs	Docs/learn/stage1_pi_mono/references/codex/codex-rs/current_folder_learn.md	ZS1-352	[ ]
-ZS1-352	codex-rs/tui	Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/current_folder_learn.md	ZS1-353	[ ]
-ZS1-353	codex-rs/tui/src	Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/current_folder_learn.md	ZS1-306,ZS1-307,ZS1-308,ZS1-309,ZS1-354	[ ]
-ZS1-354	codex-rs/tui/src/bottom_pane	Docs/learn/stage1_pi_mono/references/codex/codex-rs/tui/src/bottom_pane/current_folder_learn.md	ZS1-300,ZS1-301,ZS1-302,ZS1-303,ZS1-304,ZS1-305	[ ]

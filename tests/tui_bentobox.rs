@@ -508,6 +508,53 @@ fn restoring_tab_models_preserves_each_tab_and_clears_dirty_state() {
 }
 
 #[test]
+fn bentobox_focus_resize_collapse_persist_across_independent_restore() {
+    let mut state = TuiState::default();
+    assert!(state.focus_workspace_pane(PaneId::ProjectConversation));
+    assert!(state.adjust_workspace_split(FocusDirection::Right));
+    let resized = state.workspace_layout().ratios;
+    assert_eq!(state.toggle_workspace_pane(PaneId::Resources), Some(true));
+    assert!(state.focus_workspace_pane(PaneId::Gantt));
+    let checkpoint = state.project_checkpoint();
+
+    let mut restored = TuiState::new(32);
+    assert!(restored.restore_project_checkpoint(&checkpoint));
+    assert_eq!(restored.workspace_layout().ratios, resized);
+    assert!(
+        restored
+            .workspace_layout()
+            .collapsed
+            .contains(&PaneId::Resources)
+    );
+    assert_eq!(restored.workspace_layout().focused, Some(PaneId::Gantt));
+
+    assert_eq!(
+        restored.toggle_workspace_pane(PaneId::Resources),
+        Some(false)
+    );
+    restored.reset_workspace_layout();
+    assert_eq!(
+        restored.workspace_layout().ratios,
+        LayoutModel::new(TabId::Project).ratios
+    );
+    assert!(restored.workspace_layout().collapsed.is_empty());
+    assert_eq!(restored.workspace_layout().focused, None);
+
+    let mut reopened = TuiState::new(32);
+    assert!(reopened.restore_project_checkpoint(&restored.project_checkpoint()));
+    assert_eq!(reopened.workspace_layout(), restored.workspace_layout());
+}
+
+#[test]
+fn unavailable_pane_toggle_is_rejected_without_layout_mutation() {
+    let mut state = TuiState::default();
+    let before = state.workspace_layout().clone();
+    assert_eq!(state.toggle_workspace_pane(PaneId::Browser), None);
+    assert_eq!(state.toggle_workspace_pane(PaneId::Terminal), None);
+    assert_eq!(state.workspace_layout(), &before);
+}
+
+#[test]
 fn short_workspace_tab_cycle_skips_panes_that_have_no_screen_rows() {
     let mut terminal = Terminal::new(TestBackend::new(180, 7)).unwrap();
     let mut state = TuiState::default();

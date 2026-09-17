@@ -1,1 +1,0 @@
-- [ ] **ZS1-089** — 逐文件复核 zenpi .github/workflows/ci.yml；layer `L1` | Depends: ZS1-001 | Owner scope: 仅该owner完整现状与源差距 | Owned paths: `Docs/learn/stage1_pi_mono/targets/zenpi/files/.github/workflows/ci.yml_learn.md` | Validators: G-FILE；G-STAGE --item ZS1-089 | Rollback: 撤回该目标文件报告和本项状态，不覆盖源码 | Estimate: 2480 B；逐文件审核完整owner/模块接线/CI行为 | Estimated LOC: 0

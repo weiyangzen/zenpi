@@ -1,7 +1,0 @@
-diff --git a/Docs/quality/stage1/provider-kill319/google-first.log b/Docs/quality/stage1/provider-kill319/google-first.log
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/provider-kill319/google-first.log
-@@ -0,0 +1,2 @@
-+google partial PASS
-+google tool PASS

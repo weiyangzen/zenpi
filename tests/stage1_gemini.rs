@@ -643,7 +643,23 @@ fn unknown_model_uses_bounded_native_json_and_cannot_execute_tool() {
     let mut response = answer(signed(), "STOP");
     response["modelVersion"] = json!("future-model");
     let (url, requests, h) = serve(vec![("application/json".into(), response.to_string())]);
-    let b = backend(url);
+    let b = OpenAiCompatibleBackend::new_with_wire_api(
+        url,
+        Some("native-fixture-key".into()),
+        MODEL,
+        OpenAiWireApi::GoogleGenerativeAi,
+    )
+    .unwrap()
+    .with_model_registry(
+        "google".into(),
+        ModelRegistry::with_overrides(&[serde_json::from_value(json!({
+            "provider":"google","id":"future-model","version":"fixture-v1",
+            "tools":false,"streaming":false
+        }))
+        .unwrap()])
+        .unwrap(),
+    )
+    .unwrap();
     let mut done = false;
     assert!(
         b.complete_with_control(

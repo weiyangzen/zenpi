@@ -1,3 +1,0 @@
-api=0 pipe=diagnostic stop=watchdog outer_timeout=true elapsed_ms=2506 fixture_pids=["", ""] status=signal: 9 (SIGKILL) stdout= stderr=
-observed_fixture_success=false
-phase_file_before_cleanup_bytes=94
