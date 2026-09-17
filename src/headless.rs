@@ -8112,6 +8112,12 @@ fn execute_headless_slash(
                 message: error.to_string(),
             })
         }
+        SlashCommand::Worktree { action } => Ok(SlashExecution::Response(json!({
+            "command": "worktree",
+            "route": "local",
+            "action": action,
+            "message": "layer-2 worktree sub-tabs are owned by the interactive TUI host",
+        }))),
     }
 }
 

@@ -837,3 +837,78 @@ fn write_owner_checkpoint(
     }
     result.map_err(|e| e.to_string())
 }
+
+/// Maximum number of layer-2 sub-tabs retained per project.
+pub const MAX_PROJECT_SUBTABS: usize = 32;
+const MAX_WORKTREE_OUTPUT_BYTES: usize = 256 * 1024;
+
+/// One git worktree discovered for a project.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorktreeEntry {
+    pub path: std::path::PathBuf,
+    pub branch: Option<String>,
+    pub detached: bool,
+}
+
+fn run_git(project: &Path, args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(project)
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
+    }
+    if output.stdout.len() > MAX_WORKTREE_OUTPUT_BYTES {
+        return Err("git output exceeded the bound".to_owned());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Read-only `git worktree list` for one project.
+pub fn list_worktrees(project: &Path) -> Result<Vec<WorktreeEntry>, String> {
+    let text = run_git(project, &["worktree", "list", "--porcelain"])?;
+    let mut entries = Vec::new();
+    let mut path: Option<std::path::PathBuf> = None;
+    let mut detached = false;
+    let mut branch: Option<String> = None;
+    let mut flush = |path: &mut Option<std::path::PathBuf>,
+                     detached: &mut bool,
+                     branch: &mut Option<String>,
+                     entries: &mut Vec<WorktreeEntry>| {
+        if let Some(path) = path.take() {
+            entries.push(WorktreeEntry {
+                path,
+                branch: branch.take(),
+                detached: std::mem::take(detached),
+            });
+        }
+    };
+    for line in text.lines().chain(std::iter::once("")) {
+        if let Some(value) = line.strip_prefix("worktree ") {
+            flush(&mut path, &mut detached, &mut branch, &mut entries);
+            path = Some(std::path::PathBuf::from(value));
+        } else if line.strip_prefix("branch ").is_some() {
+            branch = line
+                .strip_prefix("branch ")
+                .map(|value| value.trim_start_matches("refs/heads/").to_owned());
+        } else if line == "detached" {
+            detached = true;
+        }
+    }
+    flush(&mut path, &mut detached, &mut branch, &mut entries);
+    Ok(entries)
+}
+
+/// Create a new worktree at `path` on a fresh branch `branch`.
+pub fn add_worktree(project: &Path, path: &Path, branch: &str) -> Result<(), String> {
+    let path = path.to_str().ok_or("worktree path is not utf-8")?;
+    run_git(project, &["worktree", "add", "-b", branch, path]).map(|_| ())
+}
+
+/// Remove a worktree (forced, as execution workers may leave it dirty).
+pub fn remove_worktree(project: &Path, path: &Path) -> Result<(), String> {
+    let path = path.to_str().ok_or("worktree path is not utf-8")?;
+    run_git(project, &["worktree", "remove", "--force", path]).map(|_| ())
+}

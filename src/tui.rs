@@ -118,6 +118,34 @@ pub const PROJECT_STYLES: [&str; 7] = [
     "cyan", "green", "yellow", "magenta", "blue", "red", "white",
 ];
 
+/// Layer-2 sub-tab kind within one project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubTabKind {
+    /// Reuses the layer-1 project workspace (default).
+    Main,
+    /// A dedicated `git worktree` for this project.
+    Worktree,
+    /// Explicit "work in the current place" choice (no new worktree).
+    InPlace,
+}
+
+/// One layer-2 tab inside a project. Default reuses the layer-1 information.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubTab {
+    pub name: String,
+    pub root: String,
+    pub kind: SubTabKind,
+}
+
+/// A clickable region in the layer-2 tab row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SubTabHit {
+    Select(usize),
+    AddWorktree,
+    AddInPlace,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectTabMetadata {
     pub cwd: String,
@@ -2462,6 +2490,9 @@ pub struct TuiState {
     project_transcripts: BTreeMap<String, VecDeque<TuiMessage>>,
     project_layouts: BTreeMap<String, LayoutModel>,
     project_metadata: BTreeMap<String, ProjectTabMetadata>,
+    project_subtabs: BTreeMap<String, Vec<SubTab>>,
+    active_subtab: BTreeMap<String, usize>,
+    subtab_hits: Vec<(Rect, SubTabHit)>,
     project_session_cursors: BTreeMap<String, ProjectSessionCursor>,
     project_checkpoint_dirty: bool,
     checkpoint_error: Option<String>,
@@ -2560,6 +2591,9 @@ impl TuiState {
             project_transcripts: BTreeMap::new(),
             project_layouts: BTreeMap::new(),
             project_metadata: BTreeMap::new(),
+            project_subtabs: BTreeMap::new(),
+            active_subtab: BTreeMap::new(),
+            subtab_hits: Vec::new(),
             project_session_cursors: BTreeMap::new(),
             project_checkpoint_dirty: false,
             checkpoint_error: None,
@@ -2871,6 +2905,153 @@ impl TuiState {
             "white" => Some(Color::White),
             _ => None,
         }
+    }
+
+    fn ensure_subtabs(&mut self) {
+        let project = self.active_project().to_owned();
+        if !self.project_subtabs.contains_key(&project) {
+            let root = self
+                .project_metadata
+                .get(&project)
+                .map(|metadata| metadata.cwd.clone())
+                .filter(|cwd| !cwd.is_empty())
+                .unwrap_or_else(|| self.project_cwd().display().to_string());
+            self.project_subtabs.insert(
+                project.clone(),
+                vec![SubTab {
+                    name: project.clone(),
+                    root,
+                    kind: SubTabKind::Main,
+                }],
+            );
+            self.active_subtab.insert(project, 0);
+        }
+    }
+
+    /// Layer-2 tabs of the active project (default reuses the layer-1 data).
+    pub fn subtabs(&mut self) -> Vec<SubTab> {
+        self.ensure_subtabs();
+        self.project_subtabs
+            .get(self.active_project())
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn active_subtab(&mut self) -> usize {
+        self.ensure_subtabs();
+        *self.active_subtab.get(self.active_project()).unwrap_or(&0)
+    }
+
+    pub fn subtab_select(&mut self, index: usize) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let len = self
+            .project_subtabs
+            .get(&project)
+            .map(Vec::len)
+            .unwrap_or(0);
+        if index < len {
+            self.active_subtab.insert(project, index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// "Work in the current place": add a layer-2 tab without a worktree.
+    pub fn subtab_add_in_place(&mut self, name: Option<String>) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let cwd = self.project_cwd().display().to_string();
+        let tabs = self.project_subtabs.entry(project.clone()).or_default();
+        if tabs.len() >= crate::project_workspace::MAX_PROJECT_SUBTABS {
+            return false;
+        }
+        let name = name.unwrap_or_else(|| format!("in-place-{}", tabs.len()));
+        tabs.push(SubTab {
+            name,
+            root: cwd,
+            kind: SubTabKind::InPlace,
+        });
+        let index = tabs.len() - 1;
+        self.active_subtab.insert(project, index);
+        true
+    }
+
+    /// Create a fresh `git worktree` and open it as a layer-2 tab.
+    pub fn subtab_add_worktree(&mut self, name: Option<String>) -> Result<String, String> {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let base = self.project_cwd();
+        let tabs = self.project_subtabs.entry(project.clone()).or_default();
+        if tabs.len() >= crate::project_workspace::MAX_PROJECT_SUBTABS {
+            return Err("too many sub-tabs".into());
+        }
+        let name = name.unwrap_or_else(|| format!("wt-{}", tabs.len()));
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        {
+            return Err("invalid worktree name".into());
+        }
+        let path = base.join(".zenpi-worktrees").join(&name);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        crate::project_workspace::add_worktree(&base, &path, &name)?;
+        tabs.push(SubTab {
+            name: name.clone(),
+            root: path.display().to_string(),
+            kind: SubTabKind::Worktree,
+        });
+        let index = tabs.len() - 1;
+        self.active_subtab.insert(project, index);
+        Ok(name)
+    }
+
+    pub fn subtab_close(&mut self, index: usize) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let cwd = self.project_cwd();
+        let Some(tabs) = self.project_subtabs.get_mut(&project) else {
+            return false;
+        };
+        if index == 0 || index >= tabs.len() {
+            return false;
+        }
+        let removed = tabs.remove(index);
+        if removed.kind == SubTabKind::Worktree {
+            let _ = crate::project_workspace::remove_worktree(
+                &cwd,
+                std::path::Path::new(&removed.root),
+            );
+        }
+        let active = self.active_subtab.entry(project).or_insert(0);
+        if *active >= tabs.len() {
+            *active = tabs.len().saturating_sub(1);
+        } else if *active > index {
+            *active -= 1;
+        }
+        true
+    }
+
+    pub fn subtab_move(&mut self, index: usize, target: usize) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let Some(tabs) = self.project_subtabs.get_mut(&project) else {
+            return false;
+        };
+        if index == 0 || index >= tabs.len() || tabs.len() < 3 {
+            return false;
+        }
+        let target = target.min(tabs.len() - 1).max(1);
+        if target == index {
+            return true;
+        }
+        let item = tabs.remove(index);
+        tabs.insert(target, item);
+        true
     }
 
     pub fn close_project_tab(&mut self, name: &str) -> bool {
@@ -5643,6 +5824,26 @@ impl TuiState {
                 return TuiAction::Redraw;
             }
         }
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+            && let Some((_, hit)) = self
+                .subtab_hits
+                .iter()
+                .find(|(rect, _)| rect.contains(position))
+        {
+            match *hit {
+                SubTabHit::Select(index) => {
+                    self.subtab_select(index);
+                }
+                SubTabHit::AddWorktree => match self.subtab_add_worktree(None) {
+                    Ok(name) => self.set_status(format!("worktree sub-tab: {name}")),
+                    Err(error) => self.set_status(format!("worktree add failed: {error}")),
+                },
+                SubTabHit::AddInPlace => {
+                    self.subtab_add_in_place(None);
+                }
+            }
+            return TuiAction::Redraw;
+        }
         let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, self.workspace_area);
         let panes: Vec<_> = adapter.visible_panes().collect();
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
@@ -7493,7 +7694,7 @@ impl TuiState {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),
+                Constraint::Length(2),
                 Constraint::Length(1),
                 Constraint::Min(1),
                 Constraint::Length(input_height),
@@ -7604,6 +7805,70 @@ impl TuiState {
             rect,
         );
         self.project_hits.push((rect, self.project_tabs.len()));
+        if area.height >= 2 {
+            self.render_subtabs(frame, Rect::new(area.x, area.y + 1, area.width, 1));
+        }
+    }
+
+    /// Layer-2 row: the active project's sub-tabs plus the two add choices
+    /// (`[~]` work in the current place, `[+]` create a new worktree).
+    fn render_subtabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.subtab_hits.clear();
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let tabs = self.subtabs();
+        let active = self.active_subtab();
+        let controls = " [~] [+] ";
+        let controls_width = UnicodeWidthStr::width(controls) as u16;
+        let limit = area.right().saturating_sub(controls_width);
+        let prefix = "  └ ";
+        frame.render_widget(
+            Paragraph::new(prefix).style(Style::default().fg(Color::DarkGray)),
+            Rect::new(area.x, area.y, UnicodeWidthStr::width(prefix) as u16, 1),
+        );
+        let mut x = area.x + UnicodeWidthStr::width(prefix) as u16;
+        for (index, tab) in tabs.iter().enumerate() {
+            if x >= limit {
+                break;
+            }
+            let text = truncate_to_width(
+                &format!(
+                    "{}{}{} ",
+                    if index == active { "[" } else { " " },
+                    tab.name,
+                    if index == active { "]" } else { " " }
+                ),
+                usize::from(limit.saturating_sub(x)).min(28),
+            );
+            let width = UnicodeWidthStr::width(text.as_str()) as u16;
+            if width == 0 {
+                break;
+            }
+            let rect = Rect::new(x, area.y, width, 1);
+            frame.render_widget(
+                Paragraph::new(text).style(Style::default().fg(if index == active {
+                    Color::Cyan
+                } else {
+                    Color::Gray
+                })),
+                rect,
+            );
+            self.subtab_hits.push((rect, SubTabHit::Select(index)));
+            x += width;
+        }
+        let in_place = Rect::new(limit, area.y, 4, 1);
+        frame.render_widget(
+            Paragraph::new(" [~]").style(Style::default().fg(Color::Magenta)),
+            in_place,
+        );
+        self.subtab_hits.push((in_place, SubTabHit::AddInPlace));
+        let worktree = Rect::new(limit + 4, area.y, 4, 1);
+        frame.render_widget(
+            Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
+            worktree,
+        );
+        self.subtab_hits.push((worktree, SubTabHit::AddWorktree));
     }
 
     fn render_workspace(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -9861,6 +10126,69 @@ pub fn dispatch_slash_command(
         }
         SlashCommand::Explore { args } => {
             dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Explore, &args);
+        }
+        SlashCommand::Worktree { action } => {
+            use crate::slash::WorktreeAction;
+            let message = match action {
+                WorktreeAction::List => {
+                    let active = state.active_subtab();
+                    state
+                        .subtabs()
+                        .iter()
+                        .enumerate()
+                        .map(|(index, tab)| {
+                            let kind = match tab.kind {
+                                SubTabKind::Main => "main",
+                                SubTabKind::Worktree => "worktree",
+                                SubTabKind::InPlace => "in-place",
+                            };
+                            format!(
+                                "{}{} [{kind}] {}",
+                                if index == active { "*" } else { " " },
+                                tab.name,
+                                tab.root
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+                WorktreeAction::Add { in_place, name } => {
+                    if in_place {
+                        if state.subtab_add_in_place(name) {
+                            "layer-2 tab added (in place)".to_owned()
+                        } else {
+                            "cannot add layer-2 tab".to_owned()
+                        }
+                    } else {
+                        match state.subtab_add_worktree(name) {
+                            Ok(name) => format!("worktree sub-tab added: {name}"),
+                            Err(error) => format!("worktree add failed: {error}"),
+                        }
+                    }
+                }
+                WorktreeAction::Select { index } => {
+                    if state.subtab_select(index) {
+                        format!("sub-tab selected: {index}")
+                    } else {
+                        format!("no such sub-tab: {index}")
+                    }
+                }
+                WorktreeAction::Close { index } => {
+                    if state.subtab_close(index) {
+                        format!("sub-tab closed: {index}")
+                    } else {
+                        format!("cannot close sub-tab: {index}")
+                    }
+                }
+                WorktreeAction::Move { index, target } => {
+                    if state.subtab_move(index, target) {
+                        format!("sub-tab moved: {index} -> {target}")
+                    } else {
+                        format!("cannot move sub-tab: {index}")
+                    }
+                }
+            };
+            state.push_message(MessageRole::System, message);
         }
     }
     if !state.is_busy() {

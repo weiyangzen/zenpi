@@ -190,6 +190,10 @@ pub enum SlashCommand {
     Sync {
         requirement: String,
     },
+    /// Operate on the active project's layer-2 worktree sub-tabs.
+    Worktree {
+        action: WorktreeAction,
+    },
     /// Dispatch one bounded Blueprint/domain execution target to the external
     /// execution owner.
     Execute {
@@ -214,6 +218,23 @@ pub enum ProjectAction {
     Rename { old: String, new: String },
     /// Set a project tab's display style from a small named palette.
     Style { name: String, style: String },
+}
+
+/// Layer-2 worktree sub-tab operations for the active project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum WorktreeAction {
+    List,
+    /// Create a new sub-tab: a fresh worktree, or "in place" (no worktree).
+    Add {
+        #[serde(default)]
+        in_place: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+    },
+    Select { index: usize },
+    Close { index: usize },
+    Move { index: usize, target: usize },
 }
 
 /// Recovery decisions require explicit host confirmation and never dispatch work.
@@ -453,6 +474,7 @@ impl SlashCommand {
             Self::Sync { .. } => "sync",
             Self::Execute { .. } => "execute",
             Self::Explore { .. } => "explore",
+            Self::Worktree { .. } => "worktree",
         }
     }
 
@@ -484,6 +506,7 @@ impl SlashCommand {
                 | Self::Sync { .. }
                 | Self::Execute { .. }
                 | Self::Explore { .. }
+                | Self::Worktree { .. }
                 | Self::Project { .. }
         )
     }
@@ -760,6 +783,13 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         usage: "/explore [start] <research-question...> | /explore status",
         summary: "dispatch an automatic research loop to an external owner",
     },
+    SlashCommandSpec {
+        name: "worktree",
+        aliases: &["wt", "subtab"],
+        route: SlashRoute::Local,
+        usage: "/worktree [list] | add [--in-place] [name] | select N | close N | move N M",
+        summary: "manage the active project layer-2 worktree sub-tabs",
+    },
 ];
 
 /// Look up a command specification by canonical name or alias.  The lookup
@@ -927,8 +957,45 @@ pub fn route_input(input: &str) -> Result<InputRoute, SlashError> {
 /// distinguish ordinary model text from an explicit user-shell request. A
 /// leading slash after optional whitespace is always a control command;
 /// malformed or unknown commands never silently reach the model.
-pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
-    if input.trim().is_empty() {
+fn parse_worktree(args: &[String]) -> Result<WorktreeAction, SlashError> {
+    use WorktreeAction as W;
+    let bad = || SlashError::UnexpectedArgument { command: "worktree" };
+    let index = |value: &str| value.parse::<usize>().map_err(|_| bad());
+    let in_place = |value: &str| {
+        value.eq_ignore_ascii_case("--in-place")
+            || value.eq_ignore_ascii_case("inplace")
+            || value.eq_ignore_ascii_case("in_place")
+    };
+    match args {
+        [] => Ok(W::List),
+        [a] if a.eq_ignore_ascii_case("list") => Ok(W::List),
+        [a] if a.eq_ignore_ascii_case("add") => Ok(W::Add {
+            in_place: false,
+            name: None,
+        }),
+        [a, b] if a.eq_ignore_ascii_case("add") && in_place(b) => Ok(W::Add {
+            in_place: true,
+            name: None,
+        }),
+        [a, n] if a.eq_ignore_ascii_case("add") => Ok(W::Add {
+            in_place: false,
+            name: Some(n.trim().to_owned()),
+        }),
+        [a, b, n] if a.eq_ignore_ascii_case("add") && in_place(b) => Ok(W::Add {
+            in_place: true,
+            name: Some(n.trim().to_owned()),
+        }),
+        [a, n] if a.eq_ignore_ascii_case("select") => Ok(W::Select { index: index(n)? }),
+        [a, n] if a.eq_ignore_ascii_case("close") => Ok(W::Close { index: index(n)? }),
+        [a, n, m] if a.eq_ignore_ascii_case("move") => Ok(W::Move {
+            index: index(n)?,
+            target: index(m)?,
+        }),
+        _ => Err(bad()),
+    }
+}
+
+pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {    if input.trim().is_empty() {
         return Ok(None);
     }
     if input.len() > MAX_SLASH_INPUT_BYTES {
@@ -1214,6 +1281,9 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         },
         "explore" => SlashCommand::Explore {
             args: args.to_vec(),
+        },
+        "worktree" | "wt" | "subtab" => SlashCommand::Worktree {
+            action: parse_worktree(args)?,
         },
         "sync" => {
             let requirement = args.join(" ");

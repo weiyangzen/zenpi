@@ -483,8 +483,9 @@ fn draw_session_selection(
         .draw(|frame| state.render_bentobox(frame, "test"))
         .unwrap();
     let area = terminal.backend().buffer().area;
-    // Top project row + header, single-line composer with borders, footer.
-    let workspace = ratatui::layout::Rect::new(0, 2, area.width, area.height - 6);
+    // Top project row + layer-2 sub-tab row + header, single-line composer
+    // with borders, footer.
+    let workspace = ratatui::layout::Rect::new(0, 3, area.width, area.height - 7);
     zenpi::tui::BentoBoxLayoutAdapter::new(state.workspace_layout(), workspace)
         .visible_panes()
         .find(|pane| pane.id == zenpi::layout::PaneId::SessionList)
@@ -640,4 +641,79 @@ fn layer1_project_tabs_move_rename_and_style() {
     assert!(state.style_project_tab("alpha", "CYAN"));
     assert!(!state.style_project_tab("alpha", "chartreuse"));
     assert!(!state.style_project_tab("missing", "green"));
+}
+
+#[test]
+fn layer2_subtabs_default_reuse_and_manage() {
+    use zenpi::slash::{SlashCommand, WorktreeAction};
+    use zenpi::tui::SubTabKind;
+
+    // Alias + add forms parse.
+    match zenpi::slash::parse("/wt add --in-place").unwrap() {
+        Some(SlashCommand::Worktree {
+            action: WorktreeAction::Add { in_place, name },
+        }) => {
+            assert!(in_place);
+            assert!(name.is_none());
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/worktree select 2").unwrap() {
+        Some(SlashCommand::Worktree {
+            action: WorktreeAction::Select { index },
+        }) => assert_eq!(index, 2),
+        other => panic!("unexpected: {other:?}"),
+    }
+
+    let mut state = TuiState::default();
+    // Default layer-2 reuses the layer-1 information: exactly one main tab.
+    let tabs = state.subtabs();
+    assert_eq!(tabs.len(), 1);
+    assert_eq!(tabs[0].kind, SubTabKind::Main);
+    assert_eq!(state.active_subtab(), 0);
+
+    // "work in the current place" adds without touching git.
+    assert!(state.subtab_add_in_place(Some("scratch".into())));
+    assert_eq!(state.active_subtab(), 1);
+    assert_eq!(state.subtabs()[1].kind, SubTabKind::InPlace);
+    assert!(state.subtab_add_in_place(None));
+    assert!(state.subtab_move(1, 2));
+    assert_eq!(state.subtabs()[2].name, "scratch");
+    // The main tab cannot be closed or moved.
+    assert!(!state.subtab_close(0));
+    assert!(!state.subtab_move(0, 1));
+    assert!(state.subtab_close(1));
+}
+
+#[test]
+fn worktree_helpers_create_list_and_remove() {
+    use std::process::Command;
+    let repo = tempdir().unwrap();
+    let root = repo.path();
+    let git = |args: &[&str]| {
+        let out = Command::new("git").arg("-C").arg(root).args(args).output().unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    git(&["config", "user.email", "t@example.invalid"]);
+    git(&["config", "user.name", "t"]);
+    fs::write(root.join("f.txt"), "x").unwrap();
+    git(&["add", "f.txt"]);
+    git(&["commit", "-qm", "base"]);
+
+    let before = zenpi::project_workspace::list_worktrees(root).unwrap();
+    assert_eq!(before.len(), 1);
+
+    let wt = root.join(".zenpi-worktrees").join("feature");
+    fs::create_dir_all(wt.parent().unwrap()).unwrap();
+    zenpi::project_workspace::add_worktree(root, &wt, "feature").unwrap();
+    let entries = zenpi::project_workspace::list_worktrees(root).unwrap();
+    assert_eq!(entries.len(), 2);
+    assert!(
+        entries.iter().any(|e| e.branch.as_deref() == Some("feature")),
+        "{entries:?}"
+    );
+
+    zenpi::project_workspace::remove_worktree(root, &wt).unwrap();
+    assert_eq!(zenpi::project_workspace::list_worktrees(root).unwrap().len(), 1);
 }
