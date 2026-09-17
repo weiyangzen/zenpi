@@ -35,6 +35,8 @@ pub enum RuntimeLifecycleState {
 
 const DEFAULT_COMPETE_TOKENS: u64 = 400_000;
 const DEFAULT_LOOP_TOKENS: u64 = 250_000;
+const DEFAULT_EXECUTE_TOKENS: u64 = 250_000;
+const DEFAULT_EXPLORE_TOKENS: u64 = 300_000;
 const DEFAULT_WALL_CLOCK_MS: u64 = 60 * 60 * 1_000;
 const DEFAULT_DISK_BYTES: u64 = 256 * 1024 * 1024;
 
@@ -107,6 +109,8 @@ impl SubmitOptions {
             tokens: match kind {
                 RuntimeIntentKind::Compete => DEFAULT_COMPETE_TOKENS,
                 RuntimeIntentKind::Loop => DEFAULT_LOOP_TOKENS,
+                RuntimeIntentKind::Execute => DEFAULT_EXECUTE_TOKENS,
+                RuntimeIntentKind::Explore => DEFAULT_EXPLORE_TOKENS,
             },
             wall_clock_ms: DEFAULT_WALL_CLOCK_MS,
             attempts: 1,

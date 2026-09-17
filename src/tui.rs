@@ -9709,6 +9709,12 @@ pub fn dispatch_slash_command(
                     .push_message(MessageRole::Error, format!("sync failed: {error}")),
             }
         }
+        SlashCommand::Execute { args } => {
+            dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Execute, &args);
+        }
+        SlashCommand::Explore { args } => {
+            dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Explore, &args);
+        }
     }
     if !state.is_busy() {
         state.set_status("Ready");

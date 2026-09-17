@@ -8074,6 +8074,44 @@ fn execute_headless_slash(
                 "queued": queued,
             })))
         }
+        SlashCommand::Execute { args } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "execute intent cannot be persisted while the agent is busy".into(),
+                });
+            };
+            crate::runtime_intent::runtime_intent_value_with_source(
+                agent,
+                crate::b3::RuntimeIntentKind::Execute,
+                &args,
+                runtime_source,
+            )
+            .map(SlashExecution::Response)
+            .map_err(|error| SlashDispatchError {
+                code: error.code(),
+                message: error.to_string(),
+            })
+        }
+        SlashCommand::Explore { args } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "explore intent cannot be persisted while the agent is busy".into(),
+                });
+            };
+            crate::runtime_intent::runtime_intent_value_with_source(
+                agent,
+                crate::b3::RuntimeIntentKind::Explore,
+                &args,
+                runtime_source,
+            )
+            .map(SlashExecution::Response)
+            .map_err(|error| SlashDispatchError {
+                code: error.code(),
+                message: error.to_string(),
+            })
+        }
     }
 }
 
@@ -8090,6 +8128,12 @@ fn slash_runtime_fingerprint(
             Some(json!({"kind": "compete", "args": args}))
         }
         crate::slash::SlashCommand::Loop { args } => Some(json!({"kind": "loop", "args": args})),
+        crate::slash::SlashCommand::Execute { args } => {
+            Some(json!({"kind": "execute", "args": args}))
+        }
+        crate::slash::SlashCommand::Explore { args } => {
+            Some(json!({"kind": "explore", "args": args}))
+        }
         _ => None,
     };
     let Some(value) = value else {
