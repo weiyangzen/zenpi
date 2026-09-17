@@ -717,3 +717,32 @@ fn worktree_helpers_create_list_and_remove() {
     zenpi::project_workspace::remove_worktree(root, &wt).unwrap();
     assert_eq!(zenpi::project_workspace::list_worktrees(root).unwrap().len(), 1);
 }
+
+#[test]
+fn interactive_double_row_tab_add_remove_reorder() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("a"));
+    assert!(state.open_project_tab("b"));
+    let order = |s: &TuiState| s.project_tabs().to_vec();
+    // "b" is active; Ctrl-B moves it left, Ctrl-F right (wrapping).
+    state.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL));
+    assert_eq!(order(&state)[1], "b");
+    state.handle_key(KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
+    assert!(state.active_project() == "b");
+
+    // Layer-2: Alt-I adds in place, Alt-,/. reorder, Alt-W closes.
+    state.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::ALT));
+    state.handle_key(KeyEvent::new(KeyCode::Char('i'), KeyModifiers::ALT));
+    assert_eq!(state.subtabs().len(), 3);
+    let last = state.subtabs()[2].name.clone();
+    state.handle_key(KeyEvent::new(KeyCode::Char(','), KeyModifiers::ALT));
+    assert_eq!(state.subtabs()[1].name, last);
+    state.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT));
+    assert_eq!(state.subtabs()[2].name, last);
+    let active = state.active_subtab();
+    state.handle_key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT));
+    assert_eq!(state.subtabs().len(), 2);
+    let _ = active;
+}

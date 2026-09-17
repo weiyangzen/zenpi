@@ -3039,6 +3039,13 @@ impl TuiState {
     pub fn subtab_move(&mut self, index: usize, target: usize) -> bool {
         self.ensure_subtabs();
         let project = self.active_project().to_owned();
+        let active_name = {
+            let active = *self.active_subtab.get(&project).unwrap_or(&0);
+            self.project_subtabs
+                .get(&project)
+                .and_then(|tabs| tabs.get(active))
+                .map(|tab| tab.name.clone())
+        };
         let Some(tabs) = self.project_subtabs.get_mut(&project) else {
             return false;
         };
@@ -3051,7 +3058,46 @@ impl TuiState {
         }
         let item = tabs.remove(index);
         tabs.insert(target, item);
+        if let Some(name) = active_name
+            && let Some(position) = tabs.iter().position(|tab| tab.name == name)
+        {
+            self.active_subtab.insert(project, position);
+        }
         true
+    }
+
+    /// Move the active layer-1 project tab by one position (wraps).
+    pub fn move_active_project(&mut self, delta: isize) -> bool {
+        let len = self.project_tabs.len();
+        if len < 2 {
+            return false;
+        }
+        let target = (self.active_project as isize + delta).rem_euclid(len as isize) as usize;
+        let name = self.active_project().to_owned();
+        self.move_project_tab(&name, target)
+    }
+
+    /// Move the active layer-2 sub-tab by one position (the Main tab stays at 0).
+    pub fn move_active_subtab(&mut self, delta: isize) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let len = self
+            .project_subtabs
+            .get(&project)
+            .map(Vec::len)
+            .unwrap_or(0);
+        if len < 3 {
+            return false;
+        }
+        let current = *self.active_subtab.get(&project).unwrap_or(&0);
+        if current == 0 {
+            return false;
+        }
+        let target = (current as isize + delta).clamp(1, len as isize - 1) as usize;
+        if target == current {
+            return false;
+        }
+        self.subtab_move(current, target)
     }
 
     pub fn close_project_tab(&mut self, name: &str) -> bool {
@@ -6297,6 +6343,30 @@ impl TuiState {
                             TuiAction::Redraw
                         });
                 }
+                KeyCode::Char(',') => {
+                    self.move_active_subtab(-1);
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('.') => {
+                    self.move_active_subtab(1);
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('n') => {
+                    match self.subtab_add_worktree(None) {
+                        Ok(name) => self.set_status(format!("worktree sub-tab: {name}")),
+                        Err(error) => self.set_status(format!("worktree add failed: {error}")),
+                    }
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('i') => {
+                    self.subtab_add_in_place(None);
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('w') => {
+                    let index = self.active_subtab();
+                    self.subtab_close(index);
+                    return TuiAction::Redraw;
+                }
                 _ => {}
             }
         }
@@ -6384,6 +6454,15 @@ impl TuiState {
         let modifiers = key.modifiers;
         if modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
+                // Layer-1 tab order: Ctrl-B/F move the active project tab.
+                KeyCode::Char('b') => {
+                    self.move_active_project(-1);
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('f') => {
+                    self.move_active_project(1);
+                    return TuiAction::Redraw;
+                }
                 // Ctrl-C is an interrupt while a provider turn is active;
                 // quitting in that state would discard a usable session
                 // instead of returning the user to an idle prompt. Ctrl-D
@@ -7639,11 +7718,11 @@ impl TuiState {
             } else if self.adjacent_paste().is_some() {
                 " Alt-Enter expand paste · Left/Right move · Backspace/Delete remove · Enter send "
             } else if area.width < 100 {
-                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Tab panes · Ctrl-J newline · Ctrl-R history · Ctrl-C stop · /help input "
+                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Ctrl-B/F tab order · Alt-,/. subtab order · Alt-N/I/W subtab · Tab panes · Ctrl-J newline · Ctrl-R history · Ctrl-C stop · /help input "
             } else if self.external_editor_shortcut_available() {
-                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Tab panes · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Ctrl-B/F tab order · Alt-,/. subtab order · Alt-N/I/W subtab · Tab panes · Ctrl-G editor · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
             } else {
-                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Tab panes · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
+                " Enter send · Ctrl-T folder · Ctrl-Tab project · Ctrl-W close · Ctrl-B/F tab order · Alt-,/. subtab order · Alt-N/I/W subtab · Tab panes · Ctrl-U line kill · Ctrl-Y yank · Ctrl-C stop · Alt-R reasoning · Alt-C copy · Alt-B blocks · /help input "
             },
             usize::from(area.width),
         );

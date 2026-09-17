@@ -1,9 +1,9 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-17T15:31:24+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-18T00:39:33+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `8642a466ad5b6c40d0c67e4a40276e2e769ce234b94bf7ec894e31e45f8f4c6f`
-- 生成时间：2026-09-17T15:31:24+08:00
+- blueprint digest: `2e123c050ba5a225811abab3c54626f3f9bdbad7c2aaace79cc30f6dd56a7bc6`
+- 生成时间：2026-09-18T00:39:33+08:00
 
 清单项 `[x]` **129/129** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
 
@@ -140,7 +140,7 @@ gantt
     ZS1-116 外部执行结果的可验证产物与主控验收 :done, ZS1-116, 13, 1s
     ZS1-118 Provider 开放与官方/第三方供应商对齐 :done, ZS1-118, 11, 1s
     ZS1-119 `/sync` 用户要求同步到 single-authority bluepri :done, ZS1-119, 12, 1s
-    ZS1-140 TUI 一层 project tab：增/减/调位置/重命名/每项目风格 :done, ZS1-140, 5, 1s
+    ZS1-140 TUI 顶部双排 tab 的交互式增/减/调换顺序（一层 project + 二 :done, ZS1-140, 5, 1s
     ZS1-141 一层 tab 增加工作文件夹支持本地与 SSH 远端 :done, ZS1-141, 6, 1s
     ZS1-142 TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号 :done, ZS1-142, 6, 1s
     ZS1-144 命令补齐：/execute /explore /addloop 的语义与实现 :done, ZS1-144, 13, 1s
@@ -263,7 +263,7 @@ gantt
 | ZS1-117 | [x] | L5 | ZS1-106,ZS1-108,ZS1-109,ZS1-110,ZS1-111,ZS1-112,ZS1-115,ZS1-116 | — | 生产入口、边界故障与轻量预算验收 |
 | ZS1-118 | [x] | L3 | ZS1-107,ZS1-091 | — | Provider 开放与官方/第三方供应商对齐 |
 | ZS1-119 | [x] | L3 | ZS1-118 | — | `/sync` 用户要求同步到 single-authority blueprint 并触发执行 |
-| ZS1-140 | [x] | L3 | ZS1-121 | — | TUI 一层 project tab：增/减/调位置/重命名/每项目风格 |
+| ZS1-140 | [x] | L3 | ZS1-121 | — | TUI 顶部双排 tab 的交互式增/减/调换顺序（一层 project + 二层 sub-tab）+重命名/每项目风格 |
 | ZS1-141 | [x] | L3 | ZS1-140 | — | 一层 tab 增加工作文件夹支持本地与 SSH 远端 |
 | ZS1-142 | [x] | L3 | ZS1-140 | — | TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号单击新建、长按双 logo） |
 | ZS1-143 | [x] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | — | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
