@@ -5814,12 +5814,31 @@ fn backend_from_effective(
             "openai".into()
         }
     });
+    // Fault tolerance: a configured reasoning effort that the selected
+    // model/wire does not advertise must not brick startup. Drop it (a stale
+    // copied config or an uncatalogued model is common) and keep the model;
+    // explicit runtime `/reasoning` stays strict.
+    let mut reasoning_effort = effective.model_reasoning_effort;
+    if let Some(effort) = reasoning_effort.clone()
+        && let Ok(descriptor) = registry.resolve(&provider, &model)
+        && descriptor
+            .validate_reasoning(
+                crate::backend::ProviderCapabilities::for_wire_api(wire_api),
+                Some(effort.as_str()),
+            )
+            .is_err()
+    {
+        eprintln!(
+            "zenpi: ignoring configured reasoning effort `{effort}`: not supported by {provider}/{model}"
+        );
+        reasoning_effort = None;
+    }
     let backend = OpenAiCompatibleBackend::from_values_with_settings_and_timeout(
         base_url,
         api_key,
         model,
         wire_api,
-        effective.model_reasoning_effort,
+        reasoning_effort,
         effective.model_verbosity,
         std::time::Duration::from_secs(effective.timeout_seconds.unwrap_or(120)),
     )?
