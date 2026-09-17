@@ -536,3 +536,266 @@ fn horizontal_split_drag_is_persisted_without_overlaps() {
         );
     }
 }
+
+#[test]
+fn alt_m_focuses_the_arch_master_console_and_submits_bash() {
+    use zenpi::tool_runtime::MasterSessionCommand;
+    use zenpi::tui::LeftPrompt;
+
+    let mut state = TuiState::default();
+    assert_eq!(state.left_prompt(), LeftPrompt::Discussion);
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.left_prompt(), LeftPrompt::Arch);
+
+    for character in "!echo hi".chars() {
+        state.handle_key(key(KeyCode::Char(character)));
+    }
+    assert_eq!(state.arch_input(), "!echo hi");
+    // The discussion draft is a separate buffer and is never touched.
+    assert_eq!(state.input(), "");
+
+    let action = state.handle_key(key(KeyCode::Enter));
+    assert!(matches!(
+        action,
+        TuiAction::SubmitArch(MasterSessionCommand::Bash(command)) if command == "echo hi"
+    ));
+    assert_eq!(state.arch_input(), "");
+    assert!(state.master_busy());
+    assert_eq!(
+        state.take_arch_intent(),
+        Some(MasterSessionCommand::Bash("echo hi".into()))
+    );
+
+    // Esc returns focus to the discussion prompt without losing the console.
+    assert_eq!(
+        state.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::ALT)),
+        TuiAction::Redraw
+    );
+    assert_eq!(state.left_prompt(), LeftPrompt::Discussion);
+}
+
+#[test]
+fn clicking_the_arch_prompt_focuses_the_master_console() {
+    use zenpi::tui::LeftPrompt;
+
+    let mut state = TuiState::default();
+    let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 3, 140, 33));
+    let arch = adapter.pane(PaneId::Arch).unwrap().rect;
+    let (_, arch_prompt) = zenpi::layout::arch_prompt_group(
+        zenpi::layout::PaneRect::new(arch.x, arch.y, arch.width, arch.height),
+        zenpi::tui::ARCH_PROMPT_PANE_ROWS,
+    );
+    state.handle_mouse(mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        arch_prompt.x + 2,
+        arch_prompt.y + 1,
+    ));
+    assert_eq!(state.left_prompt(), LeftPrompt::Arch);
+    state.handle_key(key(KeyCode::Char('x')));
+    assert_eq!(state.arch_input(), "x");
+
+    let conversation = adapter.pane(PaneId::ProjectConversation).unwrap().rect;
+    let (_, discussion_prompt) = zenpi::layout::conversation_prompt_group(
+        zenpi::layout::PaneRect::new(
+            conversation.x,
+            conversation.y,
+            conversation.width,
+            conversation.height,
+        ),
+        zenpi::tui::PROMPT_PANE_ROWS,
+    );
+    state.handle_mouse(mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        discussion_prompt.x + 2,
+        discussion_prompt.y + 1,
+    ));
+    assert_eq!(state.left_prompt(), LeftPrompt::Discussion);
+}
+
+#[test]
+fn arch_console_transcript_is_isolated_from_the_discussion_lane() {
+    let mut state = TuiState::default();
+    state.push_message(MessageRole::User, "discussion-only");
+    state.push_arch_message(MessageRole::User, "!arch-only");
+    assert_eq!(state.message_count(), 1);
+    assert_eq!(state.arch_message_count(), 1);
+    assert_eq!(state.arch_messages().next().unwrap().text, "!arch-only");
+
+    let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(text.contains("arch-only"));
+    assert!(text.contains("discussion-only"));
+}
+
+#[test]
+fn arch_steering_joins_the_active_master_turn_instead_of_forking() {
+    use zenpi::tool_runtime::{MasterSessionCommand, MasterSessionInputError};
+
+    let mut state = TuiState::default();
+    state.set_arch_input("!echo one");
+    assert!(matches!(
+        state.submit_arch_prompt(),
+        Ok(TuiAction::SubmitArch(MasterSessionCommand::Bash(_)))
+    ));
+    state.set_arch_input("!echo two");
+    assert_eq!(
+        state.submit_arch_prompt().unwrap_err(),
+        MasterSessionInputError::Busy
+    );
+    state.set_arch_input("slow the workers down");
+    assert_eq!(
+        state.submit_arch_prompt().unwrap(),
+        TuiAction::SubmitArch(MasterSessionCommand::Steer("slow the workers down".into()))
+    );
+    assert!(state.master_busy());
+}
+
+#[test]
+fn discussion_and_arch_select_independent_zone_models() {
+    use zenpi::view_model::{ViewModelError, Zone};
+
+    let mut state = TuiState::default();
+    assert_eq!(state.zone_model(Zone::Discussion), None);
+    assert_eq!(state.zone_model(Zone::Arch), None);
+
+    state
+        .set_zone_model(Zone::Discussion, Some("discussion-a".into()))
+        .unwrap();
+    state
+        .set_zone_model(Zone::Arch, Some("arch-b".into()))
+        .unwrap();
+    assert_eq!(state.zone_model(Zone::Discussion), Some("discussion-a"));
+    assert_eq!(state.zone_model(Zone::Arch), Some("arch-b"));
+    assert_eq!(
+        state.effective_zone_model(Zone::Discussion, Some("global-g")),
+        Some("discussion-a")
+    );
+    assert_eq!(
+        state.effective_zone_model(Zone::Worker, Some("global-g")),
+        Some("global-g")
+    );
+
+    // Workers never own a model choice.
+    assert!(matches!(
+        state.set_zone_model(Zone::Worker, Some("worker-c".into())),
+        Err(ViewModelError::Invalid { .. })
+    ));
+    assert_eq!(state.zone_model(Zone::Worker), None);
+
+    // A blank or control-bearing identity fails closed and changes nothing.
+    assert!(
+        state
+            .set_zone_model(Zone::Arch, Some("bad\nmodel".into()))
+            .is_err()
+    );
+    assert_eq!(state.zone_model(Zone::Arch), Some("arch-b"));
+
+    // Clearing a zone override restores the global fallback.
+    state.set_zone_model(Zone::Discussion, None).unwrap();
+    assert_eq!(state.zone_model(Zone::Discussion), None);
+    assert_eq!(
+        state.effective_zone_model(Zone::Discussion, Some("global-g")),
+        Some("global-g")
+    );
+}
+
+#[test]
+fn zone_concurrency_is_single_for_talk_zones_and_project_defined_for_workers() {
+    use zenpi::view_model::Zone;
+
+    let mut state = TuiState::default();
+    assert_eq!(state.worker_concurrency(), 1);
+    for zone in [Zone::Discussion, Zone::Arch, Zone::Worker] {
+        assert_eq!(state.zone_concurrency(zone), 1);
+    }
+
+    // The active layer-2 workspace defines the worker pool size. Talk zones
+    // stay single-concurrency regardless of the project's worker count.
+    assert!(state.subtab_concurrency(0, 3));
+    assert_eq!(state.worker_concurrency(), 4);
+    assert_eq!(state.zone_concurrency(Zone::Worker), 4);
+    assert_eq!(state.zone_concurrency(Zone::Discussion), 1);
+    assert_eq!(state.zone_concurrency(Zone::Arch), 1);
+}
+
+#[test]
+fn zone_models_round_trip_through_a_restart_snapshot() {
+    use zenpi::view_model::{Zone, ZoneModels};
+
+    let mut state = TuiState::default();
+    state
+        .set_zone_model(Zone::Discussion, Some("discussion-a".into()))
+        .unwrap();
+    state
+        .set_zone_model(Zone::Arch, Some("arch-b".into()))
+        .unwrap();
+    let encoded = serde_json::to_value(state.zone_models()).unwrap();
+    let decoded: ZoneModels = serde_json::from_value(encoded).unwrap();
+
+    let mut restarted = TuiState::default();
+    assert!(restarted.restore_zone_models(decoded).unwrap());
+    assert_eq!(restarted.zone_model(Zone::Discussion), Some("discussion-a"));
+    assert_eq!(restarted.zone_model(Zone::Arch), Some("arch-b"));
+    // Restoring the same snapshot is idempotent.
+    assert!(
+        !restarted
+            .restore_zone_models(restarted.zone_models().clone())
+            .unwrap()
+    );
+}
+
+#[test]
+fn focused_arch_model_selection_does_not_disturb_the_discussion_agent() {
+    use zenpi::view_model::Zone;
+    use zenpi::tui::LeftPrompt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut agent = Agent::with_echo(SessionStore::open(dir.path().join("s.jsonl")).unwrap());
+    let mut state = TuiState::default();
+    assert!(state.set_left_prompt(LeftPrompt::Arch));
+
+    let action = dispatch_slash_command(
+        SlashCommand::Model {
+            name: Some("arch-model".into()),
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert!(matches!(action, zenpi::tui::SlashDispatchAction::Continue));
+    assert_eq!(state.zone_model(Zone::Arch), Some("arch-model"));
+    assert_eq!(state.zone_model(Zone::Discussion), None);
+    assert_eq!(agent.zone_model(Zone::Arch), Some("arch-model"));
+    // The discussion agent's active model is untouched by an arch selection.
+    assert_eq!(agent.snapshot().model, None);
+
+    // Selecting on the discussion zone updates the shared global model.
+    assert!(state.set_left_prompt(LeftPrompt::Discussion));
+    dispatch_slash_command(
+        SlashCommand::Model {
+            name: Some("discussion-model".into()),
+        },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert_eq!(state.zone_model(Zone::Discussion), Some("discussion-model"));
+    assert_eq!(agent.zone_model(Zone::Discussion), Some("discussion-model"));
+    assert_eq!(agent.snapshot().model.as_deref(), Some("discussion-model"));
+    // The arch override is retained and independent.
+    assert_eq!(agent.zone_model(Zone::Arch), Some("arch-model"));
+}

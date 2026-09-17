@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 
+use thiserror::Error;
+
 use crate::tools::{
     SideEffectPolicy, ToolCall, ToolContext, ToolError, ToolErrorCode, ToolExecutionMode,
     ToolFailure, ToolPreview, ToolRegistry, ToolResult,
@@ -18,6 +20,94 @@ use crate::tools::{
 
 pub const MAX_BATCH_CALLS: usize = 32;
 pub const MAX_BATCH_BYTES: usize = 256 * 1024;
+
+/// Maximum bytes accepted for one lower-left Arch console submission (ZS1-148).
+/// The arch pane is a conversation that belongs to the master session, so its
+/// input shares the prompt-size budget instead of growing without bound.
+pub const MAX_MASTER_SESSION_INPUT_BYTES: usize = 16 * 1024;
+
+/// A classified submission from the lower-left Arch console (ZS1-148).
+///
+/// The arch pane is a conversation, but it belongs to the **master session**:
+/// unlike the resident discussion prompt it can drive the operator console. A
+/// `!command` submission becomes a bounded local bash command executed by the
+/// existing user-shell owner; anything else is a steering instruction for the
+/// active master turn that must join (never fork) the single master worker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MasterSessionCommand {
+    /// A local shell command with the leading `!` already stripped.
+    Bash(String),
+    /// A steering instruction for the active master turn.
+    Steer(String),
+}
+
+impl MasterSessionCommand {
+    pub const fn is_bash(&self) -> bool {
+        matches!(self, Self::Bash(_))
+    }
+
+    /// The exact text line shown in the arch transcript. Bash submissions keep
+    /// the leading marker so the console remains auditable.
+    pub fn display(&self) -> String {
+        match self {
+            Self::Bash(command) => format!("!{command}"),
+            Self::Steer(text) => text.clone(),
+        }
+    }
+}
+
+/// Typed rejection for the arch master-session console. A rejection never
+/// executes anything and never consumes the operator's draft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum MasterSessionInputError {
+    #[error("master session input is empty")]
+    Empty,
+    #[error("master session input exceeds {MAX_MASTER_SESSION_INPUT_BYTES} bytes")]
+    TooLong,
+    #[error("master session bash command is empty")]
+    EmptyBash,
+    #[error("master session input contains a control character")]
+    ControlCharacter,
+    #[error("master session is busy; steer or wait for the active turn")]
+    Busy,
+}
+
+/// Classify one Arch console submission into the single command the master
+/// session may execute (ZS1-148). This is pure and never executes anything so
+/// the TUI and the headless owner share exactly the same bounded contract
+/// before handing the result to the existing user-shell/steer routes.
+///
+/// Bash commands keep only the text after `!`; steering keeps the trimmed
+/// instruction. Control characters (other than tab/newline) are rejected so
+/// the console cannot smuggle terminal escapes through a steering turn.
+pub fn classify_master_session_input(
+    text: &str,
+) -> Result<MasterSessionCommand, MasterSessionInputError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err(MasterSessionInputError::Empty);
+    }
+    if trimmed.len() > MAX_MASTER_SESSION_INPUT_BYTES {
+        return Err(MasterSessionInputError::TooLong);
+    }
+    if trimmed
+        .chars()
+        .any(|character| character.is_control() && !matches!(character, '\t' | '\n'))
+    {
+        return Err(MasterSessionInputError::ControlCharacter);
+    }
+    match trimmed.strip_prefix('!') {
+        Some(rest) => {
+            let command = rest.trim();
+            if command.is_empty() {
+                Err(MasterSessionInputError::EmptyBash)
+            } else {
+                Ok(MasterSessionCommand::Bash(command.to_owned()))
+            }
+        }
+        None => Ok(MasterSessionCommand::Steer(trimmed.to_owned())),
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct ToolBatchOptions {

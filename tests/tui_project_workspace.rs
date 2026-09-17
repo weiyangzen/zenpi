@@ -773,6 +773,88 @@ fn project_opens_on_current_layer_and_worktree_rename_concurrency() {
     assert_eq!(state.subtabs()[active].concurrency, 1);
 }
 
+fn find_col(terminal: &Terminal<TestBackend>, row: u16, needle: &str) -> u16 {
+    let width = terminal.backend().buffer().area.width;
+    let line: String = (0..width)
+        .map(|x| terminal.backend().buffer()[(x, row)].symbol())
+        .collect();
+    let byte = line
+        .find(needle)
+        .unwrap_or_else(|| panic!("{needle:?} not on row {row}: {line:?}"));
+    line[..byte].chars().count() as u16
+}
+
+fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
+    MouseEvent {
+        kind,
+        column,
+        row,
+        modifiers: KeyModifiers::NONE,
+    }
+}
+
+#[test]
+fn mouse_drag_reorders_project_and_subtab_rows() {
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("alpha"));
+    assert!(state.open_project_tab("beta"));
+    assert!(state.open_project_tab("gamma"));
+    assert_eq!(state.project_tabs(), &["default", "alpha", "beta", "gamma"]);
+    assert!(state.subtab_add_in_place(Some("one".into())));
+    assert!(state.subtab_add_in_place(Some("two".into())));
+
+    let mut terminal = Terminal::new(TestBackend::new(120, 20)).unwrap();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+
+    // Drag layer-1 "gamma" (already active, so the press does not switch the
+    // active project) onto "alpha": it lands at the released column while the
+    // active project and its sub-tabs stay selected.
+    let gamma = find_col(&terminal, 0, "gamma");
+    let alpha = find_col(&terminal, 0, "alpha");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), gamma, 0));
+    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), alpha, 0));
+    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), alpha, 0));
+    assert_eq!(state.project_tabs(), &["default", "gamma", "alpha", "beta"]);
+    assert_eq!(state.active_project(), "gamma");
+
+    // Drag layer-2 "one" onto "two" with the same gesture.
+    let one = find_col(&terminal, 1, "one");
+    let two = find_col(&terminal, 1, "two");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), one, 1));
+    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), two, 1));
+    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), two, 1));
+    let names: Vec<String> = state.subtabs().into_iter().map(|tab| tab.name).collect();
+    assert_eq!(names, &["gamma", "two", "one"]);
+}
+
+#[test]
+fn layer2_opens_are_isolated_from_layer1_and_each_other() {
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("alpha"));
+    let layer1_root = state.active_subtab_root();
+    assert!(state.subtab_add_in_place(Some("one".into())));
+    let first = state.active_subtab_root();
+    assert_ne!(
+        first, layer1_root,
+        "a layer-2 open must not share the layer-1 workspace"
+    );
+    assert!(state.subtab_add_in_place(Some("one".into())));
+    let second = state.active_subtab_root();
+    assert_ne!(
+        second, first,
+        "two layer-2 opens must not share one workspace"
+    );
+    let tabs = state.subtabs();
+    assert!(!tabs[0].is_isolated(), "the default Main tab views layer 1");
+    assert_eq!(
+        tabs.iter().filter(|tab| tab.is_isolated()).count(),
+        2,
+        "each explicit layer-2 open carries its own workspace"
+    );
+}
+
 #[test]
 fn worktree_rename_and_concurrency_commands_parse() {
     use zenpi::slash::{SlashCommand, WorktreeAction};

@@ -28,6 +28,7 @@ use crate::layout::{
     LayoutError, LayoutModel, LayoutPreferences, MAX_LAYOUT_PREFERENCES_BYTES, TabId,
 };
 use crate::security::{SecretHandle, SecretRevocation};
+use crate::view_model::ZoneModels;
 
 /// The directory name created below the user's home directory.
 pub const ZENPI_DIR: &str = ".zenpi";
@@ -112,6 +113,7 @@ impl ProviderProfile {
             model_overrides: self.model_overrides,
             default_profile: None,
             profiles: BTreeMap::new(),
+            zone_models: ZoneModels::default(),
         }
     }
 
@@ -254,6 +256,11 @@ pub struct ConfigFile {
     pub supports_websockets: Option<bool>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub model_overrides: Vec<crate::providers::registry::ModelOverride>,
+    /// Per-zone model overrides for the discussion and arch TUI regions
+    /// (ZS1-152). These are non-secret and survive a restart; the worker pool
+    /// continues to use the global `model`.
+    #[serde(default, skip_serializing_if = "ZoneModels::is_empty")]
+    pub zone_models: ZoneModels,
 }
 
 impl ConfigFile {
@@ -289,6 +296,9 @@ impl ConfigFile {
             64,
         )?;
         validate_optional("model_verbosity", self.model_verbosity.as_deref(), 64)?;
+        self.zone_models
+            .validate()
+            .map_err(|error| ConfigError::Invalid(format!("zone_models: {error}")))?;
         if self
             .timeout_seconds
             .is_some_and(|seconds| !(1..=3600).contains(&seconds))
@@ -338,7 +348,11 @@ impl ConfigFile {
         let profile = self.profiles.get(name).ok_or_else(|| {
             ConfigError::Invalid(format!("provider profile `{name}` does not exist"))
         })?;
-        Ok((Some(name.to_owned()), profile.clone().into_flat()))
+        // Zone model overrides are a global TUI policy, not a provider-profile
+        // field, so they are carried through profile selection unchanged.
+        let mut flat = profile.clone().into_flat();
+        flat.zone_models = self.zone_models.clone();
+        Ok((Some(name.to_owned()), flat))
     }
 }
 
@@ -482,9 +496,30 @@ pub struct EffectiveConfig {
     pub requires_openai_auth: bool,
     pub supports_websockets: bool,
     pub model_overrides: Vec<crate::providers::registry::ModelOverride>,
+    /// Resolved per-zone model overrides for the discussion and arch regions
+    /// (ZS1-152). Use [`EffectiveConfig::zone_model`] to apply the global
+    /// fallback.
+    pub zone_models: ZoneModels,
 }
 
 impl EffectiveConfig {
+    /// Effective model for one TUI zone. Discussion and arch prefer an explicit
+    /// zone override; the worker pool and any zone without an override use the
+    /// resolved global `model`.
+    pub fn zone_model(&self, zone: crate::view_model::Zone) -> Option<&str> {
+        self.zone_models.effective(zone, self.model.as_deref())
+    }
+
+    /// Concurrency quota for one zone. Discussion and arch are single
+    /// concurrency; workers use the supplied project-defined count.
+    pub const fn zone_concurrency(
+        &self,
+        zone: crate::view_model::Zone,
+        project_workers: u32,
+    ) -> u32 {
+        zone.concurrency(project_workers)
+    }
+
     /// Issue an opaque credential capability for a single Blueprint policy.
     /// The API key remains private to configuration/backend setup and is never
     /// serialized as part of the handle or policy evidence.
@@ -519,6 +554,7 @@ impl std::fmt::Debug for EffectiveConfig {
             .field("max_retries", &self.max_retries)
             .field("requires_openai_auth", &self.requires_openai_auth)
             .field("supports_websockets", &self.supports_websockets)
+            .field("zone_models", &self.zone_models)
             .finish()
     }
 }
@@ -698,6 +734,7 @@ pub fn resolve(
         requires_openai_auth,
         supports_websockets,
         model_overrides: config.model_overrides.clone(),
+        zone_models: config.zone_models.clone(),
     })
 }
 
@@ -958,6 +995,7 @@ fn import_codex_from_root(codex_root: impl AsRef<Path>) -> Result<CodexImport, C
         requires_openai_auth,
         supports_websockets,
         model_overrides: Vec::new(),
+        zone_models: ZoneModels::default(),
     };
     config.validate()?;
     let api_key = match fs::read_to_string(&source_auth) {

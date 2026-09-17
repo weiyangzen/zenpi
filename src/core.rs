@@ -405,6 +405,10 @@ pub struct Agent {
     active_turn_id: Option<String>,
     active_steerable: bool,
     model: Option<String>,
+    /// Per-zone model selections for the discussion and arch TUI regions
+    /// (ZS1-152). These are validated against the backend before being stored;
+    /// the worker pool continues to use the agent's active `model`.
+    zone_models: crate::view_model::ZoneModels,
     last_error: Option<String>,
     events: Vec<AgentEvent>,
     live_tool_sink: Option<LiveToolEventSink>,
@@ -521,6 +525,7 @@ impl Agent {
             active_turn_id: None,
             active_steerable: true,
             model,
+            zone_models: crate::view_model::ZoneModels::default(),
             last_error: None,
             events: Vec::new(),
             live_tool_sink: None,
@@ -1174,6 +1179,50 @@ impl Agent {
             "budget": self.context_budget(), "catalog": self.backend.model_catalog(),
             "registry_bound": active.is_some(), "reasoning_effort": self.backend.reasoning_effort(),
         }))
+    }
+
+    /// Per-zone model overrides currently held by this agent (ZS1-152).
+    pub fn zone_models(&self) -> &crate::view_model::ZoneModels {
+        &self.zone_models
+    }
+
+    /// Effective model for a TUI zone: an explicit discussion/arch override
+    /// wins, otherwise the agent's active model is used. The worker pool always
+    /// uses the active model.
+    pub fn zone_model(&self, zone: crate::view_model::Zone) -> Option<&str> {
+        self.zone_models.effective(zone, self.model.as_deref())
+    }
+
+    /// Replace the model selection for one model-selecting zone (ZS1-152).
+    ///
+    /// This never changes the agent's active/global model and never changes the
+    /// worker pool. `None` clears the override so the zone falls back to the
+    /// active model. The backend must accept the identity and the owner must be
+    /// idle, so a rejection leaves both the agent and its journal untouched.
+    pub fn set_zone_model(
+        &mut self,
+        zone: crate::view_model::Zone,
+        model: Option<String>,
+    ) -> Result<(), AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        if self.phase == AgentPhase::Running {
+            return Err(AgentError::NotIdle);
+        }
+        if !zone.selects_model() {
+            return Err(AgentError::InvalidTurn(
+                "the worker pool does not select its own model".into(),
+            ));
+        }
+        if let Some(model) = model.as_deref() {
+            self.backend.validate_model(Some(model))?;
+        }
+        let mut next = self.zone_models.clone();
+        next.set(zone, model)
+            .map_err(|error| AgentError::InvalidTurn(error.to_string()))?;
+        self.zone_models = next;
+        Ok(())
     }
 
     pub fn snapshot(&self) -> AgentSnapshot {

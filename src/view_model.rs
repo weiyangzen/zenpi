@@ -139,6 +139,158 @@ pub enum ViewModelError {
     StreamClosed,
 }
 
+/// Maximum bytes accepted for one zone-scoped model identity.
+pub const MAX_ZONE_MODEL_BYTES: usize = 256;
+
+/// A TUI region that owns a model choice and a concurrency quota (ZS1-152).
+///
+/// The top-left discussion conversation and the lower-left arch master-session
+/// console may each select independent models, but both are single-concurrency:
+/// the discussion lane is a resident conversation and the arch lane multiplexes
+/// one master turn (a steering instruction joins the active turn instead of
+/// forking a second worker). The real parallel work is done by the project's
+/// background worker pool, whose size is defined by the active project and its
+/// layer-2 workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Zone {
+    /// The top-left resident discussion conversation (ZS1-147).
+    Discussion,
+    /// The lower-left master-session arch console (ZS1-148).
+    Arch,
+    /// The project-defined background worker pool.
+    Worker,
+}
+
+impl Zone {
+    pub const ALL: [Zone; 3] = [Zone::Discussion, Zone::Arch, Zone::Worker];
+
+    /// Stable storage and wire key.
+    pub const fn key(self) -> &'static str {
+        match self {
+            Zone::Discussion => "discussion",
+            Zone::Arch => "arch",
+            Zone::Worker => "worker",
+        }
+    }
+
+    /// Zones that expose an independent model selection. Workers run the
+    /// project's model; they do not select their own.
+    pub const fn selects_model(self) -> bool {
+        matches!(self, Zone::Discussion | Zone::Arch)
+    }
+
+    /// Concurrency quota for this zone. Discussion and arch are always single
+    /// concurrency; the worker pool runs at the project-defined count, which is
+    /// clamped to at least one so a zero value can never disable all work.
+    pub const fn concurrency(self, project_workers: u32) -> u32 {
+        match self {
+            Zone::Discussion | Zone::Arch => 1,
+            Zone::Worker => {
+                if project_workers == 0 {
+                    1
+                } else {
+                    project_workers
+                }
+            }
+        }
+    }
+}
+
+/// Durable per-zone model selections. Discussion and arch may override the
+/// global model; the worker pool always uses the global fallback (ZS1-152).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ZoneModels {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discussion: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arch: Option<String>,
+}
+
+impl ZoneModels {
+    /// Stored model for a zone. `Worker` never stores a model.
+    pub fn get(&self, zone: Zone) -> Option<&str> {
+        match zone {
+            Zone::Discussion => self.discussion.as_deref(),
+            Zone::Arch => self.arch.as_deref(),
+            Zone::Worker => None,
+        }
+    }
+
+    /// Replace the stored model for a model-selecting zone. Passing `None`
+    /// clears the override so the zone falls back to the global model. Worker is
+    /// rejected because workers do not own a model choice.
+    pub fn set(&mut self, zone: Zone, model: Option<String>) -> Result<(), ViewModelError> {
+        if !zone.selects_model() {
+            return Err(ViewModelError::Invalid {
+                field: "zone model owner",
+            });
+        }
+        if let Some(model) = model {
+            validate_zone_model(&model)?;
+            match zone {
+                Zone::Discussion => self.discussion = Some(model),
+                Zone::Arch => self.arch = Some(model),
+                Zone::Worker => unreachable!("worker model rejected above"),
+            }
+        } else {
+            match zone {
+                Zone::Discussion => self.discussion = None,
+                Zone::Arch => self.arch = None,
+                Zone::Worker => unreachable!("worker model rejected above"),
+            }
+        }
+        Ok(())
+    }
+
+    /// Effective model for a zone: an explicit zone choice wins, otherwise the
+    /// global model is used. Workers always resolve to the global model.
+    pub fn effective<'a>(&'a self, zone: Zone, global: Option<&'a str>) -> Option<&'a str> {
+        if zone.selects_model() {
+            self.get(zone).or(global)
+        } else {
+            global
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.discussion.is_none() && self.arch.is_none()
+    }
+
+    /// Validate every stored override. Control characters, blank identities and
+    /// oversized identities fail closed instead of being truncated.
+    pub fn validate(&self) -> Result<(), ViewModelError> {
+        if let Some(model) = self.discussion.as_deref() {
+            validate_zone_model(model)?;
+        }
+        if let Some(model) = self.arch.as_deref() {
+            validate_zone_model(model)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_zone_model(model: &str) -> Result<(), ViewModelError> {
+    if model.trim().is_empty() {
+        return Err(ViewModelError::Empty {
+            field: "zone model",
+        });
+    }
+    if model.len() > MAX_ZONE_MODEL_BYTES {
+        return Err(ViewModelError::TooLarge {
+            field: "zone model",
+            max: MAX_ZONE_MODEL_BYTES,
+        });
+    }
+    if model.chars().any(char::is_control) {
+        return Err(ViewModelError::ControlCharacter {
+            field: "zone model",
+        });
+    }
+    Ok(())
+}
+
 /// The conversation role associated with a group of blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -493,6 +645,88 @@ impl ViewMessage {
             block.validate()?;
         }
         Ok(())
+    }
+}
+
+/// Maximum bytes accepted for the inline, editable Goal field shown in the
+/// left-hand discussion group.  A Goal is a single label, not a document, so
+/// the bound is intentionally much smaller than a message body.
+pub const MAX_GOAL_EDIT_BYTES: usize = 4 * 1024;
+
+/// Bounded editing buffer for the inline Goal field of the discussion group.
+///
+/// The Goal lives beside the conversation and prompt, but it is still user
+/// input: it must be validated and bounded before it can be persisted by a
+/// domain owner.  Keeping the buffer here (rather than in the renderer) lets
+/// the TUI and a future headless host share exactly the same admission rules.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GoalEdit {
+    text: String,
+}
+
+impl GoalEdit {
+    /// Begin editing an existing Goal value.  The seed may be empty.
+    pub fn begin(initial: impl Into<String>) -> Result<Self, ViewModelError> {
+        let mut edit = Self {
+            text: String::new(),
+        };
+        edit.replace(initial.into())?;
+        Ok(edit)
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.text.trim().is_empty()
+    }
+
+    /// Replace the whole buffer with validated, single-line text.
+    pub fn replace(&mut self, next: impl Into<String>) -> Result<(), ViewModelError> {
+        let next = next.into();
+        if next.len() > MAX_GOAL_EDIT_BYTES {
+            return Err(ViewModelError::TooLarge {
+                field: "goal text",
+                max: MAX_GOAL_EDIT_BYTES,
+            });
+        }
+        if next.chars().any(char::is_control) {
+            return Err(ViewModelError::ControlCharacter { field: "goal text" });
+        }
+        self.text.clear();
+        self.text.push_str(&next);
+        Ok(())
+    }
+
+    /// Append one printable character while preserving the byte bound.
+    pub fn push_char(&mut self, character: char) -> Result<(), ViewModelError> {
+        if character.is_control() {
+            return Err(ViewModelError::ControlCharacter { field: "goal text" });
+        }
+        if self.text.len().saturating_add(character.len_utf8()) > MAX_GOAL_EDIT_BYTES {
+            return Err(ViewModelError::TooLarge {
+                field: "goal text",
+                max: MAX_GOAL_EDIT_BYTES,
+            });
+        }
+        self.text.push(character);
+        Ok(())
+    }
+
+    /// Remove the final character.  Returns whether anything changed.
+    pub fn pop_char(&mut self) -> bool {
+        self.text.pop().is_some()
+    }
+
+    /// Trim and return the committed Goal, rejecting an empty value.
+    pub fn commit(&self) -> Result<String, ViewModelError> {
+        let trimmed = self.text.trim();
+        if trimmed.is_empty() {
+            return Err(ViewModelError::Empty { field: "goal text" });
+        }
+        Ok(trimmed.to_owned())
     }
 }
 

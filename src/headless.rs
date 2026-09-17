@@ -1531,6 +1531,36 @@ pub fn session_search_view_in(
     }))
 }
 
+/// Translate a lower-left Arch master-session console submission (ZS1-148)
+/// into the bounded command route the headless owner already understands.
+///
+/// The arch console is a conversation owned by the master session: a
+/// `!command` becomes a [`crate::protocol::Command::UserShell`] request that the
+/// existing host approval/shell owner executes, while any other text becomes a
+/// [`crate::protocol::Command::Steer`] that joins the active master turn. This
+/// helper never executes anything and therefore shares the exact bounded,
+/// typed classification used by the TUI.
+pub fn master_session_command(
+    text: &str,
+    expected_turn_id: Option<String>,
+) -> Result<crate::protocol::Command, String> {
+    match crate::tool_runtime::classify_master_session_input(text)
+        .map_err(|error| error.to_string())?
+    {
+        crate::tool_runtime::MasterSessionCommand::Bash(command) => Ok(
+            crate::protocol::Command::UserShell(crate::protocol::UserShellRequest {
+                input: format!("!{command}"),
+            }),
+        ),
+        crate::tool_runtime::MasterSessionCommand::Steer(text) => {
+            Ok(crate::protocol::Command::Steer {
+                text,
+                expected_turn_id,
+            })
+        }
+    }
+}
+
 /// Open an existing session for an idle agent. Unlike `Agent::resume_session`
 /// this host-facing helper validates the target first, so a typo cannot create
 /// a new journal and a symbolic-link target cannot redirect the final open

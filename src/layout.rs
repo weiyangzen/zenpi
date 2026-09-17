@@ -1434,6 +1434,45 @@ impl LayoutSnapshot {
     }
 }
 
+/// Split a conversation pane into its transcript region and the resident
+/// discussion prompt (ZS1-147).
+///
+/// `Conversation + Prompt` are one left-column group: the prompt keeps the
+/// pane's `x` and `width` (so it is exactly as wide as the left column) and
+/// occupies the bottom `prompt_height` rows.  At least one row is always left
+/// for the transcript when the pane has more than one row; a degenerate pane
+/// yields an empty prompt.  The two returned rectangles never overlap and
+/// always tile the original pane.
+pub fn conversation_prompt_group(pane: PaneRect, prompt_height: u16) -> (PaneRect, PaneRect) {
+    if pane.height <= 1 {
+        return (pane, PaneRect::new(pane.x, pane.y, pane.width, 0));
+    }
+    let prompt_height = prompt_height.min(pane.height.saturating_sub(1));
+    let transcript_height = pane.height - prompt_height;
+    (
+        PaneRect::new(pane.x, pane.y, pane.width, transcript_height),
+        PaneRect::new(
+            pane.x,
+            pane.y.saturating_add(transcript_height),
+            pane.width,
+            prompt_height,
+        ),
+    )
+}
+
+/// Split the lower-left Arch pane into its master-session conversation region
+/// and the resident arch prompt (ZS1-148).
+///
+/// `arch + Prompt` are one left-column group, mirroring the top-left
+/// Conversation group: the prompt keeps the pane's `x` and `width` (so it is
+/// exactly as wide as the left column) and occupies the bottom `prompt_height`
+/// rows.  The helper is intentionally the same tiling rule as
+/// [`conversation_prompt_group`] so both hot zones share one geometry contract;
+/// the two returned rectangles never overlap and always tile the pane.
+pub fn arch_prompt_group(pane: PaneRect, prompt_height: u16) -> (PaneRect, PaneRect) {
+    conversation_prompt_group(pane, prompt_height)
+}
+
 fn collapse_optional_for_width(
     states: &mut [PaneState],
     viewport_width: u16,

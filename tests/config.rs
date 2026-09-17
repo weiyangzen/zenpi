@@ -102,6 +102,7 @@ fn effective_config_can_issue_policy_bound_secret_handle() {
         requires_openai_auth: true,
         supports_websockets: false,
         model_overrides: Vec::new(),
+        zone_models: Default::default(),
     };
     let digest = "d".repeat(64);
     let (handle, revoke) = config.issue_secret_handle(digest.clone()).unwrap().unwrap();
@@ -652,4 +653,85 @@ fn non_utf8_visual_is_rejected_instead_of_using_editor() {
     let mut env = editor_environment(&[("EDITOR", "fallback")]);
     env.insert("VISUAL".into(), std::ffi::OsString::from_vec(vec![0xff]));
     assert!(zenpi::config::resolve_editor_command(&env).is_err());
+}
+
+#[test]
+fn zone_models_persist_and_resolve_with_a_global_fallback() {
+    use zenpi::view_model::{Zone, ZoneModels};
+
+    let home = tempdir().unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+    let config = ConfigFile {
+        model: Some("global-model".into()),
+        zone_models: ZoneModels {
+            discussion: Some("discussion-model".into()),
+            arch: Some("arch-model".into()),
+        },
+        ..ConfigFile::default()
+    };
+    config.validate().unwrap();
+    save_config(&paths, &config).unwrap();
+    let loaded = load_config(&paths).unwrap();
+    assert_eq!(loaded.zone_models, config.zone_models);
+
+    let resolved = resolve(
+        &ConfigOverrides::default(),
+        &loaded,
+        &AuthFile::default(),
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    // Discussion and arch keep their independent choices; the worker pool uses
+    // the global model.
+    assert_eq!(resolved.zone_model(Zone::Discussion), Some("discussion-model"));
+    assert_eq!(resolved.zone_model(Zone::Arch), Some("arch-model"));
+    assert_eq!(resolved.zone_model(Zone::Worker), Some("global-model"));
+
+    // Concurrency semantics: talk zones are single-concurrency, workers run at
+    // the project-defined count (clamped to at least one).
+    assert_eq!(resolved.zone_concurrency(Zone::Discussion, 8), 1);
+    assert_eq!(resolved.zone_concurrency(Zone::Arch, 8), 1);
+    assert_eq!(resolved.zone_concurrency(Zone::Worker, 8), 8);
+    assert_eq!(resolved.zone_concurrency(Zone::Worker, 0), 1);
+
+    // A zone with no override falls back to the global model.
+    let mut partial = loaded.clone();
+    partial.zone_models.discussion = None;
+    let resolved = resolve(
+        &ConfigOverrides::default(),
+        &partial,
+        &AuthFile::default(),
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    assert_eq!(resolved.zone_model(Zone::Discussion), Some("global-model"));
+
+    // A CLI/env model override still wins for the zones that fall back to it.
+    let overrides = ConfigOverrides {
+        model: Some("cli-model".into()),
+        ..ConfigOverrides::default()
+    };
+    let resolved = resolve(&overrides, &partial, &AuthFile::default(), &BTreeMap::new()).unwrap();
+    assert_eq!(resolved.zone_model(Zone::Discussion), Some("cli-model"));
+}
+
+#[test]
+fn zone_models_reject_blank_control_and_unknown_identities() {
+    let home = tempdir().unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+
+    for invalid in ["", "   ", "bad\nmodel", "line\rmodel", &"x".repeat(257)] {
+        let mut config = ConfigFile::default();
+        config.zone_models.arch = Some(invalid.to_owned());
+        assert!(
+            config.validate().is_err(),
+            "accepted invalid zone model {invalid:?}"
+        );
+    }
+
+    // The durable format rejects unknown keys instead of silently ignoring an
+    // uncleared or mistyped zone.
+    save_config(&paths, &ConfigFile::default()).unwrap();
+    fs::write(&paths.config, "[zone_models]\nworker = \"never\"\n").unwrap();
+    assert!(load_config(&paths).is_err());
 }

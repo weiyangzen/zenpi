@@ -4,7 +4,8 @@ mod resources;
 use std::fs;
 
 use resources::{
-    MAX_WORKSPACE_FILES, ResourceCollector, ResourceError, SignalStatus, WorkspaceScanPolicy,
+    MAX_PROCESS_ROWS, MAX_WORKSPACE_FILES, ProcessClass, ResourceCollector, ResourceError,
+    SignalStatus, WorkspaceScanPolicy,
 };
 use tempfile::tempdir;
 
@@ -79,6 +80,66 @@ fn collection_returns_process_and_cpu_signals_with_graceful_fallbacks() {
         );
     }
     assert!(snapshot.collected_at_ms > 0);
+}
+
+#[test]
+fn process_classes_merge_lsp_mcp_and_common_workers() {
+    assert_eq!(
+        ProcessClass::classify("/usr/local/bin/rust-analyzer"),
+        ProcessClass::Lsp
+    );
+    assert_eq!(ProcessClass::classify("gopls"), ProcessClass::Lsp);
+    assert_eq!(
+        ProcessClass::classify("typescript-language-server"),
+        ProcessClass::Lsp
+    );
+    assert_eq!(ProcessClass::classify("my-mcp-bridge"), ProcessClass::Mcp);
+    assert_eq!(
+        ProcessClass::classify("/opt/homebrew/bin/node"),
+        ProcessClass::Node
+    );
+    assert_eq!(ProcessClass::classify("cargo build"), ProcessClass::Rust);
+    assert_eq!(ProcessClass::classify("/bin/zsh"), ProcessClass::Shell);
+    assert_eq!(ProcessClass::classify("/usr/bin/git"), ProcessClass::Git);
+    assert_eq!(ProcessClass::classify("zenpi"), ProcessClass::Zenpi);
+    assert_eq!(ProcessClass::classify("opencode"), ProcessClass::OpenCode);
+    // Unknown processes collapse into the bounded catch-all class.
+    assert_eq!(ProcessClass::classify("coredns"), ProcessClass::Other);
+}
+
+#[test]
+fn collection_exposes_network_gpu_and_merged_process_signals() {
+    let directory = tempdir().unwrap();
+    let snapshot = ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    assert!(matches!(
+        snapshot.network.status,
+        SignalStatus::Available | SignalStatus::Unavailable
+    ));
+    if snapshot.network.status == SignalStatus::Available {
+        assert!(snapshot.network.received_bytes.is_some());
+        assert!(snapshot.network.transmitted_bytes.is_some());
+    }
+    assert!(matches!(
+        snapshot.gpu.status,
+        SignalStatus::Available | SignalStatus::Unavailable
+    ));
+    if snapshot.gpu.status == SignalStatus::Available {
+        assert!(!snapshot.gpu.devices.is_empty());
+    }
+    assert!(snapshot.processes.rows.len() <= MAX_PROCESS_ROWS);
+    if snapshot.processes.status == SignalStatus::Available {
+        assert!(snapshot.processes.total >= 1);
+        // Same-class statistics are complete and merged: the row counts add up
+        // to the process total, with one row per class.
+        let summed: usize = snapshot.processes.rows.iter().map(|row| row.count).sum();
+        assert_eq!(summed, snapshot.processes.total);
+        for row in &snapshot.processes.rows {
+            assert!(row.count >= 1);
+        }
+    }
 }
 
 #[cfg(unix)]

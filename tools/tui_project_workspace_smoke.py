@@ -343,7 +343,9 @@ class Terminal:
         while time.monotonic()<deadline:drain(self.fd,self.output,.02)
     def folder(self,path,mouse=True):
         mark=len(self.output)
-        self.write(b'\x1b[<0;139;1M\x1b[<0;139;1m' if mouse else b'\x14')
+        # `[+]` is left-aligned now: " zenpi | projects: " + " [-]" + " [+]";
+        # SGR mouse columns are 1-based, so column 24 is reported as x=25.
+        self.write(b'\x1b[<0;25;1M\x1b[<0;25;1m' if mouse else b'\x14')
         self.expect(b'Open project folder',start=mark)
         self.write(b'\x15\x1b[200~'+str(path).encode()+b'\x1b[201~\r')
     def type_text(self,text):
@@ -431,7 +433,8 @@ def main():
         try:
             terminal=Terminal(binary,root,env);terminals.append(terminal)
             terminal.wait(lambda:checkpoint.exists());initial=saved();assert len(initial['projects'])==1
-            mark=len(terminal.output);terminal.write(b'\x1b[<0;139;1M\x1b[<0;139;1m');terminal.expect(b'Open project folder',start=mark);terminal.cancel_picker()
+            # `[+]` is left-aligned: click 1-based column 25 (cell column 24).
+            mark=len(terminal.output);terminal.write(b'\x1b[<0;25;1M\x1b[<0;25;1m');terminal.expect(b'Open project folder',start=mark);terminal.cancel_picker()
             # Next control chord also proves Esc returned input focus.
             terminal.folder(root/'missing',mouse=False);terminal.expect(b'No such file');terminal.cancel_picker()
             terminal.wait(lambda:len(saved()['projects'])==1)

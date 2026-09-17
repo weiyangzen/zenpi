@@ -36,8 +36,12 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use crate::domains::GoalStatus;
 use crate::layout::{
     Breakpoint, FocusDirection, LayoutModel, LayoutSnapshot, PaneId, PaneRect, TabId, Visibility,
+    arch_prompt_group, conversation_prompt_group,
 };
 use crate::slash::{self, BlueprintAction, InputRoute, LayoutAction, PaneAction, SlashCommand};
+use crate::tool_runtime::{
+    MasterSessionCommand, MasterSessionInputError, classify_master_session_input,
+};
 
 /// Bound retained transcript memory even when a provider streams forever.
 pub const DEFAULT_MAX_MESSAGES: usize = 2_048;
@@ -62,11 +66,20 @@ pub const MAX_SESSION_PANE_RECORDS: usize = 32;
 /// prompts remain editable; the input viewport scrolls to keep the cursor
 /// visible instead of growing without bound and starving the transcript.
 pub const MAX_INPUT_LINES: usize = 8;
+/// Rows reserved for the resident discussion prompt inside the top-left
+/// conversation group (ZS1-147). Keeping it fixed leaves the rest of the
+/// column for the transcript.
+pub const PROMPT_PANE_ROWS: u16 = 4;
+/// Rows reserved for the resident arch prompt inside the lower-left arch group
+/// (ZS1-148). The arch console is single-line oriented, so it needs fewer rows
+/// than the discussion prompt while still sharing the left-column width.
+pub const ARCH_PROMPT_PANE_ROWS: u16 = 3;
 pub const DEFAULT_FRAME_INTERVAL: Duration = Duration::from_millis(16);
 pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
-/// Periodic resource collection is deliberately slower than rendering and
-/// uses the single-slot worker so it never competes with interactive input.
-pub const RESOURCE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+/// The compact htop/nvidia-smi style resource monitor refreshes on a 5 second
+/// cadence. Collection still runs on the single-slot worker so it never
+/// competes with interactive input.
+pub const RESOURCE_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
 const MIN_LOOP_INTERVAL: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,6 +156,38 @@ pub struct SubTab {
 
 fn default_subtab_concurrency() -> u16 {
     1
+}
+
+impl SubTab {
+    /// Every layer-2 open lands in an isolated workspace/worktree. The
+    /// default `Main` tab intentionally reuses the layer-1 project root so it
+    /// stays a zero-cost view of that project; each explicitly opened tab
+    /// owns its own root instead of sharing the current workspace.
+    pub fn is_isolated(&self) -> bool {
+        !matches!(self.kind, SubTabKind::Main)
+    }
+
+    /// Canonical root for this tab's isolated workspace.
+    pub fn workspace_root(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from(&self.root)
+    }
+}
+
+/// Derive a layer-2 workspace root that cannot collide with the layer-1 root
+/// or with any sibling tab, even when two tabs share the same display name.
+fn isolated_subtab_root(
+    base: &std::path::Path,
+    tabs: &[SubTab],
+    name: &str,
+) -> std::path::PathBuf {
+    let parent = base.join(".zenpi-workspaces");
+    let mut candidate = parent.join(name);
+    let mut suffix = 1u32;
+    while candidate.as_path() == base || tabs.iter().any(|tab| tab.workspace_root() == candidate) {
+        candidate = parent.join(format!("{name}-{suffix}"));
+        suffix += 1;
+    }
+    candidate
 }
 
 /// A clickable region in the layer-2 tab row.
@@ -561,10 +606,26 @@ impl TuiMessage {
     }
 }
 
+/// The two left-column prompt hot zones that can own keyboard focus (ZS1-148).
+///
+/// `Discussion` is the resident top-left Conversation prompt (ZS1-147).
+/// `Arch` is the lower-left arch console that belongs to the master session and
+/// can execute bash/steering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum LeftPrompt {
+    #[default]
+    Discussion,
+    Arch,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuiAction {
     None,
     Submit(String),
+    /// A submission from the lower-left Arch master-session console (ZS1-148).
+    /// The typed command is already classified so any host can execute it
+    /// without re-parsing the operator's text.
+    SubmitArch(MasterSessionCommand),
     RespondApproval {
         project: String,
         request_id: String,
@@ -2509,11 +2570,53 @@ pub struct TuiState {
     palette_index: usize,
     palette_dismissed: bool,
     model_menu: ModelMenu,
+    /// Per-zone model selections for the discussion and arch regions (ZS1-152).
+    /// The actual parallel work count still comes from the active project's
+    /// layer-2 workspace.
+    zone_models: crate::view_model::ZoneModels,
     workspace_area: Rect,
+    /// Inline editable Goal for the top-left conversation group (ZS1-147).
+    goal_edit: Option<crate::view_model::GoalEdit>,
+    /// Last committed Goal label shown beside the discussion conversation.
+    goal_text: String,
+    /// Committed Goal handed to the domain owner on the next host tick.
+    goal_edit_intent: Option<String>,
+    /// Rectangle of the docked discussion prompt while it is rendered in the
+    /// left column. Used to anchor the command palette above the docked input.
+    docked_prompt_rect: Option<Rect>,
+    /// Which left-column prompt owns keyboard focus (ZS1-148). The discussion
+    /// prompt is the default so existing single-prompt behavior is unchanged.
+    left_prompt: LeftPrompt,
+    /// Resident transcript for the lower-left Arch master-session console
+    /// (ZS1-148). It is intentionally separate from the discussion transcript:
+    /// arch records operator bash/steer submissions and their bounded results.
+    arch_messages: VecDeque<TuiMessage>,
+    /// Draft buffer for the arch console. Edited only while `left_prompt` is
+    /// [`LeftPrompt::Arch`].
+    arch_input: String,
+    arch_cursor: usize,
+    /// Rectangle of the docked arch prompt while it is rendered in the left
+    /// column, so a mouse press can move focus into the arch console.
+    arch_prompt_rect: Option<Rect>,
+    /// Single-concurrency guard for the master session. A bash command cannot
+    /// start while a master turn is already active; a steering instruction
+    /// joins the active turn instead of forking a second worker.
+    master_busy: bool,
+    /// Last classified arch submission, drained by the host that owns the
+    /// master session. The view layer never executes a command itself.
+    arch_intent: Option<MasterSessionCommand>,
+    /// Whether the current frame renders the prompt inside the left column.
+    dock_prompt: bool,
     palette_area: Rect,
     palette_start: usize,
     palette_rows: usize,
     project_hits: Vec<(Rect, usize)>,
+    /// Layer-1 tab currently armed by a left-button press so a subsequent
+    /// drag can reorder it. Cleared on release; never persisted.
+    dragging_project_tab: Option<usize>,
+    /// Layer-2 sub-tab currently armed by a left-button press for drag
+    /// reordering. Cleared on release; never persisted.
+    dragging_subtab: Option<usize>,
     dragging_split: Option<(
         crate::layout::Column,
         crate::layout::Column,
@@ -2610,11 +2713,26 @@ impl TuiState {
             palette_index: 0,
             palette_dismissed: false,
             model_menu: ModelMenu::default(),
+            zone_models: crate::view_model::ZoneModels::default(),
             workspace_area: Rect::default(),
+            goal_edit: None,
+            goal_text: String::new(),
+            goal_edit_intent: None,
+            docked_prompt_rect: None,
+            left_prompt: LeftPrompt::Discussion,
+            arch_messages: VecDeque::new(),
+            arch_input: String::new(),
+            arch_cursor: 0,
+            arch_prompt_rect: None,
+            master_busy: false,
+            arch_intent: None,
+            dock_prompt: false,
             palette_area: Rect::default(),
             palette_start: 0,
             palette_rows: 0,
             project_hits: Vec::new(),
+            dragging_project_tab: None,
+            dragging_subtab: None,
             dragging_split: None,
             dragging_row: None,
             pane_scroll: BTreeMap::new(),
@@ -2955,6 +3073,17 @@ impl TuiState {
         *self.active_subtab.get(self.active_project()).unwrap_or(&0)
     }
 
+    /// Root of the active layer-2 workspace. The default `Main` tab resolves
+    /// to the layer-1 project folder; every other tab resolves to its own
+    /// isolated root. Layer-1 and layer-2 state are never aliased implicitly.
+    pub fn active_subtab_root(&mut self) -> String {
+        let index = self.active_subtab();
+        self.subtabs()
+            .get(index)
+            .map(|tab| tab.root.clone())
+            .unwrap_or_else(|| self.project_cwd().display().to_string())
+    }
+
     pub fn subtab_select(&mut self, index: usize) -> bool {
         self.ensure_subtabs();
         let project = self.active_project().to_owned();
@@ -2971,19 +3100,22 @@ impl TuiState {
         }
     }
 
-    /// "Work in the current place": add a layer-2 tab without a worktree.
+    /// Add a layer-2 tab that works without creating a git worktree. It still
+    /// receives an isolated workspace root under the project so two layer-2
+    /// opens never share the layer-1 working folder.
     pub fn subtab_add_in_place(&mut self, name: Option<String>) -> bool {
         self.ensure_subtabs();
         let project = self.active_project().to_owned();
-        let cwd = self.project_cwd().display().to_string();
+        let base = self.project_cwd();
         let tabs = self.project_subtabs.entry(project.clone()).or_default();
         if tabs.len() >= crate::project_workspace::MAX_PROJECT_SUBTABS {
             return false;
         }
         let name = name.unwrap_or_else(|| format!("in-place-{}", tabs.len()));
+        let root = isolated_subtab_root(&base, tabs, &name);
         tabs.push(SubTab {
             name,
-            root: cwd,
+            root: root.display().to_string(),
             kind: SubTabKind::InPlace,
             concurrency: 1,
         });
@@ -3948,6 +4080,15 @@ impl TuiState {
         self.resource_snapshot.as_ref()
     }
 
+    /// Publish the active conversation's context usage so the resource monitor
+    /// can show the opencode-style `context` column. Either side may be absent
+    /// independently; the pane then reports `context unavailable`.
+    pub fn set_context_usage(&mut self, used_tokens: Option<u64>, limit_tokens: Option<u64>) {
+        self.transcript_ux.history_tokens = used_tokens;
+        self.transcript_ux.context_limit = limit_tokens;
+        self.dirty = true;
+    }
+
     /// Mark a Gantt refresh as admitted by the production host.
     pub fn gantt_refresh_started(&mut self) {
         self.gantt_status = GanttPaneStatus::Refreshing;
@@ -4425,6 +4566,420 @@ impl TuiState {
     /// Number of messages currently projected in the Goal hot zone.
     pub fn goal_message_count(&self) -> usize {
         self.goal_messages.len()
+    }
+
+    /// Current inline Goal label shown in the top-left conversation group.
+    pub fn goal_text(&self) -> &str {
+        &self.goal_text
+    }
+
+    /// Whether the inline Goal editor currently owns keyboard input.
+    pub fn goal_edit_active(&self) -> bool {
+        self.goal_edit.is_some()
+    }
+
+    /// Current editor contents while the inline Goal editor is open.
+    pub fn goal_edit_buffer(&self) -> Option<&str> {
+        self.goal_edit
+            .as_ref()
+            .map(crate::view_model::GoalEdit::text)
+    }
+
+    /// Enter the inline Goal editor seeded with the committed Goal.  Returns
+    /// `false` only if the retained Goal is itself out of bounds.
+    pub fn begin_goal_edit(&mut self) -> bool {
+        match crate::view_model::GoalEdit::begin(self.goal_text.clone()) {
+            Ok(edit) => {
+                self.goal_edit = Some(edit);
+                self.dirty = true;
+                true
+            }
+            Err(error) => {
+                self.set_status(format!("Goal not editable: {error}"));
+                false
+            }
+        }
+    }
+
+    /// Abandon the inline Goal editor without changing the committed Goal.
+    pub fn cancel_goal_edit(&mut self) -> bool {
+        let active = self.goal_edit.take().is_some();
+        if active {
+            self.dirty = true;
+        }
+        active
+    }
+
+    /// Commit the inline Goal editor.  On success the bounded Goal is retained
+    /// on the state and queued for the domain owner via
+    /// [`Self::take_goal_edit_intent`].  An empty Goal is rejected and the
+    /// editor stays open so the user can correct it.
+    pub fn commit_goal_edit(&mut self) -> Option<String> {
+        let edit = self.goal_edit.as_ref()?;
+        let committed = match edit.commit() {
+            Ok(text) => text,
+            Err(error) => {
+                self.set_status(format!("Goal not saved: {error}"));
+                return None;
+            }
+        };
+        self.goal_edit = None;
+        self.goal_text = committed.clone();
+        self.goal_edit_intent = Some(committed.clone());
+        self.push_message(MessageRole::System, format!("Goal updated: {committed}"));
+        self.dirty = true;
+        Some(committed)
+    }
+
+    /// Drain the last committed Goal for the host to persist through the
+    /// domain/external owner. The view layer never writes storage itself.
+    pub fn take_goal_edit_intent(&mut self) -> Option<String> {
+        self.goal_edit_intent.take()
+    }
+
+    /// Which left-column prompt currently owns keyboard focus (ZS1-148).
+    pub fn left_prompt(&self) -> LeftPrompt {
+        self.left_prompt
+    }
+
+    /// Focus a left-column prompt without mutating either draft.
+    pub fn set_left_prompt(&mut self, prompt: LeftPrompt) -> bool {
+        if self.left_prompt == prompt {
+            return false;
+        }
+        self.left_prompt = prompt;
+        self.dirty = true;
+        true
+    }
+
+    /// Toggle between the top-left discussion prompt and the lower-left arch
+    /// console. Bound to Alt-M in the production key map.
+    pub fn toggle_left_prompt(&mut self) -> LeftPrompt {
+        let next = match self.left_prompt {
+            LeftPrompt::Discussion => LeftPrompt::Arch,
+            LeftPrompt::Arch => LeftPrompt::Discussion,
+        };
+        self.left_prompt = next;
+        self.dirty = true;
+        next
+    }
+
+    /// The model-selecting zone owned by the focused left prompt (ZS1-152).
+    pub fn focused_zone(&self) -> crate::view_model::Zone {
+        match self.left_prompt {
+            LeftPrompt::Discussion => crate::view_model::Zone::Discussion,
+            LeftPrompt::Arch => crate::view_model::Zone::Arch,
+        }
+    }
+
+    /// Durable per-zone model overrides held by this view (ZS1-152).
+    pub fn zone_models(&self) -> &crate::view_model::ZoneModels {
+        &self.zone_models
+    }
+
+    /// Stored model for one zone, if it owns an explicit selection. Workers
+    /// never store a model.
+    pub fn zone_model(&self, zone: crate::view_model::Zone) -> Option<&str> {
+        self.zone_models.get(zone)
+    }
+
+    /// Effective model for one zone: an explicit discussion/arch override wins,
+    /// otherwise the global model is used. Workers always use the global model.
+    pub fn effective_zone_model<'a>(
+        &'a self,
+        zone: crate::view_model::Zone,
+        global_model: Option<&'a str>,
+    ) -> Option<&'a str> {
+        self.zone_models.effective(zone, global_model)
+    }
+
+    /// Set or clear the model selection for one zone. The worker pool is
+    /// rejected: its model is the project/global model. An invalid identity
+    /// changes nothing.
+    pub fn set_zone_model(
+        &mut self,
+        zone: crate::view_model::Zone,
+        model: Option<String>,
+    ) -> Result<(), crate::view_model::ViewModelError> {
+        let mut next = self.zone_models.clone();
+        next.set(zone, model)?;
+        self.zone_models = next;
+        self.dirty = true;
+        Ok(())
+    }
+
+    /// Replace every zone override from a durable snapshot (restart/checkpoint
+    /// restore). Validation is atomic: an invalid snapshot changes nothing.
+    pub fn restore_zone_models(
+        &mut self,
+        models: crate::view_model::ZoneModels,
+    ) -> Result<bool, crate::view_model::ViewModelError> {
+        models.validate()?;
+        let changed = self.zone_models != models;
+        self.zone_models = models;
+        if changed {
+            self.dirty = true;
+        }
+        Ok(changed)
+    }
+
+    /// Concurrency quota for one zone. Discussion and arch are single
+    /// concurrency; the worker pool runs at the active project's layer-2 count.
+    pub fn zone_concurrency(&self, zone: crate::view_model::Zone) -> u32 {
+        zone.concurrency(self.worker_concurrency())
+    }
+
+    /// Project-defined background worker count for the active layer-2
+    /// workspace. Falls back to one when no explicit workspace is selected.
+    pub fn worker_concurrency(&self) -> u32 {
+        let project = self.active_project();
+        let index = self.active_subtab.get(project).copied().unwrap_or(0);
+        self.project_subtabs
+            .get(project)
+            .and_then(|tabs| tabs.get(index))
+            .map(|tab| u32::from(tab.concurrency))
+            .unwrap_or(1)
+    }
+
+    /// Arch console transcript, oldest first.
+    pub fn arch_messages(&self) -> impl Iterator<Item = &TuiMessage> {
+        self.arch_messages.iter()
+    }
+
+    pub fn arch_message_count(&self) -> usize {
+        self.arch_messages.len()
+    }
+
+    /// Append one bounded row to the arch console transcript. This records
+    /// operator intent and host results; it is not a model transcript.
+    pub fn push_arch_message(&mut self, role: MessageRole, text: impl Into<String>) {
+        let text = bound_text(text.into());
+        if text.is_empty() {
+            return;
+        }
+        self.arch_messages.push_back(TuiMessage::new(role, text));
+        while self.arch_messages.len() > self.max_messages {
+            self.arch_messages.pop_front();
+        }
+        self.pane_scroll.remove(&PaneId::Arch);
+        self.dirty = true;
+    }
+
+    pub fn arch_input(&self) -> &str {
+        &self.arch_input
+    }
+
+    /// Replace the arch draft (used by hosts restoring a checkpoint and by
+    /// tests). The value is bounded by the master-session budget.
+    pub fn set_arch_input(&mut self, text: impl Into<String>) {
+        let mut text = text.into();
+        if text.len() > crate::tool_runtime::MAX_MASTER_SESSION_INPUT_BYTES {
+            let mut boundary = crate::tool_runtime::MAX_MASTER_SESSION_INPUT_BYTES;
+            while !text.is_char_boundary(boundary) {
+                boundary -= 1;
+            }
+            text.truncate(boundary);
+        }
+        self.arch_cursor = text.len();
+        self.arch_input = text;
+        self.dirty = true;
+    }
+
+    /// Whether the master session still has an active turn.
+    pub fn master_busy(&self) -> bool {
+        self.master_busy
+    }
+
+    /// Set the master-session concurrency flag. Hosts use this when a job that
+    /// was not started through [`Self::submit_arch_prompt`] reaches a terminal
+    /// boundary, so the arch console can never stay permanently busy.
+    pub fn set_master_busy(&mut self, busy: bool) {
+        self.master_busy = busy;
+    }
+
+    /// Mark the master turn finished and record its bounded outcome in the arch
+    /// transcript. Called by the owner host after a bash/steer turn terminates.
+    pub fn complete_master_turn(&mut self, role: MessageRole, text: impl Into<String>) {
+        self.master_busy = false;
+        self.push_arch_message(role, text);
+    }
+
+    /// Drain the last classified arch submission. The view layer only
+    /// classifies; the host owns execution.
+    pub fn take_arch_intent(&mut self) -> Option<MasterSessionCommand> {
+        self.arch_intent.take()
+    }
+
+    /// Classify and submit the current arch draft (ZS1-148).
+    ///
+    /// The master session is single-concurrency: a `!command` bash submission is
+    /// rejected while a master turn is active, because the shell owner requires
+    /// an idle session. A steering instruction is allowed during an active turn
+    /// and joins it rather than forking a second worker. The draft is consumed
+    /// atomically: a rejected submission keeps it intact.
+    pub fn submit_arch_prompt(&mut self) -> Result<TuiAction, MasterSessionInputError> {
+        let command = classify_master_session_input(&self.arch_input)?;
+        if command.is_bash() && self.master_busy {
+            return Err(MasterSessionInputError::Busy);
+        }
+        let display = command.display();
+        if !display.trim().is_empty() {
+            self.push_arch_message(MessageRole::User, display);
+        }
+        self.arch_input.clear();
+        self.arch_cursor = 0;
+        self.master_busy = true;
+        self.arch_intent = Some(command.clone());
+        self.dirty = true;
+        Ok(TuiAction::SubmitArch(command))
+    }
+
+    fn goal_edit_key(&mut self, key: KeyEvent) -> TuiAction {
+        match key.code {
+            KeyCode::Esc => {
+                self.cancel_goal_edit();
+                TuiAction::Redraw
+            }
+            KeyCode::Enter => {
+                self.commit_goal_edit();
+                TuiAction::Redraw
+            }
+            KeyCode::Backspace => {
+                if let Some(edit) = self.goal_edit.as_mut() {
+                    edit.pop_char();
+                }
+                self.dirty = true;
+                TuiAction::Redraw
+            }
+            KeyCode::Char(character)
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
+            {
+                if let Some(edit) = self.goal_edit.as_mut() {
+                    let _ = edit.push_char(character);
+                }
+                self.dirty = true;
+                TuiAction::Redraw
+            }
+            _ => TuiAction::None,
+        }
+    }
+
+    /// Whether the arch console should consume this key. Only editing keys are
+    /// captured; Ctrl/Alt chords (interrupt, tab switching, pane focus) keep
+    /// their existing meaning so arch focus never traps the terminal.
+    fn arch_prompt_captures(&self, key: KeyEvent) -> bool {
+        if key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
+            return false;
+        }
+        matches!(
+            key.code,
+            KeyCode::Char(_)
+                | KeyCode::Backspace
+                | KeyCode::Delete
+                | KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::Home
+                | KeyCode::End
+                | KeyCode::Enter
+                | KeyCode::Esc
+        )
+    }
+
+    /// Bounded editor for the lower-left arch console (ZS1-148). Enter submits
+    /// (Shift-Enter inserts a newline), Esc returns focus to the discussion
+    /// prompt while keeping the draft, and every edit stays within the
+    /// master-session byte budget.
+    fn arch_prompt_key(&mut self, key: KeyEvent) -> TuiAction {
+        let max = crate::tool_runtime::MAX_MASTER_SESSION_INPUT_BYTES;
+        match key.code {
+            KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                if self.arch_input.len() < max {
+                    let at = self.arch_cursor.min(self.arch_input.len());
+                    self.arch_input.insert(at, '\n');
+                    self.arch_cursor = at + 1;
+                }
+            }
+            KeyCode::Enter => match self.submit_arch_prompt() {
+                Ok(action) => return action,
+                Err(error) => {
+                    self.set_status(format!("Arch console: {error}"));
+                }
+            },
+            KeyCode::Esc => {
+                self.left_prompt = LeftPrompt::Discussion;
+                self.set_status("Arch console unfocused · Alt-M to return");
+            }
+            KeyCode::Char(character) => {
+                let width = character.len_utf8();
+                if self.arch_input.len().saturating_add(width) <= max {
+                    let at = self.arch_cursor.min(self.arch_input.len());
+                    if self.arch_input.is_char_boundary(at) {
+                        self.arch_input.insert(at, character);
+                        self.arch_cursor = at + width;
+                    }
+                }
+            }
+            KeyCode::Backspace => {
+                if self.arch_cursor > 0 {
+                    let mut at = self.arch_cursor.min(self.arch_input.len());
+                    while at > 0 && !self.arch_input.is_char_boundary(at) {
+                        at -= 1;
+                    }
+                    if at > 0 {
+                        let previous = self.arch_input[..at]
+                            .chars()
+                            .next_back()
+                            .map_or(0, char::len_utf8);
+                        self.arch_input.replace_range(at - previous..at, "");
+                        self.arch_cursor = at - previous;
+                    }
+                }
+            }
+            KeyCode::Delete => {
+                let at = self.arch_cursor.min(self.arch_input.len());
+                if at < self.arch_input.len() && self.arch_input.is_char_boundary(at) {
+                    let next = self.arch_input[at..]
+                        .chars()
+                        .next()
+                        .map_or(0, char::len_utf8);
+                    self.arch_input.replace_range(at..at + next, "");
+                }
+            }
+            KeyCode::Left => {
+                let mut at = self.arch_cursor.min(self.arch_input.len());
+                while at > 0 && !self.arch_input.is_char_boundary(at) {
+                    at -= 1;
+                }
+                if at > 0 {
+                    at -= self.arch_input[..at]
+                        .chars()
+                        .next_back()
+                        .map_or(0, char::len_utf8);
+                }
+                self.arch_cursor = at;
+            }
+            KeyCode::Right => {
+                let mut at = self.arch_cursor.min(self.arch_input.len());
+                while at < self.arch_input.len() && !self.arch_input.is_char_boundary(at) {
+                    at += 1;
+                }
+                if at < self.arch_input.len() {
+                    at += self.arch_input[at..]
+                        .chars()
+                        .next()
+                        .map_or(0, char::len_utf8);
+                }
+                self.arch_cursor = at;
+            }
+            KeyCode::Home => self.arch_cursor = 0,
+            KeyCode::End => self.arch_cursor = self.arch_input.len(),
+            _ => {}
+        }
+        self.dirty = true;
+        TuiAction::Redraw
     }
 
     /// Replace the Goal lane when its owner changes (for example after a
@@ -5856,7 +6411,62 @@ impl TuiState {
         if mouse.kind == MouseEventKind::Up(MouseButton::Left) {
             self.dragging_split = None;
             self.dragging_row = None;
+            self.dragging_project_tab = None;
+            self.dragging_subtab = None;
             return TuiAction::Redraw;
+        }
+        // Arm a tab drag on press. The move is applied on `Drag` so the strip
+        // reorders live under the cursor; release simply clears the arm.
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            if let Some((_, index)) = self
+                .project_hits
+                .iter()
+                .find(|(rect, _)| rect.contains(position))
+                && *index < self.project_tabs.len()
+            {
+                self.dragging_project_tab = Some(*index);
+                self.dragging_subtab = None;
+            } else if let Some((_, SubTabHit::Select(index))) = self
+                .subtab_hits
+                .iter()
+                .find(|(rect, _)| rect.contains(position))
+            {
+                self.dragging_subtab = Some(*index);
+                self.dragging_project_tab = None;
+            }
+        }
+        if matches!(mouse.kind, MouseEventKind::Drag(MouseButton::Left)) {
+            if let Some(source) = self.dragging_project_tab {
+                let target = self
+                    .project_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(position))
+                    .map(|(_, index)| *index)
+                    .filter(|index| *index < self.project_tabs.len() && *index != source);
+                if let Some(target) = target {
+                    let name = self.project_tabs[source].clone();
+                    if self.move_project_tab(&name, target) {
+                        self.dragging_project_tab = Some(target);
+                    }
+                }
+                return TuiAction::Redraw;
+            }
+            if let Some(source) = self.dragging_subtab {
+                let target = self
+                    .subtab_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(position))
+                    .and_then(|(_, hit)| match hit {
+                        SubTabHit::Select(index) if *index != source => Some(*index),
+                        _ => None,
+                    });
+                if let Some(target) = target
+                    && self.subtab_move(source, target)
+                {
+                    self.dragging_subtab = Some(target.max(1));
+                }
+                return TuiAction::Redraw;
+            }
         }
         // Match the familiar terminal/browser tab gesture without changing
         // the BentoBox layout: middle-clicking a project tab closes only the
@@ -5944,6 +6554,20 @@ impl TuiState {
         let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, self.workspace_area);
         let panes: Vec<_> = adapter.visible_panes().collect();
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            // A press in either left-column prompt moves keyboard focus there
+            // (ZS1-148). The prompt rectangles are recorded by the frame that
+            // was actually drawn, so a collapsed group never steals focus.
+            if self
+                .arch_prompt_rect
+                .is_some_and(|rect| rect.contains(position))
+            {
+                self.set_left_prompt(LeftPrompt::Arch);
+            } else if self
+                .docked_prompt_rect
+                .is_some_and(|rect| rect.contains(position))
+            {
+                self.set_left_prompt(LeftPrompt::Discussion);
+            }
             self.dragging_row = panes.iter().find_map(|top| {
                 panes
                     .iter()
@@ -6313,6 +6937,17 @@ impl TuiState {
         }
         self.touch_editor_draft();
         self.project_checkpoint_dirty = true;
+        // The inline Goal editor is modal within the conversation group so
+        // Enter saves and Esc cancels instead of reaching the prompt.
+        if self.goal_edit.is_some() {
+            return self.goal_edit_key(key);
+        }
+        // The arch console is the focused left-column prompt (ZS1-148). It only
+        // captures editing keys; every control chord still reaches its usual
+        // handler so focus can always be moved away.
+        if self.left_prompt == LeftPrompt::Arch && self.arch_prompt_captures(key) {
+            return self.arch_prompt_key(key);
+        }
         if let Some(action) = self.approval_key(key) {
             return action;
         }
@@ -6416,6 +7051,23 @@ impl TuiState {
                 KeyCode::Char('w') => {
                     let index = self.active_subtab();
                     self.subtab_close(index);
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('g') => {
+                    self.begin_goal_edit();
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('m') => {
+                    // ZS1-148: switch the left-column prompt focus between the
+                    // resident discussion group and the arch master console.
+                    match self.toggle_left_prompt() {
+                        LeftPrompt::Arch => self.set_status(
+                            "Arch console focused · !cmd runs bash · text steers · Esc unfocuses",
+                        ),
+                        LeftPrompt::Discussion => {
+                            self.set_status("Discussion prompt focused · Alt-M for arch console")
+                        }
+                    }
                     return TuiAction::Redraw;
                 }
                 _ => {}
@@ -7673,6 +8325,15 @@ impl TuiState {
                         "no match"
                     }
                 )
+            } else if self.docked_prompt_rect == Some(area) {
+                if self.goal_text.is_empty() {
+                    " Prompt · Goal: — · Alt-G edit ".to_owned()
+                } else {
+                    format!(
+                        " Prompt · Goal: {} · Alt-G edit ",
+                        inline_token(&self.goal_text, 48)
+                    )
+                }
             } else if self.paste.folds.is_empty() && self.input.starts_with('/') {
                 " Prompt  • command palette active ".to_owned()
             } else {
@@ -7721,6 +8382,148 @@ impl TuiState {
                 .min(inner.height.saturating_sub(1)),
         );
         frame.set_cursor_position(Position::new(x, y));
+    }
+
+    /// Inline Goal editor in the top-left conversation group. Enter commits
+    /// through the bounded [`crate::view_model::GoalEdit`]; Esc cancels.
+    fn render_goal_editor(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let text = self
+            .goal_edit
+            .as_ref()
+            .map(|edit| edit.text().to_owned())
+            .unwrap_or_default();
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(" Goal · Enter save · Esc cancel ");
+        let inner = block.inner(area);
+        let width = usize::from(inner.width).max(1);
+        let lines = wrap_plain(&text, width)
+            .into_iter()
+            .map(Line::from)
+            .collect::<Vec<_>>();
+        frame.render_widget(
+            Paragraph::new(Text::from(lines))
+                .block(block)
+                .wrap(Wrap { trim: false }),
+            area,
+        );
+        if inner.width > 0 && inner.height > 0 {
+            let (cursor_x, cursor_y) = cursor_position(&text, text.len(), width);
+            let x = inner
+                .x
+                .saturating_add(cursor_x.min(inner.width.saturating_sub(1)));
+            let y = inner
+                .y
+                .saturating_add(cursor_y.min(inner.height.saturating_sub(1)));
+            frame.set_cursor_position(Position::new(x, y));
+        }
+    }
+
+    /// True when the arch pane can render its grouped transcript + prompt. The
+    /// group is offered at the same Standard/Wide breakpoints as the discussion
+    /// group; narrower viewports keep the ordinary pane and bottom strip.
+    fn arch_group_active(&self, area: Rect) -> bool {
+        matches!(
+            Breakpoint::for_size(area.width, area.height),
+            Breakpoint::Standard | Breakpoint::Wide
+        )
+    }
+
+    /// Bounded arch transcript. Arch is a conversation lane owned by the master
+    /// session, so it shows operator submissions and host results but never
+    /// mutates the discussion transcript.
+    fn render_arch_transcript(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let focused = self.left_prompt == LeftPrompt::Arch;
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(if focused {
+                Color::Cyan
+            } else {
+                Color::DarkGray
+            }))
+            .title(" Arch · master session ");
+        let inner_height = usize::from(block.inner(area).height);
+        let mut lines: Vec<Line> = self
+            .arch_messages
+            .iter()
+            .rev()
+            .take(inner_height.max(1))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .map(|message| {
+                Line::from(vec![
+                    Span::styled(
+                        format!("{}: ", message.role.label()),
+                        Style::default().fg(match message.role {
+                            MessageRole::User => Color::Cyan,
+                            MessageRole::Error => Color::Red,
+                            _ => Color::Gray,
+                        }),
+                    ),
+                    Span::raw(message.text.clone()),
+                ])
+            })
+            .collect();
+        if lines.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "arch console idle · !cmd bash · text steer",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+        frame.render_widget(
+            Paragraph::new(Text::from(lines))
+                .block(block)
+                .wrap(Wrap { trim: true }),
+            area,
+        );
+    }
+
+    /// Resident arch prompt rendered inside the left column directly beneath the
+    /// arch transcript. It keeps the pane's exact x/width, so arch + Prompt are
+    /// one group.
+    fn render_arch_input(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let focused = self.left_prompt == LeftPrompt::Arch;
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(if focused { Color::Cyan } else { Color::Magenta }))
+            .title(if focused {
+                " Arch prompt · !cmd bash · text steer · Enter send "
+            } else {
+                " Arch prompt · Alt-M focus "
+            });
+        let inner = block.inner(area);
+        let width = usize::from(inner.width).max(1);
+        let lines = wrap_plain(&self.arch_input, width)
+            .into_iter()
+            .map(Line::from)
+            .collect::<Vec<_>>();
+        frame.render_widget(
+            Paragraph::new(Text::from(lines))
+                .block(block)
+                .wrap(Wrap { trim: false }),
+            area,
+        );
+        if focused && inner.width > 0 && inner.height > 0 {
+            let (cursor_x, cursor_y) = cursor_position(&self.arch_input, self.arch_cursor, width);
+            let x = inner
+                .x
+                .saturating_add(cursor_x.min(inner.width.saturating_sub(1)));
+            let y = inner
+                .y
+                .saturating_add(cursor_y.min(inner.height.saturating_sub(1)));
+            frame.set_cursor_position(Position::new(x, y));
+        }
     }
 
     fn external_editor_shortcut_available(&self) -> bool {
@@ -7814,6 +8617,23 @@ impl TuiState {
         let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
         let prompt_lines = wrap_plain(&self.projection().text, prompt_width).len();
         let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
+        // Conversation + Prompt are one resident group. At a roomy viewport on
+        // the project workspace the prompt is rendered inside the top-left
+        // conversation pane, so it is exactly as wide as the left column.
+        // Active overlays (palette, completion, history search, pickers) and
+        // narrow/compact viewports keep the full-width bottom strip so menus
+        // and long lines retain room.
+        let overlay_active = !self.slash_choices().is_empty()
+            || self.current_file_completion().is_some()
+            || self.history_search.is_some()
+            || self.directory_picker.is_some()
+            || self.transcript_browser.is_some();
+        let group_prompt = !overlay_active
+            && self.workspace_layout.tab == TabId::Project
+            && matches!(
+                Breakpoint::for_size(area.width, area.height),
+                Breakpoint::Standard | Breakpoint::Wide
+            );
         let input_height = if area.height > 4 {
             u16::try_from(desired_input_height)
                 .unwrap_or(u16::MAX)
@@ -7833,10 +8653,22 @@ impl TuiState {
             .split(area);
         self.render_workspace_tabs(frame, chunks[0]);
         self.render_header(frame, chunks[1], title);
+        self.docked_prompt_rect = None;
+        self.dock_prompt = group_prompt;
         self.render_workspace(frame, chunks[2]);
-        self.render_input(frame, chunks[3]);
+        // When the group could not render the prompt (for example the
+        // conversation pane is collapsed) fall back to the bottom strip so the
+        // prompt is never unreachable.
+        if self.docked_prompt_rect.is_none() {
+            if self.goal_edit.is_some() {
+                self.render_goal_editor(frame, chunks[3]);
+            } else {
+                self.render_input(frame, chunks[3]);
+            }
+        }
         self.render_footer(frame, chunks[4]);
-        self.render_slash_choices(frame, chunks[3]);
+        let prompt_anchor = self.docked_prompt_rect.unwrap_or(chunks[3]);
+        self.render_slash_choices(frame, prompt_anchor);
         if let Some(picker) = self.directory_picker.as_mut() {
             picker.render(frame);
         }
@@ -8030,12 +8862,56 @@ impl TuiState {
         }
         let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, area);
         let canonical = conversation_pane_for_tab(adapter.tab());
+        self.arch_prompt_rect = None;
         for pane in adapter.visible_panes() {
             if pane.rect.width == 0 || pane.rect.height == 0 {
                 continue;
             }
             if pane.id == PaneId::GoalConversation {
                 self.render_transcript_pane(frame, pane.rect, true);
+            } else if pane.id == PaneId::Arch && self.arch_group_active(area) {
+                // Arch + Prompt are one left-column group (ZS1-148): the arch
+                // transcript keeps the upper rows and the master-session
+                // console prompt is rendered directly beneath it with the exact
+                // same x/width, never spilling into the center column.
+                let source =
+                    PaneRect::new(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+                let (conversation, prompt) = arch_prompt_group(source, ARCH_PROMPT_PANE_ROWS);
+                let conversation = Rect::new(
+                    conversation.x,
+                    conversation.y,
+                    conversation.width,
+                    conversation.height,
+                );
+                let prompt = Rect::new(prompt.x, prompt.y, prompt.width, prompt.height);
+                self.render_arch_transcript(frame, conversation);
+                self.arch_prompt_rect = Some(prompt);
+                self.render_arch_input(frame, prompt);
+            } else if pane.id == canonical
+                && pane.id == PaneId::ProjectConversation
+                && self.dock_prompt
+            {
+                // Conversation + Prompt are one left-column group: the
+                // transcript keeps the upper rows and the resident prompt (or
+                // the inline Goal editor) is rendered directly beneath it with
+                // the exact same x/width.
+                let source =
+                    PaneRect::new(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
+                let (transcript, prompt) = conversation_prompt_group(source, PROMPT_PANE_ROWS);
+                let transcript = Rect::new(
+                    transcript.x,
+                    transcript.y,
+                    transcript.width,
+                    transcript.height,
+                );
+                let prompt = Rect::new(prompt.x, prompt.y, prompt.width, prompt.height);
+                self.render_transcript(frame, transcript);
+                self.docked_prompt_rect = Some(prompt);
+                if self.goal_edit.is_some() {
+                    self.render_goal_editor(frame, prompt);
+                } else {
+                    self.render_input(frame, prompt);
+                }
             } else if pane.id == canonical
                 || matches!(
                     pane.id,
@@ -8102,10 +8978,10 @@ impl TuiState {
         } else {
             usize::from(*self.pane_scroll.get(&id).unwrap_or(&0))
         };
-        let text = if id == PaneId::Gantt {
-            style_status_marks(&content)
-        } else {
-            ratatui::text::Text::from(content)
+        let text = match id {
+            PaneId::Gantt => style_status_marks(&content),
+            PaneId::Resources => style_resource_pane(&content),
+            _ => ratatui::text::Text::from(content),
         };
         let paragraph = Paragraph::new(text)
             .style(Style::default().fg(Color::DarkGray))
@@ -8319,30 +9195,69 @@ impl TuiState {
             .available_bytes
             .map(format_byte_count)
             .unwrap_or_else(|| "unavailable".into());
+        let memory = match snapshot.memory.total_bytes.map(format_byte_count) {
+            Some(total) => format!("{memory} / {total}"),
+            None => memory,
+        };
         let process = snapshot
             .process
             .resident_bytes
             .map(format_byte_count)
             .unwrap_or_else(|| "unavailable".into());
-        let suffix = match &self.resource_status {
-            ResourcePaneStatus::Collecting => "\nrefreshing...".into(),
-            ResourcePaneStatus::Failed(error) => format!("\nrefresh failed: {error}"),
-            ResourcePaneStatus::Idle | ResourcePaneStatus::Ready => String::new(),
-        };
-        format!(
-            "workspace\nfiles {files}  dirs {directories}\nsize {bytes}  nodes {nodes}\ntruncated {truncated}\nhost\ncpu {cpus}  load {load}\nmem free {memory}\nprocess {process}{suffix}",
-            files = workspace.files,
-            directories = workspace.directories,
-            bytes = format_byte_count(workspace.bytes),
-            nodes = workspace.nodes,
-            truncated = workspace.truncated,
-            cpus = snapshot.cpu.logical_cpus,
-            load = snapshot
-                .cpu
-                .load_one_minute
-                .map(|value| format!("{value:.2}"))
-                .unwrap_or_else(|| "unavailable".into()),
-        )
+        let load = snapshot
+            .cpu
+            .load_one_minute
+            .map(|value| format!("{value:.2}"))
+            .unwrap_or_else(|| "unavailable".into());
+        let mut lines = vec![
+            format!("cpu {} cores  load {load}", snapshot.cpu.logical_cpus),
+            format!("mem free {memory}"),
+            format_gpu_signal(&snapshot.gpu),
+            format_network_signal(&snapshot.network),
+            format_process_summary(&snapshot.processes),
+        ];
+        for row in &snapshot.processes.rows {
+            lines.push(format!(
+                "  {:<10} {:>4}  {}",
+                row.class.label(),
+                row.count,
+                format_byte_count(row.resident_bytes)
+            ));
+        }
+        let context = self
+            .transcript_ux
+            .history_tokens
+            .zip(self.transcript_ux.context_limit)
+            .map(|(used, limit)| format!("context history {used}/{limit} tokens"))
+            .unwrap_or_else(|| "context unavailable".into());
+        lines.push(context);
+        lines.push(format!(
+            "lsp {} servers  mcp {} servers",
+            snapshot
+                .processes
+                .count_for(crate::resources::ProcessClass::Lsp),
+            snapshot
+                .processes
+                .count_for(crate::resources::ProcessClass::Mcp)
+        ));
+        lines.push("workspace".into());
+        lines.push(format!(
+            "files {}  dirs {}",
+            workspace.files, workspace.directories
+        ));
+        lines.push(format!(
+            "size {}  nodes {}",
+            format_byte_count(workspace.bytes),
+            workspace.nodes
+        ));
+        lines.push(format!("truncated {}", workspace.truncated));
+        lines.push(format!("self {process}"));
+        match &self.resource_status {
+            ResourcePaneStatus::Collecting => lines.push("refreshing...".into()),
+            ResourcePaneStatus::Failed(error) => lines.push(format!("refresh failed: {error}")),
+            ResourcePaneStatus::Idle | ResourcePaneStatus::Ready => {}
+        }
+        lines.join("\n")
     }
 
     fn gantt_pane_content(&self) -> String {
@@ -8446,6 +9361,59 @@ fn style_status_marks(content: &str) -> ratatui::text::Text<'static> {
         lines.push(ratatui::text::Line::from(spans));
     }
     ratatui::text::Text::from(lines)
+}
+
+/// Colour the compact resource monitor so CPU, memory, GPU and network read
+/// like a small `htop`/`nvidia-smi` board, while merged process classes keep a
+/// stable per-class hue.
+fn style_resource_pane(content: &str) -> ratatui::text::Text<'static> {
+    use ratatui::text::{Line, Span};
+    let mut lines = Vec::new();
+    for raw in content.lines() {
+        let (color, bold) = resource_line_style(raw.trim_start());
+        let style = if bold {
+            Style::default().fg(color).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(color)
+        };
+        lines.push(Line::from(Span::styled(raw.to_owned(), style)));
+    }
+    ratatui::text::Text::from(lines)
+}
+
+fn resource_line_style(trimmed: &str) -> (Color, bool) {
+    if trimmed.starts_with("cpu") {
+        return (Color::Cyan, true);
+    }
+    if trimmed.starts_with("mem") {
+        return (Color::Green, true);
+    }
+    if trimmed.starts_with("gpu") {
+        return (Color::Magenta, true);
+    }
+    if trimmed.starts_with("net") {
+        return (Color::Blue, true);
+    }
+    if trimmed.starts_with("processes") {
+        return (Color::Yellow, true);
+    }
+    if trimmed.starts_with("context") {
+        return (Color::LightBlue, false);
+    }
+    match trimmed.split_whitespace().next().unwrap_or_default() {
+        "zenpi" => (Color::Green, false),
+        "opencode" => (Color::Cyan, false),
+        "agent" => (Color::Blue, false),
+        "lsp" => (Color::LightMagenta, false),
+        "mcp" => (Color::LightCyan, false),
+        "node" => (Color::Yellow, false),
+        "rust" => (Color::LightRed, false),
+        "shell" => (Color::LightGreen, false),
+        "git" => (Color::LightBlue, false),
+        "search" => (Color::Magenta, false),
+        "refresh" | "Snapshot" => (Color::Red, true),
+        _ => (Color::DarkGray, false),
+    }
 }
 
 fn bound_gantt_pane_content(content: String) -> String {
@@ -9260,10 +10228,36 @@ pub fn dispatch_slash_command(
             }
         }
         SlashCommand::Model { name } => {
-            if let Some(agent) = agent.as_deref_mut() {
-                if let Some(name) = name {
+            if let Some(name) = name {
+                // `/model <name>` targets the focused left zone (ZS1-152). The
+                // discussion zone is the main conversation and therefore also
+                // updates the global model; the arch zone is a separate
+                // master-session region and must not disturb the discussion
+                // agent's active model.
+                let zone = state.focused_zone();
+                if zone == crate::view_model::Zone::Arch {
+                    match state.set_zone_model(zone, Some(name.clone())) {
+                        Ok(()) => state.push_message(
+                            MessageRole::System,
+                            format!("arch model selected: {}", inline_token(&name, 160)),
+                        ),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("arch model change failed: {error}"),
+                        ),
+                    }
+                    if let Some(agent) = agent.as_deref_mut()
+                        && let Err(error) = agent.set_zone_model(zone, Some(name))
+                    {
+                        state.push_message(
+                            MessageRole::Error,
+                            format!("arch model change failed: {error}"),
+                        );
+                    }
+                } else if let Some(agent) = agent.as_deref_mut() {
                     match agent.set_model(Some(name.clone())) {
                         Ok(()) => {
+                            let _ = state.set_zone_model(zone, Some(name.clone()));
                             state.refresh_transcript_status(agent);
                             // Keep the command palette's model/reasoning catalog
                             // bound to the owner we just changed.  Model
@@ -9288,16 +10282,27 @@ pub fn dispatch_slash_command(
                         ),
                     }
                 } else {
-                    match state.update_model_catalog(agent) {
-                        Ok(()) if !state.model_menu.entries.is_empty() => {
-                            state.set_input("/model ")
-                        }
+                    // No owner is bound yet: still record the discussion zone
+                    // preference so a later host can adopt it.
+                    match state.set_zone_model(zone, Some(name.clone())) {
                         Ok(()) => state.push_message(
-                            MessageRole::Error,
-                            "Model selection unavailable: this backend has no model registry",
+                            MessageRole::System,
+                            format!("model selected: {}", inline_token(&name, 160)),
                         ),
-                        Err(error) => state.push_message(MessageRole::Error, error.to_string()),
+                        Err(error) => state.push_message(
+                            MessageRole::Error,
+                            format!("model change failed: {error}"),
+                        ),
                     }
+                }
+            } else if let Some(agent) = agent.as_deref_mut() {
+                match state.update_model_catalog(agent) {
+                    Ok(()) if !state.model_menu.entries.is_empty() => state.set_input("/model "),
+                    Ok(()) => state.push_message(
+                        MessageRole::Error,
+                        "Model selection unavailable: this backend has no model registry",
+                    ),
+                    Err(error) => state.push_message(MessageRole::Error, error.to_string()),
                 }
             } else {
                 state.push_message(
@@ -11254,7 +12259,7 @@ fn signal_status(status: crate::resources::SignalStatus) -> &'static str {
 
 fn format_resource_summary(snapshot: &crate::resources::ResourceSnapshot) -> String {
     format!(
-        "resources: files={} dirs={} bytes={} truncated={} cpu={} memory={} disk={}",
+        "resources: files={} dirs={} bytes={} truncated={} cpu={} memory={} disk={} gpu={} network={} processes={} lsp={} mcp={}",
         snapshot.workspace.files,
         snapshot.workspace.directories,
         snapshot.workspace.bytes,
@@ -11262,6 +12267,15 @@ fn format_resource_summary(snapshot: &crate::resources::ResourceSnapshot) -> Str
         signal_status(snapshot.cpu.status),
         signal_status(snapshot.memory.status),
         signal_status(snapshot.disk.status),
+        signal_status(snapshot.gpu.status),
+        signal_status(snapshot.network.status),
+        snapshot.processes.total,
+        snapshot
+            .processes
+            .count_for(crate::resources::ProcessClass::Lsp),
+        snapshot
+            .processes
+            .count_for(crate::resources::ProcessClass::Mcp),
     )
 }
 
@@ -11278,6 +12292,60 @@ fn format_byte_count(bytes: u64) -> String {
     } else {
         format!("{value:.1} {}", UNITS[unit])
     }
+}
+
+fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
+    if gpu.devices.is_empty() {
+        return "gpu unavailable".into();
+    }
+    let devices: Vec<String> = gpu
+        .devices
+        .iter()
+        .map(|device| {
+            let utilization = device
+                .utilization_percent
+                .map(|value| format!("{value:.0}%"))
+                .unwrap_or_else(|| "util --".into());
+            let memory = match (device.memory_used_bytes, device.memory_total_bytes) {
+                (Some(used), Some(total)) => {
+                    format!("{}/{}", format_byte_count(used), format_byte_count(total))
+                }
+                _ => "mem --".into(),
+            };
+            format!("{} {utilization} {memory}", device.name)
+        })
+        .collect();
+    let mut line = format!("gpu {}", devices.join("; "));
+    if gpu.truncated {
+        line.push_str(" ...");
+    }
+    line
+}
+
+fn format_network_signal(network: &crate::resources::NetworkSignal) -> String {
+    match (network.received_bytes, network.transmitted_bytes) {
+        (Some(received), Some(transmitted)) => format!(
+            "net rx {}  tx {}",
+            format_byte_count(received),
+            format_byte_count(transmitted)
+        ),
+        _ => "net unavailable".into(),
+    }
+}
+
+fn format_process_summary(processes: &crate::resources::ProcessSummary) -> String {
+    if processes.total == 0 {
+        return "processes unavailable".into();
+    }
+    let mut line = format!(
+        "processes {} total  {}",
+        processes.total,
+        format_byte_count(processes.resident_bytes)
+    );
+    if processes.truncated {
+        line.push_str("  truncated");
+    }
+    line
 }
 
 /// Run the interactive mode for zenpi's shared agent.
@@ -13319,6 +14387,17 @@ pub fn run_async_with_profile(
                             JobOutcome::Succeeded(TuiJobResult::UserShell(result)) => {
                                 state.discard_stream();
                                 render_user_shell_result(&mut state, &result);
+                                // ZS1-148: record the bounded result in the arch
+                                // master-session lane and release its single
+                                // concurrency slot.
+                                if state.master_busy() {
+                                    let summary = result
+                                        .get("exit_code")
+                                        .and_then(serde_json::Value::as_i64)
+                                        .map(|code| format!("arch bash finished (exit {code})"))
+                                        .unwrap_or_else(|| "arch bash finished".to_owned());
+                                    state.complete_master_turn(MessageRole::System, summary);
+                                }
                             }
                             JobOutcome::Failed(error) => {
                                 if let Some(text) = rejected_input {
@@ -13341,6 +14420,12 @@ pub fn run_async_with_profile(
                                 state.set_status("Request failed");
                             }
                         }
+                        // Any terminal job boundary releases the arch master
+                        // session's single concurrency slot (ZS1-148). The arm
+                        // above may already have recorded a richer arch result.
+                        if state.master_busy() {
+                            state.set_master_busy(false);
+                        }
                         scheduler.request();
                     }
                     RuntimeEvent::Rejected { id, reason } => {
@@ -13358,6 +14443,9 @@ pub fn run_async_with_profile(
                         active_job_kind = None;
                         state.discard_stream();
                         state.set_busy(false);
+                        if state.master_busy() {
+                            state.set_master_busy(false);
+                        }
                         state.push_message(MessageRole::Error, reason.to_string());
                         state.set_status("Request rejected");
                         if let Some(text) = rejected_input {
@@ -13535,7 +14623,15 @@ pub fn run_async_with_profile(
                 if matches!(event, Event::Resize(_, _)) {
                     resize_pending = true;
                 }
-                match state.handle_event(event) {
+                // ZS1-148: an arch master-session submission is normalized onto
+                // the standard submit route. `display()` keeps the leading `!`
+                // for bash so the shared parser selects the user-shell owner,
+                // while steering text reaches the existing Steer/Prompt path.
+                let action = match state.handle_event(event) {
+                    TuiAction::SubmitArch(command) => TuiAction::Submit(command.display()),
+                    other => other,
+                };
+                match action {
                     TuiAction::RespondApproval {
                         project,
                         request_id,
@@ -14300,6 +15396,9 @@ pub fn run_async_with_profile(
                         }
                     }
                     TuiAction::Quit => break 'outer,
+                    // ZS1-148: arch submissions are normalized to `Submit`
+                    // before this match, so this arm is a defensive no-op.
+                    TuiAction::SubmitArch(_) => {}
                     TuiAction::Redraw | TuiAction::None => {}
                 }
                 processed += 1;
@@ -14507,6 +15606,33 @@ where
                             state.set_status("Input control failed");
                         }
                     }
+                    // ZS1-148: the arch console belongs to the master session.
+                    // The synchronous host has no shell owner, but it can still
+                    // forward a steering instruction through `on_submit` and it
+                    // must report a bash rejection instead of faking success.
+                    TuiAction::SubmitArch(command) => match command {
+                        MasterSessionCommand::Bash(_) => {
+                            state.complete_master_turn(
+                                MessageRole::Error,
+                                "local shell unavailable in the synchronous TUI host",
+                            );
+                            state.set_status("Arch bash unavailable");
+                        }
+                        MasterSessionCommand::Steer(prompt) => {
+                            state.set_busy(true);
+                            state.set_status("Working");
+                            let result = on_submit(prompt.clone(), &mut state);
+                            match result {
+                                Ok(()) => state.complete_master_turn(
+                                    MessageRole::System,
+                                    format!("arch steer applied: {prompt}"),
+                                ),
+                                Err(error) => state
+                                    .complete_master_turn(MessageRole::Error, error.to_string()),
+                            }
+                            state.set_busy(false);
+                        }
+                    },
                     TuiAction::Submit(text) => match slash::route_input(&text) {
                         Err(error) => {
                             state.push_message(MessageRole::User, &text);
@@ -17256,6 +18382,7 @@ mod local_diff_host_tests {
             cwd: "/tmp/selected-B".into(),
             session_path: Some("/tmp/B.jsonl".into()),
             approval_mode: Default::default(),
+            ..Default::default()
         });
         state.set_project_session_cursor(state.active_project().to_owned(), "session-B", 1);
         state.set_busy(true);
@@ -17294,6 +18421,7 @@ mod local_diff_host_tests {
             cwd: "/tmp/A".into(),
             session_path: Some("/tmp/A.jsonl".into()),
             approval_mode: Default::default(),
+            ..Default::default()
         });
         state.set_input("new A draft");
         let layout_a = state.active_project_workspace().clone();

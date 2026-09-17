@@ -22,6 +22,18 @@ pub const MAX_WORKSPACE_NODES: usize = 120_000;
 pub const MAX_WORKSPACE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 pub const MAX_WORKSPACE_DEPTH: usize = 64;
 
+/// Process classes shown by the compact resource monitor. Classes are a closed
+/// set so "same-class" merging can never grow unbounded on hostile process
+/// names; anything unrecognised collapses into [`ProcessClass::Other`].
+pub const MAX_PROCESS_ROWS: usize = 24;
+/// Upper bound on host processes inspected for one summary. A machine with more
+/// processes than this reports `truncated` instead of allocating without bound.
+pub const MAX_PROCESSES_SCANNED: usize = 8_192;
+/// Upper bound on discrete GPU devices reported by one probe.
+pub const MAX_GPU_DEVICES: usize = 8;
+/// Longest device/command label retained from an external probe.
+pub const MAX_DEVICE_LABEL_CHARS: usize = 48;
+
 #[derive(Debug, Error)]
 pub enum ResourceError {
     #[error("resource root does not exist: {0}")]
@@ -104,10 +116,11 @@ impl WorkspaceScanPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SignalStatus {
     Available,
+    #[default]
     Unavailable,
 }
 
@@ -151,6 +164,206 @@ pub struct ProcessSignal {
     pub status: SignalStatus,
 }
 
+/// Coarse process taxonomy used by the merged monitor. Declared in display
+/// order so `Ord` also yields a stable presentation order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessClass {
+    Zenpi,
+    OpenCode,
+    Agent,
+    Lsp,
+    Mcp,
+    Node,
+    Rust,
+    Shell,
+    Git,
+    Search,
+    #[default]
+    Other,
+}
+
+impl ProcessClass {
+    #[allow(dead_code)]
+    pub const ALL: [Self; 11] = [
+        Self::Zenpi,
+        Self::OpenCode,
+        Self::Agent,
+        Self::Lsp,
+        Self::Mcp,
+        Self::Node,
+        Self::Rust,
+        Self::Shell,
+        Self::Git,
+        Self::Search,
+        Self::Other,
+    ];
+
+    #[allow(dead_code)]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Zenpi => "zenpi",
+            Self::OpenCode => "opencode",
+            Self::Agent => "agent",
+            Self::Lsp => "lsp",
+            Self::Mcp => "mcp",
+            Self::Node => "node",
+            Self::Rust => "rust",
+            Self::Shell => "shell",
+            Self::Git => "git",
+            Self::Search => "search",
+            Self::Other => "other",
+        }
+    }
+
+    /// Classify a raw process command/path (e.g. `comm` from `ps`). The matcher
+    /// is case-insensitive and ordered so language servers and MCP bridges are
+    /// never mistaken for a generic worker.
+    pub fn classify(command: &str) -> Self {
+        let lower = command.to_ascii_lowercase();
+        let base = lower.rsplit(['/', '\\']).next().unwrap_or(lower.as_str());
+        let base = base.split_whitespace().next().unwrap_or(base);
+        let base = base.strip_suffix(".exe").unwrap_or(base);
+        let has = |needle: &str| lower.contains(needle);
+
+        if has("rust-analyzer")
+            || has("typescript-language-server")
+            || has("tsserver")
+            || has("gopls")
+            || has("clangd")
+            || has("pyright")
+            || has("pylsp")
+            || has("jedi-language-server")
+            || has("lua-language-server")
+            || has("language-server")
+            || has("language_server")
+            || has("-lsp")
+            || base == "lsp"
+        {
+            return Self::Lsp;
+        }
+        if has("mcp") {
+            return Self::Mcp;
+        }
+        if base.contains("zenpi") || base.contains("pi_agent") || base.contains("pi-agent") {
+            return Self::Zenpi;
+        }
+        if base.contains("opencode") {
+            return Self::OpenCode;
+        }
+        if matches!(base, "cargo" | "rustc" | "rustup" | "rustdoc" | "rustfmt")
+            || base.starts_with("cargo-")
+            || base.starts_with("clippy")
+        {
+            return Self::Rust;
+        }
+        if matches!(
+            base,
+            "node" | "deno" | "bun" | "npm" | "npx" | "pnpm" | "yarn" | "ts-node"
+        ) {
+            return Self::Node;
+        }
+        if matches!(
+            base,
+            "zsh" | "bash" | "sh" | "dash" | "fish" | "tcsh" | "csh" | "login" | "sudo" | "env"
+        ) {
+            return Self::Shell;
+        }
+        if base.starts_with("git") {
+            return Self::Git;
+        }
+        if matches!(
+            base,
+            "rg" | "ripgrep" | "grep" | "egrep" | "fgrep" | "find" | "fd" | "ag" | "ack"
+        ) {
+            return Self::Search;
+        }
+        if has("agent") || has("harness") || has("worker") {
+            return Self::Agent;
+        }
+        Self::Other
+    }
+}
+
+/// One merged line: every process of the same class is summed rather than
+/// listed individually.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessClassRow {
+    pub class: ProcessClass,
+    pub count: usize,
+    pub resident_bytes: u64,
+}
+
+/// Merged process view. `rows` holds at most [`MAX_PROCESS_ROWS`] classes,
+/// highest resident memory first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ProcessSummary {
+    pub total: usize,
+    pub resident_bytes: u64,
+    pub rows: Vec<ProcessClassRow>,
+    pub truncated: bool,
+    pub status: SignalStatus,
+}
+
+impl ProcessSummary {
+    pub fn unavailable() -> Self {
+        Self {
+            status: SignalStatus::Unavailable,
+            ..Self::default()
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn row(&self, class: ProcessClass) -> Option<&ProcessClassRow> {
+        self.rows.iter().find(|row| row.class == class)
+    }
+
+    #[allow(dead_code)]
+    pub fn count_for(&self, class: ProcessClass) -> usize {
+        self.row(class).map_or(0, |row| row.count)
+    }
+}
+
+/// Host network counters, cumulative since boot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct NetworkSignal {
+    pub received_bytes: Option<u64>,
+    pub transmitted_bytes: Option<u64>,
+    pub status: SignalStatus,
+}
+
+impl NetworkSignal {
+    pub fn unavailable() -> Self {
+        Self::default()
+    }
+}
+
+/// One GPU reported by an `nvidia-smi` style probe.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GpuDevice {
+    pub name: String,
+    pub utilization_percent: Option<f64>,
+    pub memory_total_bytes: Option<u64>,
+    pub memory_used_bytes: Option<u64>,
+}
+
+/// Best-effort discrete GPU inventory. Hosts without `nvidia-smi` report an
+/// explicit typed `Unavailable` instead of fabricating zeroed devices.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct GpuSignal {
+    pub devices: Vec<GpuDevice>,
+    pub truncated: bool,
+    pub status: SignalStatus,
+}
+
+impl GpuSignal {
+    pub fn unavailable() -> Self {
+        Self::default()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
     pub collected_at_ms: u64,
@@ -159,6 +372,12 @@ pub struct ResourceSnapshot {
     pub memory: MemorySignal,
     pub disk: DiskSignal,
     pub process: ProcessSignal,
+    #[serde(default)]
+    pub network: NetworkSignal,
+    #[serde(default)]
+    pub gpu: GpuSignal,
+    #[serde(default)]
+    pub processes: ProcessSummary,
 }
 
 /// Resource collector bound to one canonical workspace root.
@@ -236,6 +455,9 @@ impl ResourceCollector {
             memory: memory_signal(),
             disk: disk_signal(&self.root),
             process: process_signal(),
+            network: network_signal(),
+            gpu: gpu_signal(),
+            processes: process_summary(),
         })
     }
 
@@ -422,6 +644,248 @@ fn process_signal() -> ProcessSignal {
         } else {
             SignalStatus::Unavailable
         },
+    }
+}
+
+fn network_signal() -> NetworkSignal {
+    #[cfg(target_os = "linux")]
+    {
+        linux_network_signal()
+    }
+    #[cfg(all(unix, not(target_os = "linux")))]
+    {
+        bsd_network_signal()
+    }
+    #[cfg(not(unix))]
+    {
+        NetworkSignal::unavailable()
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_network_signal() -> NetworkSignal {
+    let Ok(text) = fs::read_to_string("/proc/net/dev") else {
+        return NetworkSignal::unavailable();
+    };
+    let mut received = 0u64;
+    let mut transmitted = 0u64;
+    let mut saw = false;
+    for line in text.lines().skip(2) {
+        let Some((_, counters)) = line.split_once(':') else {
+            continue;
+        };
+        // Receive columns: bytes packets errs drop fifo frame compressed
+        // multicast; transmit bytes are the ninth value.
+        let values: Vec<&str> = counters.split_whitespace().collect();
+        if values.len() < 16 {
+            continue;
+        }
+        let (Ok(rx), Ok(tx)) = (values[0].parse::<u64>(), values[8].parse::<u64>()) else {
+            continue;
+        };
+        received = received.saturating_add(rx);
+        transmitted = transmitted.saturating_add(tx);
+        saw = true;
+    }
+    if !saw {
+        return NetworkSignal::unavailable();
+    }
+    NetworkSignal {
+        received_bytes: Some(received),
+        transmitted_bytes: Some(transmitted),
+        status: SignalStatus::Available,
+    }
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn bsd_network_signal() -> NetworkSignal {
+    let mut received = 0u64;
+    let mut transmitted = 0u64;
+    let mut saw = false;
+    let mut interfaces: *mut libc::ifaddrs = std::ptr::null_mut();
+    // SAFETY: `getifaddrs` fills a heap list that `freeifaddrs` releases.
+    if unsafe { libc::getifaddrs(&mut interfaces) } != 0 || interfaces.is_null() {
+        return NetworkSignal::unavailable();
+    }
+    let mut cursor = interfaces;
+    while !cursor.is_null() {
+        // SAFETY: `cursor` walks the list returned by `getifaddrs`.
+        let entry = unsafe { &*cursor };
+        if !entry.ifa_addr.is_null()
+            && !entry.ifa_data.is_null()
+            && i32::from(unsafe { (*entry.ifa_addr).sa_family }) == libc::AF_LINK
+        {
+            // SAFETY: AF_LINK entries carry an `if_data` payload.
+            let data = unsafe { &*(entry.ifa_data as *const libc::if_data) };
+            received = received.saturating_add(u64::from(data.ifi_ibytes));
+            transmitted = transmitted.saturating_add(u64::from(data.ifi_obytes));
+            saw = true;
+        }
+        cursor = entry.ifa_next;
+    }
+    // SAFETY: `interfaces` is the head of the list allocated above.
+    unsafe { libc::freeifaddrs(interfaces) };
+    if !saw {
+        return NetworkSignal::unavailable();
+    }
+    NetworkSignal {
+        received_bytes: Some(received),
+        transmitted_bytes: Some(transmitted),
+        status: SignalStatus::Available,
+    }
+}
+
+fn gpu_signal() -> GpuSignal {
+    #[cfg(unix)]
+    {
+        nvidia_smi_signal()
+    }
+    #[cfg(not(unix))]
+    {
+        GpuSignal::unavailable()
+    }
+}
+
+#[cfg(unix)]
+fn nvidia_smi_signal() -> GpuSignal {
+    if !command_on_path("nvidia-smi") {
+        return GpuSignal::unavailable();
+    }
+    let Ok(output) = std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=name,utilization.gpu,memory.total,memory.used",
+            "--format=csv,noheader,nounits",
+        ])
+        .output()
+    else {
+        return GpuSignal::unavailable();
+    };
+    if !output.status.success() {
+        return GpuSignal::unavailable();
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut devices = Vec::new();
+    let mut truncated = false;
+    for line in text.lines() {
+        if devices.len() >= MAX_GPU_DEVICES {
+            truncated = true;
+            break;
+        }
+        let parts: Vec<&str> = line.split(',').map(str::trim).collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        let name: String = parts[0].chars().take(MAX_DEVICE_LABEL_CHARS).collect();
+        devices.push(GpuDevice {
+            name,
+            utilization_percent: parts[1].parse().ok(),
+            memory_total_bytes: parts[2]
+                .parse::<u64>()
+                .ok()
+                .and_then(|mb| mb.checked_mul(1024 * 1024)),
+            memory_used_bytes: parts[3]
+                .parse::<u64>()
+                .ok()
+                .and_then(|mb| mb.checked_mul(1024 * 1024)),
+        });
+    }
+    if devices.is_empty() {
+        return GpuSignal::unavailable();
+    }
+    GpuSignal {
+        devices,
+        truncated,
+        status: SignalStatus::Available,
+    }
+}
+
+#[cfg(unix)]
+fn command_on_path(name: &str) -> bool {
+    let Some(path) = std::env::var_os("PATH") else {
+        return false;
+    };
+    std::env::split_paths(&path).any(|directory| directory.join(name).is_file())
+}
+
+fn process_summary() -> ProcessSummary {
+    #[cfg(unix)]
+    {
+        unix_process_summary()
+    }
+    #[cfg(not(unix))]
+    {
+        ProcessSummary::unavailable()
+    }
+}
+
+#[cfg(unix)]
+fn unix_process_summary() -> ProcessSummary {
+    // `ps` is the portable read-only owner on both Linux and macOS. The
+    // query is bounded by `MAX_PROCESSES_SCANNED` lines regardless of output.
+    let Ok(output) = std::process::Command::new("ps")
+        .args(["-axo", "pid=,rss=,comm="])
+        .output()
+    else {
+        return ProcessSummary::unavailable();
+    };
+    if !output.status.success() {
+        return ProcessSummary::unavailable();
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut totals = std::collections::BTreeMap::<ProcessClass, (usize, u64)>::new();
+    let mut total = 0usize;
+    let mut resident_bytes = 0u64;
+    let mut truncated = false;
+    for line in text.lines() {
+        if total >= MAX_PROCESSES_SCANNED {
+            truncated = true;
+            break;
+        }
+        let Some((pid, rest)) = line.trim_start().split_once(char::is_whitespace) else {
+            continue;
+        };
+        let rest = rest.trim_start();
+        let Some((rss, command)) = rest.split_once(char::is_whitespace) else {
+            continue;
+        };
+        let (Ok(_pid), Ok(rss_kib)) = (pid.parse::<u32>(), rss.parse::<u64>()) else {
+            continue;
+        };
+        let class = ProcessClass::classify(command.trim());
+        let bytes = rss_kib.saturating_mul(1024);
+        let entry = totals.entry(class).or_insert((0, 0));
+        entry.0 = entry.0.saturating_add(1);
+        entry.1 = entry.1.saturating_add(bytes);
+        total = total.saturating_add(1);
+        resident_bytes = resident_bytes.saturating_add(bytes);
+    }
+    if total == 0 {
+        return ProcessSummary::unavailable();
+    }
+    let mut rows: Vec<ProcessClassRow> = totals
+        .into_iter()
+        .map(|(class, (count, bytes))| ProcessClassRow {
+            class,
+            count,
+            resident_bytes: bytes,
+        })
+        .collect();
+    rows.sort_by(|left, right| {
+        right
+            .resident_bytes
+            .cmp(&left.resident_bytes)
+            .then_with(|| left.class.cmp(&right.class))
+    });
+    if rows.len() > MAX_PROCESS_ROWS {
+        rows.truncate(MAX_PROCESS_ROWS);
+        truncated = true;
+    }
+    ProcessSummary {
+        total,
+        resident_bytes,
+        rows,
+        truncated,
+        status: SignalStatus::Available,
     }
 }
 
