@@ -11,6 +11,7 @@ fn metadata(root: &Path) -> ProjectTabMetadata {
         cwd: root.canonicalize().unwrap().display().to_string(),
         session_path: None,
         approval_mode: Default::default(),
+        style: None,
     }
 }
 

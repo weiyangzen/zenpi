@@ -113,12 +113,20 @@ pub struct TuiMessage {
     pub block_id: Option<String>,
 }
 
+/// Named per-project display styles accepted by `/project style`.
+pub const PROJECT_STYLES: [&str; 7] = [
+    "cyan", "green", "yellow", "magenta", "blue", "red", "white",
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectTabMetadata {
     pub cwd: String,
     pub session_path: Option<String>,
     #[serde(default)]
     pub approval_mode: crate::approval::ApprovalMode,
+    /// Optional per-project display style (a small named colour palette).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -133,6 +141,7 @@ impl ProjectTabMetadata {
             cwd: session.header().cwd.clone(),
             session_path: Some(session.path().display().to_string()),
             approval_mode: crate::approval::ApprovalMode::Always,
+            style: None,
         }
     }
 }
@@ -143,6 +152,7 @@ impl Default for ProjectTabMetadata {
             cwd: String::new(),
             session_path: None,
             approval_mode: crate::approval::ApprovalMode::Always,
+            style: None,
         }
     }
 }
@@ -2802,6 +2812,60 @@ impl TuiState {
         self.dirty = true;
         self.project_checkpoint_dirty = true;
         true
+    }
+
+    /// Move a project tab to a new zero-based position, preserving the active
+    /// project by name.
+    pub fn move_project_tab(&mut self, name: &str, target: usize) -> bool {
+        let Some(index) = self.project_index(name) else {
+            return false;
+        };
+        let len = self.project_tabs.len();
+        if len < 2 {
+            return false;
+        }
+        let target = target.min(len - 1);
+        if target == index {
+            return true;
+        }
+        let active_name = self.project_tabs[self.active_project].clone();
+        let tab = self.project_tabs.remove(index);
+        self.project_tabs.insert(target, tab);
+        self.active_project = self
+            .project_tabs
+            .iter()
+            .position(|item| item == &active_name)
+            .unwrap_or(0);
+        self.project_name = self.project_tabs[self.active_project].clone();
+        true
+    }
+
+    /// Set a project tab's display style from the small named palette.
+    pub fn style_project_tab(&mut self, name: &str, style: &str) -> bool {
+        let style = style.to_ascii_lowercase();
+        if !PROJECT_STYLES.contains(&style.as_str()) {
+            return false;
+        }
+        let Some(index) = self.project_index(name) else {
+            return false;
+        };
+        let key = self.project_tabs[index].clone();
+        self.project_metadata.entry(key).or_default().style = Some(style);
+        true
+    }
+
+    fn project_style_color(&self, index: usize) -> Option<Color> {
+        let name = self.project_tabs.get(index)?;
+        match self.project_metadata.get(name)?.style.as_deref()? {
+            "cyan" => Some(Color::Cyan),
+            "green" => Some(Color::Green),
+            "yellow" => Some(Color::Yellow),
+            "magenta" => Some(Color::Magenta),
+            "blue" => Some(Color::Blue),
+            "red" => Some(Color::Red),
+            "white" => Some(Color::White),
+            _ => None,
+        }
     }
 
     pub fn close_project_tab(&mut self, name: &str) -> bool {
@@ -7507,6 +7571,8 @@ impl TuiState {
             frame.render_widget(
                 Paragraph::new(text).style(Style::default().fg(if approvals > 0 {
                     Color::Yellow
+                } else if let Some(style) = self.project_style_color(index) {
+                    style
                 } else if index == self.active_project {
                     Color::Cyan
                 } else {
@@ -8525,6 +8591,41 @@ pub fn dispatch_slash_command(
                             },
                         )
                     }
+                }
+                ProjectAction::Move { name, index } => {
+                    let ok = state.move_project_tab(&name, index);
+                    (
+                        ok,
+                        if ok {
+                            format!("project moved: {name} -> {index}")
+                        } else {
+                            format!("cannot move project: {name}")
+                        },
+                    )
+                }
+                ProjectAction::Rename { old, new } => {
+                    let ok = !new.trim().is_empty()
+                        && !state.project_tabs().contains(&new)
+                        && state.rename_project_tab(&old, new.clone());
+                    (
+                        ok,
+                        if ok {
+                            format!("project renamed: {old} -> {new}")
+                        } else {
+                            format!("cannot rename project: {old}")
+                        },
+                    )
+                }
+                ProjectAction::Style { name, style } => {
+                    let ok = state.style_project_tab(&name, &style);
+                    (
+                        ok,
+                        if ok {
+                            format!("project style: {name} = {style}")
+                        } else {
+                            format!("unknown project or style: {name}/{style}")
+                        },
+                    )
                 }
             };
             state.push_message(
@@ -13147,8 +13248,54 @@ pub fn run_async_with_profile(
                                             );
                                             None
                                         }
+                                        ProjectAction::Move { name, index } => {
+                                            let ok = state.move_project_tab(name, *index);
+                                            state.push_message(
+                                                MessageRole::System,
+                                                if ok {
+                                                    format!("project moved: {name} -> {index}")
+                                                } else {
+                                                    format!("cannot move project: {name}")
+                                                },
+                                            );
+                                            None
+                                        }
+                                        ProjectAction::Rename { old, new } => {
+                                            let ok = !new.trim().is_empty()
+                                                && !state.project_tabs.contains(new)
+                                                && state.rename_project_tab(old, new.clone());
+                                            state.push_message(
+                                                MessageRole::System,
+                                                if ok {
+                                                    format!("project renamed: {old} -> {new}")
+                                                } else {
+                                                    format!("cannot rename project: {old}")
+                                                },
+                                            );
+                                            None
+                                        }
+                                        ProjectAction::Style { name, style } => {
+                                            let ok = state.style_project_tab(name, style);
+                                            state.push_message(
+                                                MessageRole::System,
+                                                if ok {
+                                                    format!("project style: {name} = {style}")
+                                                } else {
+                                                    format!("unknown project or style: {name}/{style}")
+                                                },
+                                            );
+                                            None
+                                        }
                                     };
-                                    if intent.is_none() && !matches!(action, ProjectAction::List) {
+                                    if intent.is_none()
+                                        && !matches!(
+                                            action,
+                                            ProjectAction::List
+                                                | ProjectAction::Move { .. }
+                                                | ProjectAction::Rename { .. }
+                                                | ProjectAction::Style { .. }
+                                        )
+                                    {
                                         state.push_message(MessageRole::Error, "Project not found");
                                     }
                                     state.pending_project = intent;
