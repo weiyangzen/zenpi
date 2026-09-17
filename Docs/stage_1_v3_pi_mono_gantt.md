@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-17T13:24:40+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-17T15:09:05+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `17330bdd308de73181d7c30463650d010e72913c8acd3c19076d3a57f16e104f`
-- 生成时间：2026-09-17T13:24:40+08:00
+- blueprint digest: `b4793c736eced1cbeef7bc4fdadc2d8fb41ba5c0ce41fd12e42dacc400ad7ac7`
+- 生成时间：2026-09-17T15:09:05+08:00
 
-清单项 `[x]` **125/129** · `[_]` **0** · `[ ]` **4**。按清单项计数，不是代码完成率。
+清单项 `[x]` **126/129** · `[_]` **0** · `[ ]` **3**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 35 | 32 | 0 | 3 |
+| L3 | 35 | 33 | 0 | 2 |
 | L5 | 2 | 1 | 0 | 1 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -141,7 +141,7 @@ gantt
     ZS1-118 Provider 开放与官方/第三方供应商对齐 :done, ZS1-118, 11, 1s
     ZS1-119 `/sync` 用户要求同步到 single-authority bluepri :done, ZS1-119, 12, 1s
     ZS1-140 TUI 一层 project tab：增/减/调位置/重命名/每项目风格 :done, ZS1-140, 5, 1s
-    ZS1-141 一层 tab 增加工作文件夹支持本地与 SSH 远端 :ZS1-141, 6, 1s
+    ZS1-141 一层 tab 增加工作文件夹支持本地与 SSH 远端 :done, ZS1-141, 6, 1s
     ZS1-142 TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号 :ZS1-142, 6, 1s
     ZS1-144 命令补齐：/execute /explore /addloop 的语义与实现 :done, ZS1-144, 13, 1s
     ZS1-145 TUI 区域补齐：arch 架构区与 execution 执行区（BentoBo :ZS1-145, 6, 1s
@@ -264,7 +264,7 @@ gantt
 | ZS1-118 | [x] | L3 | ZS1-107,ZS1-091 | — | Provider 开放与官方/第三方供应商对齐 |
 | ZS1-119 | [x] | L3 | ZS1-118 | — | `/sync` 用户要求同步到 single-authority blueprint 并触发执行 |
 | ZS1-140 | [x] | L3 | ZS1-121 | — | TUI 一层 project tab：增/减/调位置/重命名/每项目风格 |
-| ZS1-141 | [·] | L3 | ZS1-140 | — | 一层 tab 增加工作文件夹支持本地与 SSH 远端 |
+| ZS1-141 | [x] | L3 | ZS1-140 | — | 一层 tab 增加工作文件夹支持本地与 SSH 远端 |
 | ZS1-142 | [·] | L3 | ZS1-140 | — | TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号单击新建、长按双 logo） |
 | ZS1-143 | [·] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | ZS1-142,ZS1-145 | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
 | ZS1-144 | [x] | L3 | ZS1-119 | — | 命令补齐：/execute /explore /addloop 的语义与实现 |

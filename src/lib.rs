@@ -14,6 +14,7 @@ pub mod domains;
 pub mod error;
 pub mod extension_runtime;
 pub mod extensions;
+pub mod folder_source;
 pub mod governance;
 pub mod headless;
 pub mod input_queue;

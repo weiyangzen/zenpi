@@ -12,6 +12,7 @@ fn metadata(root: &Path) -> ProjectTabMetadata {
         session_path: None,
         approval_mode: Default::default(),
         style: None,
+        source: None,
     }
 }
 

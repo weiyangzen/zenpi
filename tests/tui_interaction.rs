@@ -234,6 +234,7 @@ fn project_select_binds_real_agent_session_and_workspace() {
         zenpi::tui::ProjectTabMetadata {
             approval_mode: Default::default(),
             style: None,
+        source: None,
             cwd: dir.path().display().to_string(),
             session_path: Some(api_path.display().to_string()),
         },
@@ -270,6 +271,7 @@ fn closing_active_project_rebinds_agent_to_remaining_project() {
         zenpi::tui::ProjectTabMetadata {
             approval_mode: Default::default(),
             style: None,
+        source: None,
             cwd: dir.path().display().to_string(),
             session_path: Some(default_path.display().to_string()),
         },
@@ -280,6 +282,7 @@ fn closing_active_project_rebinds_agent_to_remaining_project() {
         zenpi::tui::ProjectTabMetadata {
             approval_mode: Default::default(),
             style: None,
+        source: None,
             cwd: dir.path().display().to_string(),
             session_path: Some(api_path.display().to_string()),
         },
@@ -329,6 +332,7 @@ fn closing_project_removes_its_runtime_metadata_projection() {
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
         approval_mode: Default::default(),
         style: None,
+        source: None,
         cwd: "/work/api".into(),
         session_path: Some("/sessions/api.jsonl".into()),
     });
@@ -373,6 +377,7 @@ fn project_metadata_round_trips_with_project_strip() {
         zenpi::tui::ProjectTabMetadata {
             approval_mode: Default::default(),
             style: None,
+        source: None,
             cwd: "/workspace/api".into(),
             session_path: Some("/sessions/api.jsonl".into()),
         },
@@ -408,6 +413,7 @@ fn project_checkpoint_restores_isolated_transcript_and_layout() {
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
         approval_mode: Default::default(),
         style: None,
+        source: None,
         cwd: "/work/api".into(),
         session_path: Some("/work/api/session.jsonl".into()),
     });
@@ -440,6 +446,7 @@ fn project_view_reports_identity_and_current_feature_projection() {
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
         approval_mode: Default::default(),
         style: None,
+        source: None,
         cwd: "/work/api".into(),
         session_path: Some("/work/api/session.jsonl".into()),
     });
