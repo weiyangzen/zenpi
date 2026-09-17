@@ -742,7 +742,15 @@ fn unknown_model_cannot_execute_unadvertised_tool_and_refusal_has_no_calls() {
         OpenAiWireApi::AnthropicMessages,
     )
     .unwrap()
-    .with_model_registry("anthropic".into(), ModelRegistry::default())
+    .with_model_registry(
+        "anthropic".into(),
+        ModelRegistry::with_overrides(&[serde_json::from_value(json!({
+            "provider":"anthropic","id":"unknown-native","version":"fixture-v1",
+            "tools":false,"streaming":false
+        }))
+        .unwrap()])
+        .unwrap(),
+    )
     .unwrap();
     let mut seen = vec![];
     assert!(

@@ -1,5 +1,0 @@
-	emitError(error: ExtensionError): void {
-		for (const listener of this.errorListeners) {
-			listener(error);
-		}
-	}

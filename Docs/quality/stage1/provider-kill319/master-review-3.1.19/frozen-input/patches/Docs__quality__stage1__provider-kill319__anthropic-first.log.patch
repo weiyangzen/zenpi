@@ -1,7 +1,0 @@
-diff --git a/Docs/quality/stage1/provider-kill319/anthropic-first.log b/Docs/quality/stage1/provider-kill319/anthropic-first.log
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/provider-kill319/anthropic-first.log
-@@ -0,0 +1,2 @@
-+anthropic partial PASS
-+anthropic tool PASS

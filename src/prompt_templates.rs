@@ -1,7 +1,8 @@
 //! Independent Markdown prompt templates and bounded, one-pass substitution.
 //!
-//! Source behavior: pi packages/coding-agent/src/core/prompt-templates.ts,
-//! SHA256 e94b8504b97fe668b04577891b7029abc7d11ac795e728982d2615a13ec1528a.
+//! Source behavior: pi packages/coding-agent/src/core/prompt-templates.ts at
+//! revision 23282f60782f02b9e22b787e4b22af441454fa16, SHA256
+//! a6e7bfd0a5e68f7ecaad523841c9923ddd200e207b8048805d43fa1475985368.
 //! This module never authorizes slash controls or evaluates shell syntax.
 
 use std::{

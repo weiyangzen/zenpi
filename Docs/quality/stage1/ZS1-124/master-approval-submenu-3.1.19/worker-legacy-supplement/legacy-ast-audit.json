@@ -1,7 +1,0 @@
-{
-  "all_original_main_statements_preserved_in_order": true,
-  "additional_statements": [
-    "parser.add_argument('--selector-only', action='store_true')",
-    "if args.selector_only:\n    print(json.dumps(selector_smoke(binary, args.evidence), indent=2))\n    return"
-  ]
-}

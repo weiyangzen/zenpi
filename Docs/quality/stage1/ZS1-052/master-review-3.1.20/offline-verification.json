@@ -1,5 +1,0 @@
-{
-  "exit_code": 0,
-  "stdout": "{\n  \"ok\": true,\n  \"kind\": \"offline structural/integrity only\",\n  \"payload_files\": 239,\n  \"manifest_sha256\": \"653a26e30b8cf0d3a6967ed61dae52da849f8c61c88e4668d476ec298fc4be4d\",\n  \"report_sha256\": \"e5b27e9336b6e1fd17ba3ee008d2243124f55e3e58dc7afa85478ff519ba06ec\",\n  \"report_bytes\": 30650,\n  \"historical_prefix_bytes\": [\n    4209,\n    12934\n  ],\n  \"formal_children\": [\n    \"ZS1-022\",\n    \"ZS1-023\"\n  ],\n  \"child_receipt_artifacts_verified\": 29,\n  \"context_only_direct_files\": [\n    \"index.ts\",\n    \"loader.ts\",\n    \"wrapper.ts\"\n  ],\n  \"direct_subdirectories\": 0,\n  \"context_fragments\": 23,\n  \"scratch_git_operations\": 10,\n  \"gstage_exit\": 1,\n  \"gstage_only_error\": \"missing ZS1-052 master receipt\",\n  \"semantic_verified_by_checker\": false,\n  \"directory_accepted\": false,\n  \"new_runtime_product_executions\": 0\n}\n",
-  "stderr": ""
-}

@@ -1,7 +1,8 @@
 //! Atomic, explicitly selected skill/template/text-resource snapshots.
 //!
-//! Mapping: pi resource-loader.ts, source SHA256
-//! 1877e9535820cb8b45e5a84598ac8ae581058bb0fbee6f0c64ec672f8ab986dd.
+//! Mapping: pi resource-loader.ts at revision
+//! 23282f60782f02b9e22b787e4b22af441454fa16, source SHA256
+//! 9acb127ae635c05235df4ab19e149a3a721b6e766a6ddfc03a26aff84d0a1f4e.
 //! Atomic publication is a zenpi enhancement: the source mutates fields in order.
 
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};

@@ -1,3 +1,0 @@
-{"type":"info","message":"fd not found. Downloading..."}
-{"type":"info","message":"fd installed to /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/agent-home/bin/fd"}
-{"path":"/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/agent-home/bin/fd","statuses":[{"type":"info","message":"fd not found. Downloading..."},{"type":"info","message":"fd installed to /Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/source027/agent-home/bin/fd"}],"version":"fd 10.5.0","versionExit":0,"bytes":2970480,"sha256":"cf3bde435da174f41cf9589a2efeaf03804df7c250fc15e8b8a1e9bfc66ebc9a","platform":"darwin","arch":"arm64"}

@@ -152,6 +152,29 @@ struct ReplayState {
     acknowledged: u64,
 }
 
+/// Open the transport WAL, retrying the transient `EWOULDBLOCK` that a forked
+/// child can leave behind when it briefly inherits the owning descriptor
+/// across `exec`. A genuine second owner still fails after the bounded budget.
+fn open_reconnect_journal(
+    session: &SessionStore,
+) -> Result<(ReconnectJournal, Vec<serde_json::Value>), HeadlessError> {
+    const MAX_ATTEMPTS: usize = 64;
+    let mut delay = Duration::from_millis(1);
+    for attempt in 0..MAX_ATTEMPTS {
+        match ReconnectJournal::open(session) {
+            Ok(opened) => return Ok(opened),
+            Err(crate::session::SessionError::Io(error))
+                if error.kind() == io::ErrorKind::WouldBlock && attempt + 1 < MAX_ATTEMPTS =>
+            {
+                thread::sleep(delay);
+                delay = (delay * 2).min(Duration::from_millis(8));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    unreachable!("bounded retry loop always returns on its final attempt")
+}
+
 impl ReplayState {
     fn project_response(&self, mut response: StdioResponse) -> StdioResponse {
         if response.schema_version == 2 {
@@ -196,7 +219,7 @@ impl ReplayState {
     }
 
     fn open_unseeded(session: &SessionStore) -> Result<Self, HeadlessError> {
-        let (journal, entries) = ReconnectJournal::open(session)?;
+        let (journal, entries) = open_reconnect_journal(session)?;
         let mut state = Self::default();
         for entry in entries {
             match serde_json::from_value::<ReconnectEntry>(entry)? {

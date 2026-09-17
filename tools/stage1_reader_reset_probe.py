@@ -1,6 +1,24 @@
 #!/usr/bin/env python3
 """Rebuild and verify original/patched crossterm with real Unix PTYs.
 
+Owned by ZS1-131. The candidate is ``vendor/crossterm``, pinned to the upstream
+crossterm 0.29.0 ``.crate`` whose SHA256 is ``CRATE_SHA256`` below. The helper
+extracts the archived 77 files, writes the pristine baseline, and compares every
+relative path, byte and SHA256 against the candidate. The only permitted
+differences are the two files in ``ALLOWED_CHANGED``:
+
+* ``src/event.rs`` -- ``reset_event_reader`` (Unix, without ``event-stream``)
+* ``src/event/source/unix/mio.rs`` -- readiness-token consumption fix
+
+``.cargo-ok`` is a Cargo install marker and must not enter the vendor tree. The
+emitted ``inventory.json`` records the crate SHA, the baseline and candidate
+file inventories (relative path -> SHA256) and the changed list; ``result.json``
+records the command bindings and the real-PTY evidence.
+
+Rollback: remove the ``[patch.crates-io] crossterm`` entry from the root
+``Cargo.toml``, delete ``vendor/crossterm`` and this helper, and regenerate
+``Cargo.lock``. Callers added for item ZS1-130 are reverted together with it.
+
 Requires cargo, a pristine crossterm 0.29.0 source directory, its official .crate,
 and the candidate vendor directory. Only the new evidence directory is written.
 """
@@ -20,6 +38,7 @@ import tarfile
 import urllib.request
 
 CRATE_SHA256 = 'd8b9f2e4c67f833b660cdb0a3523065869fb35570177239812ed4c905aeff87b'
+ALLOWED_CHANGED = {'src/event.rs', 'src/event/source/unix/mio.rs'}
 # Embedded programs are independently rebuilt; no archived executable is trusted.
 BEFORE_SOURCE = r'''
 use crossterm::{event, terminal};
@@ -94,6 +113,19 @@ def sha(path):
 
 def now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def resolve_cargo(toolchain):
+    """Return the cargo argv prefix, tolerating hosts without a rustup proxy."""
+    candidates = [['cargo', '+' + toolchain], ['rustup', 'run', toolchain, 'cargo'], ['cargo']]
+    for argv in candidates:
+        try:
+            probe = subprocess.run(argv + ['--version'], capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return argv, probe.stdout.strip()
+    return ['cargo'], 'unknown'
 
 
 def inventory(root):
@@ -179,7 +211,9 @@ def main():
     baseline = args.baseline.resolve() if args.baseline else root/'original'
     archive = args.crate.resolve() if args.crate else root/'crossterm-0.29.0.crate' 
     bindings, rows = [], []
+    cargo, cargo_version = resolve_cargo(args.toolchain)
     result = dict(started=now(), status='failed', platform=os.uname().sysname,
+                  cargo=dict(argv=cargo, version=cargo_version),
                   command_bindings=bindings, pty_cases=rows, linux_executed=os.uname().sysname == 'Linux')
     try:
         if not archive.exists() and args.crate is None:
@@ -208,14 +242,17 @@ def main():
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(data)
         assert len(archive_inventory) == 77
+        assert not (candidate/'.cargo-ok').exists(), 'Cargo install marker leaked into vendor'
         original, patched = inventory(baseline), inventory(candidate)
         assert original == archive_inventory
         assert original.keys() == patched.keys()
         changed = [name for name in original if original[name] != patched[name]]
-        assert changed == ['src/event.rs'], changed
-        (root/'inventory.json').write_text(json.dumps(dict(crate_sha256=sha(archive), baseline=original,
-                                                           candidate=patched, changed=changed), indent=2)+'\n')
-        cargo = ['cargo', '+' + args.toolchain]
+        assert set(changed) == ALLOWED_CHANGED, changed
+        directories = sorted({str(Path(name).parent) for name in original if str(Path(name).parent) != '.'})
+        (root/'inventory.json').write_text(json.dumps(dict(
+            crate_sha256=sha(archive), crate_file_count=len(archive_inventory),
+            allowed_changed=sorted(ALLOWED_CHANGED), directories=directories,
+            baseline=original, candidate=patched, changed=changed), indent=2)+'\n')
         bins = {}
         for label, source, dependency in [('before', BEFORE_SOURCE, baseline), ('after', AFTER_SOURCE, candidate)]:
             build = root/label
@@ -255,9 +292,16 @@ def main():
         rows.append(row)
         unit = root/'unit-crate'
         shutil.copytree(candidate, unit, ignore=shutil.ignore_patterns('target', '.cargo-ok', '.git'))
-        command(cargo+['test', '--locked', '--manifest-path', str(unit/'Cargo.toml'), '--lib', 'zenpi_reset_candidate_tests'],
-                root, root/'wouldblock.log', bindings)
-        assert '1 passed; 0 failed' in (root/'wouldblock.log').read_text()
+        command(cargo+['test', '--locked', '--manifest-path', str(unit/'Cargo.toml'), '--lib'],
+                root, root/'vendor-tests.log', bindings)
+        vendored = (root/'vendor-tests.log').read_text()
+        for expected in (
+            'zenpi_reset_candidate_tests::reset_fails_without_waiting_for_an_existing_reader ... ok',
+            'zenpi_ready_tests::single_edge_over_1024_bytes_delivers_every_key_without_another_write ... ok',
+            'zenpi_escape_boundary_tests::one_write_full_buffer_trailing_escape_is_delivered_without_another_event ... ok',
+        ):
+            assert expected in vendored, expected
+        assert '0 failed' in vendored, vendored[-4000:]
         result['status'] = 'passed'
     except Exception as error:
         result['error'] = str(error)

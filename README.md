@@ -356,6 +356,31 @@ REPOSITORY-RELATIVE-REF` は有界 hash receipt だけを保存し、`/learn res
 インストール smoke の provider/tool 検証はローカルの OpenAI-compatible loopback fixture を使うため、
 オンラインの OpenAI/Codex サービス可用性を意味しません。
 
+## Stage 1 (pi-mono gap execution) delivery
+
+Stage 1 is tracked by the single authoritative checklist
+[`Docs/stage_1_v3_pi_mono_blueprint.md`](Docs/stage_1_v3_pi_mono_blueprint.md), with the
+active requirement selector at
+[`Docs/execution/active_requirement.json`](Docs/execution/active_requirement.json) and the
+final integration record at
+[`Docs/quality/stage1/acceptance.md`](Docs/quality/stage1/acceptance.md).
+
+The 121-item checklist is closed except for the final `ZS1-199` integration row, whose
+dependencies are all accepted. Structural closure, source/target/reference fingerprint
+re-checking, `cargo fmt --check`, `cargo check --locked`, `cargo test --locked --lib`
+(164 passed) and the `G-STAGE` checker's own test suite (46 passed) were re-run for the
+acceptance record. Hashes found only in historical learn reports are superseded by the
+blueprint's "源冻结重签声明" (machine-switch re-freeze) fingerprint table; the remaining
+operator follow-ups (re-freeze of two drifted target rows, dual-tree manifest
+regeneration, full release/PTY smoke on the complete frozen revision) are recorded in the
+acceptance file.
+
+Stage 1 由唯一权威清单 `Docs/stage_1_v3_pi_mono_blueprint.md` 跟踪，活动 requirement
+selector 为 `Docs/execution/active_requirement.json`，最终集成验收记录为
+`Docs/quality/stage1/acceptance.md`。除最终 `ZS1-199` 集成行外，121 项清单全部闭合；
+验收复跑了结构闭包、源/目标/参考指纹核对以及可用的本地门禁。历史 learn 报告中的旧
+哈希由蓝图"源冻结重签声明"表格取代；其余需 operator 处理的事项已在验收文件中列明。
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

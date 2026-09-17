@@ -143,3 +143,50 @@ The historical nine-scenario/three-loopback-HTTP probe uses actual lazy factorie
 The controller fully read the new portable verifier and executed it exactly once from the fresh immutable copy with logs outside:74 integrity checks passed, exit0. The175 payload identities, original failed167-payload audit reconstruction,88 dependency artifacts,055's1028 archived payloads, read slices, source anchors and exact single-file patch were checked. These checks supplement independent semantic reading; they are not74 behavior tests. The earlier getAvailable-anchor audit failure is preserved. No old runner, Bun/SDK/HTTP/Cargo/PTY/performance probe was run. The117 cold-start failure remains open.
 
 The installed report retains the candidate prefix and appends this controlling review. Rollback removes only059 report, receipt/status and its projections, preserving015/055, upstream sources, historical packets, product code and BentoBox. No other file, directory or whole product is accepted by this decision.
+
+## 机器迁移重冻结再核验（run ZS1-059-20260917T023259-106，authority 3.1.22）
+
+本追加节由受限 claim `ZS1-059-20260917T023259-106`（layer `L2`；Depends `ZS1-015,ZS1-055`；Owner scope 直属文件及直接子目录集成）产生，不修改上文历史候选/主控审查的任何字节。上文全部内容按原时间保留为历史；其源身份属于迁移前 revision，按当前权威已被取代。
+
+**权威与冻结绑定。** 当前权威为 `Docs/stage_1_v3_pi_mono_blueprint.md`（`blueprint_version 3.1.22`，`authoritative:true`）。claim 绑定 `blueprint_digest = snapshot_sha256 = ab3f0abb6c6f0614dbdc3f5300232dd1f503378b9c19895472e82bb0cfc9079f`；本机 validator 组件重算 requirement_digest = `f69d1f67dc6a8238f891ca8583071c72397891a3adaa17169a6d9e8516b7bc76`。蓝图第31–37行 `源冻结重签声明`：迁移前 `bbb61e34aaf231639fdaaad1adbd757947034eac` 在 origin 及本机均不可达；本 run 以 `source_revision 23282f60782f02b9e22b787e4b22af441454fa16` 重冻结；第3节源/目标行 SHA256（含可用字节数列）为权威源指纹；`ZS1-012/013/016/017/024/029` 源路径在当前 revision 已不存在，声明为历史报告一致性绑定，**缺源不构成 blocked**；历史报告内部旧 revision hash 一律被取代。本节据此绑定，不把历史报告中的旧 hash 当作有效源身份。
+
+**当前真实直接构成。** 本机 `source_repo`（`/Users/mac/GitHub/pi-mono`）HEAD = `23282f60782f02b9e22b787e4b22af441454fa16`，与蓝图 header `source_revision` 一致。`packages/ai/src` 当前为 **10 个直接文件、2 个直接目录**（历史候选记录为 19 文件、5 目录）。逐项字节/行/SHA256：
+
+| 直接项 | 字节/行 | 当前 worktree SHA256 | 归类 |
+| --- | ---: | --- | --- |
+| `api-registry.ts` | 2563/98 | `71fe243b2179761ced7833415f7a772202447a459806a087121fa8ff70c37339` | context-only（历史无） |
+| `bedrock-provider.ts` | 165/6 | `23f8d54518b415836dfdb4862486aed7e6dd7d8a2375c7ed03819b4ecd95a627` | context-only |
+| `cli.ts` | 3864/133 | `5da99f5f18404e54561a2fd955751a7767645af98d4bd10f747e5d8cebb6cee5` | context-only |
+| `env-api-keys.ts` | 5023/133 | `33cfcd8dcfee72a70e18dc27947e90b1fc750978e2762a5b16cb2b366987ce6b` | context-only |
+| `index.ts` | 1477/34 | `bd5dd6eea1505acb9b00cf78f92fc7299505160f7ca8f951c4d8c685111fa66b` | context-only |
+| `models.generated.ts` | 352191/13899 | `cdc8f279ca5286daab8aa32935a4f275a6564155abb63840ae3868e87bace1d7` | context-only（生成，未逐行复核） |
+| `models.ts` | 2888/77 | `97cdb6266f7c58d84e560768b87215397f7dbd622a267de5e334c0a8faa2d345` | context-only |
+| `oauth.ts` | 40/1 | `ed04bcd233ee6a4b16d19041012ea92fbed53ef4aa8c30851ac4c5a4cc9c97fb` | context-only |
+| `providers/` | 目录（16 文件，0 子目录） | — | context-only |
+| `stream.ts` | 1486/59 | `09b24abc904a6c3c5cfe16d30a2e1c09239a5e3c98cb70d9572f50202f4d5415` | context-only（历史无） |
+| `types.ts` | 12043/337 | `ddc294dc3ec0f84165e4f3b389dac59fd736cde8c496c4d84dee86ef017551f4` | in-scope `ZS1-015`（== 蓝图第111行） |
+| `utils/` | 目录（7 文件，1 子目录 `oauth`） | — | context-only |
+
+**drift。** 新增（历史无）：`api-registry.ts`、`stream.ts`。移除（历史有）：`bun-oauth.ts`、`compat.ts`、`image-models.generated.ts`、`image-models.ts`、`images-api-registry.ts`、`images-models.ts`、`images.ts`、`legacy-api-aliases.ts`、`model-catalog.ts`、`models-store.ts`、`session-resources.ts` 及目录 `api`、`auth`、`compat`。保留：`bedrock-provider.ts`、`cli.ts`、`env-api-keys.ts`、`index.ts`、`models.generated.ts`、`models.ts`、`oauth.ts`、`types.ts`、`providers`、`utils`。
+
+**in-scope / context-only（G-DIR 闭包）。**
+- in-scope 正式子项：`ZS1-015` → `types.ts`，当前存在，live SHA256 与蓝图第111行表格指纹逐字一致；`ZS1-055` → `api` 目录，其源路径在当前 revision **不存在**（`find packages/ai/src -type d -name api` 为空；`ZS1-016/017/029` 由重签声明第36行明确列为缺源）。故 `api` 的目录理解按声明作为历史报告一致性绑定复用 `Docs/learn/stage1_pi_mono/packages/ai/src/api/current_folder_learn.md`，本节不重读、不重算、不据此新增验收。
+- context-only：其余 8 个直接文件与 `providers`、`utils` 两个目录；它们不是本项冻结子集中的文件/目录项。注意 `providers/openai-completions.ts`、`providers/anthropic.ts`、`providers/google.ts` 与历史 `api/` 下同名文件**路径与 revision 均不同**，不构成 `ZS1-016/017/029` 的重命名，不得被读作那三项的当前源，也不得据其关闭 `ZS1-055` 之外的任何项。
+- 无跳目录、无重复接受：`ZS1-015` 有唯一 per-file 报告，`ZS1-055` 有唯一目录报告；父项 `ZS1-062` 依赖本项，须另行目录审阅，本报告不代其验收。
+
+**当前 revision 的调用/数据/错误/取消/持久化/不变量（仅据上表文件静态阅读）。**
+- 入口分派：`index.ts` 为 barrel，导出 `api-registry`、`env-api-keys`、`models`、`stream`、`types`、`providers/register-builtins`、`utils/*`，并 type-only 导出各 provider options。`stream.ts` 于模块加载 `import "./providers/register-builtins.js"` 产生注册副作用，再经 `getApiProvider(model.api)` 解析；缺项时 `resolveApiProvider` **同步** `throw new Error("No API provider registered for api: ...")`。`Model.api` 是唯一分派键；`Model.provider` 只用于模型身份与目录，不用于 wire 选择。
+- 注册/撤销所有权：`api-registry.ts` 以 `Map<api,{provider,sourceId}>` 持有；`registerApiProvider` 用 `wrapStream/wrapStreamSimple` 在调用时校验 `model.api === api`，不匹配即 throw；`unregisterApiProviders(sourceId)` 按来源批量删除；`clearApiProviders` 清表。`register-builtins.ts` 模块加载即 `registerBuiltInApiProviders()`，注册 `KnownApi` 的 10 类 api；`resetApiProviders()` 先清后注册；`setBedrockProviderModule` 允许浏览器注入覆盖。lazy 模块 Promise 按 provider 缓存，导入失败被转为 error 事件而非抛出。
+- 流/终态错误语义：`utils/event-stream.ts` 的 `EventStream` 是**单队列 + 等待者**模型；`push` 仅在未 done 时生效，终态事件（`done`/`error`）同时置 done 并 resolve 单例 result；`end()` 让剩余等待者 done 但不改已 resolve 的 result；done 后的 `push` 静默忽略；**多消费者共享同一队列（非广播）**，生产者不被消费者提前终止所停止。`AssistantMessageEventStream` 以 `done/error` 为完成判据。目录层因此不能承诺任意自定义 provider 必然有限时间终止或产生 result。`types.ts` 的 `StreamFunction` 契约要求请求/模型/运行时失败编码进流而非抛出，但 `api-registry` 的 `wrap*` 与 `stream.ts` 的 `resolveApiProvider` 仍可同步 throw，两者边界须分开解释。
+- 类型/能力/成本：`types.ts` 定义 `KnownApi`、`KnownProvider`、`ThinkingLevel`（含 `xhigh`）、`StreamOptions`（`signal`/`apiKey`/`transport`/`cacheRetention`/`sessionId`/`onPayload`/`headers`/`maxRetryDelayMs`/`metadata`）、`Model`（`api/provider/baseUrl/reasoning/input/cost/contextWindow/maxTokens/headers/compat`）、`Usage`、`StopReason`、`AssistantMessageEvent`（含 `toolcall_start/delta/end`）。`models.ts` 从 `models.generated.ts` 建 `Map`；`getModel` 可能返回 `undefined` 却被 `as Model` 强转；`supportsXhigh` 按 id 子串匹配；`modelsAreEqual` 仅比较 id+provider；`calculateCost` 原地改 `usage.cost` 并按 1e6 缩放。生成文件只读当前静态内容，未执行生成器。
+- 认证/持久化：`env-api-keys.ts` 的 `getEnvApiKey` 优先 `ANTHROPIC_OAUTH_TOKEN` 于 `ANTHROPIC_API_KEY`；`google-vertex` 按 ADC 文件存在性 + project/location 返回 `"<authenticated>"`；`amazon-bedrock` 多来源返回 `"<authenticated>"`；Node/Bun 经异步动态导入 fs/os/path，竞态期不缓存 false。`cli.ts` 是独立 main（导入即执行），`AUTH_FILE = "auth.json"` **相对 cwd**，`loadAuth` 对缺失/坏 JSON 宽容为 `{}`，`saveAuth` 整文件覆写，登录经 readline。`oauth.ts` 仅 re-export `utils/oauth/index.js`。本节未访问真实凭证、未运行登录。
+- 跨文件不变量：`KnownApi` 字符串集合与 `register-builtins` 注册键、各 provider `stream*` 名称须对应；`Model<TApi>.api` 决定 `getApiProvider` 命中并触发 `wrap*` 的 `model.api === api` 检查。capability/`contextWindow`/`cost` 是数据声明，非运行时校验。
+
+**目标映射（沿用已接受 `ZS1-015`/`ZS1-055`，限定当前 revision）。** `types.ts` 的 provider/model 能力、reasoning、输入类型、`contextWindow` 仍映射至 `src/backend.rs:121`、`src/config.rs`（G05）；wire 分派与终止块校验仍映射至 `src/backend.rs`/`src/providers/registry.rs`；回合/工具/会话/取消组合仍由 `src/core.rs`、`src/headless.rs` 所有。由于 `ZS1-016/017/029` 缺源，当前 revision 无新的 wire 源可被重读；历史 `ZS1-055` 对 016/017/029 的映射仍是这些路径的权威边界，`ZS1-107/109/110` 等产品项另行验收。`EventStream` 的共享队列/无背压/合作式取消特性不得被当作 host 授权、持久化或取消语义已实现。
+
+**本轮校验与替代记录。**
+- 已执行：`shasum -a 256 packages/ai/src/types.ts` → `ddc294dc...`，与蓝图第111行 table hash 逐字一致（exit 0）；直接项字节/行/SHA256 清点；`api` 目录存在性检查 → ABSENT；以本机 `validate_stage1_blueprint` 组件复算 `ZS1-059` 的 G-DIR 前置：报告存在且非空、`folder_path == packages/ai/src`、`children == [ZS1-015, ZS1-055]`、两者状态均 `[x]` 且其报告存在。
+- 替代：声明的 `python3 tools/validate_stage1_blueprint.py --blueprint ... --evidence-root ... --item ZS1-059` 本机 exit 1，原因是 `Docs/execution/active_requirement.json` 缺少结尾换行（`incomplete JSON record (missing final newline)`），且该 selector 的 `requirement_digest/snapshot` 属上一 bootstrap（`ca9bade1...`），与本 run 权威（`ab3f0abb...`）不一致；该文件不在本项 owned path，本节不修改它。故以组件级 G-DIR 结构检查 + 源指纹核对作为最接近等价验证，其上限是不做 receipt/selector 级联校验。
+- 限制：本轮未运行 Bun/Node/SDK/HTTP/PTY/Cargo，未执行生成器，未访问网络或真实凭证；未重读缺源的 `016/017/029`；未验收任何 context-only 文件；`models.generated.ts`（352191 B）仅按生成静态目录登记。以上不改变 `ZS1-015`/`ZS1-055` 既有接受，也不新增产品行为验收。
+
+**状态与回滚。** 本节只把当前 revision 的目录关系与绑定写入本报告，不设置蓝图状态；worker 自测只到 `[_]`，`[x]` 只能由 master 集成行为证据产生。回滚仅撤本节新增（或按 claim 撤整个报告），不递归改 `ZS1-015`/`ZS1-055`/`ZS1-062`、不改上游源码与其它 owner。

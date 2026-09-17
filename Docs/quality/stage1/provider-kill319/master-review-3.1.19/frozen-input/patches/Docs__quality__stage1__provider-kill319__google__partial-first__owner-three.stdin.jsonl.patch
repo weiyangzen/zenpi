@@ -1,7 +1,0 @@
-diff --git a/Docs/quality/stage1/provider-kill319/google/partial-first/owner-three.stdin.jsonl b/Docs/quality/stage1/provider-kill319/google/partial-first/owner-three.stdin.jsonl
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/provider-kill319/google/partial-first/owner-three.stdin.jsonl
-@@ -0,0 +1,2 @@
-+{"schema_version": 2, "type": "prompt", "id": "fresh", "text": "continue after explicit recovery"}
-+{"schema_version": 2, "type": "prompt", "id": "killed", "text": "begin interrupted response"}

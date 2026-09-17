@@ -1,7 +1,0 @@
-[
-  {
-    "path": "src/headless.rs",
-    "before": "521c2102519b502fbd6184f31ffb53cba8eeef840bf84d19450836429d9b49f0",
-    "after": "bf252fec95a859b26f9aea402c918e9efbf6c2c55d3e24b403831f86d80ec06e"
-  }
-]

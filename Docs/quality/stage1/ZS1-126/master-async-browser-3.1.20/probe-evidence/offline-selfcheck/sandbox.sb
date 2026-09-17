@@ -1,5 +1,0 @@
-(version 1)
-(allow default)
-(deny network*)
-(deny file-read-data (require-all (subpath "/Users/wangweiyang") (require-not (subpath "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-pty-3.1.20/offline-selfcheck/fixture")) (require-not (literal "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi"))))
-(deny file-write* (require-all (subpath "/Users/wangweiyang") (require-not (subpath "/Users/wangweiyang/.codex/worktrees/38de/zenpi/.ops/stage1-worker/target126-session-browser-pty-3.1.20/offline-selfcheck/fixture"))))

@@ -1,2 +1,0 @@
-{"created_at_ms":1789205763854,"cwd":"/Users/wangweiyang/GitHub/zenpi/.ops/stage1_execution/new132-ownership-integration/policy-control-review.fixture/授权 project/other project","kind":"session","schema_version":1,"seq":0,"session_id":"session-1789205763854-88704-0","timestamp":"2026-09-12T09:36:03Z","timestamp_ms":1789205763854,"version":1}
-{"event":{"generation":3,"tools":[],"type":"extensions_selected"},"kind":"event","schema_version":1,"seq":1,"session_id":"session-1789205763854-88704-0","timestamp":"2026-09-12T09:36:03Z","timestamp_ms":1789205763861}

@@ -1,3 +1,0 @@
-COUNTEREXAMPLE layout: /layout project unexpected => Some(Layout { action: Preset { tab: Some(Project) } }); extra token silently discarded
-COUNTEREXAMPLE resource: parse => Some(Resources { path: None }); spec absent; resource_input_candidate=true
-PASS: 2 actual unmodified captured slash.rs parser counterexamples; host-template collision is call-site inference, not executed host evidence

@@ -1,9 +1,0 @@
-{
-  "command": [
-    "/usr/bin/codesign",
-    "-dvvv",
-    "/Users/wangweiyang/GitHub/zenpi/target/release/zenpi"
-  ],
-  "returncode": 0,
-  "elapsed_ms": 8.541292
-}

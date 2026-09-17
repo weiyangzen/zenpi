@@ -1,6 +1,0 @@
-{
-  "exit_code": 0,
-  "stdout": "{\n  \"passed\": true,\n  \"manifest_sha256\": \"24edf0ea9aab3adf2e7b87b5ff6a8e98be9e865c64872f8e5940c40f0e8bb34a\",\n  \"artifacts\": 107,\n  \"diagnosis_sha256\": \"97d8ac1b0ba9a3edce38f684958383e83fb9b224160dcfe26c53cdca9d6258bc\",\n  \"plan_sha256\": \"89535287138dfc8704697f5e3e94275e4b6a0e4160bc6f183826c5712112f375\",\n  \"original_budget_exit\": 1,\n  \"original_cold_gate_still_failed\": true,\n  \"full_read_files\": 5,\n  \"bounded_excerpts\": 20,\n  \"read_only_system_command_receipts\": 10,\n  \"scan_to_result_ms\": 1044.2375,\n  \"root_cause_proven\": false,\n  \"new_product_executions\": 0\n}\n",
-  "stderr": "",
-  "at": "2026-09-12T15:31:55.973900+00:00"
-}

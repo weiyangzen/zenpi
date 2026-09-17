@@ -1,2 +1,0 @@
-{"schema_version": 2, "type": "command", "id": "inspect", "text": "/recovery inspect"}
-{"schema_version": 2, "type": "prompt", "id": "search", "text": "find workspace files"}

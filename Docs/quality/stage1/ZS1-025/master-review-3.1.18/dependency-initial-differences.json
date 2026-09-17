@@ -1,8 +1,0 @@
-[
-  {
-    "path": ".vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json",
-    "expected_sha256": "1467e33920384a16ec2b16d8a24d8326993b31bbe0e8cd56cb5da560cd6564e3",
-    "actual_sha256": "869e741edc5c525a5b109c1d46d7975d0e9a96ae28185963337b36595dba7b91",
-    "actual_bytes": 426
-  }
-]

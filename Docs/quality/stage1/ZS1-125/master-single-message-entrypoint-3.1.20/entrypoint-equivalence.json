@@ -1,7 +1,0 @@
-{
-  "new_case_body_identical_except_name": true,
-  "original_long_history_function_identical": true,
-  "original_main_identical_except_new_option_and_dispatch": true,
-  "temporary_standalone_removed": true,
-  "source_sha256": "da5f91b5ae1c49808d62fff2f5402bd70790c51122819a382d6353a7bb0c41a8"
-}

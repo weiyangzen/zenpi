@@ -1,1 +1,0 @@
-{"ok": true, "checks": {"delayed_tab_accepts_second_persona": true, "delayed_enter_opens_second_search_hit": true, "navigation_makes_no_provider_requests": true, "terminal_restored": true}, "http": 3}

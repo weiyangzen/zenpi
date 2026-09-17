@@ -1,4 +1,0 @@
-backend='openai'
-base_url='http://127.0.0.1:55031'
-model='gpt-4.1'
-wire_api='chat_completions'

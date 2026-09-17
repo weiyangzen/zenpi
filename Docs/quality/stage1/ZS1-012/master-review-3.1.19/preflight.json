@@ -1,8 +1,0 @@
-{
-  "manifest_sha256": "864b716e573797cb1748141ee30ec97b041518305f338135f08467618640f0ec",
-  "payload_files_verified": 51,
-  "source_files_verified": 27,
-  "tests_run": 0,
-  "dependency_files_verified": 677,
-  "generated_cache_excluded": ".vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json"
-}

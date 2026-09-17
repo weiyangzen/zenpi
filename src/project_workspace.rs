@@ -471,19 +471,16 @@ impl ProjectOwnerPool {
         self.contexts
             .insert(id.to_owned(), ProjectContext::from_agent(id, agent));
         let session_path = agent.session().path();
-        let session_path = session_path
-            .canonicalize()
-            .unwrap_or_else(|_| {
-                if session_path.is_absolute() {
-                    session_path.to_path_buf()
-                } else {
-                    std::env::current_dir()
-                        .map(|cwd| cwd.join(session_path))
-                        .unwrap_or_else(|_| session_path.to_path_buf())
-                }
-            });
-        self.sessions
-            .insert(id.to_owned(), session_path);
+        let session_path = session_path.canonicalize().unwrap_or_else(|_| {
+            if session_path.is_absolute() {
+                session_path.to_path_buf()
+            } else {
+                std::env::current_dir()
+                    .map(|cwd| cwd.join(session_path))
+                    .unwrap_or_else(|_| session_path.to_path_buf())
+            }
+        });
+        self.sessions.insert(id.to_owned(), session_path);
     }
     /// A worker owns only a checkpoint proposal, never another Agent. The
     /// existing compare-and-replace writer rejects concurrent host changes.

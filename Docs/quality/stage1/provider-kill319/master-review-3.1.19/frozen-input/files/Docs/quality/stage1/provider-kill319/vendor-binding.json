@@ -1,6 +1,0 @@
-{
-  "files": 77,
-  "sha256": "a873d9dd2002719bbc9e9f0904a9be02f8c1461aab26522a4cdedca3f295c750",
-  "algorithm": "SHA256(sorted path + NUL + file hex SHA256 + newline)",
-  "files_index": "captured-main-inputs.json"
-}

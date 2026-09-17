@@ -387,13 +387,19 @@ fn unknown(provider: &str, id: &str) -> ModelDescriptor {
         id: id.into(),
         context_window: UNKNOWN_CONTEXT_WINDOW,
         max_output_tokens: UNKNOWN_MAX_OUTPUT,
+        // Provider openness: an uncatalogued model defaults to the wire's
+        // capabilities instead of a closed text-only profile, so any
+        // OpenAI-compatible (chat completions / responses) or Anthropic-
+        // compatible endpoint works without a hand-written override.
+        // `effective_capabilities` still intersects this with the wire and an
+        // explicit `model_override` can restrict any field.
         capabilities: ProviderCapabilities {
             text: true,
-            images: false,
-            files: false,
-            tools: false,
-            structured_output: false,
-            streaming: false,
+            images: true,
+            files: true,
+            tools: true,
+            structured_output: true,
+            streaming: true,
             reasoning: false,
         },
         reasoning_levels: BTreeSet::new(),

@@ -300,9 +300,19 @@ fn echo_agent(root: &Path) -> Agent {
     );
     a
 }
+/// Each owner below spawns real fixture subprocesses, CLI processes and HTTP
+/// servers. libtest would otherwise start twenty of them at once and starve the
+/// manifest's fixed 1000 ms hook deadline on a loaded host, producing spurious
+/// `CommandTimeout` instead of exercising the behavior under test. The guard
+/// admits one owner workload at a time; the cases themselves are unchanged.
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 #[test]
 fn real_http_owner_chains_input_context_tools_and_exact_lifecycle() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -375,6 +385,7 @@ fn real_http_owner_chains_input_context_tools_and_exact_lifecycle() {
 
 #[test]
 fn before_tool_failures_never_spawn_requested_command() {
+    let _serial = serial();
     for mode in [
         "deny",
         "unknown",
@@ -418,6 +429,7 @@ fn before_tool_failures_never_spawn_requested_command() {
 
 #[test]
 fn rewritten_schema_path_and_original_deny_are_checked_before_dispatch() {
+    let _serial = serial();
     for mode in ["bad_schema", "escape"] {
         let dir = tempdir().unwrap();
         let root = dir.path();
@@ -460,6 +472,7 @@ fn rewritten_schema_path_and_original_deny_are_checked_before_dispatch() {
 
 #[test]
 fn rewritten_arguments_are_the_exact_human_approval_payload() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -514,6 +527,7 @@ fn rewritten_arguments_are_the_exact_human_approval_payload() {
 
 #[test]
 fn failed_reload_keeps_tools_and_lease_successful_reload_revokes_old() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -542,6 +556,7 @@ fn failed_reload_keeps_tools_and_lease_successful_reload_revokes_old() {
 
 #[test]
 fn cancellation_kills_and_reaps_hook_and_next_turn_gets_fresh_process() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -569,6 +584,7 @@ fn cancellation_kills_and_reaps_hook_and_next_turn_gets_fresh_process() {
 
 #[test]
 fn malformed_input_and_stale_capability_cannot_reach_provider() {
+    let _serial = serial();
     for mode in ["wrong_action", "huge_input", "stale", "wrong_id"] {
         let dir = tempdir().unwrap();
         let root = dir.path();
@@ -588,6 +604,7 @@ fn malformed_input_and_stale_capability_cannot_reach_provider() {
 
 #[test]
 fn resume_and_process_restart_never_reactivate_old_capability() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -626,6 +643,7 @@ fn resume_and_process_restart_never_reactivate_old_capability() {
 
 #[test]
 fn api_two_requires_session_negotiation_and_duplicate_reload_is_atomic() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -733,6 +751,7 @@ impl Drop for Cli {
 
 #[test]
 fn production_jsonl_reload_and_new_process_lease_affect_real_requests() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("user/extensions");
@@ -795,6 +814,7 @@ fn production_jsonl_reload_and_new_process_lease_affect_real_requests() {
 
 #[test]
 fn revoked_inflight_lease_reaps_child_before_any_provider_request() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -830,6 +850,7 @@ fn revoked_inflight_lease_reaps_child_before_any_provider_request() {
 
 #[test]
 fn legacy_tool_cancellation_covers_blocked_stdin_and_reaps_process() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -874,6 +895,7 @@ fn legacy_tool_cancellation_covers_blocked_stdin_and_reaps_process() {
 
 #[test]
 fn production_cancel_reaps_input_hook_while_jsonl_owner_remains_responsive() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("user/extensions");
@@ -915,6 +937,7 @@ fn production_cancel_reaps_input_hook_while_jsonl_owner_remains_responsive() {
 
 #[test]
 fn successful_api_two_tool_negotiation_runs_through_real_owner() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -934,6 +957,7 @@ fn successful_api_two_tool_negotiation_runs_through_real_owner() {
 
 #[test]
 fn first_extension_deny_cannot_be_overridden_by_later_hook() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -953,6 +977,7 @@ fn first_extension_deny_cannot_be_overridden_by_later_hook() {
 
 #[test]
 fn legacy_json_null_result_remains_valid_but_missing_result_is_rejected() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");
@@ -993,6 +1018,7 @@ fn legacy_json_null_result_remains_valid_but_missing_result_is_rejected() {
 
 #[test]
 fn lifecycle_and_after_tool_failures_preserve_valid_owner_state() {
+    let _serial = serial();
     let dir = tempdir().unwrap();
     let root = dir.path();
     let ext = root.join("extensions");

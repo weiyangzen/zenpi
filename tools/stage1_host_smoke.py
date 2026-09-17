@@ -454,9 +454,140 @@ def run_local_controls(binary: Path, evidence: Path):
     return result
 
 
+def run_command_matrix(binary: Path, evidence: Path):
+    """Drive every mapped Codex slash entry through one real TUI and JSONL host.
+
+    Positive commands must show a real local projection; malformed input must be
+    rejected without mutating the valid project layout or the persisted draft
+    owner. No provider endpoint is reachable, so any accidental turn is an
+    observable failure rather than a silently mocked success.
+    """
+    result = {"binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "checks": {}}
+    terminals, wire_records = [], []
+    try:
+        with TemporaryDirectory(prefix="command-matrix-128-", dir=ROOT / ".ops") as raw:
+            root = Path(raw)
+            work, config = root / "initial", root / "fixture"
+            for path in (work, config, root / "sessions"):
+                path.mkdir(parents=True)
+            subprocess.run(["git", "init", "--quiet", str(work)], check=True)
+            (work / "note.txt").write_text("MATRIX_NOTE_MARKER\n")
+            (config / "config.toml").write_text('backend="openai"\nmodel="gpt-4.1"\nbase_url="http://127.0.0.1:9/v1"\nwire_api="responses"\nrequires_openai_auth=false\nmax_retries=0\n')
+            (config / "auth.json").write_text(json.dumps({"OPENAI_API_KEY": "command-matrix-fixture"}))
+            (config / "auth.json").chmod(0o600)
+            env = {k: v for k, v in os.environ.items() if not k.startswith(("ZENPI_", "OPENAI_"))}
+            env.update(ZENPI_HOME=str(config), TERM="xterm-256color", NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost")
+            journal, checkpoint = root / "sessions/initial.jsonl", config / "project-tabs.json"
+
+            def layout():
+                value = json.loads(checkpoint.read_text())
+                active = value["projects"][value["active"]]
+                model = next(p["layout"] for p in value["project_state"] if p["name"] == active)
+                return {key: model[key] for key in ("ratios", "row_weights", "collapsed", "focused")}
+
+            t = Terminal(binary, root, env)
+            terminals.append(t)
+            t.command("/help", b"/reasoning")
+            t.command("/status", b"phase=Idle")
+            t.command("/models", b'"command": "models"')
+            t.command("/doctor", b'"command": "doctor"')
+            t.command("/layout show", b'"tab": "project"')
+            t.command("/skills", b'"skills_total"')
+            t.command("/reload", b'"generation": 2')
+            t.command("/templates", b'"templates_total"')
+            t.command("/session agents", b"session agents:")
+            t.command("/approval", b"approval mode")
+            t.command("/attach note.txt", b"attachment staged")
+            t.command("/persona ESFP", b"Persona ESFP")
+            t.wait(lambda: journal.exists() and '"persona":"ESFP"' in journal.read_text())
+            t.command("/diff note.txt", b"MATRIX_NOTE_MARKER")
+            t.command("/review note.txt", b"MATRIX_NOTE_MARKER")
+            result["checks"]["real_tui_local_command_projections"] = True
+
+            t.command("/pane collapse resources", b"pane collapsed: resources")
+            t.wait(lambda: "resources" in layout()["collapsed"])
+            t.command("/pane expand resources", b"pane expanded: resources")
+            t.wait(lambda: "resources" not in layout()["collapsed"])
+            t.command("/pane focus gantt", b"pane focused: gantt")
+            t.wait(lambda: layout()["focused"] == "gantt")
+            result["checks"]["real_tui_pane_collapse_expand_focus"] = True
+
+            selected = layout()
+
+            def rejected(text, expect):
+                # A command that opens the completion popup must not leak its
+                # draft into the next rejected command.
+                t.write(b"\x15")
+                t.command(text, expect)
+
+            rejected("/pane focus not_a_pane", b"unknown pane")
+            rejected("/model a b", b"unexpected argument")
+            rejected("/layout nonsense", b"unknown layout scope")
+            rejected("/attach", b"requires an argument")
+            assert layout() == selected
+            result["checks"]["invalid_input_keeps_valid_layout_and_owner"] = True
+
+            draft = "matrix restart draft 中文"
+            t.write(b"\x1b\x15")
+            t.wait(lambda: t.draft() == "")
+            t.write(draft.encode())
+            t.wait(lambda: any(p["draft"]["input"] == draft for p in json.loads(checkpoint.read_text())["project_state"]))
+            t.close(preserve_draft=True)
+            t = Terminal(binary, root, env)
+            terminals.append(t)
+            t.expect(draft.encode())
+            assert '"persona":"ESFP"' in journal.read_text()
+            t.write(b"\x15")
+            t.wait(lambda: t.draft() == "")
+            t.command("/status", b"phase=Idle")
+            t.command("/pane collapse resources", b"pane collapsed: resources")
+            t.wait(lambda: "resources" in layout()["collapsed"])
+            t.command("/layout show", b'"collapsed": [')
+            result["checks"]["independent_restart_keeps_persona_and_layout_owner"] = True
+            t.close()
+
+            order = [("help", "/help"), ("status", "/status"), ("models", "/models"), ("doctor", "/doctor"),
+                     ("layout-show", "/layout show"), ("skills", "/skills"), ("reload", "/reload"),
+                     ("templates", "/templates"), ("agents", "/session agents"), ("approval", "/approval"),
+                     ("attach", "/attach note.txt"), ("diff", "/diff note.txt"), ("review", "/review note.txt")]
+            denied = [("bad-pane", "/pane focus not_a_pane"), ("bad-model", "/model a b"), ("bad-layout", "/layout nonsense")]
+            requests = [dict(schema_version=2, type="command", id=rid, text=text) for rid, text in order + denied]
+            requests.append(dict(schema_version=2, type="shutdown", id="shutdown-matrix"))
+            completed = subprocess.run([str(binary), "--mode", "headless", "--session", str(journal)], cwd=work, env=env,
+                input="".join(json.dumps(r) + "\n" for r in requests), text=True, capture_output=True, timeout=30)
+            assert completed.returncode == 0, completed.stderr
+            records = [json.loads(line) for line in completed.stdout.splitlines()]
+            wire_records.extend(records)
+            responses = {r["id"]: r for r in records if r.get("type") == "response"}
+            for rid, _ in order:
+                assert responses[rid]["success"], responses[rid]
+            for rid, _ in denied:
+                assert not responses[rid]["success"], responses[rid]
+            assert '"command": "models"' in json.dumps(responses["models"])
+            assert '"command": "doctor"' in json.dumps(responses["doctor"])
+            assert "MATRIX_NOTE_MARKER" in json.dumps(responses["diff"])
+            assert "MATRIX_NOTE_MARKER" in json.dumps(responses["review"])
+            events = [json.loads(line) for line in journal.read_text().splitlines()]
+            assert not any(record.get("event", {}).get("operation_kind") == "provider" for record in events)
+            result["checks"]["real_jsonl_matrix_positive_and_negative_no_provider"] = True
+            result.update(status="passed", request_count=0, tui_processes=len(terminals), jsonl_processes=1)
+    except Exception as error:
+        result.update(status="failed", error=str(error))
+        raise
+    finally:
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.with_suffix(".pty.log").write_bytes(b"\nPROCESS\n".join(bytes(t.output) for t in terminals))
+        evidence.with_suffix(".jsonl.log").write_text("".join(json.dumps(r) + "\n" for r in wire_records))
+        evidence.write_text(json.dumps(result, indent=2) + "\n")
+        for terminal in terminals:
+            cleanup_terminal(terminal)
+    return result
+
+
 CASES = {
     "shared-projects": None,
     "bentobox": None,
+    "command-matrix": None,
     "compact": None,
     "local-controls": None,
     "projects": "tui_project_workspace_smoke.py",
@@ -503,7 +634,7 @@ def main():
     binary = args.binary.resolve(strict=True)
     (ROOT / ".ops").mkdir(exist_ok=True)
     if args.evidence:
-        handlers = {"shared-projects": run_shared_projects, "bentobox": run_bentobox, "compact": run_compact, "local-controls": run_local_controls}
+        handlers = {"shared-projects": run_shared_projects, "bentobox": run_bentobox, "command-matrix": run_command_matrix, "compact": run_compact, "local-controls": run_local_controls}
         assert args.case in handlers
         handler = handlers[args.case]
         print(json.dumps(handler(binary, args.evidence.resolve())))

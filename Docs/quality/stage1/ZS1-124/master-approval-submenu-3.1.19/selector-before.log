@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_approval_smoke.py", line 379, in <module>
-    main()
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_approval_smoke.py", line 183, in main
-    print(json.dumps(selector_smoke(binary, args.evidence), indent=2))
-  File "/Users/wangweiyang/GitHub/zenpi/tools/tui_approval_smoke.py", line 160, in selector_smoke
-    assert not failures, failures
-AssertionError: ['0_always_opens_without_policy_or_http_change', '0_escape_keeps_always_and_command_draft', '0_never_opens_without_policy_or_http_change', '0_escape_keeps_never_and_command_draft', '0_cancelled_selector_retains_actual_no_prompt_write_policy', '0_select_opens_without_policy_or_http_change', '1_always_opens_without_policy_or_http_change', '1_escape_keeps_always_and_command_draft', '1_never_opens_without_policy_or_http_change', '1_escape_keeps_never_and_command_draft', '1_cancelled_selector_retains_actual_no_prompt_write_policy', '1_select_opens_without_policy_or_http_change']

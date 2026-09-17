@@ -1,5 +1,0 @@
-{
-  "src/tui.rs": "19fcdd4d7cb98e45096bfb122300815738dd80734d671c7a7714002f6af4d339",
-  "tests/tui_transcript_ux.rs": "3e4fb7b4b833f8c1a6d2b7966d310720a22ffd868478083ffbe6b7165a0c0cbf",
-  "tools/tui_transcript_ux_smoke.py": "8147c07c9ab01c820e7430b349e2c875f40981b7565e9efc5a7c5e2544ad6cf0"
-}

@@ -1,4 +1,0 @@
-
-thread 'main' (28352004) panicked at /Users/wangweiyang/.codex/worktrees/2267/zenpi/.ops/ux130-phase-observation/phase_probe.rs:149:13:
-intentional fixture failure stays a failure
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

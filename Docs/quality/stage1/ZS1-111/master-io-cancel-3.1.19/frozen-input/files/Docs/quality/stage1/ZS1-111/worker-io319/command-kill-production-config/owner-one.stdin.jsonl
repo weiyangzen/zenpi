@@ -1,2 +1,0 @@
-{"schema_version": 2, "type": "user_shell", "id": "killed-command", "text": "!exec /Applications/Xcode.app/Contents/Developer/usr/bin/python3 effect.py"}
-{"schema_version": 2, "type": "approve", "id": "approve", "approval_id": "approval-ab6ed4c25b5acbdf780d071f237f30f104e3208f0d21b9865f2abf9f6f15df81", "decision": "allow", "remember": true}

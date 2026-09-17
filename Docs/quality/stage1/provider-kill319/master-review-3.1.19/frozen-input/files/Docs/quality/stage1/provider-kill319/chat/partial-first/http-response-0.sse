@@ -1,4 +1,0 @@
-data: {"id": "chat319", "object": "chat.completion.chunk", "model": "gpt-4.1", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "INTERRUPTED_PARTIAL_319"}, "finish_reason": null}]}
-
-data: {"id": "chat319", "object": "chat.completion.chunk", "model": "gpt-4.1", "choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "incomplete_write_319", "type": "function", "function": {"name": "write_file", "arguments": "{\"path\":\"NEVER"}}]}, "finish_reason": null}]}
-

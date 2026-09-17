@@ -1,8 +1,0 @@
-{
-  "exit_code": 1,
-  "command": "python3 .ops/stage1_execution/accept_directory401_321.py",
-  "error": "BlueprintError: accepted item has claim",
-  "location": "frontiers during state([x])",
-  "preserved_original_attempt": true,
-  "products_executed": 0
-}

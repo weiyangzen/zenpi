@@ -1,6 +1,0 @@
-diff --git a/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.log b/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.log
-new file mode 100644
---- /dev/null
-+++ b/Docs/quality/stage1/ZS1-111/worker-io319/evidence-verified.log
-@@ -0,0 +1 @@
-+{"result": "pass", "snapshot_files": 132, "source_overlay_paths": ["src/tool_output.rs", "tests/stage1_tool_output.rs"], "test_prefix_preserved": true, "cancel_ms_before": 4687, "cancel_ms_after": 4, "production_command_kill": "pass", "core_source_sha256": "6a881cc8eb1193dfbe4d4b06e71d6d28b3b78f4fe00bc836c1ea74c2f2c60b63"}
