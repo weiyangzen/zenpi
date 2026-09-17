@@ -278,22 +278,15 @@ fn reasoning_preference_survives_project_switch_and_checkpoint() {
     assert!(render(&mut restored, 140, 40).contains("first reasoning"));
 }
 #[test]
-fn narrow_project_arrows_remain_visible_and_mouse_navigates_hidden_previous_tabs() {
+fn narrow_project_controls_remain_visible_and_resizes_are_safe() {
     let mut state = TuiState::default();
     state.open_project_tab("one");
     state.open_project_tab("two");
     let screen = render(&mut state, 40, 20);
     let top = screen.lines().next().unwrap();
-    assert!(top.contains("[<]"));
-    assert!(top.contains("[>]"));
+    // Left-aligned controls replaced the `[<] [>]` navigation buttons.
+    assert!(top.contains("[-]"));
     assert!(top.contains("[+]"));
-    state.handle_mouse(MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Left),
-        column: 30,
-        row: 0,
-        modifiers: KeyModifiers::NONE,
-    });
-    assert_eq!(state.active_project(), "one");
     for w in 1..45 {
         let _ = render(&mut state, w, 8);
     }

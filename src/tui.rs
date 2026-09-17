@@ -136,6 +136,13 @@ pub struct SubTab {
     pub name: String,
     pub root: String,
     pub kind: SubTabKind,
+    /// Default harness concurrency (parallel workers) for this workspace.
+    #[serde(default = "default_subtab_concurrency")]
+    pub concurrency: u16,
+}
+
+fn default_subtab_concurrency() -> u16 {
+    1
 }
 
 /// A clickable region in the layer-2 tab row.
@@ -144,6 +151,8 @@ enum SubTabHit {
     Select(usize),
     AddWorktree,
     AddInPlace,
+    ConcurrencyUp(usize),
+    ConcurrencyDown(usize),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -2726,8 +2735,11 @@ impl TuiState {
             return false;
         }
         self.touch_editor_draft();
-        self.project_tabs.push(name);
-        self.select_project_tab(self.project_tabs.len() - 1)
+        // A new project opens on the current layer: insert it right after the
+        // active project instead of appending to the far right.
+        let insert_at = (self.active_project + 1).min(self.project_tabs.len());
+        self.project_tabs.insert(insert_at, name);
+        self.select_project_tab(insert_at)
     }
 
     pub fn select_project_tab(&mut self, index: usize) -> bool {
@@ -2922,6 +2934,7 @@ impl TuiState {
                     name: project.clone(),
                     root,
                     kind: SubTabKind::Main,
+                    concurrency: 1,
                 }],
             );
             self.active_subtab.insert(project, 0);
@@ -2972,6 +2985,7 @@ impl TuiState {
             name,
             root: cwd,
             kind: SubTabKind::InPlace,
+            concurrency: 1,
         });
         let index = tabs.len() - 1;
         self.active_subtab.insert(project, index);
@@ -3004,6 +3018,7 @@ impl TuiState {
             name: name.clone(),
             root: path.display().to_string(),
             kind: SubTabKind::Worktree,
+            concurrency: 1,
         });
         let index = tabs.len() - 1;
         self.active_subtab.insert(project, index);
@@ -3098,6 +3113,42 @@ impl TuiState {
             return false;
         }
         self.subtab_move(current, target)
+    }
+
+    /// Rename one layer-2 tab (worktree or otherwise).
+    pub fn subtab_rename(&mut self, index: usize, name: &str) -> bool {
+        self.ensure_subtabs();
+        let name = name.trim();
+        if name.is_empty() {
+            return false;
+        }
+        let project = self.active_project().to_owned();
+        let Some(tabs) = self.project_subtabs.get_mut(&project) else {
+            return false;
+        };
+        if index >= tabs.len() {
+            return false;
+        }
+        tabs[index].name = name.to_owned();
+        true
+    }
+
+    /// Adjust the default harness concurrency for one layer-2 tab.
+    pub fn subtab_concurrency(&mut self, index: usize, delta: isize) -> bool {
+        self.ensure_subtabs();
+        let project = self.active_project().to_owned();
+        let Some(tabs) = self.project_subtabs.get_mut(&project) else {
+            return false;
+        };
+        if index >= tabs.len() {
+            return false;
+        }
+        let next = (tabs[index].concurrency as isize + delta).clamp(1, 64) as u16;
+        if next == tabs[index].concurrency {
+            return false;
+        }
+        tabs[index].concurrency = next;
+        true
     }
 
     pub fn close_project_tab(&mut self, name: &str) -> bool {
@@ -5853,15 +5904,9 @@ impl TuiState {
                 .iter()
                 .find(|(rect, _)| rect.contains(position))
             {
-                if *index == usize::MAX {
-                    self.request_project_select(
-                        (self.active_project + self.project_tabs.len() - 1)
-                            % self.project_tabs.len(),
-                    );
-                } else if *index == usize::MAX - 1 {
-                    self.request_project_select(
-                        (self.active_project + 1) % self.project_tabs.len(),
-                    );
+                if *index == usize::MAX - 2 {
+                    let name = self.active_project().to_owned();
+                    self.close_project_tab(&name);
                 } else if *index == self.project_tabs.len() {
                     self.open_directory_picker();
                 } else {
@@ -5886,6 +5931,12 @@ impl TuiState {
                 },
                 SubTabHit::AddInPlace => {
                     self.subtab_add_in_place(None);
+                }
+                SubTabHit::ConcurrencyUp(index) => {
+                    self.subtab_concurrency(index, 1);
+                }
+                SubTabHit::ConcurrencyDown(index) => {
+                    self.subtab_concurrency(index, -1);
                 }
             }
             return TuiAction::Redraw;
@@ -7800,9 +7851,7 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let plus_width = area.width.min(4);
-        let navigation_width = if area.width >= 16 { 8 } else { 0 };
-        let limit = area.right() - plus_width - navigation_width;
+        let limit = area.right();
         let prefix = if area.width > 40 {
             truncate_to_width(" zenpi | projects: ", usize::from(limit - area.x))
         } else {
@@ -7813,13 +7862,26 @@ impl TuiState {
             Rect::new(area.x, area.y, limit - area.x, 1),
         );
         let mut x = area.x + UnicodeWidthStr::width(prefix.as_str()) as u16;
-        // Center the retained viewport on the selected tab; plus stays visible.
-        let start = if area.width < 90 {
-            self.active_project
-        } else {
-            self.active_project.saturating_sub(1)
-        };
-        for index in start..self.project_tabs.len() {
+        // Left-aligned controls: `[-]` closes the active workspace, `[+]`
+        // opens a new project on the current layer. Horizontal reordering is
+        // done by dragging a tab, not by `[<] [>]` buttons.
+        if area.width >= 16 {
+            let minus = Rect::new(x, area.y, 4, 1);
+            frame.render_widget(
+                Paragraph::new(" [-]").style(Style::default().fg(Color::Cyan)),
+                minus,
+            );
+            self.project_hits.push((minus, usize::MAX - 2));
+            x += 4;
+            let plus = Rect::new(x, area.y, 4, 1);
+            frame.render_widget(
+                Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
+                plus,
+            );
+            self.project_hits.push((plus, self.project_tabs.len()));
+            x += 4;
+        }
+        for index in 0..self.project_tabs.len() {
             if x >= limit {
                 break;
             }
@@ -7868,22 +7930,6 @@ impl TuiState {
             self.project_hits.push((rect, index));
             x += width;
         }
-        if navigation_width > 0 {
-            for (offset, label, index) in [(0, " [<]", usize::MAX), (4, " [>]", usize::MAX - 1)] {
-                let rect = Rect::new(limit + offset, area.y, 4, 1);
-                frame.render_widget(
-                    Paragraph::new(label).style(Style::default().fg(Color::Cyan)),
-                    rect,
-                );
-                self.project_hits.push((rect, index));
-            }
-        }
-        let rect = Rect::new(area.right() - plus_width, area.y, plus_width, 1);
-        frame.render_widget(
-            Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
-            rect,
-        );
-        self.project_hits.push((rect, self.project_tabs.len()));
         if area.height >= 2 {
             self.render_subtabs(frame, Rect::new(area.x, area.y + 1, area.width, 1));
         }
@@ -7898,8 +7944,9 @@ impl TuiState {
         }
         let tabs = self.subtabs();
         let active = self.active_subtab();
-        let controls = " [~] [+] ";
-        let controls_width = UnicodeWidthStr::width(controls) as u16;
+        let active_concurrency = tabs.get(active).map(|tab| tab.concurrency).unwrap_or(1);
+        let controls = format!(" ↑ {active_concurrency} ↓ [~] [+] ");
+        let controls_width = UnicodeWidthStr::width(controls.as_str()) as u16;
         let limit = area.right().saturating_sub(controls_width);
         let prefix = "  └ ";
         frame.render_widget(
@@ -7936,13 +7983,39 @@ impl TuiState {
             self.subtab_hits.push((rect, SubTabHit::Select(index)));
             x += width;
         }
-        let in_place = Rect::new(limit, area.y, 4, 1);
+        let mut cx = limit;
+        let up = Rect::new(cx, area.y, 3, 1);
+        frame.render_widget(
+            Paragraph::new(" ↑").style(Style::default().fg(Color::Cyan)),
+            up,
+        );
+        self.subtab_hits
+            .push((up, SubTabHit::ConcurrencyUp(active)));
+        cx += 3;
+        let number = format!(" {active_concurrency} ");
+        let number_width = UnicodeWidthStr::width(number.as_str()) as u16;
+        let rect = Rect::new(cx, area.y, number_width, 1);
+        frame.render_widget(
+            Paragraph::new(number).style(Style::default().fg(Color::White)),
+            rect,
+        );
+        cx += number_width;
+        let down = Rect::new(cx, area.y, 3, 1);
+        frame.render_widget(
+            Paragraph::new(" ↓").style(Style::default().fg(Color::Cyan)),
+            down,
+        );
+        self.subtab_hits
+            .push((down, SubTabHit::ConcurrencyDown(active)));
+        cx += 3;
+        let in_place = Rect::new(cx, area.y, 4, 1);
         frame.render_widget(
             Paragraph::new(" [~]").style(Style::default().fg(Color::Magenta)),
             in_place,
         );
         self.subtab_hits.push((in_place, SubTabHit::AddInPlace));
-        let worktree = Rect::new(limit + 4, area.y, 4, 1);
+        cx += 4;
+        let worktree = Rect::new(cx, area.y, 4, 1);
         frame.render_widget(
             Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
             worktree,
@@ -7992,7 +8065,7 @@ impl TuiState {
         let content = match id {
             PaneId::Gantt => self.gantt_pane_content(),
             PaneId::Arch => self.arch_pane_content(),
-            PaneId::Execution => self.execution_pane_content(),
+            PaneId::Execution => self.execution_terminal_content(),
             PaneId::Resources => self.resource_pane_content(),
             PaneId::SessionList => self.session_browser_content(),
             PaneId::ReplayControls => self.replay_pane_content(),
@@ -8029,7 +8102,12 @@ impl TuiState {
         } else {
             usize::from(*self.pane_scroll.get(&id).unwrap_or(&0))
         };
-        let paragraph = Paragraph::new(content)
+        let text = if id == PaneId::Gantt {
+            style_status_marks(&content)
+        } else {
+            ratatui::text::Text::from(content)
+        };
+        let paragraph = Paragraph::new(text)
             .style(Style::default().fg(Color::DarkGray))
             .block(block)
             .scroll((scroll.min(usize::from(u16::MAX)) as u16, 0));
@@ -8312,6 +8390,62 @@ impl TuiState {
         ];
         bound_gantt_pane_content(lines.join("\n"))
     }
+
+    /// The Execution pane is an embedded terminal: it mirrors the live local
+    /// PTY snapshot so unix-fluent users can drive commands in place.
+    fn execution_terminal_content(&self) -> String {
+        if self.terminal_snapshot.trim().is_empty() {
+            "embedded terminal (PTY): run a local `!command` to attach output here".to_owned()
+        } else {
+            self.terminal_snapshot.clone()
+        }
+    }
+}
+
+/// Colour the blueprint three-state marks with a soft, low-glare red/yellow/
+/// green so status is readable at a glance without harsh terminal colours.
+fn style_status_marks(content: &str) -> ratatui::text::Text<'static> {
+    use ratatui::text::Span;
+    const MARKS: [(&str, Color); 3] = [
+        ("[ ]", Color::Rgb(178, 102, 102)),
+        ("[_]", Color::Rgb(176, 148, 74)),
+        ("[x]", Color::Rgb(96, 158, 110)),
+    ];
+    let mut lines = Vec::new();
+    for raw in content.lines() {
+        let mut spans: Vec<Span> = Vec::new();
+        let mut rest = raw;
+        loop {
+            let mut best: Option<(usize, &str, Color)> = None;
+            for (mark, color) in MARKS {
+                if let Some(position) = rest.find(mark)
+                    && best.is_none_or(|(current, _, _)| position < current)
+                {
+                    best = Some((position, mark, color));
+                }
+            }
+            match best {
+                Some((position, mark, color)) => {
+                    if position > 0 {
+                        spans.push(Span::raw(rest[..position].to_owned()));
+                    }
+                    spans.push(Span::styled(
+                        mark.to_owned(),
+                        Style::default().fg(color).add_modifier(Modifier::BOLD),
+                    ));
+                    rest = &rest[position + mark.len()..];
+                }
+                None => {
+                    if !rest.is_empty() {
+                        spans.push(Span::raw(rest.to_owned()));
+                    }
+                    break;
+                }
+            }
+        }
+        lines.push(ratatui::text::Line::from(spans));
+    }
+    ratatui::text::Text::from(lines)
 }
 
 fn bound_gantt_pane_content(content: String) -> String {
@@ -10295,6 +10429,20 @@ pub fn dispatch_slash_command(
                         format!("sub-tab moved: {index} -> {target}")
                     } else {
                         format!("cannot move sub-tab: {index}")
+                    }
+                }
+                WorktreeAction::Rename { index, name } => {
+                    if state.subtab_rename(index, &name) {
+                        format!("sub-tab renamed: {index} -> {name}")
+                    } else {
+                        format!("cannot rename sub-tab: {index}")
+                    }
+                }
+                WorktreeAction::Concurrency { index, delta } => {
+                    if state.subtab_concurrency(index, delta as isize) {
+                        format!("sub-tab concurrency updated: {index} {delta:+}")
+                    } else {
+                        format!("cannot update concurrency: {index}")
                     }
                 }
             };

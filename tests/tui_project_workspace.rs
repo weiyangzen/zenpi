@@ -145,7 +145,8 @@ fn topmost_plus_opens_picker_and_cancel_never_creates_a_tab_or_changes_draft() {
     assert!(row.contains("[+]"));
     state.handle_mouse(MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),
-        column: 98,
+        // `[+]` is left-aligned now: " zenpi | projects: " + " [-]" + " [+]".
+        column: 24,
         row: 0,
         modifiers: KeyModifiers::NONE,
     });
@@ -745,4 +746,52 @@ fn interactive_double_row_tab_add_remove_reorder() {
     state.handle_key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::ALT));
     assert_eq!(state.subtabs().len(), 2);
     let _ = active;
+}
+
+#[test]
+fn project_opens_on_current_layer_and_worktree_rename_concurrency() {
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("a"));
+    assert!(state.open_project_tab("b"));
+    assert_eq!(state.project_tabs(), &["default", "a", "b"]);
+    // A new project opens on the current layer: insert right after the active.
+    let index = state.project_index("a").unwrap();
+    assert!(state.select_project_tab(index));
+    assert!(state.open_project_tab("c"));
+    assert_eq!(state.project_tabs(), &["default", "a", "c", "b"]);
+
+    // Layer-2 tab rename + default harness concurrency control.
+    assert!(state.subtab_add_in_place(Some("w".into())));
+    let active = state.active_subtab();
+    assert!(state.subtab_rename(active, "wt-x"));
+    assert_eq!(state.subtabs()[active].name, "wt-x");
+    assert!(state.subtab_concurrency(active, 2));
+    assert_eq!(state.subtabs()[active].concurrency, 3);
+    assert!(state.subtab_concurrency(active, -1));
+    assert_eq!(state.subtabs()[active].concurrency, 2);
+    assert!(state.subtab_concurrency(active, -9));
+    assert_eq!(state.subtabs()[active].concurrency, 1);
+}
+
+#[test]
+fn worktree_rename_and_concurrency_commands_parse() {
+    use zenpi::slash::{SlashCommand, WorktreeAction};
+    match zenpi::slash::parse("/worktree rename 1 wt-alpha").unwrap() {
+        Some(SlashCommand::Worktree {
+            action: WorktreeAction::Rename { index, name },
+        }) => {
+            assert_eq!(index, 1);
+            assert_eq!(name, "wt-alpha");
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    match zenpi::slash::parse("/wt conc 2 +1").unwrap() {
+        Some(SlashCommand::Worktree {
+            action: WorktreeAction::Concurrency { index, delta },
+        }) => {
+            assert_eq!(index, 2);
+            assert_eq!(delta, 1);
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
 }

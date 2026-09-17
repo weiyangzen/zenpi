@@ -311,6 +311,13 @@ proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创�
 - [x] **ZS1-143** — Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox；layer `L5` | Depends: ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | Owner scope: 端到端 runtime 验收与证据 | Owned paths: `tests/stage1_runtime_modes.rs`, `tools/stage1_host_smoke.py`, `Docs/quality/stage1/ZS1-143` | Validators: G-CODE、G-HOST、G-PROD | Rollback: 撤回验收记录，不删功能 | Estimate: 3 用例真实 TUI→headless + 区域与 BentoBox 断言 | Estimated LOC: 600
 - [x] **ZS1-144** — 命令补齐：/execute /explore /addloop 的语义与实现；layer `L3` | Depends: ZS1-119 | Owner scope: 三个命令的解析/动作/路由与测试 | Owned paths: `src/slash.rs`, `src/slash_actions.rs`, `src/headless.rs`, `tests/stage1_sync.rs`, `tests/slash.rs` | Validators: G-CODE；cargo test --locked --test slash --test stage1_sync | Rollback: 撤回三个命令，保留 /loop /plan | Estimate: /execute=蓝图执行派发；/explore=research 循环；/addloop=/loop 别名或独立 | Estimated LOC: 1200
 - [x] **ZS1-145** — TUI 区域补齐：arch 架构区与 execution 执行区（BentoBox 可调）；layer `L3` | Depends: ZS1-140 | Owner scope: 新 pane 的数据与渲染 owner | Owned paths: `src/layout.rs`, `src/tui.rs`, `src/view_model.rs`, `tests/layout.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE；cargo test --locked --test layout --test tui_bentobox | Rollback: 撤回新 pane，恢复原 BentoBox 预设 | Estimate: 新 pane 接入 + 断点/折叠 | Estimated LOC: 1200
+- [ ] **ZS1-146** — TUI 双排 tab 行为修正：新开落在上一层、+ 左对齐、- 跟随活动工作区、鼠标拖拽换序、一二层均隔离 workspace/worktree；第二层每个 worktree 可重命名，并有上下箭头夹一个数字调整默认 harness 多开并发数；layer `L3` | Depends: ZS1-140,ZS1-142 | Owner scope: 双排 tab 的打开位置、增删控件与拖拽换序 owner | Owned paths: `src/tui.rs`, `src/project_workspace.rs`, `src/layout.rs`, `tests/tui_project_workspace.rs`, `tools/tui_project_workspace_smoke.py` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_project_workspace --test layout_persistence | Rollback: 撤回 tab 行为/拖拽改动，恢复命令式操作 | Estimate: 上一层层级派生新 tab + 左对齐 + 跟随关闭 + 鼠标拖拽 + 隔离 workspace/worktree + worktree 重命名 + 并发数字 | Estimated LOC: 2000
+- [ ] **ZS1-147** — 左上 Conversation+Prompt 成组：可编辑 Goal、prompt 与左栏等宽、常驻讨论；layer `L3` | Depends: ZS1-121 | Owner scope: 左栏会话组布局与 Goal 编辑 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/tui_bentobox.rs`, `tests/layout.rs` | Validators: G-CODE；cargo test --locked --test layout --test tui_bentobox | Rollback: 撤回左栏编组，恢复原预设 | Estimate: 会话+输入合并为左栏单元，prompt 等宽，Goal 可改 | Estimated LOC: 1500
+- [ ] **ZS1-148** — 左下 arch+Prompt 成组：arch 为 master session 会话，可执行 bash/steering；layer `L3` | Depends: ZS1-147,ZS1-117 | Owner scope: master-session 会话单元与 bash/steering owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `src/headless.rs`, `tests/tui_bentobox.rs`, `tests/tui_interaction.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_interaction --test tui_bentobox | Rollback: 撤回 arch 会话与 bash/steering，保留普通 pane | Estimate: arch 作为 master session，可发 bash 命令与 steering | Estimated LOC: 2200
+- [ ] **ZS1-149** — 资源池精简监控：htop/nvidia-smi 风格、5s 刷新、彩色、进程同类合并、含 context/lsp/mcp；layer `L3` | Depends: ZS1-091 | Owner scope: 资源采样与渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `src/view_model.rs`, `tests/resources.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE；cargo test --locked --test resources --test tui_bentobox | Rollback: 撤回新采样与渲染，恢复原资源快照 | Estimate: CPU/内存/GPU/网络+分类计数+context/lsp/mcp，5s 周期 | Estimated LOC: 2600
+- [x] **ZS1-150** — Goal 并入 Gantt；Gantt 以红黄绿渲染三态；layer `L3` | Depends: ZS1-091 | Owner scope: Gantt 投影与配色 owner | Owned paths: `src/tui.rs`, `src/view_model.rs`, `src/layout.rs`, `tests/tui_bentobox.rs`, `tests/layout.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test layout | Rollback: 撤回配色与 Goal 合并，恢复原 Gantt/Goal | Estimate: [ ][_][x] → 柔和红黄绿；Plan 信息并入 Gantt | Estimated LOC: 900
+- [x] **ZS1-151** — 右下 Execution 区域改为内嵌终端；layer `L3` | Depends: ZS1-130,ZS1-129 | Owner scope: 内嵌 PTY 终端 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs`, `tools/tui_user_shell_smoke.py` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox；python3 tools/tui_user_shell_smoke.py --binary target/release/zenpi | Rollback: 撤回内嵌终端，恢复 Execution 只读投影 | Estimate: Execution pane 承载真实 PTY 终端 | Estimated LOC: 2000
+- [ ] **ZS1-152** — 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，worker 并发=项目定义数；layer `L3` | Depends: ZS1-147,ZS1-148 | Owner scope: 区域模型选择与并发配额 owner | Owned paths: `src/tui.rs`, `src/config.rs`, `src/core.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE；cargo test --locked --test tui_interaction --test config | Rollback: 撤回区域级配置，恢复全局 model | Estimate: 讨论=单并发、arch=单并发、worker=项目定义数；每区可独立选模型 | Estimated LOC: 1800
 - [x] **ZS1-199** — Master 集成验收与阶段交付；layer `L6` | Depends: ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | Owner scope: 仅整合本阶段证据与最终交付 | Owned paths: `Docs/stage_1_v3_pi_mono_blueprint.md`, `Docs/quality/stage1/acceptance.md`, `Docs/execution/active_requirement.json`, `README.md` | Validators: G-STAGE、G-RUST、G-PROD；所有依赖[x]且逐文件/目录覆盖闭包，零缺失或虚假行为证据 | Rollback: 撤回本阶段接受记录与活动指针切换，不删除用户或worker原始证据 | Estimate: 约1天独立主控复验与交付 | Estimated LOC: 0
 
 ## 6. 各产品项的完成定义
@@ -705,3 +712,24 @@ ZS1-128完成判据：逐个Codex交互条目映射实际操作与证据；每�
 验收基线：以上各项各自实现+测试后由主控集成；`/sync` 自身必须可被本文件中的后续要求反复使用。3.1.24 追加不改变 3.1.23 及之前已接受项的字节与义务。
 
 
+
+
+### 3.1.25 TUI 格局重排（新增 ZS1-146…151，清单 135 项）
+
+用户对当前 TUI 格局不满意，登记为执行义务，按“先补蓝图、再实现、再 build 到 zenpi-dev”推进。
+
+- **双排 tab 行为（ZS1-146）**：开新项目默认落在当前项目的“上一层”（按层级/父子关系），`+` 固定左对齐，`-` 关闭并跟随当前活动工作区；左右换序改为**鼠标拖拽**（不再只用 `> <` 按钮）。第二层同样逻辑。**一层与二层每次新开都必须是隔离的 workspace 与 worktree**（当前未隔离，必须修）。
+- **左上会话组（ZS1-147）**：`Conversation + Prompt` 视为一组，可在此修改 Goal；prompt 与左栏等宽；作为常驻讨论区（讨论、btw 等）。
+- **左下 arch 组（ZS1-148）**：`arch + Prompt` 成组、prompt 与左栏等宽；arch 本质是一个 conversation，但属于 **master session**，能执行 bash 命令并做 steering。
+- **资源池（ZS1-149）**：精简版 htop + nvidia-smi；**5s** 刷新；彩色 CPU/内存/GPU/网络；对进程做**同类项合并统计**（不是明细）；并纳入 opencode 右侧信息列的 **context / lsp / mcp** 信息。
+- **Goal 并入 Gantt（ZS1-150）**：左侧 Goal 区实际对应 opencode 右侧信息列的 Plan，应由 **Gantt** 承载；Gantt 渲染 blueprint 三态 `[ ] [_] [x]` 时用**护眼的柔和红/黄/绿**提示。
+- **Execution 内嵌终端（ZS1-151）**：右下 Execution 区改为**内嵌真实 PTY 终端**，方便熟悉 unix 的用户直接敲命令。
+
+验收：按项实现+测试（含真实 PTY/TUI 证据），主控集成后 build 到 `zenpi-dev` 交付。3.1.25 追加不改变 3.1.24 及之前已接受项的字节与义务。
+
+### 3.1.26 区域并发与模型语义补充（ZS1-146/147/148/152 细化）
+
+- 第二层每个 worktree：可**重命名**；每个 worktree 有 **↑ 数字 ↓** 控件调整该 worktree 的默认 **harness 多开并发数**（省去每次指定）。
+- 讨论区（左上 Conversation+Prompt）与 arch 区（左下 arch+Prompt）：各自可**独立调整 model**；两者都是**单并发**（讨论区常驻讨论、arch 是 master session 可 bash/steering）。
+- 真正干活的并发由**一层项目内定义的后台 workers 数目**决定（与第二层 worktree 的并发数字对应），不是讨论/arch 区的并发。
+- 一层/第二层新开都必须落在隔离的 workspace / worktree，不得共享当前工作区。

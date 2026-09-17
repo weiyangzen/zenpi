@@ -235,6 +235,10 @@ pub enum WorktreeAction {
     Select { index: usize },
     Close { index: usize },
     Move { index: usize, target: usize },
+    /// Rename one layer-2 tab.
+    Rename { index: usize, name: String },
+    /// Adjust one layer-2 tab's default harness concurrency by `delta`.
+    Concurrency { index: usize, delta: i32 },
 }
 
 /// Recovery decisions require explicit host confirmation and never dispatch work.
@@ -991,6 +995,16 @@ fn parse_worktree(args: &[String]) -> Result<WorktreeAction, SlashError> {
             index: index(n)?,
             target: index(m)?,
         }),
+        [a, n, name] if a.eq_ignore_ascii_case("rename") => Ok(W::Rename {
+            index: index(n)?,
+            name: name.trim().to_owned(),
+        }),
+        [a, n, d] if a.eq_ignore_ascii_case("concurrency") || a.eq_ignore_ascii_case("conc") => {
+            Ok(W::Concurrency {
+                index: index(n)?,
+                delta: d.parse::<i32>().map_err(|_| bad())?,
+            })
+        }
         _ => Err(bad()),
     }
 }

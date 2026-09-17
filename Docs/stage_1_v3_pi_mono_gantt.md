@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-18T00:39:33+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-18T01:10:25+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `2e123c050ba5a225811abab3c54626f3f9bdbad7c2aaace79cc30f6dd56a7bc6`
-- 生成时间：2026-09-18T00:39:33+08:00
+- blueprint digest: `29404a57671b7293eb8da36157e4e87bf3812ffdc2ae6837350c6dd68570454e`
+- 生成时间：2026-09-18T01:10:25+08:00
 
-清单项 `[x]` **129/129** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
+清单项 `[x]` **131/136** · `[_]` **0** · `[ ]` **5**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 35 | 35 | 0 | 0 |
+| L3 | 42 | 37 | 0 | 5 |
 | L5 | 2 | 2 | 0 | 0 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -145,6 +145,13 @@ gantt
     ZS1-142 TUI 第二层 tab：每项目内嵌 worktree tab（默认复用一层；加号 :done, ZS1-142, 6, 1s
     ZS1-144 命令补齐：/execute /explore /addloop 的语义与实现 :done, ZS1-144, 13, 1s
     ZS1-145 TUI 区域补齐：arch 架构区与 execution 执行区（BentoBo :done, ZS1-145, 6, 1s
+    ZS1-146 TUI 双排 tab 行为修正：新开落在上一层、+ 左对齐、- 跟随活动工作区、 :ZS1-146, 7, 1s
+    ZS1-147 左上 Conversation+Prompt 成组：可编辑 Goal、promp :ZS1-147, 5, 1s
+    ZS1-148 左下 arch+Prompt 成组：arch 为 master session  :ZS1-148, 15, 1s
+    ZS1-149 资源池精简监控：htop/nvidia-smi 风格、5s 刷新、彩色、进程同类 :ZS1-149, 10, 1s
+    ZS1-150 Goal 并入 Gantt；Gantt 以红黄绿渲染三态 :done, ZS1-150, 10, 1s
+    ZS1-151 右下 Execution 区域改为内嵌终端 :done, ZS1-151, 14, 1s
+    ZS1-152 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，wor :ZS1-152, 16, 1s
     ZS1-120 项目身份、cwd与持久化owner :done, ZS1-120, 3, 1s
     ZS1-121 顶部+目录picker与真实项目分页接线 :done, ZS1-121, 4, 1s
     ZS1-122 输入编辑、历史、粘贴和可编辑排队消息 :done, ZS1-122, 11, 1s
@@ -269,6 +276,13 @@ gantt
 | ZS1-143 | [x] | L5 | ZS1-117,ZS1-140,ZS1-142,ZS1-144,ZS1-145 | — | Runtime 3 用例验收：/blueprint /execute /learn /explore /addloop 与 TUI 区域(pm/arch/resources/execution/terminal/gantt)+BentoBox |
 | ZS1-144 | [x] | L3 | ZS1-119 | — | 命令补齐：/execute /explore /addloop 的语义与实现 |
 | ZS1-145 | [x] | L3 | ZS1-140 | — | TUI 区域补齐：arch 架构区与 execution 执行区（BentoBox 可调） |
+| ZS1-146 | [·] | L3 | ZS1-140,ZS1-142 | — | TUI 双排 tab 行为修正：新开落在上一层、+ 左对齐、- 跟随活动工作区、鼠标拖拽换序、一二层均隔离 workspace/worktree；第二层每个 worktree 可重命名，并有上下箭头夹一个数字调整默认 harness 多开并发数 |
+| ZS1-147 | [·] | L3 | ZS1-121 | — | 左上 Conversation+Prompt 成组：可编辑 Goal、prompt 与左栏等宽、常驻讨论 |
+| ZS1-148 | [·] | L3 | ZS1-147,ZS1-117 | ZS1-147 | 左下 arch+Prompt 成组：arch 为 master session 会话，可执行 bash/steering |
+| ZS1-149 | [·] | L3 | ZS1-091 | — | 资源池精简监控：htop/nvidia-smi 风格、5s 刷新、彩色、进程同类合并、含 context/lsp/mcp |
+| ZS1-150 | [x] | L3 | ZS1-091 | — | Goal 并入 Gantt；Gantt 以红黄绿渲染三态 |
+| ZS1-151 | [x] | L3 | ZS1-130,ZS1-129 | — | 右下 Execution 区域改为内嵌终端 |
+| ZS1-152 | [·] | L3 | ZS1-147,ZS1-148 | ZS1-147,ZS1-148 | 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，worker 并发=项目定义数 |
 | ZS1-199 | [x] | L6 | ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | — | Master 集成验收与阶段交付 |
 | ZS1-300 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/chat_composer.rs |
 | ZS1-301 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/textarea.rs |

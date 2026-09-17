@@ -105,16 +105,15 @@ fn mouse_focus_tabs_and_split_drag_preserve_draft_and_layout() {
         .unwrap();
     let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 2, 140, 34));
     let conversation = adapter.pane(PaneId::ProjectConversation).unwrap().rect;
-    let goal = adapter.pane(PaneId::GoalConversation).unwrap().rect;
+    // The Project tab keeps one conversation lane; the former Goal pane is
+    // now carried by Gantt, so the lower-left pane is Arch.
+    let arch = adapter.pane(PaneId::Arch).unwrap().rect;
     state.handle_mouse(mouse(
         MouseEventKind::Down(MouseButton::Left),
-        goal.x + 2,
-        goal.y + 1,
+        arch.x + 2,
+        arch.y + 1,
     ));
-    assert_eq!(
-        state.focused_workspace_pane(),
-        Some(PaneId::GoalConversation)
-    );
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Arch));
     state.handle_mouse(mouse(
         MouseEventKind::Down(MouseButton::Left),
         conversation.x + 2,
@@ -177,6 +176,9 @@ fn goal_hot_zone_keeps_an_independent_transcript_lane() {
     state.push_goal_message(MessageRole::System, "goal-only");
     assert_eq!(state.message_count(), 1);
     assert_eq!(state.goal_message_count(), 1);
+    // The goal lane is shown by the Goal tab; the Project tab is now a single
+    // conversation lane with plan/goal carried by Gantt.
+    state.set_workspace_tab(TabId::Goal);
     let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
     terminal
         .draw(|f| state.render_bentobox(f, "zenpi"))
@@ -485,9 +487,11 @@ fn both_hot_zones_remain_visible_when_switching_workspace_tabs() {
             .map(|c| c.symbol())
             .collect();
         assert!(text.contains("Conversation"));
-        assert!(text.contains("Goal"));
         assert!(text.contains("conversation lane"));
-        assert!(text.contains("goal lane"));
+        if tab == TabId::Goal {
+            assert!(text.contains("Goal"));
+            assert!(text.contains("goal lane"));
+        }
     }
 }
 

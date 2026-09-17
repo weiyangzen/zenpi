@@ -166,7 +166,6 @@ fn pane_focus_cycles_in_preset_order_and_skips_collapsed_or_unavailable_panes() 
         vec![
             PaneId::ProjectConversation,
             PaneId::Resources,
-            PaneId::GoalConversation,
             PaneId::Arch,
             PaneId::Gantt,
             PaneId::Execution,
@@ -190,7 +189,7 @@ fn pane_focus_cycles_in_preset_order_and_skips_collapsed_or_unavailable_panes() 
     model.set_collapsed(PaneId::Resources, true);
     assert_eq!(
         model.focus_next(viewport.0, viewport.1),
-        Some(PaneId::GoalConversation)
+        Some(PaneId::Arch)
     );
     model.set_capabilities(PaneCapabilities::default());
     assert!(
@@ -220,13 +219,16 @@ fn directional_focus_prefers_same_row_or_column_before_falling_back() {
         model.focus_direction(FocusDirection::Right, 200, 40),
         Some(PaneId::Gantt)
     );
+    // No pane sits left of the top-left conversation, so directional focus
+    // falls back to the focused pane itself.
     assert_eq!(
         model.focus_direction(FocusDirection::Left, 200, 40),
-        Some(PaneId::Resources)
+        Some(PaneId::ProjectConversation)
     );
+    // Up from the top-left conversation wraps to the last focusable pane.
     assert_eq!(
         model.focus_direction(FocusDirection::Up, 200, 40),
-        Some(PaneId::ProjectConversation)
+        Some(PaneId::Terminal)
     );
 
     // At a narrow width only the focused rectangle is rendered, but keyboard
