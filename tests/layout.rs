@@ -143,7 +143,9 @@ fn fully_collapsed_state_is_safe_at_a_normal_viewport() {
         PaneId::ProjectConversation,
         PaneId::Resources,
         PaneId::GoalConversation,
+        PaneId::Arch,
         PaneId::Gantt,
+        PaneId::Execution,
     ] {
         model.set_collapsed(pane, true);
     }
@@ -165,7 +167,9 @@ fn pane_focus_cycles_in_preset_order_and_skips_collapsed_or_unavailable_panes() 
             PaneId::ProjectConversation,
             PaneId::Resources,
             PaneId::GoalConversation,
+            PaneId::Arch,
             PaneId::Gantt,
+            PaneId::Execution,
             PaneId::Browser,
             PaneId::Terminal,
         ]

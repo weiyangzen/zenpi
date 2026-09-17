@@ -150,7 +150,7 @@ fn production_workspace_renders_tabs_and_existing_transcript_prompt() {
 
 #[test]
 fn production_resources_pane_renders_completed_snapshot() {
-    let mut terminal = Terminal::new(TestBackend::new(160, 44)).unwrap();
+    let mut terminal = Terminal::new(TestBackend::new(160, 60)).unwrap();
     let mut state = TuiState::default();
     state.set_resource_snapshot(resource_snapshot());
 
