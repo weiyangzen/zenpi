@@ -9671,6 +9671,44 @@ pub fn dispatch_slash_command(
         SlashCommand::Loop { args } => {
             dispatch_runtime_intent(state, agent, crate::b3::RuntimeIntentKind::Loop, &args);
         }
+        SlashCommand::Sync { requirement } => {
+            let workspace = agent
+                .as_deref()
+                .map(|agent| std::path::PathBuf::from(agent.session().header().cwd.clone()));
+            let Some(workspace) = workspace else {
+                state.push_message(
+                    MessageRole::Error,
+                    "sync cannot run while the agent is busy".to_owned(),
+                );
+                return SlashDispatchAction::Continue;
+            };
+            match crate::sync::sync_requirement(&workspace, &requirement) {
+                Ok(receipt) => {
+                    state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "sync: {} -> {} (duplicate={}, queued={})",
+                            receipt.item_id, receipt.blueprint, receipt.duplicate, receipt.queued
+                        ),
+                    );
+                    if !receipt.duplicate {
+                        let args = vec![
+                            "start".to_owned(),
+                            receipt.item_id.clone(),
+                            requirement.clone(),
+                        ];
+                        dispatch_runtime_intent(
+                            state,
+                            agent,
+                            crate::b3::RuntimeIntentKind::Loop,
+                            &args,
+                        );
+                    }
+                }
+                Err(error) => state
+                    .push_message(MessageRole::Error, format!("sync failed: {error}")),
+            }
+        }
     }
     if !state.is_busy() {
         state.set_status("Ready");

@@ -35,6 +35,7 @@ pub mod session_tree;
 pub mod skills;
 pub mod slash;
 pub mod slash_actions;
+pub mod sync;
 pub mod tool_output;
 pub mod tool_runtime;
 pub mod tools;

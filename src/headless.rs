@@ -8036,6 +8036,44 @@ fn execute_headless_slash(
                 message: error.to_string(),
             })
         }
+        SlashCommand::Sync { requirement } => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "sync cannot run while the agent is busy".into(),
+                });
+            };
+            let workspace = owner_workspace(Some(agent))?;
+            let receipt =
+                crate::sync::sync_requirement(&workspace, &requirement).map_err(|error| {
+                    SlashDispatchError {
+                        code: "sync_failed",
+                        message: error.to_string(),
+                    }
+                })?;
+            let queued = if receipt.duplicate {
+                false
+            } else {
+                let args = vec!["start".to_owned(), receipt.item_id.clone(), requirement.clone()];
+                crate::runtime_intent::runtime_intent_value_with_source(
+                    agent,
+                    crate::b3::RuntimeIntentKind::Loop,
+                    &args,
+                    runtime_source,
+                )
+                .is_ok()
+            };
+            Ok(SlashExecution::Response(json!({
+                "command": "sync",
+                "route": "local",
+                "accepted": true,
+                "item_id": receipt.item_id,
+                "blueprint": receipt.blueprint,
+                "digest": receipt.digest,
+                "duplicate": receipt.duplicate,
+                "queued": queued,
+            })))
+        }
     }
 }
 
