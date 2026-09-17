@@ -9,3 +9,6 @@ __pycache__/
 .ruff_cache/
 
 .local/
+
+# Local secrets (test keys); never commit.
+.secrets/
