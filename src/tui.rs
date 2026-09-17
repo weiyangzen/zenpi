@@ -127,6 +127,9 @@ pub struct ProjectTabMetadata {
     /// Optional per-project display style (a small named colour palette).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub style: Option<String>,
+    /// Folder source: `local:<path>` or `ssh:<spec>` for a remote project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -142,6 +145,7 @@ impl ProjectTabMetadata {
             session_path: Some(session.path().display().to_string()),
             approval_mode: crate::approval::ApprovalMode::Always,
             style: None,
+            source: None,
         }
     }
 }
@@ -153,6 +157,7 @@ impl Default for ProjectTabMetadata {
             session_path: None,
             approval_mode: crate::approval::ApprovalMode::Always,
             style: None,
+            source: None,
         }
     }
 }
@@ -8502,6 +8507,47 @@ pub fn dispatch_slash_command(
                     ),
                 ),
                 ProjectAction::Open { name } => {
+                    // A remote folder source is read-only: probe it, record the
+                    // source on the tab, and never fabricate a local session.
+                    if let Ok(crate::folder_source::FolderSource::Remote { spec }) =
+                        crate::folder_source::FolderSource::resolve(&name)
+                    {
+                        let ok = state.open_project_tab(name.clone());
+                        if ok {
+                            if let Some(index) = state.project_index(&name) {
+                                let key = state.project_tabs[index].clone();
+                                state
+                                    .project_metadata
+                                    .entry(key)
+                                    .or_default()
+                                    .source = Some(format!("ssh:{}", spec.display()));
+                            }
+                            match spec.probe(&spec.path) {
+                                Ok(entries) => state.push_message(
+                                    MessageRole::System,
+                                    format!(
+                                        "remote {} ({} entries): {}",
+                                        spec.display(),
+                                        entries.len(),
+                                        entries.join("  ")
+                                    ),
+                                ),
+                                Err(error) => state.push_message(
+                                    MessageRole::Error,
+                                    format!("remote probe failed: {error}"),
+                                ),
+                            }
+                        }
+                        state.push_message(
+                            MessageRole::System,
+                            if ok {
+                                format!("remote project: {}", spec.display())
+                            } else {
+                                format!("project already exists: {name}")
+                            },
+                        );
+                        return SlashDispatchAction::Continue;
+                    }
                     let ok = state.open_project_tab(name.clone());
                     if ok && let Some(agent) = agent.as_deref_mut() {
                         let mut slug = name
