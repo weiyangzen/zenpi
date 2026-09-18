@@ -139,17 +139,10 @@ fn topmost_plus_opens_picker_and_cancel_never_creates_a_tab_or_changes_draft() {
     terminal
         .draw(|frame| state.render_bentobox(frame, "zenpi"))
         .unwrap();
-    let row: String = (0..100)
-        .map(|x| terminal.backend().buffer()[(x, 0)].symbol())
-        .collect();
-    assert!(row.contains("[+]"));
-    state.handle_mouse(MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Left),
-        // `[+]` is left-aligned now: " zenpi | projects: " + " [-]" + " [+]".
-        column: 24,
-        row: 0,
-        modifiers: KeyModifiers::NONE,
-    });
+    let screen: String = terminal.backend().buffer().content().iter().map(|c| c.symbol()).collect();
+    assert!(screen.contains("[+]"));
+    let (plus_col, plus_row) = find_pos(&terminal, "[+]");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), plus_col, plus_row));
     assert!(state.directory_picker_open());
     assert_eq!(state.project_tab_count(), 1);
     key(&mut state, KeyCode::Esc, KeyModifiers::NONE);
@@ -486,7 +479,7 @@ fn draw_session_selection(
     let area = terminal.backend().buffer().area;
     // Top project row + layer-2 sub-tab row + header, single-line composer
     // with borders, footer.
-    let workspace = ratatui::layout::Rect::new(0, 3, area.width, area.height - 7);
+    let workspace = ratatui::layout::Rect::new(0, 6, area.width, area.height - 10);
     zenpi::tui::BentoBoxLayoutAdapter::new(state.workspace_layout(), workspace)
         .visible_panes()
         .find(|pane| pane.id == zenpi::layout::PaneId::SessionList)
@@ -784,6 +777,19 @@ fn find_col(terminal: &Terminal<TestBackend>, row: u16, needle: &str) -> u16 {
     line[..byte].chars().count() as u16
 }
 
+fn find_pos(terminal: &Terminal<TestBackend>, needle: &str) -> (u16, u16) {
+    let width = terminal.backend().buffer().area.width;
+    for row in 0..6u16 {
+        let line: String = (0..width)
+            .map(|x| terminal.backend().buffer()[(x, row)].symbol())
+            .collect();
+        if let Some(byte) = line.find(needle) {
+            return (line[..byte].chars().count() as u16, row);
+        }
+    }
+    panic!("{needle:?} not in the header");
+}
+
 fn mouse(kind: MouseEventKind, column: u16, row: u16) -> MouseEvent {
     MouseEvent {
         kind,
@@ -811,20 +817,20 @@ fn mouse_drag_reorders_project_and_subtab_rows() {
     // Drag layer-1 "gamma" (already active, so the press does not switch the
     // active project) onto "alpha": it lands at the released column while the
     // active project and its sub-tabs stay selected.
-    let gamma = find_col(&terminal, 0, "gamma");
-    let alpha = find_col(&terminal, 0, "alpha");
-    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), gamma, 0));
-    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), alpha, 0));
-    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), alpha, 0));
+    let (gamma, grow) = find_pos(&terminal, "gamma");
+    let (alpha, arow) = find_pos(&terminal, "alpha");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), gamma, grow));
+    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), alpha, arow));
+    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), alpha, arow));
     assert_eq!(state.project_tabs(), &["default", "gamma", "alpha", "beta"]);
     assert_eq!(state.active_project(), "gamma");
 
     // Drag layer-2 "one" onto "two" with the same gesture.
-    let one = find_col(&terminal, 1, "one");
-    let two = find_col(&terminal, 1, "two");
-    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), one, 1));
-    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), two, 1));
-    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), two, 1));
+    let (one, orow) = find_pos(&terminal, "one");
+    let (two, trow) = find_pos(&terminal, "two");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), one, orow));
+    state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), two, trow));
+    state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), two, trow));
     let names: Vec<String> = state.subtabs().into_iter().map(|tab| tab.name).collect();
     assert_eq!(names, &["gamma", "two", "one"]);
 }

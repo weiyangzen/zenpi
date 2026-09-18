@@ -175,7 +175,7 @@ fn production_workspace_renders_tabs_and_existing_transcript_prompt() {
     assert!(output.contains("project"));
     // Goal is an in-workspace command/pane, not a peer top-level tab.
     assert!(!output.contains("1:project"));
-    assert!(output.contains("projects:"));
+    assert!(output.contains("workspaces"));
     assert!(!output.contains("/goal"));
     assert!(!output.contains("/learn"));
     assert!(!output.contains("/review"));
@@ -200,26 +200,28 @@ fn production_resources_pane_renders_completed_snapshot() {
 
     let output = rendered(&terminal);
     // Existing workspace/host contract is preserved.
-    assert!(output.contains("files 23"));
-    assert!(output.contains("dirs 7"));
+    assert!(output.contains("Files 23"));
+    assert!(output.contains("Dirs 7"));
     assert!(output.contains("3.0 MiB"));
-    assert!(output.contains("cpu 8"));
+    assert!(output.contains("CPU 8"));
     assert!(output.contains("load 1.25"));
     assert!(output.contains("6.0 GiB"));
     assert!(output.contains("12.0 MiB"));
     // New htop/nvidia-smi style signals: GPU, network, merged processes, and
     // the opencode-style context/lsp/mcp column.
-    assert!(output.contains("gpu RTX 4090 45% 3.0 GiB/24.0 GiB"));
-    assert!(output.contains("net rx 2.0 GiB  tx 512.0 MiB"));
-    assert!(output.contains("processes 128 total"));
-    assert!(output.contains("lsp 5 servers  mcp 3 servers"));
-    assert!(output.contains("context history 12000/200000 tokens"));
+    assert!(output.contains("GPU RTX 4090 45% 3.0 GiB/24.0 GiB"));
+    assert!(output.contains("Net rx 2.0 GiB  tx 512.0 MiB"));
+    assert!(output.contains("Processes 128 total"));
+    assert!(output.contains("LSP 5 servers  MCP 3 servers"));
+    assert!(output.contains("Context history 12000/200000 tokens"));
     assert!(output.contains("zenpi"));
 }
 
 #[test]
 fn resource_monitor_colours_cpu_memory_gpu_and_network_sections() {
-    let mut terminal = Terminal::new(TestBackend::new(160, 60)).unwrap();
+    // Taller viewport: the six-row header leaves less room for the resource
+    // pane, and the network (blue) line must remain visible.
+    let mut terminal = Terminal::new(TestBackend::new(200, 80)).unwrap();
     let mut state = TuiState::default();
     state.set_resource_snapshot(resource_snapshot());
     terminal
@@ -254,7 +256,7 @@ fn resource_monitor_merges_process_classes_without_detail_rows() {
         .unwrap();
 
     let output = rendered(&terminal);
-    assert!(output.contains("processes 128 total"));
+    assert!(output.contains("Processes 128 total"));
     assert!(output.contains("lsp"));
     assert!(output.contains("mcp"));
     // Merged statistics keep one row per class instead of per-process detail.
@@ -743,7 +745,7 @@ fn discussion_prompt_is_grouped_with_the_left_column_conversation() {
     assert!(output.contains("draft"));
     // The prompt is rendered inside the conversation pane, so it keeps the
     // left column width and never spills into the center/right columns.
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 3, 140, 33));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 28));
     let conversation = adapter.pane(PaneId::ProjectConversation).unwrap();
     let (_, prompt) = zenpi::layout::conversation_prompt_group(
         zenpi::layout::PaneRect::new(
@@ -862,7 +864,7 @@ fn arch_master_prompt_is_grouped_in_the_left_column() {
     assert!(output.contains("!echo hi"));
 
     // The rendered prompt shares the arch pane's exact left-column width.
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 3, 140, 33));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 28));
     let arch = adapter.pane(PaneId::Arch).unwrap().rect;
     let (_, prompt) = zenpi::layout::arch_prompt_group(
         zenpi::layout::PaneRect::new(arch.x, arch.y, arch.width, arch.height),

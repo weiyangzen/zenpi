@@ -198,6 +198,7 @@ enum SubTabHit {
     AddInPlace,
     ConcurrencyUp(usize),
     ConcurrencyDown(usize),
+    Close(usize),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -2796,6 +2797,12 @@ impl TuiState {
 
     pub fn cursor(&self) -> usize {
         self.cursor
+    }
+
+    /// Last provider usage tracked for the active conversation (the header
+    /// status strip was removed, so hosts/tests read this accessor).
+    pub fn tracked_usage(&self) -> Option<crate::backend::Usage> {
+        self.transcript_ux.usage.clone()
     }
 
     pub fn status(&self) -> &str {
@@ -6517,6 +6524,14 @@ impl TuiState {
                 if *index == usize::MAX - 2 {
                     let name = self.active_project().to_owned();
                     self.close_project_tab(&name);
+                } else if *index >= usize::MAX - 3 - self.project_tabs.len()
+                    && *index < usize::MAX - 2
+                {
+                    let close_index = usize::MAX - 3 - *index;
+                    if close_index < self.project_tabs.len() {
+                        let name = self.project_tabs[close_index].clone();
+                        self.close_project_tab(&name);
+                    }
                 } else if *index == self.project_tabs.len() {
                     self.open_directory_picker();
                 } else {
@@ -6547,6 +6562,9 @@ impl TuiState {
                 }
                 SubTabHit::ConcurrencyDown(index) => {
                     self.subtab_concurrency(index, -1);
+                }
+                SubTabHit::Close(index) => {
+                    self.subtab_close(index);
                 }
             }
             return TuiAction::Redraw;
@@ -8644,30 +8662,28 @@ impl TuiState {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),
-                Constraint::Length(1),
+                Constraint::Length(6),
                 Constraint::Min(1),
                 Constraint::Length(input_height),
                 Constraint::Length(1),
             ])
             .split(area);
         self.render_workspace_tabs(frame, chunks[0]);
-        self.render_header(frame, chunks[1], title);
         self.docked_prompt_rect = None;
         self.dock_prompt = group_prompt;
-        self.render_workspace(frame, chunks[2]);
+        self.render_workspace(frame, chunks[1]);
         // When the group could not render the prompt (for example the
         // conversation pane is collapsed) fall back to the bottom strip so the
         // prompt is never unreachable.
         if self.docked_prompt_rect.is_none() {
             if self.goal_edit.is_some() {
-                self.render_goal_editor(frame, chunks[3]);
+                self.render_goal_editor(frame, chunks[2]);
             } else {
-                self.render_input(frame, chunks[3]);
+                self.render_input(frame, chunks[2]);
             }
         }
-        self.render_footer(frame, chunks[4]);
-        let prompt_anchor = self.docked_prompt_rect.unwrap_or(chunks[3]);
+        self.render_footer(frame, chunks[3]);
+        let prompt_anchor = self.docked_prompt_rect.unwrap_or(chunks[2]);
         self.render_slash_choices(frame, prompt_anchor);
         if let Some(picker) = self.directory_picker.as_mut() {
             picker.render(frame);
@@ -8680,179 +8696,155 @@ impl TuiState {
 
     fn render_workspace_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
         self.project_hits.clear();
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-        let limit = area.right();
-        let prefix = if area.width > 40 {
-            truncate_to_width(" zenpi | projects: ", usize::from(limit - area.x))
-        } else {
-            String::new()
-        };
-        frame.render_widget(
-            Paragraph::new(prefix.clone()),
-            Rect::new(area.x, area.y, limit - area.x, 1),
-        );
-        let mut x = area.x + UnicodeWidthStr::width(prefix.as_str()) as u16;
-        // Left-aligned controls: `[-]` closes the active workspace, `[+]`
-        // opens a new project on the current layer. Horizontal reordering is
-        // done by dragging a tab, not by `[<] [>]` buttons.
-        if area.width >= 16 {
-            let minus = Rect::new(x, area.y, 4, 1);
-            frame.render_widget(
-                Paragraph::new(" [-]").style(Style::default().fg(Color::Cyan)),
-                minus,
-            );
-            self.project_hits.push((minus, usize::MAX - 2));
-            x += 4;
-            let plus = Rect::new(x, area.y, 4, 1);
-            frame.render_widget(
-                Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
-                plus,
-            );
-            self.project_hits.push((plus, self.project_tabs.len()));
-            x += 4;
-        }
-        for index in 0..self.project_tabs.len() {
-            if x >= limit {
-                break;
-            }
-            let label = self.project_label(index);
-            let approvals = self.project_approval_count(index);
-            let attention = if approvals > 0 {
-                format!("!{approvals} ")
-            } else {
-                String::new()
-            };
-            let text = truncate_to_width(
-                &format!(
-                    "{}{}{}{} ",
-                    if index == self.active_project {
-                        "["
-                    } else {
-                        " "
-                    },
-                    attention,
-                    label,
-                    if index == self.active_project {
-                        "]"
-                    } else {
-                        " "
-                    }
-                ),
-                usize::from(limit - x).min(32),
-            );
-            let width = UnicodeWidthStr::width(text.as_str()) as u16;
-            if width == 0 {
-                break;
-            }
-            let rect = Rect::new(x, area.y, width, 1);
-            frame.render_widget(
-                Paragraph::new(text).style(Style::default().fg(if approvals > 0 {
-                    Color::Yellow
-                } else if let Some(style) = self.project_style_color(index) {
-                    style
-                } else if index == self.active_project {
-                    Color::Cyan
-                } else {
-                    Color::White
-                })),
-                rect,
-            );
-            self.project_hits.push((rect, index));
-            x += width;
-        }
-        if area.height >= 2 {
-            self.render_subtabs(frame, Rect::new(area.x, area.y + 1, area.width, 1));
-        }
-    }
-
-    /// Layer-2 row: the active project's sub-tabs plus the two add choices
-    /// (`[~]` work in the current place, `[+]` create a new worktree).
-    fn render_subtabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
         self.subtab_hits.clear();
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let tabs = self.subtabs();
-        let active = self.active_subtab();
-        let active_concurrency = tabs.get(active).map(|tab| tab.concurrency).unwrap_or(1);
-        let controls = format!(" ↑ {active_concurrency} ↓ [~] [+] ");
-        let controls_width = UnicodeWidthStr::width(controls.as_str()) as u16;
-        let limit = area.right().saturating_sub(controls_width);
-        let prefix = "  └ ";
-        frame.render_widget(
-            Paragraph::new(prefix).style(Style::default().fg(Color::DarkGray)),
-            Rect::new(area.x, area.y, UnicodeWidthStr::width(prefix) as u16, 1),
-        );
-        let mut x = area.x + UnicodeWidthStr::width(prefix) as u16;
-        for (index, tab) in tabs.iter().enumerate() {
-            if x >= limit {
-                break;
+        // Left: vertical ZENPI wordmark. Right: the double-row tab block,
+        // side by side with no gap. Both occupy the six header rows.
+        let logo_width = if area.width >= 24 { 6 } else { 0 };
+        if logo_width > 0 {
+            for (index, glyph) in ["Z", "E", "N", "P", "I"].iter().enumerate() {
+                let row = area.y + index as u16;
+                if row >= area.bottom() {
+                    break;
+                }
+                frame.render_widget(
+                    Paragraph::new(format!(" {glyph}"))
+                        .style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+                    Rect::new(area.x, row, logo_width, 1),
+                );
             }
-            let text = truncate_to_width(
-                &format!(
-                    "{}{}{} ",
-                    if index == active { "[" } else { " " },
-                    tab.name,
-                    if index == active { "]" } else { " " }
-                ),
-                usize::from(limit.saturating_sub(x)).min(28),
-            );
-            let width = UnicodeWidthStr::width(text.as_str()) as u16;
-            if width == 0 {
-                break;
-            }
-            let rect = Rect::new(x, area.y, width, 1);
-            frame.render_widget(
-                Paragraph::new(text).style(Style::default().fg(if index == active {
-                    Color::Cyan
-                } else {
-                    Color::Gray
-                })),
-                rect,
-            );
-            self.subtab_hits.push((rect, SubTabHit::Select(index)));
-            x += width;
         }
-        let mut cx = limit;
-        let up = Rect::new(cx, area.y, 3, 1);
-        frame.render_widget(
-            Paragraph::new(" ↑").style(Style::default().fg(Color::Cyan)),
-            up,
+        let info = Rect::new(
+            area.x + logo_width,
+            area.y,
+            area.width.saturating_sub(logo_width),
+            area.height,
         );
-        self.subtab_hits
-            .push((up, SubTabHit::ConcurrencyUp(active)));
-        cx += 3;
-        let number = format!(" {active_concurrency} ");
-        let number_width = UnicodeWidthStr::width(number.as_str()) as u16;
-        let rect = Rect::new(cx, area.y, number_width, 1);
-        frame.render_widget(
-            Paragraph::new(number).style(Style::default().fg(Color::White)),
-            rect,
+        let top_height = (info.height / 2).max(1).min(info.height);
+        let top = Rect::new(info.x, info.y, info.width, top_height);
+        let bottom = Rect::new(
+            info.x,
+            info.y + top_height,
+            info.width,
+            info.height.saturating_sub(top_height),
         );
-        cx += number_width;
-        let down = Rect::new(cx, area.y, 3, 1);
+        self.render_tab_layer(frame, top, true);
+        self.render_tab_layer(frame, bottom, false);
+    }
+
+    /// One layer of the header: ` zenpi | workspaces : name [-] || ... [+]` or
+    /// ` └ Worktrees: name ↑N↓ [-] || ... [+]`, wrapped into the given rows.
+    fn render_tab_layer(&mut self, frame: &mut Frame<'_>, area: Rect, layer1: bool) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let header = if layer1 {
+            " zenpi | workspaces : "
+        } else {
+            " \u{2514} Worktrees: "
+        };
+        let entries: Vec<(usize, String)> = if layer1 {
+            self.project_tabs
+                .iter()
+                .enumerate()
+                .map(|(index, name)| {
+                    let approvals = self.project_approval_count(index);
+                    let attention = if approvals > 0 {
+                        format!("!{approvals} ")
+                    } else {
+                        String::new()
+                    };
+                    (index, format!("{attention}{name}"))
+                })
+                .collect()
+        } else {
+            self.subtabs()
+                .into_iter()
+                .enumerate()
+                .map(|(index, tab)| (index, format!("{} \u{2191}{}\u{2193}", tab.name, tab.concurrency)))
+                .collect()
+        };
+        let active = if layer1 { self.active_project } else { self.active_subtab() };
+        let width = usize::from(area.width);
+        let max_rows = usize::from(area.height).max(1);
+        let mut row = 0usize;
+        let mut column = 0usize;
+        let header_shown = truncate_chars(header, width);
         frame.render_widget(
-            Paragraph::new(" ↓").style(Style::default().fg(Color::Cyan)),
-            down,
+            Paragraph::new(header_shown.clone()).style(Style::default().fg(Color::DarkGray)),
+            Rect::new(area.x, area.y, width as u16, 1),
         );
-        self.subtab_hits
-            .push((down, SubTabHit::ConcurrencyDown(active)));
-        cx += 3;
-        let in_place = Rect::new(cx, area.y, 4, 1);
-        frame.render_widget(
-            Paragraph::new(" [~]").style(Style::default().fg(Color::Magenta)),
-            in_place,
-        );
-        self.subtab_hits.push((in_place, SubTabHit::AddInPlace));
-        cx += 4;
-        let worktree = Rect::new(cx, area.y, 4, 1);
-        frame.render_widget(
-            Paragraph::new(" [+]").style(Style::default().fg(Color::Green)),
-            worktree,
-        );
-        self.subtab_hits.push((worktree, SubTabHit::AddWorktree));
+        column = header_shown.chars().count();
+        if column >= width {
+            row += 1;
+            column = 0;
+        }
+        for (index, label) in &entries {
+            let token = format!(" {label} [-] || ");
+            let len = token.chars().count();
+            if column > 0 && column + len.min(width) > width {
+                row += 1;
+                column = 0;
+            }
+            if row >= max_rows {
+                break;
+            }
+            let available = width.saturating_sub(column).max(1);
+            let shown = truncate_chars(&token, available);
+            let shown_len = shown.chars().count();
+            let colour = if *index == active {
+                Color::Cyan
+            } else if layer1 {
+                self.project_style_color(*index).unwrap_or(Color::White)
+            } else {
+                Color::White
+            };
+            let rect = Rect::new(area.x + column as u16, area.y + row as u16, shown_len as u16, 1);
+            let close_offset = shown
+                .find("[-]")
+                .map(|byte| shown[..byte].chars().count());
+            frame.render_widget(Paragraph::new(shown).style(Style::default().fg(colour)), rect);
+            // Whole token selects; the embedded `[-]` closes that entry.
+            if layer1 {
+                self.project_hits.push((rect, *index));
+            } else {
+                self.subtab_hits.push((rect, SubTabHit::Select(*index)));
+            }
+            if let Some(offset) = close_offset {
+                let close = Rect::new(
+                    area.x + (column + offset) as u16,
+                    area.y + row as u16,
+                    3.min((width - column - offset) as u16),
+                    1,
+                );
+                if layer1 {
+                    self.project_hits.push((close, usize::MAX - 3 - *index));
+                } else {
+                    self.subtab_hits.push((close, SubTabHit::Close(*index)));
+                }
+            }
+            column += shown_len;
+            if shown_len < len {
+                break;
+            }
+        }
+        let plus = " [+]";
+        let plus_len = plus.chars().count();
+        if column > 0 && column + plus_len > width {
+            row += 1;
+            column = 0;
+        }
+        if row < max_rows {
+            let rect = Rect::new(area.x + column as u16, area.y + row as u16, plus_len as u16, 1);
+            frame.render_widget(Paragraph::new(plus).style(Style::default().fg(Color::Green)), rect);
+            if layer1 {
+                self.project_hits.push((rect, self.project_tabs.len()));
+            } else {
+                self.subtab_hits.push((rect, SubTabHit::AddWorktree));
+            }
+        }
     }
 
     fn render_workspace(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -9210,8 +9202,8 @@ impl TuiState {
             .map(|value| format!("{value:.2}"))
             .unwrap_or_else(|| "unavailable".into());
         let mut lines = vec![
-            format!("cpu {} cores  load {load}", snapshot.cpu.logical_cpus),
-            format!("mem free {memory}"),
+            format!("CPU {} cores  load {load}  util ~{util:.0}%", snapshot.cpu.logical_cpus, util = snapshot.cpu.load_one_minute.unwrap_or(0.0) / (snapshot.cpu.logical_cpus.max(1) as f64) * 100.0),
+            format!("Mem free {memory}"),
             format_gpu_signal(&snapshot.gpu),
             format_network_signal(&snapshot.network),
             format_process_summary(&snapshot.processes),
@@ -9228,11 +9220,11 @@ impl TuiState {
             .transcript_ux
             .history_tokens
             .zip(self.transcript_ux.context_limit)
-            .map(|(used, limit)| format!("context history {used}/{limit} tokens"))
-            .unwrap_or_else(|| "context unavailable".into());
+            .map(|(used, limit)| format!("Context history {used}/{limit} tokens"))
+            .unwrap_or_else(|| "Context unavailable".into());
         lines.push(context);
         lines.push(format!(
-            "lsp {} servers  mcp {} servers",
+            "LSP {} servers  MCP {} servers",
             snapshot
                 .processes
                 .count_for(crate::resources::ProcessClass::Lsp),
@@ -9240,18 +9232,18 @@ impl TuiState {
                 .processes
                 .count_for(crate::resources::ProcessClass::Mcp)
         ));
-        lines.push("workspace".into());
+        lines.push("Workspace".into());
         lines.push(format!(
-            "files {}  dirs {}",
+            "Files {}  Dirs {}",
             workspace.files, workspace.directories
         ));
         lines.push(format!(
-            "size {}  nodes {}",
+            "Size {}  Nodes {}",
             format_byte_count(workspace.bytes),
             workspace.nodes
         ));
-        lines.push(format!("truncated {}", workspace.truncated));
-        lines.push(format!("self {process}"));
+        lines.push(format!("Truncated {}", workspace.truncated));
+        lines.push(format!("Self {process}"));
         match &self.resource_status {
             ResourcePaneStatus::Collecting => lines.push("refreshing...".into()),
             ResourcePaneStatus::Failed(error) => lines.push(format!("refresh failed: {error}")),
@@ -9382,25 +9374,26 @@ fn style_resource_pane(content: &str) -> ratatui::text::Text<'static> {
 }
 
 fn resource_line_style(trimmed: &str) -> (Color, bool) {
-    if trimmed.starts_with("cpu") {
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("cpu") {
         return (Color::Cyan, true);
     }
-    if trimmed.starts_with("mem") {
+    if lower.starts_with("mem") {
         return (Color::Green, true);
     }
-    if trimmed.starts_with("gpu") {
+    if lower.starts_with("gpu") {
         return (Color::Magenta, true);
     }
-    if trimmed.starts_with("net") {
+    if lower.starts_with("net") {
         return (Color::Blue, true);
     }
-    if trimmed.starts_with("processes") {
+    if lower.starts_with("processes") {
         return (Color::Yellow, true);
     }
-    if trimmed.starts_with("context") {
+    if lower.starts_with("context") {
         return (Color::LightBlue, false);
     }
-    match trimmed.split_whitespace().next().unwrap_or_default() {
+    match lower.split_whitespace().next().unwrap_or_default() {
         "zenpi" => (Color::Green, false),
         "opencode" => (Color::Cyan, false),
         "agent" => (Color::Blue, false),
@@ -9548,7 +9541,7 @@ fn workspace_pane_title(id: PaneId) -> &'static str {
         PaneId::GoalConversation => "Goal",
         PaneId::Gantt => "Gantt",
         PaneId::Arch => "Arch",
-        PaneId::Execution => "Execution",
+        PaneId::Execution => "Shell",
         PaneId::Browser => "Browser",
         PaneId::Terminal => "Terminal",
         PaneId::LearnConversation => "Conversation",
@@ -12296,7 +12289,7 @@ fn format_byte_count(bytes: u64) -> String {
 
 fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
     if gpu.devices.is_empty() {
-        return "gpu unavailable".into();
+        return "GPU unavailable".into();
     }
     let devices: Vec<String> = gpu
         .devices
@@ -12315,7 +12308,7 @@ fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
             format!("{} {utilization} {memory}", device.name)
         })
         .collect();
-    let mut line = format!("gpu {}", devices.join("; "));
+    let mut line = format!("GPU {}", devices.join("; "));
     if gpu.truncated {
         line.push_str(" ...");
     }
@@ -12325,20 +12318,20 @@ fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
 fn format_network_signal(network: &crate::resources::NetworkSignal) -> String {
     match (network.received_bytes, network.transmitted_bytes) {
         (Some(received), Some(transmitted)) => format!(
-            "net rx {}  tx {}",
+            "Net rx {}  tx {}",
             format_byte_count(received),
             format_byte_count(transmitted)
         ),
-        _ => "net unavailable".into(),
+        _ => "Net unavailable".into(),
     }
 }
 
 fn format_process_summary(processes: &crate::resources::ProcessSummary) -> String {
     if processes.total == 0 {
-        return "processes unavailable".into();
+        return "Processes unavailable".into();
     }
     let mut line = format!(
-        "processes {} total  {}",
+        "Processes {} total  {}",
         processes.total,
         format_byte_count(processes.resident_bytes)
     );
@@ -16406,6 +16399,10 @@ fn menu_prefix(text: &str, width: usize) -> String {
         result.push_str(grapheme);
     }
     result
+}
+
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    text.chars().take(max_chars).collect()
 }
 
 fn truncate_to_width(text: &str, width: usize) -> String {

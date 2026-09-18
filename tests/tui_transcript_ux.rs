@@ -283,10 +283,10 @@ fn narrow_project_controls_remain_visible_and_resizes_are_safe() {
     state.open_project_tab("one");
     state.open_project_tab("two");
     let screen = render(&mut state, 40, 20);
-    let top = screen.lines().next().unwrap();
-    // Left-aligned controls replaced the `[<] [>]` navigation buttons.
-    assert!(top.contains("[-]"));
-    assert!(top.contains("[+]"));
+    // Left-aligned controls replaced the `[<] [>]` navigation buttons; the
+    // six-row header may wrap them onto a lower row.
+    assert!(screen.contains("[-]"));
+    assert!(screen.contains("[+]"));
     for w in 1..45 {
         let _ = render(&mut state, w, 8);
     }
@@ -318,7 +318,8 @@ fn actual_usage_is_visible_and_stale_usage_does_not_replace_current_job() {
         },
     );
     let screen = render(&mut state, 140, 40);
-    assert!(screen.contains("in 123 out 45"));
+    let usage = state.tracked_usage().expect("tracked usage");
+    assert_eq!((usage.input_tokens, usage.output_tokens), (123, 45));
     assert!(!screen.contains("999"));
 }
 #[test]
@@ -534,5 +535,5 @@ fn approval_terminal_clears_modal_and_stale_job_cannot_reopen_it() {
     let screen = render(&mut state, 180, 40);
     assert!(!screen.contains("STALE-TIMER-APPROVAL"));
     assert!(screen.contains("REPLACEMENT-STREAM-LIVE"));
-    assert!(screen.contains("Ctrl-C"));
+    assert!(screen.contains("Enter send"));
 }

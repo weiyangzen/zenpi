@@ -318,6 +318,11 @@ proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创�
 - [x] **ZS1-150** — Goal 并入 Gantt；Gantt 以红黄绿渲染三态；layer `L3` | Depends: ZS1-091 | Owner scope: Gantt 投影与配色 owner | Owned paths: `src/tui.rs`, `src/view_model.rs`, `src/layout.rs`, `tests/tui_bentobox.rs`, `tests/layout.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test layout | Rollback: 撤回配色与 Goal 合并，恢复原 Gantt/Goal | Estimate: [ ][_][x] → 柔和红黄绿；Plan 信息并入 Gantt | Estimated LOC: 900
 - [x] **ZS1-151** — 右下 Execution 区域改为内嵌终端；layer `L3` | Depends: ZS1-130,ZS1-129 | Owner scope: 内嵌 PTY 终端 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs`, `tools/tui_user_shell_smoke.py` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox；python3 tools/tui_user_shell_smoke.py --binary target/release/zenpi | Rollback: 撤回内嵌终端，恢复 Execution 只读投影 | Estimate: Execution pane 承载真实 PTY 终端 | Estimated LOC: 2000
 - [x] **ZS1-152** — 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，worker 并发=项目定义数；layer `L3` | Depends: ZS1-147,ZS1-148 | Owner scope: 区域模型选择与并发配额 owner | Owned paths: `src/tui.rs`, `src/config.rs`, `src/core.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE；cargo test --locked --test tui_interaction --test config | Rollback: 撤回区域级配置，恢复全局 model | Estimate: 讨论=单并发、arch=单并发、worker=项目定义数；每区可独立选模型 | Estimated LOC: 1800
+- [x] **ZS1-153** — 顶部 6 行信息头：左上竖排 ZENPI logo；右侧一层 workspaces（` zenpi [-] || name [-] || … || [+]`，名字=文件夹名，≤20 字符，自动换行最多 3 行，过多则按宽度均分截断）与二层 Worktrees（`└ Worktrees: name ↑N↓ [-] || … || [+]`，默认名=当前分支或 main，可编辑）；移除含糊的 Ready/model/token 状态行；layer `L3` | Depends: ZS1-146 | Owner scope: 头部信息区布局、命名与渲染 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/tui_bentobox.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test tui_project_workspace | Rollback: 撤回头部重排，恢复两行 tab+状态行 | Estimate: 6 行 header、双层换行与均分、命名对齐文件夹/分支 | Estimated LOC: 2200
+- [ ] **ZS1-154** — 资源区 htop/nvidia-smi 化：缺 htop/nvidia-smi 时启动请求权限自动安装并抽取；彩色利用率条；修复 CPU/GPU 不显示；大小写美观；layer `L3` | Depends: ZS1-149 | Owner scope: 外部监控工具与资源渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `tools/install_monitors.sh`, `tests/resources.rs` | Validators: G-CODE；cargo test --locked --test resources | Rollback: 撤回外部工具依赖，恢复纯内建采样 | Estimate: 安装/探测 htop+nvidia-smi，彩色 CPU/GPU/内存/网络 | Estimated LOC: 2200
+- [x] **ZS1-155** — 右下 Shell（替换 Execution）：默认对齐当前项目 workspace/worktree 的交互式 shell；layer `L3` | Depends: ZS1-151 | Owner scope: 内嵌 shell 生命周期 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox | Rollback: 撤回 shell 改造，恢复只读投影 | Estimate: pane 更名 Shell 并默认起交互 shell | Estimated LOC: 1600
+- [ ] **ZS1-156** — 左上 Conversation 与左下 Arch 各自独立 agent runtime session 与独立 model、独立 Prompt：两个逻辑会话同时打开，绝对独立；layer `L5` | Depends: ZS1-147,ZS1-148,ZS1-152 | Owner scope: 双独立会话 owner 与输入端口 owner | Owned paths: `src/tui.rs`, `src/core.rs`, `src/project_workspace.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_interaction --test config | Rollback: 撤回双会话，恢复单会话共享 | Estimate: 两个 runtime session 与各自 model/输入/审批 | Estimated LOC: 3000
+- [ ] **ZS1-157** — 退出重进持久化：进程中断/重启只影响一层 [+] 的默认 workspaces 添加逻辑，不丢失既有 workspaces/worktrees 及其顺序/命名/并发；layer `L3` | Depends: ZS1-146,ZS1-153 | Owner scope: 项目/子 tab 持久化与恢复 owner | Owned paths: `src/project_workspace.rs`, `src/tui.rs`, `src/session.rs`, `tests/tui_project_workspace.rs`, `tests/session_recovery.rs` | Validators: G-CODE；cargo test --locked --test tui_project_workspace --test session_recovery | Rollback: 撤回持久化扩展，保留内存态 | Estimate: workspaces/worktrees 顺序/命名/并发持久化与重启恢复 | Estimated LOC: 1400
 - [x] **ZS1-199** — Master 集成验收与阶段交付；layer `L6` | Depends: ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | Owner scope: 仅整合本阶段证据与最终交付 | Owned paths: `Docs/stage_1_v3_pi_mono_blueprint.md`, `Docs/quality/stage1/acceptance.md`, `Docs/execution/active_requirement.json`, `README.md` | Validators: G-STAGE、G-RUST、G-PROD；所有依赖[x]且逐文件/目录覆盖闭包，零缺失或虚假行为证据 | Rollback: 撤回本阶段接受记录与活动指针切换，不删除用户或worker原始证据 | Estimate: 约1天独立主控复验与交付 | Estimated LOC: 0
 
 ## 6. 各产品项的完成定义
@@ -733,3 +738,16 @@ ZS1-128完成判据：逐个Codex交互条目映射实际操作与证据；每�
 - 讨论区（左上 Conversation+Prompt）与 arch 区（左下 arch+Prompt）：各自可**独立调整 model**；两者都是**单并发**（讨论区常驻讨论、arch 是 master session 可 bash/steering）。
 - 真正干活的并发由**一层项目内定义的后台 workers 数目**决定（与第二层 worktree 的并发数字对应），不是讨论/arch 区的并发。
 - 一层/第二层新开都必须落在隔离的 workspace / worktree，不得共享当前工作区。
+
+### 3.1.27 顶部信息头与 Shell/双会话（新增 ZS1-153…156，清单 140 项）
+
+- 顶部信息头（ZS1-153）：左上竖排 `ZENPI`（高 6 行、宽度合理）；右侧为双层信息：一层 `workspaces` 与二层 `Worktrees`，均左到右、每项后跟 `[-]` 关闭、末尾 `[+]`；二层前置 `└`。名字一层取文件夹名、二层取当前分支（无则 `main`）并可编辑，单项 ≤20 字符；一层/二层各最多 3 行自动换行，过多则按可用宽度均分截断。**移除现有含糊的 `Ready | model … | in/out | cwd` 状态行**。
+- 资源区（ZS1-154）：以 htop/nvidia-smi 为数据源（缺失则在启动时请求权限自动安装再抽取），彩色利用率条；修 CPU/GPU 缺失；统一美观大小写。
+- Shell（ZS1-155）：右下角由只读 Execution 改为默认对齐当前项目 workspace/worktree 的**交互式 shell**，标题改为 `Shell`。
+- 双独立会话（ZS1-156）：左上 Conversation 与左下 Arch 是两个**独立 agent runtime session**，各自独立 model、独立 Prompt、独立审批，绝对不共享输入/上下文。
+
+验收：逐项实现+测试，主控集成后 build 到 `zenpi-dev`。3.1.27 追加不改动此前已接受项。
+
+### 3.1.28 持久化与布局补充（ZS1-157）
+- 退出/中断/重启只影响一层 `[+]` 的“默认加 workspaces”逻辑；既有的 workspaces、worktrees 及其顺序、命名、并发数必须持久化并在重启后恢复，不能因 zenpi 进程中断导致工作中断。
+- 顶部 header 采用 logo（左，竖排 ZENPI，高 6 行）+ 双层 tab（右）**左右布局、无空隙**：一层 `workspaces` 最多 3 行换行，二层 `Worktrees` 最多 3 行换行；单项名字 ≤20 字符，过多时按宽度均分截断；二层默认名取当前分支（无则 `main`）且可编辑。

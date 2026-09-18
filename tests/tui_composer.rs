@@ -774,7 +774,7 @@ fn folded_payload_counts_toward_input_and_pretty_checkpoint_budgets() {
     crowded.handle_event(Event::Paste("x".repeat(MAX_MESSAGE_BYTES - 4)));
     assert_eq!(crowded.input(), "keep");
     assert_eq!(saved_draft(&crowded)["next_paste_id"], 1);
-    assert!(composer_screen(&mut crowded, 140).contains("4 MiB"));
+    assert!(crowded.status().contains("4 MiB"), "status: {}", crowded.status());
 }
 
 #[test]
@@ -983,7 +983,7 @@ fn yank_input_and_pretty_checkpoint_rejections_preserve_full_buffer_and_draft() 
     let before = saved_draft(&s);
     ctrl(&mut s, 'y');
     assert_eq!(saved_draft(&s), before);
-    assert!(composer_screen(&mut s, 140).contains("256 KiB"));
+    assert!(s.status().contains("256 KiB"), "status: {}", s.status());
     s.set_input("");
     ctrl(&mut s, 'y');
     assert_eq!(s.input().len(), MAX_MESSAGE_BYTES);
@@ -1003,7 +1003,7 @@ fn yank_input_and_pretty_checkpoint_rejections_preserve_full_buffer_and_draft() 
     );
     ctrl(&mut s, 'y');
     assert_eq!(saved_draft(&s), before);
-    assert!(composer_screen(&mut s, 140).contains("4 MiB"));
+    assert!(s.status().contains("4 MiB"), "status: {}", s.status());
     // Failure kept the complete buffer; switching away and back does not drop it.
     s.open_project_tab("B");
     s.select_project_tab(0);

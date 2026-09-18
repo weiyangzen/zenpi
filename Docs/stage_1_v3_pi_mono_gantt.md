@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-18T02:32:00+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-18T14:13:38+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `be803a9a09e3040c1942d6bd90adbca395fc1ec6d991cc42d13ad206993a602d`
-- 生成时间：2026-09-18T02:32:00+08:00
+- blueprint digest: `b03883a6385ee37de6d9c8ea732a48c36a321f5b10e04058bd41abd85c2ed6e8`
+- 生成时间：2026-09-18T14:13:38+08:00
 
-清单项 `[x]` **136/136** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
+清单项 `[x]` **138/141** · `[_]` **0** · `[ ]` **3**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,8 +16,8 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 42 | 42 | 0 | 0 |
-| L5 | 2 | 2 | 0 | 0 |
+| L3 | 46 | 44 | 0 | 2 |
+| L5 | 3 | 2 | 0 | 1 |
 | L6 | 1 | 1 | 0 | 0 |
 
 ## 依赖层级 Gantt
@@ -152,6 +152,10 @@ gantt
     ZS1-150 Goal 并入 Gantt；Gantt 以红黄绿渲染三态 :done, ZS1-150, 10, 1s
     ZS1-151 右下 Execution 区域改为内嵌终端 :done, ZS1-151, 14, 1s
     ZS1-152 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，wor :done, ZS1-152, 16, 1s
+    ZS1-153 顶部 6 行信息头：左上竖排 ZENPI logo；右侧一层 workspace :done, ZS1-153, 8, 1s
+    ZS1-154 资源区 htop/nvidia-smi 化：缺 htop/nvidia-smi  :ZS1-154, 11, 1s
+    ZS1-155 右下 Shell（替换 Execution）：默认对齐当前项目 workspac :done, ZS1-155, 15, 1s
+    ZS1-157 退出重进持久化：进程中断/重启只影响一层 [+] 的默认 workspaces  :ZS1-157, 9, 1s
     ZS1-120 项目身份、cwd与持久化owner :done, ZS1-120, 3, 1s
     ZS1-121 顶部+目录picker与真实项目分页接线 :done, ZS1-121, 4, 1s
     ZS1-122 输入编辑、历史、粘贴和可编辑排队消息 :done, ZS1-122, 11, 1s
@@ -167,6 +171,7 @@ gantt
     section L5
     ZS1-117 生产入口、边界故障与轻量预算验收 :done, ZS1-117, 14, 1s
     ZS1-143 Runtime 3 用例验收：/blueprint /execute /lear :done, ZS1-143, 15, 1s
+    ZS1-156 左上 Conversation 与左下 Arch 各自独立 agent runt :ZS1-156, 17, 1s
     section L6
     ZS1-199 Master 集成验收与阶段交付 :done, ZS1-199, 16, 1s
 ```
@@ -283,6 +288,11 @@ gantt
 | ZS1-150 | [x] | L3 | ZS1-091 | — | Goal 并入 Gantt；Gantt 以红黄绿渲染三态 |
 | ZS1-151 | [x] | L3 | ZS1-130,ZS1-129 | — | 右下 Execution 区域改为内嵌终端 |
 | ZS1-152 | [x] | L3 | ZS1-147,ZS1-148 | — | 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，worker 并发=项目定义数 |
+| ZS1-153 | [x] | L3 | ZS1-146 | — | 顶部 6 行信息头：左上竖排 ZENPI logo；右侧一层 workspaces（` zenpi [-] || name [-] || … || [+]`，名字=文件夹名，≤20 字符，自动换行最多 3 行，过多则按宽度均分截断）与二层 Worktrees（`└ Worktrees: name ↑N↓ [-] || … || [+]`，默认名=当前分支或 main，可编辑）；移除含糊的 Ready/model/token 状态行 |
+| ZS1-154 | [·] | L3 | ZS1-149 | — | 资源区 htop/nvidia-smi 化：缺 htop/nvidia-smi 时启动请求权限自动安装并抽取；彩色利用率条；修复 CPU/GPU 不显示；大小写美观 |
+| ZS1-155 | [x] | L3 | ZS1-151 | — | 右下 Shell（替换 Execution）：默认对齐当前项目 workspace/worktree 的交互式 shell |
+| ZS1-156 | [·] | L5 | ZS1-147,ZS1-148,ZS1-152 | — | 左上 Conversation 与左下 Arch 各自独立 agent runtime session 与独立 model、独立 Prompt：两个逻辑会话同时打开，绝对独立 |
+| ZS1-157 | [·] | L3 | ZS1-146,ZS1-153 | — | 退出重进持久化：进程中断/重启只影响一层 [+] 的默认 workspaces 添加逻辑，不丢失既有 workspaces/worktrees 及其顺序/命名/并发 |
 | ZS1-199 | [x] | L6 | ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | — | Master 集成验收与阶段交付 |
 | ZS1-300 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/chat_composer.rs |
 | ZS1-301 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/textarea.rs |
