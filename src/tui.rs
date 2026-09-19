@@ -2587,6 +2587,9 @@ pub struct TuiState {
     /// pane. The pane never owns a child process; execution remains in the
     /// host runner.
     terminal_snapshot: String,
+    /// Interactive shell bound to the active workspace cwd (ZS1-166). `None`
+    /// until the Shell pane is first rendered or if the PTY cannot be created.
+    pty_shell: Option<crate::pty_shell::PtyShell>,
     session_snapshot: Option<SessionPaneSnapshot>,
     session_browser: Vec<crate::session::SessionSummary>,
     session_browser_cursor: usize,
@@ -2747,6 +2750,7 @@ impl TuiState {
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
             terminal_snapshot: "No local shell result".into(),
+            pty_shell: None,
             session_snapshot: None,
             session_browser: Vec::new(),
             session_browser_cursor: 0,
@@ -7415,6 +7419,18 @@ impl TuiState {
         if self.left_prompt == LeftPrompt::Arch && self.arch_prompt_captures(key) {
             return self.arch_prompt_key(key);
         }
+        // While the Shell pane holds focus, keystrokes drive the live PTY
+        // (ZS1-166). Chords the TUI reserves (tabs, pane cycling) return `None`
+        // from `key_bytes` and still reach their usual handler.
+        // While the Shell pane holds focus, keystrokes drive the live PTY
+        // (ZS1-166). Chords the TUI reserves (tabs, pane cycling) return `None`
+        // from `key_bytes` and still reach their usual handler.
+        if self.workspace_layout.focused == Some(PaneId::Execution)
+            && self.input.is_empty()
+            && self.forward_shell_key(key)
+        {
+            return TuiAction::Redraw;
+        }
         if let Some(action) = self.approval_key(key) {
             return action;
         }
@@ -9360,6 +9376,17 @@ impl TuiState {
             if pane.rect.width == 0 || pane.rect.height == 0 {
                 continue;
             }
+            if pane.id == PaneId::Execution {
+                // ZS1-166: the Shell pane owns a real PTY rooted at the active
+                // workspace; (re)spawn on workspace change and track the pane
+                // size so full-screen programs lay out correctly.
+                self.ensure_shell();
+                let rows = pane.rect.height.saturating_sub(2);
+                let cols = pane.rect.width.saturating_sub(2);
+                if let Some(shell) = self.pty_shell.as_mut() {
+                    shell.resize(rows, cols);
+                }
+            }
             if pane.id == PaneId::GoalConversation {
                 self.render_transcript_pane(frame, pane.rect, true);
             } else if pane.id == PaneId::Arch && self.arch_group_active(area) {
@@ -9434,7 +9461,7 @@ impl TuiState {
         let content = match id {
             PaneId::Gantt => self.gantt_pane_content(),
             PaneId::Arch => self.arch_pane_content(),
-            PaneId::Execution => self.execution_terminal_content(),
+            PaneId::Execution => self.shell_content(area.height.saturating_sub(2) as usize),
             PaneId::Resources => self.resource_pane_content(),
             PaneId::SessionList => self.session_browser_content(),
             PaneId::ReplayControls => self.replay_pane_content(),
@@ -9968,6 +9995,72 @@ impl TuiState {
         } else {
             self.terminal_snapshot.clone()
         }
+    }
+
+    /// Working directory the Shell pane binds to: the active layer-2 worktree,
+    /// else the process cwd (ZS1-166).
+    fn shell_cwd(&self) -> std::path::PathBuf {
+        let tabs = self.subtabs();
+        let mut candidates = Vec::new();
+        if let Some(tab) = tabs.get(self.active_subtab()) {
+            if !tab.root.trim().is_empty() {
+                candidates.push(std::path::PathBuf::from(&tab.root));
+            }
+        }
+        candidates.push(std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+        crate::pty_shell::resolve_cwd(candidates)
+    }
+
+    /// (Re)spawn the Shell PTY rooted at the active workspace when it moved.
+    fn ensure_shell(&mut self) {
+        let cwd = self.shell_cwd();
+        let current = self
+            .pty_shell
+            .as_ref()
+            .map(|shell| shell.cwd() == cwd)
+            .unwrap_or(false);
+        if !current {
+            self.pty_shell = crate::pty_shell::PtyShell::spawn(cwd).ok();
+        }
+    }
+
+    /// Drain pending shell output into the bounded scrollback. Safe to call on
+    /// every loop iteration; marks the frame dirty only on real output.
+    pub fn pump_shell(&mut self) {
+        if let Some(shell) = self.pty_shell.as_mut() {
+            if shell.pump() {
+                self.dirty = true;
+            }
+        }
+    }
+
+    /// Whether a live Shell PTY is attached; callers shorten their poll wait so
+    /// shell output appears promptly.
+    pub fn has_shell(&self) -> bool {
+        self.pty_shell.is_some()
+    }
+
+    /// Shell pane body: live PTY scrollback, falling back to the last `!command`
+    /// snapshot when no PTY is available.
+    fn shell_content(&self, rows: usize) -> String {
+        self.pty_shell
+            .as_ref()
+            .map(|shell| shell.content(rows))
+            .filter(|text| !text.trim().is_empty())
+            .unwrap_or_else(|| self.execution_terminal_content())
+    }
+
+    /// Forward a key to the focused Shell PTY. Returns whether it was consumed.
+    fn forward_shell_key(&mut self, key: crossterm::event::KeyEvent) -> bool {
+        let Some(bytes) = crate::pty_shell::key_bytes(&key.code, key.modifiers) else {
+            return false;
+        };
+        let Some(shell) = self.pty_shell.as_mut() else {
+            return false;
+        };
+        shell.write_input(&bytes);
+        self.dirty = true;
+        true
     }
 }
 
@@ -15506,10 +15599,21 @@ pub fn run_async_with_profile(
             } else {
                 poll_interval
             };
+            // A live shell can produce output without a terminal event, so keep
+            // the loop responsive while still respecting the paste guard.
+            let wait = if state.has_shell() {
+                wait.min(Duration::from_millis(16))
+            } else {
+                wait
+            };
             let wait = state.ordinary_paste_wait(Instant::now(), wait);
+            state.pump_shell();
             if !event::poll(wait)
                 .map_err(|error| crate::error::ZenpiError::Message(error.to_string()))?
             {
+                // Idle tick: keep the embedded Shell pane's scrollback live
+                // even when no terminal event arrives (ZS1-166).
+                state.pump_shell();
                 continue;
             }
             let mut processed = 0usize;
@@ -16510,7 +16614,13 @@ where
             } else {
                 poll_interval
             };
+            let wait = if state.has_shell() {
+                wait.min(Duration::from_millis(16))
+            } else {
+                wait
+            };
             let wait = state.ordinary_paste_wait(Instant::now(), wait);
+            state.pump_shell();
             if !event::poll(wait)? {
                 continue;
             }

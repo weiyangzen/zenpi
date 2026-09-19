@@ -705,6 +705,25 @@ fn arch_console_supports_slash_commands_with_isolated_feedback() {
     ));
 }
 
+#[cfg(unix)]
+#[test]
+fn shell_pane_forwards_keys_when_focused() {
+    let mut state = TuiState::default();
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    assert!(state.has_shell(), "Shell pane must own a real PTY");
+    assert!(state.focus_workspace_pane(PaneId::Execution));
+    let action = state.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+    assert!(matches!(action, TuiAction::Redraw));
+    assert_eq!(
+        state.input(),
+        "",
+        "a Shell keystroke must drive the PTY, not the prompt"
+    );
+}
+
 #[test]
 fn discussion_and_arch_select_independent_zone_models() {
     use zenpi::view_model::{ViewModelError, Zone};

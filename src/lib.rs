@@ -26,6 +26,7 @@ pub mod project_workspace;
 pub mod prompt_templates;
 pub mod protocol;
 pub mod providers;
+pub mod pty_shell;
 pub mod render;
 pub mod resource_loader;
 pub mod resources;
