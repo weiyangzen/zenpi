@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-19T17:31:20+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-19T17:47:08+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `5d86513bc40ff1ffc57ee2104ee9a8b79c55e4bbce3719b5b07b6f67247af86f`
-- 生成时间：2026-09-19T17:31:20+08:00
+- blueprint digest: `66ee349d6f0edc86ae4bf6361e99e647bcdb7341affeef9ab95d45e4d3aa8d24`
+- 生成时间：2026-09-19T17:47:08+08:00
 
-清单项 `[x]` **155/155** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
+清单项 `[x]` **156/156** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 59 | 59 | 0 | 0 |
+| L3 | 60 | 60 | 0 | 0 |
 | L5 | 4 | 4 | 0 | 0 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -166,6 +166,7 @@ gantt
     ZS1-169 一二层分页卡右键重命名：对一层 workspace 卡或二层 worktree  :done, ZS1-169, 10, 1s
     ZS1-170 一层 `[+]` 新增 workspace 聚焦目录选择器 + 前缀跳转：点击一 :done, ZS1-170, 8, 1s
     ZS1-171 Shell 原生按键对齐（ZS1-166 修复）：Shell 面板聚焦后，逐字符 :done, ZS1-171, 17, 1s
+    ZS1-172 输入法（IME）热区锁定到聚焦输入框：终端光标只有当前聚焦的输入框可以设置——C :done, ZS1-172, 19, 1s
     ZS1-159 Headless stdio runtime：稳定的 stdin/stdout  :done, ZS1-159, 15, 1s
     ZS1-161 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent  :done, ZS1-161, 17, 1s
     ZS1-162 Headless footprint 预算与实测：每 headless 进程 C :done, ZS1-162, 16, 1s
@@ -317,6 +318,7 @@ gantt
 | ZS1-169 | [x] | L3 | ZS1-146,ZS1-157 | — | 一二层分页卡右键重命名：对一层 workspace 卡或二层 worktree 卡右键弹出内联重命名输入，沿用既有校验（非空、去重、长度上限），Enter 提交、Esc 取消；鼠标右键与键盘入口行为一致 |
 | ZS1-170 | [x] | L3 | ZS1-146 | — | 一层 `[+]` 新增 workspace 聚焦目录选择器 + 前缀跳转：点击一层 `[+]` 打开目录选择框后键盘焦点自动进入其中；键入字母前缀即时过滤/跳转到匹配目录（大小写不敏感）；Enter/右箭头进入所选目录，Esc 取消 |
 | ZS1-171 | [x] | L3 | ZS1-166 | — | Shell 原生按键对齐（ZS1-166 修复）：Shell 面板聚焦后，逐字符键入（含 ASCII 普通字符）必须直接进入 PTY，不得被普通粘贴缓冲改道进 prompt；任意按键经 PTY 执行命令并在面板回显结果 |
+| ZS1-172 | [x] | L3 | ZS1-165,ZS1-166,ZS1-170,ZS1-171 | — | 输入法（IME）热区锁定到聚焦输入框：终端光标只有当前聚焦的输入框可以设置——Conversation prompt、Arch prompt、Shell 面板各自在聚焦时才 `set_cursor_position`，未聚焦者不得覆盖，从而让中文输入法的预编辑/候选窗锚定在正在输入的区域而不是最后渲染的那一个；目录选择框与分页改名浮层同样拥有光标 |
 | ZS1-159 | [x] | L3 | ZS1-117 | — | Headless stdio runtime：稳定的 stdin/stdout JSONL 协议、session 持久化与 context 维护（恢复/压缩/预算）；可作为被远程宿主拉起的无界面 agent |
 | ZS1-160 | [x] | L5 | ZS1-158,ZS1-159 | — | 局域网 headless 集群 + 本机 control plane：把 LAN 上其他机器的 CPU/内存当宿主，按凭据/容量把 headless worker 派到远端并回收；本机做调度/聚合；只读探测 + 显式授权 |
 | ZS1-161 | [x] | L3 | ZS1-149,ZS1-158,ZS1-160 | — | 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影 |

@@ -289,6 +289,20 @@ mod imp {
             let start = lines.len().saturating_sub(rows.max(1));
             lines[start..].join("\n")
         }
+
+        /// Display column after the last emitted character, so the IME anchor
+        /// sits at the shell prompt rather than at another pane (ZS1-172).
+        pub fn cursor_column(&self) -> usize {
+            let Ok(inner) = self.inner.lock() else {
+                return 0;
+            };
+            inner
+                .display
+                .split('\n')
+                .next_back()
+                .map(|line| line.chars().count())
+                .unwrap_or(0)
+        }
     }
 
     impl Drop for Inner {
@@ -521,6 +535,10 @@ mod fallback {
 
         pub fn content(&self, _rows: usize) -> String {
             String::new()
+        }
+
+        pub fn cursor_column(&self) -> usize {
+            0
         }
     }
 

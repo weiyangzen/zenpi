@@ -8,7 +8,7 @@ use zenpi::{
     session::SessionStore,
     slash::{self, SlashCommand},
     tui::{
-        BentoBoxLayoutAdapter, MessageRole, MessageTarget, TuiAction, TuiState,
+        BentoBoxLayoutAdapter, LeftPrompt, MessageRole, MessageTarget, TuiAction, TuiState,
         dispatch_slash_command,
     },
 };
@@ -754,6 +754,36 @@ fn shell_pane_forwards_ordinary_chars_before_the_paste_buffer() {
         "",
         "ordinary chars must reach the PTY, not the prompt buffer"
     );
+}
+
+#[test]
+fn only_the_focused_input_owns_the_ime_cursor() {
+    let mut state = TuiState::default();
+    assert!(
+        state.discussion_prompt_focused(),
+        "the discussion prompt owns the IME anchor by default"
+    );
+    state.set_left_prompt(LeftPrompt::Arch);
+    assert_eq!(state.left_prompt(), LeftPrompt::Arch);
+    assert!(
+        !state.discussion_prompt_focused(),
+        "focusing arch must release the discussion cursor"
+    );
+    state.set_left_prompt(LeftPrompt::Discussion);
+    assert!(state.discussion_prompt_focused());
+
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    assert!(state.focus_workspace_pane(PaneId::Execution));
+    assert!(
+        !state.discussion_prompt_focused(),
+        "focusing the Shell pane must release the discussion cursor"
+    );
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
 }
 
 #[test]

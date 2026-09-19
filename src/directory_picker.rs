@@ -351,10 +351,18 @@ impl DirectoryPicker {
         }
         let inner = Rect::new(self.area.x + 1, self.area.y + 1, width - 2, height - 2);
         let path_width = usize::from(inner.width).saturating_sub(6);
+        let shown_path = visible_path(&self.input, path_width);
+        let cursor_col = (6 + unicode_width::UnicodeWidthStr::width(shown_path.as_str()))
+            .min(usize::from(inner.width).saturating_sub(1));
         frame.render_widget(
-            Paragraph::new(format!("Path: {}", visible_path(&self.input, path_width))),
+            Paragraph::new(format!("Path: {shown_path}")),
             Rect::new(inner.x, inner.y, inner.width, 1),
         );
+        // The picker is modal, so its path field owns the IME anchor (ZS1-172).
+        frame.set_cursor_position(Position::new(
+            inner.x.saturating_add(cursor_col as u16),
+            inner.y,
+        ));
         frame.render_widget(
             Paragraph::new(
                 "Type to jump to a folder | Enter/Tab open | arrows browse | Ctrl-W parent | Ctrl-U clear",

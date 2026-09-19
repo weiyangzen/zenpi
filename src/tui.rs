@@ -9072,7 +9072,27 @@ impl TuiState {
                 .unwrap_or(u16::MAX)
                 .min(inner.height.saturating_sub(1)),
         );
-        frame.set_cursor_position(Position::new(x, y));
+        // Only the focused input may own the terminal cursor, so the input
+        // method (IME) anchors its preedit/candidate window to the active
+        // field instead of whichever prompt rendered last (ZS1-172).
+        if self.discussion_prompt_focused() {
+            frame.set_cursor_position(Position::new(x, y));
+        }
+    }
+
+    /// Whether the discussion prompt is the field that keys and IME belong to.
+    pub fn discussion_prompt_focused(&self) -> bool {
+        self.left_prompt == LeftPrompt::Discussion
+            && self.goal_edit.is_none()
+            && self.directory_picker.is_none()
+            && self.transcript_browser.is_none()
+            && self.history_search.is_none()
+            && self.tab_rename.is_none()
+            && self.workspace_layout.focused != Some(PaneId::Execution)
+            && !self
+                .approval_views
+                .get(self.active_project())
+                .is_some_and(|view| view.focused && !view.requests.is_empty())
     }
 
     /// Inline Goal editor in the top-left conversation group. Enter commits
@@ -9395,6 +9415,15 @@ impl TuiState {
         );
         let inner = Rect::new(area.x + 1, area.y + 1, width.saturating_sub(2), 1);
         frame.render_widget(Paragraph::new(format!("{}_", rename.buffer)), inner);
+        let column = rename
+            .buffer
+            .chars()
+            .count()
+            .min(usize::from(inner.width).saturating_sub(1));
+        frame.set_cursor_position(Position::new(
+            inner.x.saturating_add(column as u16),
+            inner.y,
+        ));
     }
 
     fn render_workspace_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -9596,6 +9625,29 @@ impl TuiState {
                 let cols = pane.rect.width.saturating_sub(2);
                 if let Some(shell) = self.pty_shell.as_mut() {
                     shell.resize(rows, cols);
+                }
+                // Anchor the IME/preedit to the shell pane while it is focused
+                // (ZS1-172); the column follows the live prompt.
+                if self.workspace_layout.focused == Some(PaneId::Execution)
+                    && self.left_prompt == LeftPrompt::Discussion
+                    && self.directory_picker.is_none()
+                    && self.tab_rename.is_none()
+                {
+                    let column = self
+                        .pty_shell
+                        .as_ref()
+                        .map(|shell| shell.cursor_column())
+                        .unwrap_or(0);
+                    let inner_x = pane.rect.x.saturating_add(1);
+                    let inner_w = pane.rect.width.saturating_sub(2).max(1);
+                    let x = inner_x
+                        .saturating_add(u16::try_from(column).unwrap_or(u16::MAX).min(inner_w - 1));
+                    let y = pane
+                        .rect
+                        .bottom()
+                        .saturating_sub(2)
+                        .max(pane.rect.y.saturating_add(1));
+                    frame.set_cursor_position(Position::new(x, y));
                 }
             }
             if pane.id == PaneId::GoalConversation {
