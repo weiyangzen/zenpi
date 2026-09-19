@@ -18,3 +18,30 @@ __pycache__/
 
 # Execution controller runtime.
 .cron/
+
+# Secrets and keys: never commit.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+id_rsa*
+id_ed25519*
+*credentials*.json
+
+# Local runtime / session state that must never be uploaded.
+auth.json
+session.jsonl
+*.session.jsonl
+project-workspace.json
+project-workspace.lock
+layout.json
+
+# Editor / OS cruft.
+*.swp
+*.swo
+.idea/
+.vscode/

@@ -1,9 +1,9 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-19T17:58:20+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-19T18:04:05+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `40611a902a94901b044dc75d10cb1e0e4e87986ae3e57e5dd20a04c2cefb225e`
-- 生成时间：2026-09-19T17:58:20+08:00
+- blueprint digest: `1885c75506a28789ac10461c6f1f215442d24258bd6e40fb7e005fe16ed680d3`
+- 生成时间：2026-09-19T18:04:05+08:00
 
 清单项 `[x]` **157/157** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
 
