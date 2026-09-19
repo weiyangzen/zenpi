@@ -942,3 +942,47 @@ fn header_controls_click_to_add_close_and_change_concurrency() {
     // Confirm Esc still works after clicks.
     let _ = state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
 }
+
+#[test]
+fn right_click_renames_a_workspace_card() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("alpha"));
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    let (col, row) = find_pos(&terminal, "alpha");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Right), col, row));
+    for _ in 0..64 {
+        let _ = state.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+    }
+    for character in "alpine".chars() {
+        let _ = state.handle_key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+    }
+    let _ = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        (0..state.project_tab_count()).any(|index| state.project_label(index) == "alpine"),
+        "right-click rename must relabel the workspace card"
+    );
+}
+
+#[test]
+fn right_click_renames_a_worktree_card() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let mut state = TuiState::default();
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    let (col, row) = find_pos(&terminal, "main");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Right), col, row));
+    for _ in 0.."main".len() {
+        let _ = state.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+    }
+    for character in "trunk".chars() {
+        let _ = state.handle_key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+    }
+    let _ = state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(state.subtabs()[0].name, "trunk");
+}

@@ -85,3 +85,26 @@ fn local_listing_is_sorted_and_bounded() {
     let entries = list_local(dir.path()).unwrap();
     assert_eq!(entries, vec!["a", "b/"]);
 }
+
+#[test]
+fn picker_type_ahead_jumps_to_a_matching_folder() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use zenpi::directory_picker::DirectoryPicker;
+
+    let root = tempdir().unwrap();
+    for name in ["alpha", "beta", "gamma"] {
+        fs::create_dir(root.path().join(name)).unwrap();
+    }
+    let mut picker = DirectoryPicker::new(root.path());
+    for character in "ga".chars() {
+        let response = picker.key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+        assert!(response.is_none());
+    }
+    assert!(
+        picker.input().ends_with("ga"),
+        "type-ahead mirrors the prefix: {}",
+        picker.input()
+    );
+    let opened = picker.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(opened, Some(Some(root.path().join("gamma"))));
+}

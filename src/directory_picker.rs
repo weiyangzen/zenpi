@@ -49,6 +49,10 @@ fn remove_last_grapheme(text: &mut String) {
 pub struct DirectoryPicker {
     cwd: PathBuf,
     input: String,
+    /// Type-ahead prefix within `cwd` (ZS1-170). While non-empty, printable
+    /// keys extend the prefix and jump the selection instead of editing the
+    /// path, so a few letters move straight to a folder.
+    filter: String,
     entries: Vec<PathBuf>,
     selected: usize,
     error: String,
@@ -60,6 +64,7 @@ impl DirectoryPicker {
         let mut picker = Self {
             cwd: base.to_path_buf(),
             input: base.display().to_string(),
+            filter: String::new(),
             entries: Vec::new(),
             selected: 0,
             error: String::new(),
@@ -110,8 +115,35 @@ impl DirectoryPicker {
     pub fn paste(&mut self, text: &str) {
         let clean: String = text.chars().filter(|c| !c.is_control()).collect();
         if self.input.len() + clean.len() <= crate::project_workspace::MAX_PROJECT_PATH_BYTES {
+            self.filter.clear();
             self.input.push_str(&clean);
         }
+    }
+
+    /// Jump the selection to the first entry whose name starts with the current
+    /// type-ahead prefix, and mirror the partial name in the path line.
+    fn apply_filter(&mut self) {
+        if self.filter.is_empty() {
+            self.input = self.cwd.display().to_string();
+            return;
+        }
+        let needle = self.filter.to_lowercase();
+        if let Some(index) = self.entries.iter().position(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.to_lowercase().starts_with(&needle))
+        }) {
+            self.selected = index;
+        }
+        self.input = self.cwd.join(&self.filter).display().to_string();
+    }
+
+    /// The type-ahead match currently selected, if any.
+    fn filtered_entry(&self) -> Option<PathBuf> {
+        if self.filter.is_empty() {
+            return None;
+        }
+        self.entries.get(self.selected).cloned()
     }
     fn resolved(&self) -> Result<PathBuf, String> {
         let expanded = if self.input == "~" || self.input.starts_with("~/") {
@@ -143,6 +175,7 @@ impl DirectoryPicker {
     fn enter(&mut self, path: PathBuf) {
         self.cwd = path;
         self.input = self.cwd.display().to_string();
+        self.filter.clear();
         self.refresh();
     }
     /// Outer None means keep modal open; Some(None) means cancel.
@@ -151,22 +184,24 @@ impl DirectoryPicker {
             match key.code {
                 KeyCode::Char('u') | KeyCode::Char('l') => {
                     self.input.clear();
+                    self.filter.clear();
                     return None;
                 }
                 KeyCode::Char('w') => {
-                    let trimmed = self.input.trim_end_matches(std::path::MAIN_SEPARATOR);
-                    let normalized = if trimmed.is_empty() && self.input.starts_with('/') {
-                        "/"
+                    // Type-ahead is path-relative, so Ctrl-W first drops the
+                    // filter, then walks the effective path one level up.
+                    self.filter.clear();
+                    let source = if self.input.trim().is_empty() {
+                        self.cwd.clone()
                     } else {
-                        trimmed
+                        PathBuf::from(self.input.trim_end_matches(std::path::MAIN_SEPARATOR))
                     };
-                    let parent = Path::new(normalized)
+                    let parent = source
                         .parent()
                         .map(|path| path.display().to_string())
-                        .unwrap_or_else(|| self.input.clone());
-                    if !parent.is_empty() {
-                        self.input = parent;
-                    }
+                        .filter(|value| !value.is_empty())
+                        .unwrap_or_else(|| self.cwd.display().to_string());
+                    self.input = parent;
                     return None;
                 }
                 KeyCode::Char('c') => return Some(None),
@@ -175,26 +210,46 @@ impl DirectoryPicker {
         }
         match key.code {
             KeyCode::Esc => return Some(None),
-            KeyCode::Enter => return self.confirm(),
+            KeyCode::Enter => {
+                // In type-ahead mode Enter opens the highlighted folder.
+                if let Some(path) = self.filtered_entry()
+                    && let Ok(_) = fs::read_dir(&path)
+                {
+                    return Some(Some(path));
+                }
+                return self.confirm();
+            }
             KeyCode::Backspace => {
-                remove_last_grapheme(&mut self.input);
+                if !self.filter.is_empty() {
+                    self.filter.pop();
+                    self.apply_filter();
+                } else {
+                    remove_last_grapheme(&mut self.input);
+                }
             }
             KeyCode::Char(c)
                 if !c.is_control()
-                    && self.input.len() + c.len_utf8()
+                    && self.filter.len() + self.cwd.as_os_str().len() + c.len_utf8()
                         <= crate::project_workspace::MAX_PROJECT_PATH_BYTES =>
             {
-                self.input.push(c)
+                self.filter.push(c);
+                self.apply_filter();
             }
             KeyCode::Up => {
-                self.selected = self.selected.saturating_sub(1);
-                if let Some(p) = self.entries.get(self.selected) {
-                    self.input = p.display().to_string();
+                if !self.filter.is_empty() {
+                    self.selected = self.selected.saturating_sub(1);
+                } else {
+                    self.selected = self.selected.saturating_sub(1);
+                    if let Some(p) = self.entries.get(self.selected) {
+                        self.input = p.display().to_string();
+                    }
                 }
             }
             KeyCode::Down => {
                 self.selected = (self.selected + 1).min(self.entries.len().saturating_sub(1));
-                if let Some(p) = self.entries.get(self.selected) {
+                if self.filter.is_empty()
+                    && let Some(p) = self.entries.get(self.selected)
+                {
                     self.input = p.display().to_string();
                 }
             }
@@ -204,12 +259,16 @@ impl DirectoryPicker {
                 }
             }
             KeyCode::Right => {
-                if let Some(p) = self.entries.get(self.selected) {
+                if let Some(path) = self.filtered_entry() {
+                    self.enter(path);
+                } else if let Some(p) = self.entries.get(self.selected) {
                     self.enter(p.clone());
                 }
             }
             KeyCode::Tab => {
-                if let Ok(path) = self.resolved() {
+                if let Some(path) = self.filtered_entry() {
+                    self.enter(path);
+                } else if let Ok(path) = self.resolved() {
                     self.enter(path);
                 } else {
                     let path = if Path::new(&self.input).is_absolute() {
@@ -298,7 +357,7 @@ impl DirectoryPicker {
         );
         frame.render_widget(
             Paragraph::new(
-                "Type path | Tab browse/complete | arrows browse | Ctrl-W parent | Ctrl-U clear",
+                "Type to jump to a folder | Enter/Tab open | arrows browse | Ctrl-W parent | Ctrl-U clear",
             ),
             Rect::new(inner.x, inner.y + 1, inner.width, 1),
         );

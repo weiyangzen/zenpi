@@ -4,7 +4,7 @@
 
 ```yaml
 schema_version: execution-blueprint/stage1
-blueprint_version: 3.1.30
+blueprint_version: 3.1.31
 revision_date: 2026-09-19
 review_date: 2026-09-19
 status: bootstrap-active
@@ -329,6 +329,10 @@ proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创�
 - [x] **ZS1-165** — 双 Prompt 绝对独立与独立斜杠命令：左上 Conversation+Prompt 与左下 arch+Prompt 的输入缓冲、光标、编辑历史、`/` 命令补全与执行、提交目标各自独立；任一侧输入与 `/` 展开互不串写、互不抢焦点，可同时各自进入命令态；layer `L3` | Depends: ZS1-156,ZS1-147,ZS1-148 | Owner scope: 双输入端口与各自斜杠命令路由 owner | Owned paths: `src/tui.rs`, `src/slash.rs`, `src/slash_actions.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/slash.rs` | Validators: G-CODE；cargo test --locked --test tui_interaction --test slash | Rollback: 撤回双输入独立化，恢复共享输入缓冲 | Estimate: 双缓冲/双历史/双命令路由隔离 | Estimated LOC: 1200
 - [x] **ZS1-166** — Shell 面板绑定当前工作区真实交互式 shell：右下 Shell 起真实 `$SHELL` 登录交互式 PTY（非只读投影），cwd 恒等于当前一层 workspace / 二层 worktree 工作目录；切换工作区或 worktree 时同步到新目录，用户可直接敲任何命令；layer `L3` | Depends: ZS1-155,ZS1-157 | Owner scope: 内嵌 shell 生命周期与 cwd 绑定 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox | Rollback: 撤回 cwd 绑定，恢复默认 shell | Estimate: 真实 PTY + workspace/worktree cwd 同步 | Estimated LOC: 1400
 - [x] **ZS1-167** — 二层并发上下控件加宽可见：每个 worktree 的 `↑ N ↓` 并发控件把上下点击热区加宽为独立按钮块（不再挤在单列），视觉上明确可点，鼠标与键盘都能调整该 worktree 最大并发数，当前值醒目；layer `L3` | Depends: ZS1-146,ZS1-152 | Owner scope: 二层并发控件渲染与命中区 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `tests/tui_bentobox.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test tui_project_workspace | Rollback: 撤回加宽，恢复单列上下箭头 | Estimate: 加宽命中区+独立按钮块+值可视化 | Estimated LOC: 600
+- [x] **ZS1-168** — 二层 `[+]` 新增 worktree（可命名 + 失败可见）：点击二层 worktree 条的 `[+]` 在 active project 内新建隔离 git worktree 子 tab 并切换过去；默认名 `wt-N`；非 git 仓库、重名分支、超限等失败必须在会话可见区给出原因，而不是静默无效果；layer `L3` | Depends: ZS1-146 | Owner scope: 二层新增 worktree 的创建与错误可见性 owner | Owned paths: `src/tui.rs`, `src/project_workspace.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_project_workspace | Rollback: 撤回 `[+]` 新增逻辑与错误提示 | Estimate: 创建+切换+失败可见 | Estimated LOC: 700
+- [x] **ZS1-169** — 一二层分页卡右键重命名：对一层 workspace 卡或二层 worktree 卡右键弹出内联重命名输入，沿用既有校验（非空、去重、长度上限），Enter 提交、Esc 取消；鼠标右键与键盘入口行为一致；layer `L3` | Depends: ZS1-146,ZS1-157 | Owner scope: 分页卡重命名交互 owner | Owned paths: `src/tui.rs`, `tests/tui_project_workspace.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE；cargo test --locked --test tui_project_workspace --test tui_bentobox | Rollback: 撤回右键重命名，保留现有 `/project rename`、`/worktree rename` | Estimate: 右键->内联编辑->校验提交 | Estimated LOC: 900
+- [x] **ZS1-170** — 一层 `[+]` 新增 workspace 聚焦目录选择器 + 前缀跳转：点击一层 `[+]` 打开目录选择框后键盘焦点自动进入其中；键入字母前缀即时过滤/跳转到匹配目录（大小写不敏感）；Enter/右箭头进入所选目录，Esc 取消；layer `L3` | Depends: ZS1-146 | Owner scope: 新增 workspace 的目录选择体验 owner | Owned paths: `src/tui.rs`, `src/directory_picker.rs`, `tests/tui_directory_picker.rs` | Validators: G-CODE；cargo test --locked --test tui_directory_picker | Rollback: 撤回前缀跳转与自动聚焦 | Estimate: 自动聚焦+类型前缀过滤/跳转 | Estimated LOC: 800
+- [x] **ZS1-171** — Shell 原生按键对齐（ZS1-166 修复）：Shell 面板聚焦后，逐字符键入（含 ASCII 普通字符）必须直接进入 PTY，不得被普通粘贴缓冲改道进 prompt；任意按键经 PTY 执行命令并在面板回显结果；layer `L3` | Depends: ZS1-166 | Owner scope: Shell 输入路由与按键对齐 owner | Owned paths: `src/tui.rs`, `tests/tui_interaction.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_interaction | Rollback: 撤回 shell 按键前置转发 | Estimate: 按键在粘贴缓冲前转发+回显验证 | Estimated LOC: 500
 - [x] **ZS1-159** — Headless stdio runtime：稳定的 stdin/stdout JSONL 协议、session 持久化与 context 维护（恢复/压缩/预算）；可作为被远程宿主拉起的无界面 agent；layer `L3` | Depends: ZS1-117 | Owner scope: headless 协议/session/context owner | Owned paths: `src/headless.rs`, `src/protocol.rs`, `src/session.rs`, `src/context.rs`, `tests/headless_protocol.rs`, `tests/session_recovery.rs` | Validators: G-CODE；cargo test --locked --test headless_protocol --test session_recovery | Rollback: 撤回 stdio 强化，保留既有 JSONL | Estimate: stdio 稳定性、session/context 维护、远程可托管 | Estimated LOC: 2200
 - [x] **ZS1-160** — 局域网 headless 集群 + 本机 control plane：把 LAN 上其他机器的 CPU/内存当宿主，按凭据/容量把 headless worker 派到远端并回收；本机做调度/聚合；只读探测 + 显式授权；layer `L5` | Depends: ZS1-158,ZS1-159 | Owner scope: 集群调度与远端生命周期 owner | Owned paths: `src/net_probe.rs`, `src/cluster.rs`, `src/tui.rs`, `tools/cluster_dispatch.sh`, `tests/cluster.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test cluster --test net_probe | Rollback: 撤回远端派发，恢复纯本机 | Estimate: 远端宿主发现/容量/派发/回收 + 本机控制面 | Estimated LOC: 3600
 - [x] **ZS1-161** — 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影；layer `L3` | Depends: ZS1-149,ZS1-158,ZS1-160 | Owner scope: 资源/预算/端口信息 owner | Owned paths: `src/resources.rs`, `src/cluster.rs`, `src/tui.rs`, `src/view_model.rs`, `tests/resources.rs`, `tests/cluster.rs` | Validators: G-CODE；cargo test --locked --test resources --test cluster | Rollback: 撤回信息总线，保留各项独立 | Estimate: budget/devport/cluster 打通到统一快照 | Estimated LOC: 2600
@@ -801,3 +805,15 @@ ZS1-128完成判据：逐个Codex交互条目映射实际操作与证据；每�
 - **二层并发控件加宽可见（ZS1-167）**：二层每个 worktree 的 `↑ N ↓` 并发控件，把上下点击热区加宽为独立按钮块（不再挤在单列窄箭头），视觉上明确可点，鼠标与键盘都能调整该 worktree 的最大并发数，当前值醒目。对应并细化 ZS1-146/ZS1-152。
 
 验收：逐项实现并补测试（含真实 PTY/TUI 证据），主控集成后 build 到 `zenpi-dev`。3.1.30 追加不改动此前已接受项的字节与义务。
+
+### 3.1.31 分页交互与 Shell 输入对齐（新增 ZS1-168…171，清单 155 项）
+
+用户要求（2026-09-19）：
+
+- **二层 `[+]` = 新增 worktree（ZS1-168）**：二层 worktree 条的 `[+]` 必须真的新建一个隔离 worktree 子 tab 并切换；失败（非 git 仓库、分支重名、超限）必须在可见区说明原因，不能“点了没反应”。
+- **分页卡右键改名（ZS1-169）**：一层 workspace 卡与二层 worktree 卡都可以右键改名，内联编辑、Enter 提交、Esc 取消，校验与现有重命名一致。
+- **一层 `[+]` 目录选择体验（ZS1-170）**：点一层 `[+]` 打开目录选择框后键盘焦点进入其中，直接键入字母前缀即可快速跳到匹配目录。
+- **Shell 原生按键对齐（ZS1-171）**：聚焦 Shell 面板后逐字符键入必须直接进 PTY 执行并回显，不能被 prompt 的普通粘贴缓冲截走。
+- 说明：Conversation 下方 prompt 与 Arch 下方 prompt 各自独立（ZS1-165 已实现，本次一并回归验证）。
+
+验收：逐项实现并补测试，主控集成后 build 到 `zenpi-dev`。3.1.31 追加不改动此前已接受项的字节与义务。

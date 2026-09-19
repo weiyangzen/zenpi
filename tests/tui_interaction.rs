@@ -1,4 +1,6 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::{Terminal, backend::TestBackend, layout::Rect};
 use zenpi::{
     core::Agent,
@@ -237,6 +239,7 @@ fn project_select_binds_real_agent_session_and_workspace() {
     state.set_project_metadata(
         "api",
         zenpi::tui::ProjectTabMetadata {
+            display_name: None,
             approval_mode: Default::default(),
             style: None,
         source: None,
@@ -274,6 +277,7 @@ fn closing_active_project_rebinds_agent_to_remaining_project() {
     state.set_project_metadata(
         "default",
         zenpi::tui::ProjectTabMetadata {
+            display_name: None,
             approval_mode: Default::default(),
             style: None,
         source: None,
@@ -285,6 +289,7 @@ fn closing_active_project_rebinds_agent_to_remaining_project() {
     state.set_project_metadata(
         "api",
         zenpi::tui::ProjectTabMetadata {
+            display_name: None,
             approval_mode: Default::default(),
             style: None,
         source: None,
@@ -335,6 +340,7 @@ fn closing_project_removes_its_runtime_metadata_projection() {
     let mut state = TuiState::default();
     assert!(state.open_project_tab("api"));
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
+            display_name: None,
         approval_mode: Default::default(),
         style: None,
         source: None,
@@ -380,6 +386,7 @@ fn project_metadata_round_trips_with_project_strip() {
     state.set_project_metadata(
         "api",
         zenpi::tui::ProjectTabMetadata {
+            display_name: None,
             approval_mode: Default::default(),
             style: None,
         source: None,
@@ -416,6 +423,7 @@ fn project_checkpoint_restores_isolated_transcript_and_layout() {
     assert!(state.open_project_tab("api"));
     state.push_message(zenpi::tui::MessageRole::Assistant, "api message");
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
+            display_name: None,
         approval_mode: Default::default(),
         style: None,
         source: None,
@@ -449,6 +457,7 @@ fn project_view_reports_identity_and_current_feature_projection() {
     let mut state = TuiState::default();
     assert!(state.open_project_tab("api"));
     state.set_active_project_metadata(zenpi::tui::ProjectTabMetadata {
+            display_name: None,
         approval_mode: Default::default(),
         style: None,
         source: None,
@@ -721,6 +730,29 @@ fn shell_pane_forwards_keys_when_focused() {
         state.input(),
         "",
         "a Shell keystroke must drive the PTY, not the prompt"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn shell_pane_forwards_ordinary_chars_before_the_paste_buffer() {
+    let mut state = TuiState::default();
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal
+        .draw(|f| state.render_bentobox(f, "zenpi"))
+        .unwrap();
+    assert!(state.has_shell());
+    assert!(state.focus_workspace_pane(PaneId::Execution));
+    for character in "echo ZS171".chars() {
+        let _ = state.handle_event_at(
+            Event::Key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE)),
+            std::time::Instant::now(),
+        );
+    }
+    assert_eq!(
+        state.input(),
+        "",
+        "ordinary chars must reach the PTY, not the prompt buffer"
     );
 }
 

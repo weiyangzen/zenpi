@@ -204,6 +204,14 @@ enum SubTabHit {
     Close(usize),
 }
 
+/// Inline rename of a layer-1 workspace or layer-2 worktree card (ZS1-169).
+#[derive(Debug, Clone)]
+struct TabRename {
+    layer1: bool,
+    index: usize,
+    buffer: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectTabMetadata {
     pub cwd: String,
@@ -216,6 +224,9 @@ pub struct ProjectTabMetadata {
     /// Folder source: `local:<path>` or `ssh:<spec>` for a remote project.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// Optional card label overriding the folder basename (ZS1-169).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -232,6 +243,7 @@ impl ProjectTabMetadata {
             approval_mode: crate::approval::ApprovalMode::Always,
             style: None,
             source: None,
+            display_name: None,
         }
     }
 }
@@ -244,6 +256,7 @@ impl Default for ProjectTabMetadata {
             approval_mode: crate::approval::ApprovalMode::Always,
             style: None,
             source: None,
+            display_name: None,
         }
     }
 }
@@ -2608,6 +2621,8 @@ pub struct TuiState {
     project_subtabs: BTreeMap<String, Vec<SubTab>>,
     active_subtab: BTreeMap<String, usize>,
     subtab_hits: Vec<(Rect, SubTabHit)>,
+    /// Active inline rename for a header tab card (ZS1-169).
+    tab_rename: Option<TabRename>,
     project_session_cursors: BTreeMap<String, ProjectSessionCursor>,
     project_checkpoint_dirty: bool,
     checkpoint_error: Option<String>,
@@ -2765,6 +2780,7 @@ impl TuiState {
             project_subtabs: BTreeMap::new(),
             active_subtab: BTreeMap::new(),
             subtab_hits: Vec::new(),
+            tab_rename: None,
             project_session_cursors: BTreeMap::new(),
             project_checkpoint_dirty: false,
             checkpoint_error: None,
@@ -3344,9 +3360,99 @@ impl TuiState {
         if index >= tabs.len() {
             return false;
         }
+        if tabs
+            .iter()
+            .enumerate()
+            .any(|(other, tab)| other != index && tab.name == name)
+        {
+            return false;
+        }
         tabs[index].name = name.to_owned();
         self.project_checkpoint_dirty = true;
         true
+    }
+
+    /// Rename a layer-1 workspace card by setting a display alias (ZS1-169).
+    /// The underlying folder and session id are never touched.
+    pub fn rename_project_display(&mut self, index: usize, name: &str) -> bool {
+        let name = name.trim();
+        let too_long = name.chars().count() > 20;
+        if name.is_empty() || too_long || index >= self.project_tabs.len() {
+            return false;
+        }
+        if (0..self.project_tabs.len()).any(|other| other != index && self.project_label(other) == name)
+        {
+            return false;
+        }
+        let key = self.project_tabs[index].clone();
+        self.project_metadata.entry(key).or_default().display_name = Some(name.to_owned());
+        self.project_checkpoint_dirty = true;
+        self.dirty = true;
+        true
+    }
+
+    /// Begin an inline rename of a header tab card (ZS1-169).
+    fn begin_tab_rename(&mut self, layer1: bool, index: usize) {
+        let current = if layer1 {
+            self.project_tabs.get(index).map(|_| self.project_label(index))
+        } else {
+            self.subtabs().get(index).map(|tab| tab.name.clone())
+        };
+        if let Some(name) = current {
+            self.tab_rename = Some(TabRename {
+                layer1,
+                index,
+                buffer: name,
+            });
+            self.dirty = true;
+        }
+    }
+
+    /// Commit the active inline rename, applying existing name validation.
+    fn commit_tab_rename(&mut self) {
+        let Some(rename) = self.tab_rename.take() else {
+            return;
+        };
+        let name = rename.buffer.trim().to_owned();
+        if name.is_empty() {
+            self.set_status("rename cancelled: empty name");
+            self.dirty = true;
+            return;
+        }
+        if rename.layer1 {
+            if !self.rename_project_display(rename.index, &name) {
+                self.set_status("rename rejected: duplicate or invalid name");
+            }
+        } else if !self.subtab_rename(rename.index, &name) {
+            self.set_status("rename rejected: duplicate or invalid name");
+        }
+        self.dirty = true;
+    }
+
+    /// Key handling for the inline tab rename overlay.
+    fn tab_rename_key(&mut self, key: KeyEvent) -> TuiAction {
+        match key.code {
+            KeyCode::Esc => {
+                self.tab_rename = None;
+                self.set_status("rename cancelled");
+            }
+            KeyCode::Enter => self.commit_tab_rename(),
+            KeyCode::Backspace => {
+                if let Some(rename) = self.tab_rename.as_mut() {
+                    rename.buffer.pop();
+                }
+            }
+            KeyCode::Char(character) if !character.is_control() => {
+                if let Some(rename) = self.tab_rename.as_mut()
+                    && rename.buffer.len() + character.len_utf8() <= 64
+                {
+                    rename.buffer.push(character);
+                }
+            }
+            _ => {}
+        }
+        self.dirty = true;
+        TuiAction::Redraw
     }
 
     /// Adjust the default harness concurrency for one layer-2 tab.
@@ -3447,6 +3553,15 @@ impl TuiState {
     }
     pub fn project_label(&self, index: usize) -> String {
         let key = &self.project_tabs[index];
+        // An explicit card rename wins over the folder basename (ZS1-169).
+        if let Some(name) = self
+            .project_metadata
+            .get(key)
+            .and_then(|meta| meta.display_name.clone())
+            .filter(|name| !name.trim().is_empty())
+        {
+            return name;
+        }
         let cwd_of = |i: usize| -> Option<String> {
             let k = &self.project_tabs[i];
             self.project_metadata
@@ -6935,6 +7050,25 @@ impl TuiState {
                 return TuiAction::Redraw;
             }
         }
+        // Right-click a header card to rename it in place (ZS1-169).
+        if mouse.kind == MouseEventKind::Down(MouseButton::Right) {
+            if let Some((_, index)) = self
+                .project_hits
+                .iter()
+                .find(|(rect, index)| rect.contains(position) && *index < self.project_tabs.len())
+            {
+                self.begin_tab_rename(true, *index);
+                return TuiAction::Redraw;
+            }
+            if let Some((_, SubTabHit::Select(index))) = self
+                .subtab_hits
+                .iter()
+                .find(|(rect, _)| rect.contains(position))
+            {
+                self.begin_tab_rename(false, *index);
+                return TuiAction::Redraw;
+            }
+        }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             if self.palette_area.contains(position) {
                 let choices = self.slash_choices();
@@ -6986,8 +7120,17 @@ impl TuiState {
                     self.subtab_select(index);
                 }
                 SubTabHit::AddWorktree => match self.subtab_add_worktree(None) {
-                    Ok(name) => self.set_status(format!("worktree sub-tab: {name}")),
-                    Err(error) => self.set_status(format!("worktree add failed: {error}")),
+                    Ok(name) => {
+                        self.set_status(format!("worktree sub-tab: {name}"));
+                        self.push_message(MessageRole::System, format!("worktree added: {name}"));
+                    }
+                    Err(error) => {
+                        self.set_status(format!("worktree add failed: {error}"));
+                        self.push_message(
+                            MessageRole::Error,
+                            format!("worktree add failed: {error}"),
+                        );
+                    }
                 },
                 SubTabHit::AddInPlace => {
                     self.subtab_add_in_place(None);
@@ -7291,6 +7434,28 @@ impl TuiState {
     /// Direct handle_key remains the already-classified editor/modal dispatcher.
     pub fn handle_event_at(&mut self, event: Event, now: Instant) -> TuiAction {
         self.flush_ordinary_paste(now);
+        // The inline tab rename overlay is modal (ZS1-169).
+        if self.tab_rename.is_some()
+            && let Event::Key(key) = &event
+        {
+            return self.tab_rename_key(*key);
+        }
+        // A focused Shell pane owns raw keystrokes. Forward them here, before
+        // the ordinary-paste buffer can divert ASCII characters into the
+        // prompt (ZS1-166); control chords the TUI reserves still fall through.
+        if let Event::Key(key) = &event
+            && key.kind != KeyEventKind::Release
+            && self.workspace_layout.focused == Some(PaneId::Execution)
+            && self.input.is_empty()
+            && self.directory_picker.is_none()
+            && self.transcript_browser.is_none()
+            && self.history_search.is_none()
+            && self.goal_edit.is_none()
+            && self.left_prompt != LeftPrompt::Arch
+            && self.forward_shell_key(*key)
+        {
+            return TuiAction::Redraw;
+        }
         let composing = self.directory_picker.is_none()
             && self.transcript_browser.is_none()
             && self.history_search.is_none()
@@ -7405,6 +7570,10 @@ impl TuiState {
     pub fn handle_key(&mut self, key: KeyEvent) -> TuiAction {
         if key.kind == KeyEventKind::Release {
             return TuiAction::None;
+        }
+        // Inline tab rename is modal for direct callers as well (ZS1-169).
+        if self.tab_rename.is_some() {
+            return self.tab_rename_key(key);
         }
         self.touch_editor_draft();
         self.project_checkpoint_dirty = true;
@@ -7522,8 +7691,20 @@ impl TuiState {
                 }
                 KeyCode::Char('n') => {
                     match self.subtab_add_worktree(None) {
-                        Ok(name) => self.set_status(format!("worktree sub-tab: {name}")),
-                        Err(error) => self.set_status(format!("worktree add failed: {error}")),
+                        Ok(name) => {
+                            self.set_status(format!("worktree sub-tab: {name}"));
+                            self.push_message(
+                                MessageRole::System,
+                                format!("worktree added: {name}"),
+                            );
+                        }
+                        Err(error) => {
+                            self.set_status(format!("worktree add failed: {error}"));
+                            self.push_message(
+                                MessageRole::Error,
+                                format!("worktree add failed: {error}"),
+                            );
+                        }
                     }
                     return TuiAction::Redraw;
                 }
@@ -9183,7 +9364,37 @@ impl TuiState {
         if let Some(browser) = self.transcript_browser.as_mut() {
             browser.render(frame);
         }
+        self.render_tab_rename(frame);
         self.render_approval(frame);
+    }
+
+    /// Draw the inline tab-rename overlay when a header card is being renamed.
+    fn render_tab_rename(&self, frame: &mut Frame<'_>) {
+        let Some(rename) = self.tab_rename.as_ref() else {
+            return;
+        };
+        let screen = frame.area();
+        let width = screen.width.saturating_sub(4).min(64).max(20);
+        let area = Rect::new(
+            screen.x + (screen.width.saturating_sub(width)) / 2,
+            screen.y + 5,
+            width,
+            3,
+        );
+        frame.render_widget(Clear, area);
+        let layer = if rename.layer1 {
+            "workspace"
+        } else {
+            "worktree"
+        };
+        frame.render_widget(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" Rename {layer} ")),
+            area,
+        );
+        let inner = Rect::new(area.x + 1, area.y + 1, width.saturating_sub(2), 1);
+        frame.render_widget(Paragraph::new(format!("{}_", rename.buffer)), inner);
     }
 
     fn render_workspace_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
