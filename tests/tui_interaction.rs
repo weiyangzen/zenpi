@@ -5,7 +5,10 @@ use zenpi::{
     layout::{LayoutPreferences, PaneId, TabId},
     session::SessionStore,
     slash::{self, SlashCommand},
-    tui::{BentoBoxLayoutAdapter, MessageRole, TuiAction, TuiState, dispatch_slash_command},
+    tui::{
+        BentoBoxLayoutAdapter, MessageRole, MessageTarget, TuiAction, TuiState,
+        dispatch_slash_command,
+    },
 };
 
 fn mouse(kind: MouseEventKind, x: u16, y: u16) -> MouseEvent {
@@ -664,6 +667,42 @@ fn arch_steering_joins_the_active_master_turn_instead_of_forking() {
         TuiAction::SubmitArch(MasterSessionCommand::Steer("slow the workers down".into()))
     );
     assert!(state.master_busy());
+}
+
+#[test]
+fn arch_console_supports_slash_commands_with_isolated_feedback() {
+    let mut state = TuiState::default();
+    // The discussion draft is independent of the arch draft.
+    state.set_input("/help");
+    state.set_arch_input("/help");
+    let action = state.submit_arch_prompt().unwrap();
+    assert!(
+        matches!(
+            action,
+            TuiAction::SubmitArchSlash {
+                command: SlashCommand::Help { .. },
+                ..
+            }
+        ),
+        "arch slash must route as an arch command, got {action:?}"
+    );
+    // Submitting the arch command clears only the arch draft.
+    assert_eq!(state.arch_input(), "");
+    assert_eq!(state.input(), "/help");
+
+    // Feedback for an arch command lands in the arch transcript only (ZS1-165).
+    state.set_message_target(MessageTarget::Arch);
+    state.push_message(MessageRole::Error, "arch-only-error");
+    state.set_message_target(MessageTarget::Discussion);
+    assert_eq!(state.message_count(), 0);
+    assert_eq!(state.arch_message_count(), 1);
+
+    // Non-slash drafts keep the master-session bash/steer classification.
+    state.set_arch_input("!echo hi");
+    assert!(matches!(
+        state.submit_arch_prompt(),
+        Ok(TuiAction::SubmitArch(_))
+    ));
 }
 
 #[test]

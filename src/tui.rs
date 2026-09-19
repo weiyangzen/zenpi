@@ -622,6 +622,16 @@ pub enum LeftPrompt {
     Arch,
 }
 
+/// Which transcript receives host feedback while a command runs. The two left
+/// prompts are independent (ZS1-165), so a slash command launched from the arch
+/// console reports into the arch transcript and never the discussion one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MessageTarget {
+    #[default]
+    Discussion,
+    Arch,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TuiAction {
     None,
@@ -630,6 +640,13 @@ pub enum TuiAction {
     /// The typed command is already classified so any host can execute it
     /// without re-parsing the operator's text.
     SubmitArch(MasterSessionCommand),
+    /// A slash command submitted from the arch console (ZS1-165). The host
+    /// executes it with the arch transcript as the feedback target so the two
+    /// prompts can use `/` independently without cross-writing.
+    SubmitArchSlash {
+        command: SlashCommand,
+        text: String,
+    },
     RespondApproval {
         project: String,
         request_id: String,
@@ -2633,6 +2650,9 @@ pub struct TuiState {
     /// Set by an arch submission so the host routes it to the independent arch
     /// runtime owner instead of the discussion owner (ZS1-156).
     arch_submit_pending: bool,
+    /// Transcript that receives feedback for the command currently running
+    /// (ZS1-165). Reset to [`MessageTarget::Discussion`] after arch dispatch.
+    message_target: MessageTarget,
     /// Whether the current frame renders the prompt inside the left column.
     dock_prompt: bool,
     palette_area: Rect,
@@ -2762,6 +2782,7 @@ impl TuiState {
             master_busy: false,
             arch_intent: None,
             arch_submit_pending: false,
+            message_target: MessageTarget::Discussion,
             dock_prompt: false,
             palette_area: Rect::default(),
             palette_start: 0,
@@ -4845,6 +4866,12 @@ impl TuiState {
     }
 
     pub fn push_message(&mut self, role: MessageRole, text: impl Into<String>) {
+        // Arch-origin commands keep their feedback out of the discussion
+        // transcript (ZS1-165); the arch console is a separate session.
+        if self.message_target == MessageTarget::Arch {
+            self.push_arch_message(role, text);
+            return;
+        }
         self.messages.push_back(TuiMessage::new(role, text));
         self.cached_transcript = None;
         while self.messages.len() > self.max_messages {
@@ -5102,6 +5129,57 @@ impl TuiState {
         &self.arch_input
     }
 
+    /// Route host feedback to the arch transcript while a command submitted
+    /// from the arch console runs (ZS1-165). Callers reset it to
+    /// [`MessageTarget::Discussion`] when the command completes.
+    pub fn set_message_target(&mut self, target: MessageTarget) {
+        self.message_target = target;
+    }
+
+    pub fn message_target(&self) -> MessageTarget {
+        self.message_target
+    }
+
+    /// Complete a slash command name in the arch draft (ZS1-165). Mirrors the
+    /// discussion prompt so both prompts discover `/` commands independently.
+    fn arch_complete_slash(&mut self) -> bool {
+        if self.arch_cursor != self.arch_input.len() {
+            return false;
+        }
+        let trimmed = self.arch_input.trim_start_matches(char::is_whitespace);
+        if !trimmed.starts_with('/')
+            || trimmed.len() <= 1
+            || trimmed[1..].chars().any(char::is_whitespace)
+        {
+            return false;
+        }
+        let candidates = slash::complete(trimmed);
+        if candidates.is_empty() {
+            return false;
+        }
+        let body = &trimmed[1..];
+        let common = slash_common_prefix(&candidates);
+        let replacement = if candidates.len() == 1 && common.len() >= body.len() {
+            format!("/{} ", candidates[0])
+        } else if common.len() > body.len() {
+            format!("/{common}")
+        } else if let Some(exact) = candidates
+            .iter()
+            .find(|candidate| candidate.eq_ignore_ascii_case(body))
+        {
+            format!("/{exact} ")
+        } else {
+            return false;
+        };
+        if replacement.len() > crate::tool_runtime::MAX_MASTER_SESSION_INPUT_BYTES {
+            return false;
+        }
+        self.arch_input = replacement;
+        self.arch_cursor = self.arch_input.len();
+        self.dirty = true;
+        true
+    }
+
     /// Replace the arch draft (used by hosts restoring a checkpoint and by
     /// tests). The value is bounded by the master-session budget.
     pub fn set_arch_input(&mut self, text: impl Into<String>) {
@@ -5151,6 +5229,20 @@ impl TuiState {
     /// and joins it rather than forking a second worker. The draft is consumed
     /// atomically: a rejected submission keeps it intact.
     pub fn submit_arch_prompt(&mut self) -> Result<TuiAction, MasterSessionInputError> {
+        // Both prompts accept slash commands independently (ZS1-165). A slash
+        // draft from the arch console is routed to the host with the arch
+        // transcript as its feedback target; everything else keeps the
+        // master-session bash/steer classification.
+        let trimmed = self.arch_input.trim();
+        if trimmed.starts_with('/') {
+            if let Ok(InputRoute::Slash(command)) = slash::route_input(trimmed) {
+                let text = trimmed.to_owned();
+                self.arch_input.clear();
+                self.arch_cursor = 0;
+                self.dirty = true;
+                return Ok(TuiAction::SubmitArchSlash { command, text });
+            }
+        }
         let command = classify_master_session_input(&self.arch_input)?;
         if command.is_bash() && self.master_busy {
             return Err(MasterSessionInputError::Busy);
@@ -5207,6 +5299,14 @@ impl TuiState {
         {
             return false;
         }
+        // Tab completes a slash command name while the draft is a command token
+        // (ZS1-165); otherwise Tab keeps its pane-focus meaning.
+        if key.code == KeyCode::Tab {
+            let trimmed = self.arch_input.trim_start_matches(char::is_whitespace);
+            return trimmed.starts_with('/')
+                && trimmed.len() > 1
+                && !trimmed[1..].chars().any(char::is_whitespace);
+        }
         matches!(
             key.code,
             KeyCode::Char(_)
@@ -5244,6 +5344,11 @@ impl TuiState {
             KeyCode::Esc => {
                 self.left_prompt = LeftPrompt::Discussion;
                 self.set_status("Arch console unfocused · Alt-M to return");
+            }
+            KeyCode::Tab => {
+                if self.arch_complete_slash() {
+                    return TuiAction::Redraw;
+                }
             }
             KeyCode::Char(character) => {
                 let width = character.len_utf8();
@@ -9143,9 +9248,9 @@ impl TuiState {
                     index,
                     vec![
                         (tab.name.clone(), 0),
-                        (" \u{2191}".to_owned(), 2),
-                        (format!("{}", tab.concurrency), 4),
-                        ("\u{2193}".to_owned(), 3),
+                        (" [\u{2191}]".to_owned(), 2),
+                        (format!(" {} ", tab.concurrency), 4),
+                        (" [\u{2193}]".to_owned(), 3),
                         (" [-]".to_owned(), 1),
                     ],
                 ));
@@ -14553,13 +14658,21 @@ pub fn run_async_with_profile(
                 return Err("lan scan cancelled".into());
             }
             let local = crate::net_probe::local_ipv4().ok_or_else(|| "no local ipv4".to_string())?;
-            let backend = crate::net_probe::SystemProbeBackend::new();
             let credentials = crate::net_probe::NetCredentials::from_env();
+            // Credentialed scans use the SSH backend for resource extraction;
+            // without credentials the read-only system backend is enough.
+            let system_backend = crate::net_probe::SystemProbeBackend::new();
+            let ssh_backend = crate::net_probe::SshProbeBackend::new();
+            let backend: &dyn crate::net_probe::ProbeBackend = if credentials.is_empty() {
+                &system_backend
+            } else {
+                &ssh_backend
+            };
             let scanner = crate::net_probe::LanScanner::new(local);
             // The ARP table already lists recent peers; scanning it avoids a
             // 254-address ping sweep on every automatic refresh. Hosts without
             // an ARP entry can be probed by an explicit deep scan later.
-            let snapshot = scanner.scan(&backend, &[], &credentials);
+            let snapshot = scanner.scan(backend, &[], &credentials);
             if token.is_cancelled() {
                 return Err("lan scan cancelled".into());
             }
@@ -15417,6 +15530,24 @@ pub fn run_async_with_profile(
                         state.set_arch_submit_pending();
                         TuiAction::Submit(command.display())
                     }
+                    TuiAction::SubmitArchSlash { command, text } => {
+                        // The arch console owns slash commands independently
+                        // (ZS1-165): run here and report into the arch
+                        // transcript, never the discussion one.
+                        state.set_message_target(MessageTarget::Arch);
+                        state.push_arch_message(MessageRole::User, &text);
+                        let result = dispatch_slash_command(command, &mut state, None);
+                        state.set_message_target(MessageTarget::Discussion);
+                        match result {
+                            SlashDispatchAction::Quit => TuiAction::Quit,
+                            SlashDispatchAction::Interrupt => {
+                                state.set_busy(false);
+                                state.set_status("Interrupted");
+                                TuiAction::Redraw
+                            }
+                            SlashDispatchAction::Continue => TuiAction::Redraw,
+                        }
+                    }
                     other => other,
                 };
                 match action {
@@ -16207,6 +16338,22 @@ pub fn run_async_with_profile(
                     // ZS1-148: arch submissions are normalized to `Submit`
                     // before this match, so this arm is a defensive no-op.
                     TuiAction::SubmitArch(_) => {}
+                    TuiAction::SubmitArchSlash { command, text } => {
+                        // Synchronous host: still honor an arch slash command so
+                        // both prompts behave alike (ZS1-165).
+                        state.set_message_target(MessageTarget::Arch);
+                        state.push_arch_message(MessageRole::User, &text);
+                        let result = dispatch_slash_command(command, &mut state, None);
+                        state.set_message_target(MessageTarget::Discussion);
+                        match result {
+                            SlashDispatchAction::Quit => break 'outer,
+                            SlashDispatchAction::Interrupt => {
+                                state.set_busy(false);
+                                state.set_status("Interrupted");
+                            }
+                            SlashDispatchAction::Continue => {}
+                        }
+                    }
                     TuiAction::Redraw | TuiAction::None => {}
                 }
                 processed += 1;
@@ -16443,6 +16590,20 @@ where
                             state.set_busy(false);
                         }
                     },
+                    TuiAction::SubmitArchSlash { command, text } => {
+                        state.set_message_target(MessageTarget::Arch);
+                        state.push_arch_message(MessageRole::User, &text);
+                        let result = dispatch_slash_command(command, &mut state, None);
+                        state.set_message_target(MessageTarget::Discussion);
+                        match result {
+                            SlashDispatchAction::Quit => break 'outer,
+                            SlashDispatchAction::Interrupt => {
+                                state.set_busy(false);
+                                state.set_status("Interrupted");
+                            }
+                            SlashDispatchAction::Continue => {}
+                        }
+                    }
                     TuiAction::Submit(text) => match slash::route_input(&text) {
                         Err(error) => {
                             state.push_message(MessageRole::User, &text);

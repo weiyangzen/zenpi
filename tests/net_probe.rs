@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use zenpi::net_probe::{
     ArpEntry, DeviceClass, HostResources, LanScanner, NetCredential, NetCredentials, ProbeBackend,
-    parse_arp_table,
+    parse_arp_table, parse_remote_facts,
 };
 
 struct FixtureBackend {
@@ -130,6 +130,7 @@ fn real_topology_fixture() -> FixtureBackend {
 
     let gpu = |cpu: &str, cpus: usize, mem: u64, gpus: &[&str]| HostResources {
         os: Some("Ubuntu 24.04".into()),
+        hostname: Some("gpu-node".into()),
         kernel: Some("6.8.0".into()),
         cpu: Some(cpu.into()),
         logical_cpus: Some(cpus),
@@ -168,6 +169,7 @@ fn real_topology_fixture() -> FixtureBackend {
 
     let mac = |model: &str, mem: u64| HostResources {
         os: Some(format!("macOS 26.5 ({model})")),
+        hostname: None,
         kernel: Some("Darwin 25.5.0".into()),
         cpu: Some(model.into()),
         logical_cpus: Some(20),
@@ -308,4 +310,35 @@ fn credentials_are_redacted_and_parse_from_json() {
     let json = serde_json::to_string(&snapshot).unwrap();
     assert!(!json.contains("test-secret"));
     assert!(!json.contains("password"));
+}
+
+#[test]
+fn remote_facts_parse_into_host_resources() {
+    let text = "os=Ubuntu 24.04.4 LTS\n\
+hostname=node-2-7945hx\n\
+kernel=6.8.0-45-generic\n\
+cpu=AMD Ryzen 9 7950X 16-Core Processor\n\
+cpus=32\n\
+mem=134217728000\n\
+disk_total=2000000000000\n\
+disk_avail=750000000000\n\
+gpus=NVIDIA GeForce RTX 4090 D,NVIDIA GeForce RTX 3080\n\
+unknown=ignored\n\
+empty=\n";
+    let resources = parse_remote_facts(text);
+    assert_eq!(resources.os.as_deref(), Some("Ubuntu 24.04.4 LTS"));
+    assert_eq!(resources.hostname.as_deref(), Some("node-2-7945hx"));
+    assert_eq!(resources.kernel.as_deref(), Some("6.8.0-45-generic"));
+    assert_eq!(resources.logical_cpus, Some(32));
+    assert_eq!(resources.memory_total_bytes, Some(134_217_728_000));
+    assert_eq!(resources.disk_total_bytes, Some(2_000_000_000_000));
+    assert_eq!(resources.disk_available_bytes, Some(750_000_000_000));
+    assert_eq!(resources.gpus.len(), 2);
+    assert_eq!(resources.gpus[0], "NVIDIA GeForce RTX 4090 D");
+
+    // A probe that returns only partial facts still yields a usable record.
+    let partial = parse_remote_facts("cpus=8\ngpus=\n");
+    assert_eq!(partial.logical_cpus, Some(8));
+    assert!(partial.gpus.is_empty());
+    assert!(partial.os.is_none());
 }

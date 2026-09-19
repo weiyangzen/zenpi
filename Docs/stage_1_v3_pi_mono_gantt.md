@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-19T15:36:40+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-19T16:12:27+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `4d5c747634cf037e4079492df38aaa4c4d0b8ca3f535457b4e9feba345ddb12e`
-- 生成时间：2026-09-19T15:36:40+08:00
+- blueprint digest: `5d0324ea12de883e0351175141f27a816c9881e5ec66e69d549cf8b3b987811c`
+- 生成时间：2026-09-19T16:12:27+08:00
 
-清单项 `[x]` **148/148** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
+清单项 `[x]` **150/151** · `[_]` **0** · `[ ]` **1**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 52 | 52 | 0 | 0 |
+| L3 | 55 | 54 | 0 | 1 |
 | L5 | 4 | 4 | 0 | 0 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -159,6 +159,9 @@ gantt
     ZS1-158 局域网资源网络感知：Resources 分区（本机/网关/各组主机/存储）+ 点 :done, ZS1-158, 11, 1s
     ZS1-163 Resources 网络分区块与点进明细：资源区先划分为「本机 / 网关 / 各 :done, ZS1-163, 12, 1s
     ZS1-164 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内 :done, ZS1-164, 12, 1s
+    ZS1-165 双 Prompt 绝对独立与独立斜杠命令：左上 Conversation+Pro :done, ZS1-165, 18, 1s
+    ZS1-166 Shell 面板绑定当前工作区真实交互式 shell：右下 Shell 起真实  :ZS1-166, 16, 1s
+    ZS1-167 二层并发上下控件加宽可见：每个 worktree 的 `↑ N ↓` 并发控件把 :done, ZS1-167, 17, 1s
     ZS1-159 Headless stdio runtime：稳定的 stdin/stdout  :done, ZS1-159, 15, 1s
     ZS1-161 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent  :done, ZS1-161, 17, 1s
     ZS1-162 Headless footprint 预算与实测：每 headless 进程 C :done, ZS1-162, 16, 1s
@@ -303,6 +306,9 @@ gantt
 | ZS1-158 | [x] | L3 | ZS1-149 | — | 局域网资源网络感知：Resources 分区（本机/网关/各组主机/存储）+ 点进明细；无凭据时最大化感知（ARP/ICMP/端口指纹/mDNS/SSH banner），有凭据时用本地 secrets 抽取 CPU/内存/磁盘/GPU/服务；C 段扫描有界、只读、凭据不落库不打日志 |
 | ZS1-163 | [x] | L3 | ZS1-158 | — | Resources 网络分区块与点进明细：资源区先划分为「本机 / 网关 / 各组主机（mac / linux / 存储 / 其它）/ 存储」等可折叠块，每块只给汇总计数与最高层信息；键盘（Enter/方向键/Esc）与鼠标点击块进入该块明细表并返回；明细列含 IP、MAC、厂商、主机名/OS、开放端口/服务指纹，凭据可用时追加 CPU/内存/磁盘/GPU 列 |
 | ZS1-164 | [x] | L3 | ZS1-158 | — | 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内做 ARP 表、ICMP 探测、常用端口指纹、mDNS/NetBIOS 名称、SSH banner 版本、HTTP title/Server 头与设备类型归类（thor / mac / linux / nas / printer / router / IoT / GPU 节点）；存在本地 secrets 时经 SSH 只读抽取 CPU 型号与核数、内存、磁盘总量/可用、GPU（nvidia-smi / rocm-smi / lspci）、发行版与内核、监听服务；凭据仅从本地 secrets 读取，不落库、不打日志、不外传；以真实 10.20.30.0/24 拓扑为验收夹具，须给出与 10.20.30.38 同组机器的列表、全段清单（1 thor + 若干 mac + 若干 linux + 2 NAS）及 CPU/内存/磁盘/GPU 表 |
+| ZS1-165 | [x] | L3 | ZS1-156,ZS1-147,ZS1-148 | — | 双 Prompt 绝对独立与独立斜杠命令：左上 Conversation+Prompt 与左下 arch+Prompt 的输入缓冲、光标、编辑历史、`/` 命令补全与执行、提交目标各自独立；任一侧输入与 `/` 展开互不串写、互不抢焦点，可同时各自进入命令态 |
+| ZS1-166 | [·] | L3 | ZS1-155,ZS1-157 | — | Shell 面板绑定当前工作区真实交互式 shell：右下 Shell 起真实 `$SHELL` 登录交互式 PTY（非只读投影），cwd 恒等于当前一层 workspace / 二层 worktree 工作目录；切换工作区或 worktree 时同步到新目录，用户可直接敲任何命令 |
+| ZS1-167 | [x] | L3 | ZS1-146,ZS1-152 | — | 二层并发上下控件加宽可见：每个 worktree 的 `↑ N ↓` 并发控件把上下点击热区加宽为独立按钮块（不再挤在单列），视觉上明确可点，鼠标与键盘都能调整该 worktree 最大并发数，当前值醒目 |
 | ZS1-159 | [x] | L3 | ZS1-117 | — | Headless stdio runtime：稳定的 stdin/stdout JSONL 协议、session 持久化与 context 维护（恢复/压缩/预算）；可作为被远程宿主拉起的无界面 agent |
 | ZS1-160 | [x] | L5 | ZS1-158,ZS1-159 | — | 局域网 headless 集群 + 本机 control plane：把 LAN 上其他机器的 CPU/内存当宿主，按凭据/容量把 headless worker 派到远端并回收；本机做调度/聚合；只读探测 + 显式授权 |
 | ZS1-161 | [x] | L3 | ZS1-149,ZS1-158,ZS1-160 | — | 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影 |

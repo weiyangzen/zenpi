@@ -4,9 +4,9 @@
 
 ```yaml
 schema_version: execution-blueprint/stage1
-blueprint_version: 3.1.29
-revision_date: 2026-09-18
-review_date: 2026-09-18
+blueprint_version: 3.1.30
+revision_date: 2026-09-19
+review_date: 2026-09-19
 status: bootstrap-active
 authoritative: true
 predecessor: none
@@ -326,6 +326,9 @@ proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创�
 - [x] **ZS1-158** — 局域网资源网络感知：Resources 分区（本机/网关/各组主机/存储）+ 点进明细；无凭据时最大化感知（ARP/ICMP/端口指纹/mDNS/SSH banner），有凭据时用本地 secrets 抽取 CPU/内存/磁盘/GPU/服务；C 段扫描有界、只读、凭据不落库不打日志；layer `L3` | Depends: ZS1-149 | Owner scope: 局域网发现、凭据探测与渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `src/net_probe.rs`, `tools/net_probe.sh`, `tests/net_probe.rs` | Validators: G-CODE；cargo test --locked --test resources --test net_probe | Rollback: 撤回网络探测，恢复本机资源快照 | Estimate: 分区+明细、无凭据指纹、凭据抽取资源表 | Estimated LOC: 3200
 - [x] **ZS1-163** — Resources 网络分区块与点进明细：资源区先划分为「本机 / 网关 / 各组主机（mac / linux / 存储 / 其它）/ 存储」等可折叠块，每块只给汇总计数与最高层信息；键盘（Enter/方向键/Esc）与鼠标点击块进入该块明细表并返回；明细列含 IP、MAC、厂商、主机名/OS、开放端口/服务指纹，凭据可用时追加 CPU/内存/磁盘/GPU 列；layer `L3` | Depends: ZS1-158 | Owner scope: 区块投影、焦点导航与明细表渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/net_probe.rs`, `tests/resources.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE；cargo test --locked --test net_probe --test resources --test tui_bentobox | Rollback: 撤回分区块与明细导航，恢复 ZS1-158 的平铺列表 | Estimate: 块化渲染+块内焦点/返回+明细表（键盘+鼠标） | Estimated LOC: 1800
 - [x] **ZS1-164** — 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内做 ARP 表、ICMP 探测、常用端口指纹、mDNS/NetBIOS 名称、SSH banner 版本、HTTP title/Server 头与设备类型归类（thor / mac / linux / nas / printer / router / IoT / GPU 节点）；存在本地 secrets 时经 SSH 只读抽取 CPU 型号与核数、内存、磁盘总量/可用、GPU（nvidia-smi / rocm-smi / lspci）、发行版与内核、监听服务；凭据仅从本地 secrets 读取，不落库、不打日志、不外传；以真实 10.20.30.0/24 拓扑为验收夹具，须给出与 10.20.30.38 同组机器的列表、全段清单（1 thor + 若干 mac + 若干 linux + 2 NAS）及 CPU/内存/磁盘/GPU 表；layer `L3` | Depends: ZS1-158 | Owner scope: 无凭据指纹、凭据抽取与真实拓扑验收 owner | Owned paths: `src/net_probe.rs`, `src/resources.rs`, `src/tui.rs`, `tools/net_probe.sh`, `tests/net_probe.rs` | Validators: G-CODE；cargo test --locked --test net_probe | Rollback: 撤回指纹与凭据抽取，保留 ARP/ICMP 基本发现 | Estimate: 无凭据指纹+本地 secrets 抽取+真实拓扑验收 | Estimated LOC: 2200
+- [x] **ZS1-165** — 双 Prompt 绝对独立与独立斜杠命令：左上 Conversation+Prompt 与左下 arch+Prompt 的输入缓冲、光标、编辑历史、`/` 命令补全与执行、提交目标各自独立；任一侧输入与 `/` 展开互不串写、互不抢焦点，可同时各自进入命令态；layer `L3` | Depends: ZS1-156,ZS1-147,ZS1-148 | Owner scope: 双输入端口与各自斜杠命令路由 owner | Owned paths: `src/tui.rs`, `src/slash.rs`, `src/slash_actions.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/slash.rs` | Validators: G-CODE；cargo test --locked --test tui_interaction --test slash | Rollback: 撤回双输入独立化，恢复共享输入缓冲 | Estimate: 双缓冲/双历史/双命令路由隔离 | Estimated LOC: 1200
+- [ ] **ZS1-166** — Shell 面板绑定当前工作区真实交互式 shell：右下 Shell 起真实 `$SHELL` 登录交互式 PTY（非只读投影），cwd 恒等于当前一层 workspace / 二层 worktree 工作目录；切换工作区或 worktree 时同步到新目录，用户可直接敲任何命令；layer `L3` | Depends: ZS1-155,ZS1-157 | Owner scope: 内嵌 shell 生命周期与 cwd 绑定 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox | Rollback: 撤回 cwd 绑定，恢复默认 shell | Estimate: 真实 PTY + workspace/worktree cwd 同步 | Estimated LOC: 1400
+- [x] **ZS1-167** — 二层并发上下控件加宽可见：每个 worktree 的 `↑ N ↓` 并发控件把上下点击热区加宽为独立按钮块（不再挤在单列），视觉上明确可点，鼠标与键盘都能调整该 worktree 最大并发数，当前值醒目；layer `L3` | Depends: ZS1-146,ZS1-152 | Owner scope: 二层并发控件渲染与命中区 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `tests/tui_bentobox.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test tui_project_workspace | Rollback: 撤回加宽，恢复单列上下箭头 | Estimate: 加宽命中区+独立按钮块+值可视化 | Estimated LOC: 600
 - [x] **ZS1-159** — Headless stdio runtime：稳定的 stdin/stdout JSONL 协议、session 持久化与 context 维护（恢复/压缩/预算）；可作为被远程宿主拉起的无界面 agent；layer `L3` | Depends: ZS1-117 | Owner scope: headless 协议/session/context owner | Owned paths: `src/headless.rs`, `src/protocol.rs`, `src/session.rs`, `src/context.rs`, `tests/headless_protocol.rs`, `tests/session_recovery.rs` | Validators: G-CODE；cargo test --locked --test headless_protocol --test session_recovery | Rollback: 撤回 stdio 强化，保留既有 JSONL | Estimate: stdio 稳定性、session/context 维护、远程可托管 | Estimated LOC: 2200
 - [x] **ZS1-160** — 局域网 headless 集群 + 本机 control plane：把 LAN 上其他机器的 CPU/内存当宿主，按凭据/容量把 headless worker 派到远端并回收；本机做调度/聚合；只读探测 + 显式授权；layer `L5` | Depends: ZS1-158,ZS1-159 | Owner scope: 集群调度与远端生命周期 owner | Owned paths: `src/net_probe.rs`, `src/cluster.rs`, `src/tui.rs`, `tools/cluster_dispatch.sh`, `tests/cluster.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test cluster --test net_probe | Rollback: 撤回远端派发，恢复纯本机 | Estimate: 远端宿主发现/容量/派发/回收 + 本机控制面 | Estimated LOC: 3600
 - [x] **ZS1-161** — 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影；layer `L3` | Depends: ZS1-149,ZS1-158,ZS1-160 | Owner scope: 资源/预算/端口信息 owner | Owned paths: `src/resources.rs`, `src/cluster.rs`, `src/tui.rs`, `src/view_model.rs`, `tests/resources.rs`, `tests/cluster.rs` | Validators: G-CODE；cargo test --locked --test resources --test cluster | Rollback: 撤回信息总线，保留各项独立 | Estimate: budget/devport/cluster 打通到统一快照 | Estimated LOC: 2600
@@ -788,3 +791,13 @@ ZS1-128完成判据：逐个Codex交互条目映射实际操作与证据；每�
 - 以本机为 **control plane**，把 LAN 其他机器的 CPU/内存当宿主执行 headless worker（按 ZZ1-158 的探测与凭据、只读+显式授权），并回收。
 - 统一信息总线：本机 + 局域网集群 + agent 余额/budget + devport 抢占/租约，全部进 Resources 分区并可点进明细。
 - footprint：每 headless 进程 CPU/RSS 上限与逐进程统计进资源门禁。
+
+### 3.1.30 TUI 输入独立性 / Shell 绑定 / 二层并发控件补充（新增 ZS1-165…167，清单 151 项）
+
+用户要求（2026-09-19，先补蓝图再改代码，以保证 blueprint 与代码一致）：
+
+- **双 Prompt 绝对独立（ZS1-165）**：左上 `Conversation + Prompt` 与左下 `arch + Prompt` 是两个独立输入端口。各自的文本缓冲、光标、编辑历史、`/` 命令补全与执行、提交目标必须完全独立；任一侧输入或 `/` 展开不得串写另一侧，也不得抢占另一侧焦点；两侧应能各自独立进入命令态。对应并细化 ZS1-156「双独立会话」的输入侧。
+- **Shell 绑定当前工作区（ZS1-166）**：右下 `Shell` 必须是**真实交互式 shell**（登录式 `$SHELL` PTY），不是只读投影；其 cwd 恒等于当前一层 workspace / 二层 worktree 的工作目录；切换一层/二层时同步到新目录，用户能直接在其中敲任意命令。对应并细化 ZS1-155。
+- **二层并发控件加宽可见（ZS1-167）**：二层每个 worktree 的 `↑ N ↓` 并发控件，把上下点击热区加宽为独立按钮块（不再挤在单列窄箭头），视觉上明确可点，鼠标与键盘都能调整该 worktree 的最大并发数，当前值醒目。对应并细化 ZS1-146/ZS1-152。
+
+验收：逐项实现并补测试（含真实 PTY/TUI 证据），主控集成后 build 到 `zenpi-dev`。3.1.30 追加不改动此前已接受项的字节与义务。

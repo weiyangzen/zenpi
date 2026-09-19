@@ -19,6 +19,8 @@ use std::{
     fmt,
     io::{Read, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
+    path::PathBuf,
+    process::Stdio,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -109,6 +111,7 @@ pub struct ServiceFingerprint {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HostResources {
     pub os: Option<String>,
+    pub hostname: Option<String>,
     pub kernel: Option<String>,
     pub cpu: Option<String>,
     pub logical_cpus: Option<usize>,
@@ -469,11 +472,19 @@ impl LanScanner {
     pub fn new(local_ip: impl Into<String>) -> Self {
         let local_ip = local_ip.into();
         let gateway_ip = default_gateway_for(&local_ip);
+        // Credentialed resource extraction is sequential, so a full /24 scan
+        // can exceed the conservative default; operators may widen the budget.
+        let budget = std::env::var("ZENPI_NET_BUDGET_SECONDS")
+            .ok()
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .filter(|seconds| *seconds > 0)
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::from_secs(8));
         Self {
             local_ip,
             gateway_ip,
             ports: PROBE_PORTS.to_vec(),
-            budget: Duration::from_secs(8),
+            budget,
         }
     }
 
@@ -593,7 +604,11 @@ impl LanScanner {
                 // Credentials reveal the real OS, which can upgrade a
                 // banner-less host (e.g. an Apple device) to its true class.
                 let os = resources.os.clone();
+                let hostname = resources.hostname.clone();
                 host.resources = Some(resources);
+                if host.hostname.is_none() {
+                    host.hostname = hostname;
+                }
                 host.class = classify_device(
                     ip == self.local_ip,
                     Some(ip.as_str()) == self.gateway_ip.as_deref(),
@@ -745,10 +760,205 @@ impl ProbeBackend for SystemProbeBackend {
     }
 
     fn remote_resources(&self, _ip: &str, _credentials: &NetCredentials) -> Option<HostResources> {
-        // Password SSH extraction is intentionally not performed by the default
-        // backend; callers that provision a key/agent use `RemoteShellBackend`.
+        // The credential-free default backend performs no authenticated
+        // extraction; callers that load credentials use `SshProbeBackend`.
         None
     }
+}
+
+/// Credentialed backend: inherits unauthenticated probing from
+/// [`SystemProbeBackend`] and adds read-only resource extraction over SSH.
+///
+/// Key/agent authentication is attempted first so a host reachable without a
+/// password never receives a secret. Password authentication needs no extra
+/// binary: a short-lived helper echoes the password through `SSH_ASKPASS`, and
+/// `SSH_ASKPASS_REQUIRE=force` (OpenSSH >= 8.4) makes `ssh` honor it even when
+/// a controlling terminal exists. Each host is probed read-only and bounded.
+pub struct SshProbeBackend {
+    system: SystemProbeBackend,
+    ssh_timeout: Duration,
+}
+
+impl Default for SshProbeBackend {
+    fn default() -> Self {
+        Self {
+            system: SystemProbeBackend::default(),
+            ssh_timeout: Duration::from_secs(5),
+        }
+    }
+}
+
+impl SshProbeBackend {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Read-only, POSIX-`sh` fact gatherer. Every fact is optional and missing
+    /// tools degrade to an empty line rather than a failed probe.
+    fn remote_facts_script() -> &'static str {
+        "OS=$(. /etc/os-release 2>/dev/null && printf '%s' \"$PRETTY_NAME\" || uname -s 2>/dev/null); \
+printf 'os=%s\\n' \"$OS\"; \
+printf 'hostname=%s\\n' \"$(hostname 2>/dev/null)\"; \
+printf 'kernel=%s\\n' \"$(uname -r 2>/dev/null)\"; \
+printf 'cpu=%s\\n' \"$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | sed 's/.*: //' || sysctl -n machdep.cpu.brand_string 2>/dev/null)\"; \
+printf 'cpus=%s\\n' \"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null)\"; \
+printf 'mem=%s\\n' \"$(free -b 2>/dev/null | awk '/^Mem:/{print $2}' || sysctl -n hw.memsize 2>/dev/null)\"; \
+printf 'disk_total=%s\\n' \"$(df -kP / 2>/dev/null | awk 'NR==2{print $2*1024}')\"; \
+printf 'disk_avail=%s\\n' \"$(df -kP / 2>/dev/null | awk 'NR==2{print $4*1024}')\"; \
+printf 'gpus=%s\\n' \"$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | tr '\\n' ',' | sed 's/,$//')\""
+    }
+
+    fn run_ssh(
+        &self,
+        ip: &str,
+        credential: &NetCredential,
+        password: bool,
+        askpass: Option<&PathBuf>,
+    ) -> Option<String> {
+        let mut command = std::process::Command::new("ssh");
+        command
+            .arg("-o")
+            .arg("StrictHostKeyChecking=accept-new")
+            .arg("-o")
+            .arg(format!(
+                "ConnectTimeout={}",
+                self.ssh_timeout.as_secs().max(1)
+            ))
+            .arg("-o")
+            .arg(format!("User={}", credential.username()));
+        if password {
+            command
+                .arg("-o")
+                .arg("BatchMode=no")
+                .arg("-o")
+                .arg("NumberOfPasswordPrompts=1")
+                .arg("-o")
+                .arg("PreferredAuthentications=password,keyboard-interactive")
+                .arg("-o")
+                .arg("PubkeyAuthentication=no");
+            if let Some(askpass) = askpass {
+                command
+                    .env("SSH_ASKPASS", askpass)
+                    .env("SSH_ASKPASS_REQUIRE", "force")
+                    .env("DISPLAY", ":0")
+                    .env("ZENPI_SSH_ASKPASS_SECRET", credential.password());
+            }
+        } else {
+            command
+                .arg("-o")
+                .arg("BatchMode=yes")
+                .arg("-o")
+                .arg("NumberOfPasswordPrompts=0");
+        }
+        let output = command
+            .arg(ip)
+            .arg(Self::remote_facts_script())
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&output.stdout).into_owned();
+        if text.trim().is_empty() {
+            None
+        } else {
+            Some(text)
+        }
+    }
+}
+
+impl ProbeBackend for SshProbeBackend {
+    fn arp_table(&self) -> Vec<ArpEntry> {
+        self.system.arp_table()
+    }
+
+    fn ping(&self, ip: &str) -> bool {
+        self.system.ping(ip)
+    }
+
+    fn open_port(&self, ip: &str, port: u16) -> bool {
+        self.system.open_port(ip, port)
+    }
+
+    fn ssh_banner(&self, ip: &str) -> Option<String> {
+        self.system.ssh_banner(ip)
+    }
+
+    fn remote_resources(&self, ip: &str, credentials: &NetCredentials) -> Option<HostResources> {
+        for credential in credentials.entries() {
+            if let Some(text) = self.run_ssh(ip, credential, false, None) {
+                return Some(parse_remote_facts(&text));
+            }
+        }
+        for credential in credentials.entries() {
+            let askpass = write_askpass_helper()?;
+            let result = self.run_ssh(ip, credential, true, Some(&askpass));
+            let _ = std::fs::remove_file(&askpass);
+            if let Some(text) = result {
+                return Some(parse_remote_facts(&text));
+            }
+        }
+        None
+    }
+}
+
+/// Write a short-lived `SSH_ASKPASS` helper that prints the password from the
+/// `ZENPI_SSH_ASKPASS_SECRET` environment variable. The secret never lands on
+/// disk; only the fixed script does. Returns the helper path.
+fn write_askpass_helper() -> Option<PathBuf> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("zenpi-askpass-{}-{nanos}", std::process::id()));
+    let mut file = std::fs::File::create(&path).ok()?;
+    file.write_all(b"#!/bin/sh\nprintf '%s\\n' \"$ZENPI_SSH_ASKPASS_SECRET\"\n")
+        .ok()?;
+    drop(file);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).ok()?;
+    }
+    Some(path)
+}
+
+/// Interpret the `key=value` lines emitted by
+/// `SshProbeBackend::remote_facts_script`. Pure and fixture-testable; unknown
+/// keys and unparsable numbers are ignored so a partial host still reports.
+pub fn parse_remote_facts(text: &str) -> HostResources {
+    let mut resources = HostResources::default();
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        if value.is_empty() {
+            continue;
+        }
+        match key.trim() {
+            "os" => resources.os = Some(value.to_owned()),
+            "hostname" => resources.hostname = Some(value.to_owned()),
+            "kernel" => resources.kernel = Some(value.to_owned()),
+            "cpu" => resources.cpu = Some(value.to_owned()),
+            "cpus" => resources.logical_cpus = value.parse().ok(),
+            "mem" => resources.memory_total_bytes = value.parse().ok(),
+            "disk_total" => resources.disk_total_bytes = value.parse().ok(),
+            "disk_avail" => resources.disk_available_bytes = value.parse().ok(),
+            "gpus" => {
+                resources.gpus = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_owned)
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+    resources
 }
 
 fn connect(ip: &str, port: u16) -> Option<TcpStream> {
