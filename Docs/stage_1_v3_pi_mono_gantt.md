@@ -1,11 +1,11 @@
 # stage_1_v3_pi_mono_gantt — Blueprint Gantt
 
-> 更新时间：2026-09-19T15:29:36+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
+> 更新时间：2026-09-19T15:36:40+08:00。只读投影，唯一要求来源：[同名蓝图](stage_1_v3_pi_mono_blueprint.md)。
 
-- blueprint digest: `7240b097a67778e21326fdf9c76a26fb1f79c8c9c024cf7887504805b9e4beee`
-- 生成时间：2026-09-19T15:29:36+08:00
+- blueprint digest: `4d5c747634cf037e4079492df38aaa4c4d0b8ca3f535457b4e9feba345ddb12e`
+- 生成时间：2026-09-19T15:36:40+08:00
 
-清单项 `[x]` **147/148** · `[_]` **1** · `[ ]` **0**。按清单项计数，不是代码完成率。
+清单项 `[x]` **148/148** · `[_]` **0** · `[ ]` **0**。按清单项计数，不是代码完成率。
 
 横轴为依赖层级；条宽相同，不表示工期，也不虚构日历。
 
@@ -16,7 +16,7 @@
 | L0 | 1 | 1 | 0 | 0 |
 | L1 | 58 | 58 | 0 | 0 |
 | L2 | 32 | 32 | 0 | 0 |
-| L3 | 52 | 51 | 1 | 0 |
+| L3 | 52 | 52 | 0 | 0 |
 | L5 | 4 | 4 | 0 | 0 |
 | L6 | 1 | 1 | 0 | 0 |
 
@@ -160,7 +160,7 @@ gantt
     ZS1-163 Resources 网络分区块与点进明细：资源区先划分为「本机 / 网关 / 各 :done, ZS1-163, 12, 1s
     ZS1-164 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内 :done, ZS1-164, 12, 1s
     ZS1-159 Headless stdio runtime：稳定的 stdin/stdout  :done, ZS1-159, 15, 1s
-    ZS1-161 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent  :active, ZS1-161, 17, 1s
+    ZS1-161 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent  :done, ZS1-161, 17, 1s
     ZS1-162 Headless footprint 预算与实测：每 headless 进程 C :done, ZS1-162, 16, 1s
     ZS1-120 项目身份、cwd与持久化owner :done, ZS1-120, 3, 1s
     ZS1-121 顶部+目录picker与真实项目分页接线 :done, ZS1-121, 4, 1s
@@ -305,7 +305,7 @@ gantt
 | ZS1-164 | [x] | L3 | ZS1-158 | — | 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内做 ARP 表、ICMP 探测、常用端口指纹、mDNS/NetBIOS 名称、SSH banner 版本、HTTP title/Server 头与设备类型归类（thor / mac / linux / nas / printer / router / IoT / GPU 节点）；存在本地 secrets 时经 SSH 只读抽取 CPU 型号与核数、内存、磁盘总量/可用、GPU（nvidia-smi / rocm-smi / lspci）、发行版与内核、监听服务；凭据仅从本地 secrets 读取，不落库、不打日志、不外传；以真实 10.20.30.0/24 拓扑为验收夹具，须给出与 10.20.30.38 同组机器的列表、全段清单（1 thor + 若干 mac + 若干 linux + 2 NAS）及 CPU/内存/磁盘/GPU 表 |
 | ZS1-159 | [x] | L3 | ZS1-117 | — | Headless stdio runtime：稳定的 stdin/stdout JSONL 协议、session 持久化与 context 维护（恢复/压缩/预算）；可作为被远程宿主拉起的无界面 agent |
 | ZS1-160 | [x] | L5 | ZS1-158,ZS1-159 | — | 局域网 headless 集群 + 本机 control plane：把 LAN 上其他机器的 CPU/内存当宿主，按凭据/容量把 headless worker 派到远端并回收；本机做调度/聚合；只读探测 + 显式授权 |
-| ZS1-161 | [_] | L3 | ZS1-149,ZS1-158,ZS1-160 | — | 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影 |
+| ZS1-161 | [x] | L3 | ZS1-149,ZS1-158,ZS1-160 | — | 统一资源与信息总线：CPU/内存/GPU/网络 + 局域网集群 + agent 余额/budget + 本机 devport 抢占/租约，统一进 Resources 分区与对外投影 |
 | ZS1-162 | [x] | L3 | ZS1-159 | — | Headless footprint 预算与实测：每 headless 进程 CPU/RSS 上限与逐进程统计，纳入资源门禁 |
 | ZS1-199 | [x] | L6 | ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | — | Master 集成验收与阶段交付 |
 | ZS1-300 | [x] | L1 | ZS1-001 | — | 逐文件复核Codex codex-rs/tui/src/bottom_pane/chat_composer.rs |

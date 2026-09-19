@@ -4,10 +4,13 @@ mod resources;
 use std::fs;
 
 use resources::{
+    AgentBudgetSignal, BudgetDimension, BudgetKind, ClusterBusSection, DEFAULT_PORT_LEASE_MS,
     FootprintPhase, HeadlessFootprintBudget, HeadlessFootprintSummary, HeadlessFootprintVerdict,
-    HeadlessProcessFootprint, MAX_HEADLESS_CPU_PERCENT, MAX_HEADLESS_FOOTPRINT_ROWS,
-    MAX_PROCESS_ROWS, MAX_WORKSPACE_FILES, ProcessClass, ResourceCollector, ResourceError,
-    SignalStatus, WorkspaceScanPolicy,
+    HeadlessProcessFootprint, HostBusSection, LanBusSection, MAX_HEADLESS_CPU_PERCENT,
+    MAX_HEADLESS_FOOTPRINT_ROWS, MAX_PORT_LEASE_MS, MAX_PORT_LEASE_ROWS, MAX_PORT_LEASES,
+    MAX_PROCESS_ROWS, MAX_WORKSPACE_FILES, PortLeaseError, PortLeaseRegistry, PortLeaseState,
+    ProcessClass, ResourceBusSnapshot, ResourceCollector, ResourceError, SignalStatus,
+    WorkspaceScanPolicy,
 };
 use tempfile::tempdir;
 
@@ -369,7 +372,13 @@ fn collection_embeds_the_headless_footprint_gate() {
         SignalStatus::Available | SignalStatus::Unavailable
     ));
     if snapshot.headless.status == SignalStatus::Available {
-        assert!(snapshot.headless.rows.iter().any(|row| row.pid == std::process::id()));
+        assert!(
+            snapshot
+                .headless
+                .rows
+                .iter()
+                .any(|row| row.pid == std::process::id())
+        );
     }
     let value = serde_json::to_value(&snapshot).unwrap();
     assert!(value.get("headless").is_some());
@@ -388,4 +397,225 @@ fn headless_gate_scores_the_current_process_against_a_budget() {
     }
     let sample = resources::sample_own_footprint(FootprintPhase::Idle);
     assert_eq!(sample.pid, std::process::id());
+}
+
+#[test]
+fn port_lease_registry_grant_conflict_and_release() {
+    let mut registry = PortLeaseRegistry::new();
+    let lease = registry
+        .lease(3000, "worker-a", DEFAULT_PORT_LEASE_MS, 1_000)
+        .unwrap();
+    assert_eq!(lease.port, 3000);
+    assert_eq!(lease.state, PortLeaseState::Active);
+    assert!(lease.is_active(1_000));
+
+    // Re-leasing the same port by the same owner is an idempotent renewal and
+    // keeps the original acquisition time.
+    let renewed = registry
+        .lease(3000, "worker-a", DEFAULT_PORT_LEASE_MS, 2_000)
+        .unwrap();
+    assert_eq!(renewed.acquired_ms, lease.acquired_ms);
+    assert_eq!(renewed.renewed_ms, 2_000);
+
+    // Another agent cannot steal a live lease.
+    assert_eq!(
+        registry.lease(3000, "worker-b", DEFAULT_PORT_LEASE_MS, 2_000),
+        Err(PortLeaseError::Conflict(3000))
+    );
+    assert_eq!(
+        registry.release(3000, "worker-b", 2_000),
+        Err(PortLeaseError::NotOwner(3000))
+    );
+    let released = registry.release(3000, "worker-a", 2_000).unwrap();
+    assert_eq!(released.state, PortLeaseState::Released);
+    assert!(registry.is_empty());
+    assert_eq!(
+        registry.release(3000, "worker-a", 2_000),
+        Err(PortLeaseError::UnknownLease(3000))
+    );
+}
+
+#[test]
+fn port_lease_validation_rejects_privileged_and_unbounded_requests() {
+    let mut registry = PortLeaseRegistry::new();
+    assert_eq!(
+        registry.lease(80, "worker", DEFAULT_PORT_LEASE_MS, 0),
+        Err(PortLeaseError::InvalidPort(80))
+    );
+    assert!(matches!(
+        registry.lease(3000, "   ", DEFAULT_PORT_LEASE_MS, 0),
+        Err(PortLeaseError::InvalidOwner(_))
+    ));
+    assert_eq!(
+        registry.lease(3000, "worker", 0, 0),
+        Err(PortLeaseError::InvalidDuration(0))
+    );
+    assert_eq!(
+        registry.lease(3000, "worker", MAX_PORT_LEASE_MS + 1, 0),
+        Err(PortLeaseError::InvalidDuration(MAX_PORT_LEASE_MS + 1))
+    );
+    assert!(registry.is_empty());
+}
+
+#[test]
+fn port_lease_expiry_allows_preemption_and_reuse() {
+    let mut registry = PortLeaseRegistry::new();
+    registry.lease(3000, "stale", 1_000, 0).unwrap();
+    registry.lease(3001, "live", 60_000, 0).unwrap();
+    assert_eq!(registry.snapshot(500).active, 2);
+
+    let preempted = registry.preempt_expired(1_000);
+    assert_eq!(preempted.len(), 1);
+    assert_eq!(preempted[0].port, 3000);
+    assert_eq!(preempted[0].state, PortLeaseState::Expired);
+    assert!(registry.get(3000).is_none());
+    assert_eq!(registry.snapshot(1_000).active, 1);
+
+    // The freed port is immediately leasable by another agent.
+    registry
+        .lease(3000, "replacement", DEFAULT_PORT_LEASE_MS, 1_000)
+        .unwrap();
+    // Cancelling an owner preempts only that owner's leases.
+    let cancelled = registry.preempt_owner("live", 2_000);
+    assert_eq!(cancelled.len(), 1);
+    assert_eq!(cancelled[0].state, PortLeaseState::Preempted);
+    assert_eq!(registry.len(), 1);
+}
+
+#[test]
+fn port_lease_registry_is_bounded_and_snapshot_is_truncated() {
+    let mut registry = PortLeaseRegistry::new();
+    for index in 0..MAX_PORT_LEASES {
+        registry
+            .lease(2000 + index as u16, "bulk", DEFAULT_PORT_LEASE_MS, 0)
+            .unwrap();
+    }
+    assert_eq!(registry.len(), MAX_PORT_LEASES);
+    let snapshot = registry.snapshot(0);
+    assert_eq!(snapshot.total, MAX_PORT_LEASES);
+    assert_eq!(snapshot.active, MAX_PORT_LEASES);
+    assert_eq!(snapshot.rows.len(), MAX_PORT_LEASE_ROWS);
+    assert!(snapshot.truncated);
+    assert_eq!(
+        registry.lease(
+            2000 + MAX_PORT_LEASES as u16,
+            "overflow",
+            DEFAULT_PORT_LEASE_MS,
+            0
+        ),
+        Err(PortLeaseError::Limit)
+    );
+}
+
+#[test]
+fn budget_dimension_tracks_balance_and_exhaustion() {
+    let dimension = BudgetDimension::new(30, 100);
+    assert_eq!(dimension.remaining(), 70);
+    assert_eq!(dimension.percent_used(), 30.0);
+    assert!(!dimension.exhausted());
+
+    let signal =
+        AgentBudgetSignal::from_usage((30, 100), (0, 0), (8, 10), (0, 0), (0, 0), (0, 0), (0, 0));
+    assert_eq!(signal.status, SignalStatus::Available);
+    assert_eq!(signal.remaining(BudgetKind::InputTokens), 70);
+    assert_eq!(signal.remaining(BudgetKind::OutputTokens), 0);
+    assert!(!signal.exhausted());
+    assert_eq!(signal.low_balance(50.0), vec![BudgetKind::WallTime]);
+    assert!(signal.low_balance(25.0).contains(&BudgetKind::InputTokens));
+
+    let exhausted =
+        AgentBudgetSignal::from_usage((100, 100), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0));
+    assert!(exhausted.exhausted());
+    assert_eq!(
+        AgentBudgetSignal::unavailable().status,
+        SignalStatus::Unavailable
+    );
+}
+
+#[test]
+fn host_bus_section_derives_bounded_utilization() {
+    let directory = tempdir().unwrap();
+    let snapshot = ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    let host = HostBusSection::from_snapshot(&snapshot);
+    assert!(host.logical_cpus >= 1);
+    assert!((0.0..=100.0).contains(&host.cpu_percent));
+    assert!((0.0..=100.0).contains(&host.memory_percent));
+    assert!(host.gpu_devices <= resources::MAX_GPU_DEVICES);
+    assert_eq!(host.headless_workers, snapshot.headless.total);
+}
+
+#[test]
+fn unified_bus_aggregates_every_section_and_round_trips() {
+    let directory = tempdir().unwrap();
+    let host = ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    let mut registry = PortLeaseRegistry::new();
+    registry
+        .lease(3000, "agent", DEFAULT_PORT_LEASE_MS, 5_000)
+        .unwrap();
+
+    let bus = ResourceBusSnapshot::from_host(&host, 5_000)
+        .with_budget(AgentBudgetSignal::from_usage(
+            (10, 100),
+            (0, 0),
+            (0, 0),
+            (0, 0),
+            (0, 0),
+            (0, 0),
+            (0, 0),
+        ))
+        .with_ports(registry.snapshot(5_000))
+        .with_lan(LanBusSection {
+            local_ip: "10.0.0.14".into(),
+            gateway_ip: Some("10.0.0.1".into()),
+            host_count: 3,
+            block_count: 2,
+            truncated: false,
+        })
+        .with_cluster(ClusterBusSection {
+            host_count: 2,
+            authorized_hosts: 1,
+            total_workers: 1,
+            running_workers: 1,
+            reclaimed_workers: 0,
+            failed_workers: 0,
+            host_ips: vec!["10.0.0.55".into()],
+            truncated: false,
+        });
+
+    assert_eq!(
+        bus.section_keys(),
+        vec!["host", "budget", "ports", "lan", "cluster"]
+    );
+    assert_eq!(bus.ports.active, 1);
+    assert_eq!(bus.cluster.as_ref().unwrap().host_ips, vec!["10.0.0.55"]);
+    assert_eq!(bus.generated_ms, 5_000);
+
+    let value = serde_json::to_value(&bus).unwrap();
+    for key in ["host", "budget", "ports", "lan", "cluster"] {
+        assert!(value.get(key).is_some(), "missing bus section {key}");
+    }
+    let restored: ResourceBusSnapshot = serde_json::from_value(value).unwrap();
+    assert_eq!(restored, bus);
+}
+
+#[test]
+fn unified_bus_without_optional_sections_is_host_only() {
+    let directory = tempdir().unwrap();
+    let host = ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    let bus = ResourceBusSnapshot::from_host(&host, 42);
+    assert_eq!(bus.section_keys(), vec!["host", "budget", "ports"]);
+    assert!(bus.lan.is_none());
+    assert!(bus.cluster.is_none());
+    assert_eq!(bus.budget.status, SignalStatus::Unavailable);
+    assert_eq!(bus.ports.total, 0);
+    assert_eq!(bus.generated_ms, 42);
 }

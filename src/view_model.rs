@@ -1487,3 +1487,237 @@ fn validate_text(value: &str, field: &'static str) -> Result<(), ViewModelError>
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// ZS1-161: external projection of the unified resource and information bus.
+//
+// The TUI renders this projection inside the Resources pane and the same value
+// serializes to JSON for external consumers, so both transports describe the
+// host, budget, port leases, LAN and cluster with one bounded shape. Rendering
+// never adds data; it only formats the already-aggregated bus.
+// ---------------------------------------------------------------------------
+
+/// Upper bound on lines in one projected bus.
+pub const MAX_RESOURCE_BUS_LINES: usize = 64;
+/// Upper bound on bytes in one projected line, so a hostile label cannot grow
+/// the projection without bound.
+pub const MAX_RESOURCE_BUS_LINE_BYTES: usize = 256;
+/// Upper bound on rows inside one projected section.
+pub const MAX_RESOURCE_BUS_ROWS: usize = 32;
+
+/// One bounded section of the projected bus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ResourceBusSectionView {
+    pub key: String,
+    pub title: String,
+    pub summary: String,
+    pub rows: Vec<String>,
+}
+
+/// Bounded external projection of [`crate::resources::ResourceBusSnapshot`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceBusProjection {
+    pub version: u16,
+    pub generated_ms: u64,
+    pub sections: Vec<ResourceBusSectionView>,
+}
+
+impl ResourceBusProjection {
+    pub fn from_bus(bus: &crate::resources::ResourceBusSnapshot) -> Self {
+        use crate::resources::BudgetKind;
+
+        let host = &bus.host;
+        let host_summary = truncate_bus_line(&format!(
+            "CPU {} cores load {} {:.0}%  Mem {} / {} {:.0}%  GPU {} {}  Net rx {} tx {}  headless {}",
+            host.logical_cpus,
+            optional_number(host.load_one_minute),
+            host.cpu_percent,
+            optional_bytes(host.memory_available_bytes),
+            optional_bytes(host.memory_total_bytes),
+            host.memory_percent,
+            host.gpu_devices,
+            host.gpu_utilization_percent
+                .map(|value| format!("{value:.0}%"))
+                .unwrap_or_else(|| "n/a".into()),
+            optional_bytes(host.network_received_bytes),
+            optional_bytes(host.network_transmitted_bytes),
+            host.headless_workers,
+        ));
+        let mut host_rows = Vec::new();
+        if host.headless_exceeded {
+            host_rows.push("headless footprint budget exceeded".to_owned());
+        }
+
+        let budget_summary = if bus.budget.status == crate::resources::SignalStatus::Unavailable {
+            "budget unavailable".to_owned()
+        } else {
+            let dimension = bus.budget.dimension(BudgetKind::InputTokens);
+            format!(
+                "input {}/{} ({}%)  exhausted={}",
+                dimension.used,
+                dimension.limit,
+                dimension.percent_used().round(),
+                bus.budget.exhausted()
+            )
+        };
+        let mut budget_rows = Vec::with_capacity(BudgetKind::ALL.len());
+        for kind in BudgetKind::ALL {
+            let dimension = bus.budget.dimension(kind);
+            if dimension.limit == 0 {
+                continue;
+            }
+            budget_rows.push(format!(
+                "{} used {} / {}  remaining {}  {}%",
+                kind.label(),
+                dimension.used,
+                dimension.limit,
+                dimension.remaining(),
+                dimension.percent_used().round(),
+            ));
+        }
+
+        let ports = &bus.ports;
+        let ports_summary = format!("{} active / {} total lease(s)", ports.active, ports.total);
+        let ports_rows: Vec<String> = ports
+            .rows
+            .iter()
+            .take(MAX_RESOURCE_BUS_ROWS)
+            .map(|lease| {
+                format!(
+                    "port {} {} owner {} remaining {}",
+                    lease.port,
+                    lease.state.label(),
+                    lease.owner,
+                    lease.remaining_ms(bus.generated_ms),
+                )
+            })
+            .collect();
+
+        let mut sections = vec![
+            ResourceBusSectionView {
+                key: "host".into(),
+                title: "Host".into(),
+                summary: host_summary,
+                rows: host_rows,
+            },
+            ResourceBusSectionView {
+                key: "budget".into(),
+                title: "Budget".into(),
+                summary: truncate_bus_line(&budget_summary),
+                rows: budget_rows
+                    .into_iter()
+                    .take(MAX_RESOURCE_BUS_ROWS)
+                    .map(|row| truncate_bus_line(row.as_str()))
+                    .collect(),
+            },
+            ResourceBusSectionView {
+                key: "ports".into(),
+                title: "Ports".into(),
+                summary: truncate_bus_line(&ports_summary),
+                rows: ports_rows
+                    .into_iter()
+                    .map(|row| truncate_bus_line(row.as_str()))
+                    .collect(),
+            },
+        ];
+        if let Some(lan) = &bus.lan {
+            sections.push(ResourceBusSectionView {
+                key: "lan".into(),
+                title: "LAN".into(),
+                summary: truncate_bus_line(&format!(
+                    "{} host(s) across {} block(s)  local {}  gateway {}",
+                    lan.host_count,
+                    lan.block_count,
+                    lan.local_ip,
+                    lan.gateway_ip.as_deref().unwrap_or("-"),
+                )),
+                rows: Vec::new(),
+            });
+        }
+        if let Some(cluster) = &bus.cluster {
+            sections.push(ResourceBusSectionView {
+                key: "cluster".into(),
+                title: "Cluster".into(),
+                summary: truncate_bus_line(&format!(
+                    "{} host(s) authorized {}  workers {} run / {} reclaimed / {} failed",
+                    cluster.host_count,
+                    cluster.authorized_hosts,
+                    cluster.running_workers,
+                    cluster.reclaimed_workers,
+                    cluster.failed_workers,
+                )),
+                rows: cluster
+                    .host_ips
+                    .iter()
+                    .take(MAX_RESOURCE_BUS_ROWS)
+                    .map(|ip| truncate_bus_line(ip))
+                    .collect(),
+            });
+        }
+        Self {
+            version: VIEW_MODEL_VERSION,
+            generated_ms: bus.generated_ms,
+            sections,
+        }
+    }
+
+    pub fn section(&self, key: &str) -> Option<&ResourceBusSectionView> {
+        self.sections.iter().find(|section| section.key == key)
+    }
+
+    /// Deterministic line rendering shared by the TUI and text consumers. The
+    /// total line count is bounded by [`MAX_RESOURCE_BUS_LINES`].
+    pub fn lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        for section in &self.sections {
+            lines.push(format!("{}  {}", section.title, section.summary));
+            for row in &section.rows {
+                lines.push(format!("  {row}"));
+                if lines.len() >= MAX_RESOURCE_BUS_LINES {
+                    break;
+                }
+            }
+            if lines.len() >= MAX_RESOURCE_BUS_LINES {
+                break;
+            }
+        }
+        lines.truncate(MAX_RESOURCE_BUS_LINES);
+        lines
+    }
+
+    pub fn to_text(&self) -> String {
+        self.lines().join("\n")
+    }
+}
+
+fn truncate_bus_line(value: &str) -> String {
+    if value.chars().count() <= MAX_RESOURCE_BUS_LINE_BYTES {
+        return value.to_owned();
+    }
+    value.chars().take(MAX_RESOURCE_BUS_LINE_BYTES).collect()
+}
+
+fn optional_number(value: Option<f64>) -> String {
+    value
+        .map(|value| format!("{value:.2}"))
+        .unwrap_or_else(|| "n/a".into())
+}
+
+fn optional_bytes(value: Option<u64>) -> String {
+    value.map(format_bus_bytes).unwrap_or_else(|| "n/a".into())
+}
+
+fn format_bus_bytes(bytes: u64) -> String {
+    const UNITS: [(&str, u64); 4] = [
+        ("GiB", 1024 * 1024 * 1024),
+        ("MiB", 1024 * 1024),
+        ("KiB", 1024),
+        ("B", 1),
+    ];
+    for (label, scale) in UNITS {
+        if bytes >= scale {
+            return format!("{:.1} {label}", bytes as f64 / scale as f64);
+        }
+    }
+    "0 B".to_owned()
+}

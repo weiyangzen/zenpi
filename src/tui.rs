@@ -2552,6 +2552,16 @@ pub struct TuiState {
     /// control plane owns dispatch and aggregation; rendering only reads this
     /// small, credential-free value.
     cluster_snapshot: Option<crate::cluster::ClusterSnapshot>,
+    /// Unified resource/information bus (ZS1-161). Recomputed from the
+    /// individual host/LAN/cluster/budget/lease inputs whenever one changes so
+    /// the Resources pane and the external projection never disagree.
+    resource_bus: Option<crate::resources::ResourceBusSnapshot>,
+    /// Agent balance/budget signal folded into the bus. Set by the host that
+    /// owns the governance ledger; unavailable until then.
+    agent_budget: crate::resources::AgentBudgetSignal,
+    /// Local development-port leases folded into the bus (ZS1-161). Bounded,
+    /// in-memory ownership ledger with expiry-based preemption.
+    port_leases: crate::resources::PortLeaseRegistry,
     /// Last valid Blueprint/Goal projection. Collection and store validation
     /// happen on a dedicated bounded worker in the production host.
     gantt_snapshot: Option<GanttPaneSnapshot>,
@@ -2711,6 +2721,9 @@ impl TuiState {
             resource_block_index: 0,
             resource_open_block: None,
             cluster_snapshot: None,
+            resource_bus: None,
+            agent_budget: crate::resources::AgentBudgetSignal::unavailable(),
+            port_leases: crate::resources::PortLeaseRegistry::new(),
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
             terminal_snapshot: "No local shell result".into(),
@@ -4178,6 +4191,7 @@ impl TuiState {
     pub fn set_resource_snapshot(&mut self, snapshot: crate::resources::ResourceSnapshot) {
         self.resource_snapshot = Some(snapshot);
         self.resource_status = ResourcePaneStatus::Ready;
+        self.rebuild_resource_bus();
         self.dirty = true;
     }
 
@@ -4202,6 +4216,7 @@ impl TuiState {
             self.resource_block_index = self.resource_block_index.min(snapshot.blocks.len() - 1);
         }
         self.lan_snapshot = Some(snapshot);
+        self.rebuild_resource_bus();
         self.dirty = true;
     }
 
@@ -4257,6 +4272,7 @@ impl TuiState {
     /// pane.
     pub fn set_cluster_snapshot(&mut self, snapshot: crate::cluster::ClusterSnapshot) {
         self.cluster_snapshot = Some(snapshot);
+        self.rebuild_resource_bus();
         self.dirty = true;
     }
 
@@ -4267,6 +4283,7 @@ impl TuiState {
     /// Drop the cluster projection (e.g. after authorization is withdrawn).
     pub fn clear_cluster_snapshot(&mut self) {
         self.cluster_snapshot = None;
+        self.rebuild_resource_bus();
         self.dirty = true;
     }
 
@@ -4289,6 +4306,101 @@ impl TuiState {
             .as_ref()
             .map(|snapshot| snapshot.running_workers)
             .unwrap_or(0)
+    }
+
+    /// Rebuild the unified resource bus from the inputs the view currently
+    /// holds. Pure aggregation; no I/O and no locking. Called whenever one of
+    /// the contributing snapshots, the budget signal or a port lease changes.
+    fn rebuild_resource_bus(&mut self) {
+        let now = crate::resources::now_ms();
+        let Some(host) = self.resource_snapshot.as_ref() else {
+            self.resource_bus = None;
+            return;
+        };
+        let mut bus = crate::cluster::cluster_resource_bus(
+            host,
+            self.lan_snapshot.as_ref(),
+            self.cluster_snapshot.as_ref(),
+            now,
+        );
+        bus = bus.with_budget(self.agent_budget.clone());
+        bus = bus.with_ports(self.port_leases.snapshot(now));
+        self.resource_bus = Some(bus);
+    }
+
+    /// Last unified resource/information bus snapshot (ZS1-161).
+    pub fn resource_bus(&self) -> Option<&crate::resources::ResourceBusSnapshot> {
+        self.resource_bus.as_ref()
+    }
+
+    /// Bounded external projection of the unified bus, shared by the Resources
+    /// pane and text/JSON consumers.
+    pub fn resource_bus_projection(&self) -> Option<crate::view_model::ResourceBusProjection> {
+        self.resource_bus
+            .as_ref()
+            .map(crate::view_model::ResourceBusProjection::from_bus)
+    }
+
+    /// Publish the agent's balance/budget for the unified bus. The host owns
+    /// the governance ledger; this view only stores the read-only projection.
+    pub fn set_agent_budget(&mut self, budget: crate::resources::AgentBudgetSignal) {
+        self.agent_budget = budget;
+        self.rebuild_resource_bus();
+        self.dirty = true;
+    }
+
+    pub fn agent_budget(&self) -> &crate::resources::AgentBudgetSignal {
+        &self.agent_budget
+    }
+
+    /// Stage a local development-port lease and fold it into the bus. Fails
+    /// closed on conflict; it never overrides a live lease held by another
+    /// agent.
+    pub fn lease_dev_port(
+        &mut self,
+        port: u16,
+        owner: &str,
+        ttl_ms: u64,
+    ) -> Result<crate::resources::PortLease, crate::resources::PortLeaseError> {
+        let lease = self
+            .port_leases
+            .lease(port, owner, ttl_ms, crate::resources::now_ms())?;
+        self.rebuild_resource_bus();
+        self.dirty = true;
+        Ok(lease)
+    }
+
+    /// Release a lease held by `owner`.
+    pub fn release_dev_port(
+        &mut self,
+        port: u16,
+        owner: &str,
+    ) -> Result<crate::resources::PortLease, crate::resources::PortLeaseError> {
+        let lease = self
+            .port_leases
+            .release(port, owner, crate::resources::now_ms())?;
+        self.rebuild_resource_bus();
+        self.dirty = true;
+        Ok(lease)
+    }
+
+    /// Preempt stale leases (and optionally a cancelled owner's leases) and
+    /// fold the reclamation into the bus.
+    pub fn preempt_dev_ports(&mut self, owner: Option<&str>) -> usize {
+        let now = crate::resources::now_ms();
+        let mut preempted = self.port_leases.preempt_expired(now).len();
+        if let Some(owner) = owner {
+            preempted += self.port_leases.preempt_owner(owner, now).len();
+        }
+        if preempted > 0 {
+            self.rebuild_resource_bus();
+            self.dirty = true;
+        }
+        preempted
+    }
+
+    pub fn port_leases(&self) -> &crate::resources::PortLeaseRegistry {
+        &self.port_leases
     }
 
     /// Publish the active conversation's context usage so the resource monitor
@@ -9690,6 +9802,10 @@ impl TuiState {
             output.push_str("\n\n");
         }
         output.push_str(&lines.join("\n"));
+        if let Some(projection) = self.resource_bus_projection() {
+            output.push_str("\n\n");
+            output.push_str(&projection.to_text());
+        }
         output
     }
 

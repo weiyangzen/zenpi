@@ -961,3 +961,68 @@ pub fn shell_quote(value: &str) -> String {
     quoted.push('\'');
     quoted
 }
+
+// ---------------------------------------------------------------------------
+// ZS1-161: bridges from the LAN/cluster projections into the unified resource
+// and information bus. These are pure conversions of already-bounded values;
+// they never touch the network, the transport, or credentials.
+// ---------------------------------------------------------------------------
+
+/// Upper bound on host addresses carried by one bus section.
+pub const MAX_BUS_HOST_IPS: usize = 64;
+
+impl ClusterSnapshot {
+    /// Fold this cluster projection into the bus, keeping the credential-free
+    /// aggregate plus a bounded list of admitted host addresses.
+    pub fn bus_section(&self) -> crate::resources::ClusterBusSection {
+        let truncated = self.hosts.len() > MAX_BUS_HOST_IPS;
+        let host_ips = self
+            .hosts
+            .iter()
+            .take(MAX_BUS_HOST_IPS)
+            .map(|host| host.ip.clone())
+            .collect();
+        crate::resources::ClusterBusSection {
+            host_count: self.hosts.len(),
+            authorized_hosts: self.authorized_hosts,
+            total_workers: self.total_workers,
+            running_workers: self.running_workers,
+            reclaimed_workers: self.reclaimed_workers,
+            failed_workers: self.failed_workers,
+            host_ips,
+            truncated,
+        }
+    }
+}
+
+/// Fold a bounded LAN scan into the bus summary. Only counts and topology
+/// labels are retained; per-host detail stays in the LAN projection.
+pub fn lan_bus_section(snapshot: &LanSnapshot) -> crate::resources::LanBusSection {
+    crate::resources::LanBusSection {
+        local_ip: snapshot.local_ip.clone(),
+        gateway_ip: snapshot.gateway_ip.clone(),
+        host_count: snapshot.hosts.len(),
+        block_count: snapshot.blocks.len(),
+        truncated: snapshot.truncated,
+    }
+}
+
+/// Assemble the unified bus from host hardware plus the LAN and cluster
+/// projections the local control plane already holds. Budget and port leases
+/// are attached by their owners through the builder methods, so this function
+/// cannot invent accounting it was not given.
+pub fn cluster_resource_bus(
+    host: &crate::resources::ResourceSnapshot,
+    lan: Option<&LanSnapshot>,
+    cluster: Option<&ClusterSnapshot>,
+    now_ms: u64,
+) -> crate::resources::ResourceBusSnapshot {
+    let mut bus = crate::resources::ResourceBusSnapshot::from_host(host, now_ms);
+    if let Some(lan) = lan {
+        bus = bus.with_lan(lan_bus_section(lan));
+    }
+    if let Some(cluster) = cluster {
+        bus = bus.with_cluster(cluster.bus_section());
+    }
+    bus
+}

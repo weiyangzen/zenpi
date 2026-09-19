@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 
 use zenpi::cluster::{
     ClusterAuthorization, ClusterControlPlane, ClusterError, DispatchBackend, HostCapacity,
-    MAX_WORKERS_PER_HOST, RemoteWorker, SshDispatchBackend, WorkerProbe, WorkerSpec, WorkerState,
-    shell_quote,
+    MAX_BUS_HOST_IPS, MAX_WORKERS_PER_HOST, RemoteWorker, SshDispatchBackend, WorkerProbe,
+    WorkerSpec, WorkerState, cluster_resource_bus, lan_bus_section, shell_quote,
 };
 use zenpi::net_probe::{HostResources, LanHost, LanSnapshot, NetCredential, NetCredentials};
 
@@ -517,4 +517,161 @@ fn ssh_remote_command_quotes_prompts_and_omits_secrets() {
     // The generic quoter round-trips a hostile value safely.
     assert_eq!(shell_quote("a'b"), "'a'\\''b'");
     assert_eq!(shell_quote("plain"), "'plain'");
+}
+
+#[test]
+fn lan_and_cluster_project_into_the_unified_bus() {
+    let lan = snapshot(vec![
+        host(
+            "10.0.0.55",
+            &[22],
+            Some(resources(8, 16 * 1024 * 1024 * 1024)),
+        ),
+        host("10.0.0.56", &[22], None),
+    ]);
+    let lan_section = lan_bus_section(&lan);
+    assert_eq!(lan_section.local_ip, "10.0.0.14");
+    assert_eq!(lan_section.gateway_ip.as_deref(), Some("10.0.0.1"));
+    assert_eq!(lan_section.host_count, 2);
+    assert!(!lan_section.truncated);
+
+    let mut plane = ClusterControlPlane::new(
+        credentials(),
+        ClusterAuthorization::from_entries(["10.0.0.55"]),
+    );
+    plane.admit(&lan);
+    let backend = FixtureBackend::default();
+    plane
+        .dispatch(&WorkerSpec::headless("job", "s1"), &backend)
+        .unwrap();
+
+    let cluster = plane.snapshot();
+    let section = cluster.bus_section();
+    assert_eq!(section.host_count, 2);
+    assert_eq!(section.authorized_hosts, 1);
+    assert_eq!(section.total_workers, 1);
+    assert_eq!(section.running_workers, 1);
+    assert_eq!(
+        section.host_ips,
+        vec!["10.0.0.55".to_owned(), "10.0.0.56".to_owned()]
+    );
+    assert!(!section.truncated);
+}
+
+#[test]
+fn unified_bus_never_carries_cluster_credentials() {
+    let directory = tempfile::tempdir().unwrap();
+    let host_snapshot = zenpi::resources::ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    let lan = snapshot(vec![host(
+        "10.0.0.55",
+        &[22],
+        Some(resources(4, 8 * 1024 * 1024 * 1024)),
+    )]);
+    let mut plane = ClusterControlPlane::new(
+        credentials(),
+        ClusterAuthorization::from_entries(["10.0.0.55"]),
+    );
+    plane.admit(&lan);
+    let backend = FixtureBackend::default();
+    plane
+        .dispatch(&WorkerSpec::headless("job", "s1"), &backend)
+        .unwrap();
+
+    let bus = cluster_resource_bus(&host_snapshot, Some(&lan), Some(&plane.snapshot()), 42);
+    assert_eq!(bus.generated_ms, 42);
+    assert!(bus.lan.is_some());
+    assert!(bus.cluster.is_some());
+    assert_eq!(
+        bus.section_keys(),
+        vec!["host", "budget", "ports", "lan", "cluster"]
+    );
+    let json = serde_json::to_string(&bus).unwrap();
+    assert!(!json.contains("test-secret"), "credential leaked: {json}");
+    assert!(
+        !json.contains("password"),
+        "credential field leaked: {json}"
+    );
+}
+
+#[test]
+fn cluster_bus_section_bounds_host_addresses() {
+    let mut hosts = Vec::new();
+    for index in 0..MAX_BUS_HOST_IPS + 6 {
+        hosts.push(host(&format!("10.0.1.{}", index + 10), &[22], None));
+    }
+    let mut plane = ClusterControlPlane::new(credentials(), ClusterAuthorization::none());
+    assert_eq!(plane.admit(&snapshot(hosts)), MAX_BUS_HOST_IPS + 6);
+    let section = plane.snapshot().bus_section();
+    assert_eq!(section.host_count, MAX_BUS_HOST_IPS + 6);
+    assert_eq!(section.host_ips.len(), MAX_BUS_HOST_IPS);
+    assert!(section.truncated);
+    assert_eq!(
+        section.host_ips.first().map(String::as_str),
+        Some("10.0.1.10")
+    );
+}
+
+#[test]
+fn unified_bus_projects_to_bounded_credential_free_text() {
+    let directory = tempfile::tempdir().unwrap();
+    let host_snapshot = zenpi::resources::ResourceCollector::new(directory.path())
+        .unwrap()
+        .collect()
+        .unwrap();
+    let mut leases = zenpi::resources::PortLeaseRegistry::new();
+    leases
+        .lease(
+            3000,
+            "agent-a",
+            zenpi::resources::DEFAULT_PORT_LEASE_MS,
+            100,
+        )
+        .unwrap();
+    let budget = zenpi::resources::AgentBudgetSignal::from_usage(
+        (25, 100),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+        (0, 0),
+    );
+
+    let bus = zenpi::cluster::cluster_resource_bus(
+        &host_snapshot,
+        Some(&snapshot(vec![host(
+            "10.0.0.55",
+            &[22],
+            Some(resources(4, 8 * 1024 * 1024 * 1024)),
+        )])),
+        None,
+        100,
+    )
+    .with_budget(budget)
+    .with_ports(leases.snapshot(100));
+
+    let projection = zenpi::view_model::ResourceBusProjection::from_bus(&bus);
+    assert_eq!(projection.version, zenpi::view_model::VIEW_MODEL_VERSION);
+    for key in ["host", "budget", "ports", "lan"] {
+        assert!(projection.section(key).is_some(), "missing section {key}");
+    }
+    assert!(projection.section("cluster").is_none());
+    assert_eq!(projection.generated_ms, 100);
+    let lines = projection.lines();
+    assert!(lines.len() <= zenpi::view_model::MAX_RESOURCE_BUS_LINES);
+    let text = projection.to_text();
+    assert!(text.contains("Host"));
+    assert!(text.contains("Budget"));
+    assert!(text.contains("Ports"));
+    assert!(text.contains("port 3000"));
+    // The projection is serializable and carries no credential material.
+    let json = serde_json::to_string(&projection).unwrap();
+    assert!(!json.contains("test-secret"), "credential leaked: {json}");
+    assert!(
+        !json.contains("password"),
+        "credential field leaked: {json}"
+    );
 }

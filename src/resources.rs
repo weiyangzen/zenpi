@@ -8,6 +8,7 @@
 //! background worker (the work itself has explicit node/file/byte limits).
 
 use std::{
+    collections::BTreeMap,
     fs, io,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -1370,9 +1371,7 @@ fn process_cpu_time_ms() -> Option<u64> {
 fn timeval_to_ms(value: &libc::timeval) -> u64 {
     let seconds = u64::try_from(value.tv_sec).unwrap_or(0);
     let micros = u64::try_from(value.tv_usec).unwrap_or(0);
-    seconds
-        .saturating_mul(1000)
-        .saturating_add(micros / 1000)
+    seconds.saturating_mul(1000).saturating_add(micros / 1000)
 }
 
 /// Parse one `ps`-style duration (`MM:SS`, `HH:MM:SS`, or `DD-HH:MM:SS`) into
@@ -1470,12 +1469,9 @@ fn parse_headless_rows(
             break;
         }
         let mut fields = line.split_whitespace();
-        let (Some(pid), Some(rss), Some(cpu), Some(elapsed)) = (
-            fields.next(),
-            fields.next(),
-            fields.next(),
-            fields.next(),
-        ) else {
+        let (Some(pid), Some(rss), Some(cpu), Some(elapsed)) =
+            (fields.next(), fields.next(), fields.next(), fields.next())
+        else {
             continue;
         };
         let command: Vec<&str> = fields.collect();
@@ -1677,4 +1673,644 @@ fn unix_time_ms() -> u64 {
         .unwrap_or_default()
         .as_millis()
         .min(u128::from(u64::MAX)) as u64
+}
+
+/// Wall-clock milliseconds since the Unix epoch, saturating at `u64::MAX`.
+/// Exposed so hosts can stamp bus snapshots and leases consistently with the
+/// sampler clock instead of duplicating the conversion.
+pub fn now_ms() -> u64 {
+    unix_time_ms()
+}
+
+// ---------------------------------------------------------------------------
+// ZS1-161: unified resource and information bus.
+// The signals above are each owned by an independent subsystem (host probes,
+// LAN discovery, the headless cluster control plane, the governance budget
+// ledger, and local development-port leasing).  The bus below folds them into
+// one bounded, serializable snapshot so the Resources pane and the external
+// JSONL projection present a single consistent view instead of five unrelated
+// ones.  Nothing in this section performs I/O: it is pure aggregation, which is
+// what makes it safe to build on the terminal thread from already-collected
+// values.
+// ---------------------------------------------------------------------------
+
+/// Upper bound on staged local development-port leases retained at once.
+pub const MAX_PORT_LEASES: usize = 128;
+/// Ports below this are privileged and are never reserved by the bus.
+pub const MIN_DEV_PORT: u16 = 1024;
+/// Default lease lifetime for a local development port (15 minutes).
+pub const DEFAULT_PORT_LEASE_MS: u64 = 15 * 60 * 1000;
+/// Hard ceiling for a single lease (24 hours); prevents a never-expiring lease.
+pub const MAX_PORT_LEASE_MS: u64 = 24 * 60 * 60 * 1000;
+/// Longest retained lease owner label.
+pub const MAX_LEASE_OWNER_CHARS: usize = 96;
+/// Upper bound on lease rows carried by one snapshot.
+pub const MAX_PORT_LEASE_ROWS: usize = 32;
+
+/// A local development port is reservable only above the privileged range.
+pub const fn is_reservable_dev_port(port: u16) -> bool {
+    port >= MIN_DEV_PORT
+}
+
+/// One dimension of the agent budget ledger: durable usage against a ceiling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct BudgetDimension {
+    pub used: u64,
+    pub limit: u64,
+}
+
+impl BudgetDimension {
+    pub const fn new(used: u64, limit: u64) -> Self {
+        Self { used, limit }
+    }
+
+    /// Remaining balance, saturating at zero once exhausted.
+    pub const fn remaining(self) -> u64 {
+        self.limit.saturating_sub(self.used)
+    }
+
+    /// Fraction of the ceiling consumed, clamped to `0.0..=100.0`.
+    pub fn percent_used(self) -> f64 {
+        utilization_percent(self.used, self.limit)
+    }
+
+    /// A dimension with a non-zero ceiling that has been reached.
+    pub const fn exhausted(self) -> bool {
+        self.limit > 0 && self.used >= self.limit
+    }
+}
+
+/// A named budget dimension. The order matches the governance resource kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetKind {
+    InputTokens,
+    OutputTokens,
+    WallTime,
+    Disk,
+    Processes,
+    Concurrency,
+    NetworkRequests,
+}
+
+impl BudgetKind {
+    pub const ALL: [Self; 7] = [
+        Self::InputTokens,
+        Self::OutputTokens,
+        Self::WallTime,
+        Self::Disk,
+        Self::Processes,
+        Self::Concurrency,
+        Self::NetworkRequests,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::InputTokens => "input_tokens",
+            Self::OutputTokens => "output_tokens",
+            Self::WallTime => "wall_time",
+            Self::Disk => "disk",
+            Self::Processes => "processes",
+            Self::Concurrency => "concurrency",
+            Self::NetworkRequests => "network_requests",
+        }
+    }
+}
+
+/// Agent balance/budget signal: the remaining balance for every governance
+/// dimension, folded into the resource bus. A dimension with a zero ceiling is
+/// reported as unset rather than as an exhausted balance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AgentBudgetSignal {
+    pub input_tokens: BudgetDimension,
+    pub output_tokens: BudgetDimension,
+    pub wall_time: BudgetDimension,
+    pub disk: BudgetDimension,
+    pub processes: BudgetDimension,
+    pub concurrency: BudgetDimension,
+    pub network_requests: BudgetDimension,
+    pub status: SignalStatus,
+}
+
+impl AgentBudgetSignal {
+    /// Build a signal from a governance limits/usage pair. This is the single
+    /// mapping point from [`crate::governance`] primitives; the bus itself never
+    /// imports the ledger, so it stays usable from the standalone unit tests.
+    pub fn from_usage(
+        input_tokens: (u64, u64),
+        output_tokens: (u64, u64),
+        wall_time: (u64, u64),
+        disk: (u64, u64),
+        processes: (u64, u64),
+        concurrency: (u64, u64),
+        network_requests: (u64, u64),
+    ) -> Self {
+        Self {
+            input_tokens: BudgetDimension::new(input_tokens.0, input_tokens.1),
+            output_tokens: BudgetDimension::new(output_tokens.0, output_tokens.1),
+            wall_time: BudgetDimension::new(wall_time.0, wall_time.1),
+            disk: BudgetDimension::new(disk.0, disk.1),
+            processes: BudgetDimension::new(processes.0, processes.1),
+            concurrency: BudgetDimension::new(concurrency.0, concurrency.1),
+            network_requests: BudgetDimension::new(network_requests.0, network_requests.1),
+            status: SignalStatus::Available,
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self::default()
+    }
+
+    pub fn dimension(&self, kind: BudgetKind) -> BudgetDimension {
+        match kind {
+            BudgetKind::InputTokens => self.input_tokens,
+            BudgetKind::OutputTokens => self.output_tokens,
+            BudgetKind::WallTime => self.wall_time,
+            BudgetKind::Disk => self.disk,
+            BudgetKind::Processes => self.processes,
+            BudgetKind::Concurrency => self.concurrency,
+            BudgetKind::NetworkRequests => self.network_requests,
+        }
+    }
+
+    pub fn set_dimension(&mut self, kind: BudgetKind, used: u64, limit: u64) {
+        let dimension = BudgetDimension::new(used, limit);
+        match kind {
+            BudgetKind::InputTokens => self.input_tokens = dimension,
+            BudgetKind::OutputTokens => self.output_tokens = dimension,
+            BudgetKind::WallTime => self.wall_time = dimension,
+            BudgetKind::Disk => self.disk = dimension,
+            BudgetKind::Processes => self.processes = dimension,
+            BudgetKind::Concurrency => self.concurrency = dimension,
+            BudgetKind::NetworkRequests => self.network_requests = dimension,
+        }
+        self.status = SignalStatus::Available;
+    }
+
+    /// Remaining balance for one dimension.
+    pub fn remaining(&self, kind: BudgetKind) -> u64 {
+        self.dimension(kind).remaining()
+    }
+
+    /// True once any dimension that had a ceiling has been reached.
+    pub fn exhausted(&self) -> bool {
+        BudgetKind::ALL
+            .iter()
+            .any(|kind| self.dimension(*kind).exhausted())
+    }
+
+    /// Dimensions whose consumption is at or above `threshold_percent`.
+    pub fn low_balance(&self, threshold_percent: f64) -> Vec<BudgetKind> {
+        let threshold = threshold_percent.clamp(0.0, 100.0);
+        BudgetKind::ALL
+            .iter()
+            .copied()
+            .filter(|kind| {
+                let dimension = self.dimension(*kind);
+                dimension.limit > 0 && dimension.percent_used() >= threshold
+            })
+            .collect()
+    }
+}
+
+/// Lifecycle of a local development-port lease.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PortLeaseState {
+    Active,
+    Expired,
+    Preempted,
+    Released,
+}
+
+impl PortLeaseState {
+    pub const fn is_terminal(self) -> bool {
+        matches!(self, Self::Expired | Self::Preempted | Self::Released)
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Expired => "expired",
+            Self::Preempted => "preempted",
+            Self::Released => "released",
+        }
+    }
+}
+
+/// One bounded lease over a local development port, owned by an agent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortLease {
+    pub id: String,
+    pub port: u16,
+    pub owner: String,
+    pub state: PortLeaseState,
+    pub acquired_ms: u64,
+    pub renewed_ms: u64,
+    pub expires_ms: u64,
+}
+
+impl PortLease {
+    pub fn is_active(&self, now_ms: u64) -> bool {
+        self.state == PortLeaseState::Active && now_ms < self.expires_ms
+    }
+
+    pub fn is_stale(&self, now_ms: u64) -> bool {
+        self.state == PortLeaseState::Active && now_ms >= self.expires_ms
+    }
+
+    pub fn remaining_ms(&self, now_ms: u64) -> u64 {
+        if self.state != PortLeaseState::Active {
+            return 0;
+        }
+        self.expires_ms.saturating_sub(now_ms)
+    }
+}
+
+/// Explicit failures for local port leasing; callers fail closed and never
+/// silently take a port another agent already holds.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum PortLeaseError {
+    #[error("port {0} is outside the reservable range")]
+    InvalidPort(u16),
+    #[error("port lease owner is invalid: {0}")]
+    InvalidOwner(String),
+    #[error("port lease duration {0} ms is outside the allowed range")]
+    InvalidDuration(u64),
+    #[error("port {0} is already leased by another agent")]
+    Conflict(u16),
+    #[error("unknown port lease for port {0}")]
+    UnknownLease(u16),
+    #[error("unknown port lease id {0}")]
+    UnknownLeaseId(String),
+    #[error("port {0} is owned by another agent")]
+    NotOwner(u16),
+    #[error("port lease registry is full")]
+    Limit,
+}
+
+/// Bounded in-memory registry of local development-port leases. The registry
+/// performs no socket I/O: it is the durable ownership ledger the caller uses
+/// before binding, and it supports expiry-based preemption so a dead agent
+/// cannot permanently strand a port.
+#[derive(Debug, Clone, Default)]
+pub struct PortLeaseRegistry {
+    leases: BTreeMap<u16, PortLease>,
+    next_seq: u64,
+}
+
+impl PortLeaseRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.leases.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.leases.is_empty()
+    }
+
+    pub fn get(&self, port: u16) -> Option<&PortLease> {
+        self.leases.get(&port)
+    }
+
+    pub fn leases(&self) -> impl Iterator<Item = &PortLease> {
+        self.leases.values()
+    }
+
+    /// Active leases, bounded and sorted by port for deterministic output.
+    pub fn active(&self, now_ms: u64) -> Vec<&PortLease> {
+        self.leases
+            .values()
+            .filter(|lease| lease.is_active(now_ms))
+            .collect()
+    }
+
+    /// Acquire a lease on `port` for `owner`. Re-leasing a port the same owner
+    /// already holds is an idempotent renewal; a live lease held by another
+    /// owner is a hard conflict. A stale lease is preempted and replaced.
+    pub fn lease(
+        &mut self,
+        port: u16,
+        owner: &str,
+        ttl_ms: u64,
+        now_ms: u64,
+    ) -> Result<PortLease, PortLeaseError> {
+        if !is_reservable_dev_port(port) {
+            return Err(PortLeaseError::InvalidPort(port));
+        }
+        let owner = owner.trim();
+        if owner.is_empty() || owner.chars().count() > MAX_LEASE_OWNER_CHARS {
+            return Err(PortLeaseError::InvalidOwner(owner.to_owned()));
+        }
+        if owner.chars().any(char::is_control) {
+            return Err(PortLeaseError::InvalidOwner(owner.to_owned()));
+        }
+        if ttl_ms == 0 || ttl_ms > MAX_PORT_LEASE_MS {
+            return Err(PortLeaseError::InvalidDuration(ttl_ms));
+        }
+        if let Some(existing) = self.leases.get(&port) {
+            if existing.is_active(now_ms) && existing.owner != owner {
+                return Err(PortLeaseError::Conflict(port));
+            }
+        } else if self.leases.len() >= MAX_PORT_LEASES {
+            return Err(PortLeaseError::Limit);
+        }
+        let seq = self.next_seq;
+        self.next_seq = self.next_seq.saturating_add(1);
+        let acquired_ms = self
+            .leases
+            .get(&port)
+            .map(|lease| lease.acquired_ms)
+            .unwrap_or(now_ms);
+        let lease = PortLease {
+            id: format!("port-{port}-{seq:04}"),
+            port,
+            owner: owner.to_owned(),
+            state: PortLeaseState::Active,
+            acquired_ms,
+            renewed_ms: now_ms,
+            expires_ms: now_ms.saturating_add(ttl_ms),
+        };
+        self.leases.insert(port, lease.clone());
+        Ok(lease)
+    }
+
+    /// Renew a lease by id. Revives an expired lease because the holder is
+    /// explicitly asking for it back; never steals a lease from another owner.
+    pub fn renew(
+        &mut self,
+        id: &str,
+        owner: &str,
+        ttl_ms: u64,
+        now_ms: u64,
+    ) -> Result<PortLease, PortLeaseError> {
+        if ttl_ms == 0 || ttl_ms > MAX_PORT_LEASE_MS {
+            return Err(PortLeaseError::InvalidDuration(ttl_ms));
+        }
+        let owner = owner.trim();
+        let port = self
+            .leases
+            .values()
+            .find(|lease| lease.id == id)
+            .map(|lease| lease.port)
+            .ok_or_else(|| PortLeaseError::UnknownLeaseId(id.to_owned()))?;
+        let lease = self
+            .leases
+            .get_mut(&port)
+            .expect("lease located by id must exist");
+        if lease.owner != owner {
+            return Err(PortLeaseError::NotOwner(port));
+        }
+        lease.state = PortLeaseState::Active;
+        lease.renewed_ms = now_ms;
+        lease.expires_ms = now_ms.saturating_add(ttl_ms);
+        Ok(lease.clone())
+    }
+
+    /// Release a lease deliberately. Only the owning agent may release it.
+    pub fn release(
+        &mut self,
+        port: u16,
+        owner: &str,
+        now_ms: u64,
+    ) -> Result<PortLease, PortLeaseError> {
+        let owner = owner.trim();
+        match self.leases.get(&port) {
+            None => Err(PortLeaseError::UnknownLease(port)),
+            Some(lease) if lease.owner != owner => Err(PortLeaseError::NotOwner(port)),
+            Some(_) => {
+                let mut lease = self
+                    .leases
+                    .remove(&port)
+                    .expect("lease checked above must exist");
+                lease.state = PortLeaseState::Released;
+                lease.renewed_ms = now_ms;
+                Ok(lease)
+            }
+        }
+    }
+
+    /// Preempt every stale lease at `now_ms`, returning the reclaimed records.
+    /// This is the mechanism that stops a crashed agent from blocking a port
+    /// forever once its lease has elapsed.
+    pub fn preempt_expired(&mut self, now_ms: u64) -> Vec<PortLease> {
+        let stale: Vec<u16> = self
+            .leases
+            .values()
+            .filter(|lease| lease.is_stale(now_ms))
+            .map(|lease| lease.port)
+            .collect();
+        let mut preempted = Vec::with_capacity(stale.len());
+        for port in stale {
+            if let Some(mut lease) = self.leases.remove(&port) {
+                lease.state = PortLeaseState::Expired;
+                preempted.push(lease);
+            }
+        }
+        preempted
+    }
+
+    /// Preempt all active leases owned by `owner` (for example when a worker is
+    /// cancelled). Returns the reclaimed records.
+    pub fn preempt_owner(&mut self, owner: &str, now_ms: u64) -> Vec<PortLease> {
+        let owner = owner.trim();
+        let owned: Vec<u16> = self
+            .leases
+            .values()
+            .filter(|lease| lease.owner == owner)
+            .map(|lease| lease.port)
+            .collect();
+        let mut preempted = Vec::with_capacity(owned.len());
+        for port in owned {
+            if let Some(mut lease) = self.leases.remove(&port) {
+                lease.state = PortLeaseState::Preempted;
+                lease.renewed_ms = now_ms;
+                preempted.push(lease);
+            }
+        }
+        preempted
+    }
+
+    pub fn snapshot(&self, now_ms: u64) -> PortLeaseSnapshot {
+        let active = self
+            .leases
+            .values()
+            .filter(|lease| lease.is_active(now_ms))
+            .count();
+        let total = self.leases.len();
+        let mut rows: Vec<PortLease> = self.leases.values().cloned().collect();
+        let truncated = rows.len() > MAX_PORT_LEASE_ROWS;
+        rows.truncate(MAX_PORT_LEASE_ROWS);
+        PortLeaseSnapshot {
+            generated_ms: now_ms,
+            total,
+            active,
+            expired: total.saturating_sub(active),
+            rows,
+            truncated,
+        }
+    }
+}
+
+/// Read-only projection of the local port-lease registry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct PortLeaseSnapshot {
+    pub generated_ms: u64,
+    pub total: usize,
+    pub active: usize,
+    pub expired: usize,
+    pub rows: Vec<PortLease>,
+    pub truncated: bool,
+}
+
+impl PortLeaseSnapshot {
+    pub fn empty(now_ms: u64) -> Self {
+        Self {
+            generated_ms: now_ms,
+            ..Self::default()
+        }
+    }
+}
+
+/// Hardware half of the bus: CPU, memory, GPU and network plus headless
+/// footprint, derived from a completed [`ResourceSnapshot`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HostBusSection {
+    pub logical_cpus: usize,
+    pub load_one_minute: Option<f64>,
+    pub cpu_percent: f64,
+    pub memory_total_bytes: Option<u64>,
+    pub memory_available_bytes: Option<u64>,
+    pub memory_percent: f64,
+    pub gpu_devices: usize,
+    pub gpu_utilization_percent: Option<f64>,
+    pub network_received_bytes: Option<u64>,
+    pub network_transmitted_bytes: Option<u64>,
+    pub headless_workers: usize,
+    pub headless_exceeded: bool,
+}
+
+impl HostBusSection {
+    pub fn from_snapshot(snapshot: &ResourceSnapshot) -> Self {
+        let cpu_percent = (snapshot.cpu.load_one_minute.unwrap_or(0.0)
+            / snapshot.cpu.logical_cpus.max(1) as f64
+            * 100.0)
+            .clamp(0.0, 100.0);
+        let memory_percent = match (snapshot.memory.total_bytes, snapshot.memory.available_bytes) {
+            (Some(total), Some(available)) => {
+                utilization_percent(total.saturating_sub(available), total)
+            }
+            _ => 0.0,
+        };
+        let gpu_utilization_percent = snapshot
+            .gpu
+            .devices
+            .iter()
+            .filter_map(|device| device.utilization_percent)
+            .reduce(f64::max);
+        Self {
+            logical_cpus: snapshot.cpu.logical_cpus,
+            load_one_minute: snapshot.cpu.load_one_minute,
+            cpu_percent,
+            memory_total_bytes: snapshot.memory.total_bytes,
+            memory_available_bytes: snapshot.memory.available_bytes,
+            memory_percent,
+            gpu_devices: snapshot.gpu.devices.len(),
+            gpu_utilization_percent,
+            network_received_bytes: snapshot.network.received_bytes,
+            network_transmitted_bytes: snapshot.network.transmitted_bytes,
+            headless_workers: snapshot.headless.total,
+            headless_exceeded: snapshot.headless.exceeded,
+        }
+    }
+}
+
+/// LAN half of the bus. Kept as a small plain value so the resource module does
+/// not have to depend on the network probe and remains usable from the
+/// standalone unit tests; the cluster bridge constructs it from a real
+/// `LanSnapshot`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct LanBusSection {
+    pub local_ip: String,
+    pub gateway_ip: Option<String>,
+    pub host_count: usize,
+    pub block_count: usize,
+    pub truncated: bool,
+}
+
+/// Cluster half of the bus: the credential-free aggregate the control plane
+/// already exposes, plus the bounded list of admitted host addresses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ClusterBusSection {
+    pub host_count: usize,
+    pub authorized_hosts: usize,
+    pub total_workers: usize,
+    pub running_workers: usize,
+    pub reclaimed_workers: usize,
+    pub failed_workers: usize,
+    pub host_ips: Vec<String>,
+    pub truncated: bool,
+}
+
+/// The unified resource and information bus. This is the single snapshot the
+/// Resources pane renders and the external projection serializes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResourceBusSnapshot {
+    pub generated_ms: u64,
+    pub host: HostBusSection,
+    pub budget: AgentBudgetSignal,
+    pub ports: PortLeaseSnapshot,
+    pub lan: Option<LanBusSection>,
+    pub cluster: Option<ClusterBusSection>,
+}
+
+impl ResourceBusSnapshot {
+    /// Seed the bus from a completed host snapshot. Optional sections are
+    /// attached by the owner that actually holds them, so the bus never
+    /// fabricates cluster, budget or lease data it was not given.
+    pub fn from_host(snapshot: &ResourceSnapshot, now_ms: u64) -> Self {
+        Self {
+            generated_ms: now_ms,
+            host: HostBusSection::from_snapshot(snapshot),
+            budget: AgentBudgetSignal::unavailable(),
+            ports: PortLeaseSnapshot::empty(now_ms),
+            lan: None,
+            cluster: None,
+        }
+    }
+
+    pub fn with_budget(mut self, budget: AgentBudgetSignal) -> Self {
+        self.budget = budget;
+        self
+    }
+
+    pub fn with_ports(mut self, ports: PortLeaseSnapshot) -> Self {
+        self.ports = ports;
+        self
+    }
+
+    pub fn with_lan(mut self, lan: LanBusSection) -> Self {
+        self.lan = Some(lan);
+        self
+    }
+
+    pub fn with_cluster(mut self, cluster: ClusterBusSection) -> Self {
+        self.cluster = Some(cluster);
+        self
+    }
+
+    /// Section keys present in this snapshot, in stable render order.
+    pub fn section_keys(&self) -> Vec<&'static str> {
+        let mut keys = vec!["host", "budget", "ports"];
+        if self.lan.is_some() {
+            keys.push("lan");
+        }
+        if self.cluster.is_some() {
+            keys.push("cluster");
+        }
+        keys
+    }
 }
