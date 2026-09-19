@@ -11,6 +11,7 @@ use zenpi::net_probe::{HostResources, LanHost, LanSnapshot, NetCredential, NetCr
 fn resources(cpus: usize, memory: u64) -> HostResources {
     HostResources {
         os: Some("Ubuntu 24.04".into()),
+        hostname: Some("node-a".into()),
         kernel: Some("6.8.0".into()),
         cpu: Some("AMD Ryzen 9 7945HX".into()),
         logical_cpus: Some(cpus),
