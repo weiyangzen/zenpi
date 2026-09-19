@@ -9633,20 +9633,28 @@ impl TuiState {
                     && self.directory_picker.is_none()
                     && self.tab_rename.is_none()
                 {
-                    let column = self
+                    let (column, cursor_row) = self
                         .pty_shell
                         .as_ref()
-                        .map(|shell| shell.cursor_column())
-                        .unwrap_or(0);
+                        .map(|shell| shell.cursor())
+                        .unwrap_or((0, 0));
+                    let total = self
+                        .pty_shell
+                        .as_ref()
+                        .map(|shell| shell.line_count())
+                        .unwrap_or(1);
+                    let visible = usize::from(rows).max(1);
+                    let start = total.saturating_sub(visible);
+                    let relative = cursor_row.saturating_sub(start);
                     let inner_x = pane.rect.x.saturating_add(1);
+                    let inner_y = pane.rect.y.saturating_add(1);
                     let inner_w = pane.rect.width.saturating_sub(2).max(1);
+                    let inner_h = pane.rect.height.saturating_sub(2).max(1);
                     let x = inner_x
                         .saturating_add(u16::try_from(column).unwrap_or(u16::MAX).min(inner_w - 1));
-                    let y = pane
-                        .rect
-                        .bottom()
-                        .saturating_sub(2)
-                        .max(pane.rect.y.saturating_add(1));
+                    let y = inner_y.saturating_add(
+                        u16::try_from(relative).unwrap_or(u16::MAX).min(inner_h - 1),
+                    );
                     frame.set_cursor_position(Position::new(x, y));
                 }
             }
