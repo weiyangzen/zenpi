@@ -174,8 +174,9 @@ fn picker_confirmation_and_real_tools_bind_two_equal_basename_directories() {
         let label = state.project_label(state.active_project_index());
         assert!(label.starts_with("工作 folder"));
         if state.project_tab_count() > 2 {
+            // Equal basenames disambiguate by parent folder name, never a hash.
             assert!(label.contains("one") || label.contains("two"));
-            assert!(label.contains('#'));
+            assert!(!label.contains('#'));
         }
         assert_eq!(
             state
@@ -479,7 +480,7 @@ fn draw_session_selection(
     let area = terminal.backend().buffer().area;
     // Top project row + layer-2 sub-tab row + header, single-line composer
     // with borders, footer.
-    let workspace = ratatui::layout::Rect::new(0, 6, area.width, area.height - 10);
+    let workspace = ratatui::layout::Rect::new(0, 5, area.width, area.height - 9);
     zenpi::tui::BentoBoxLayoutAdapter::new(state.workspace_layout(), workspace)
         .visible_panes()
         .find(|pane| pane.id == zenpi::layout::PaneId::SessionList)
@@ -680,6 +681,34 @@ fn layer2_subtabs_default_reuse_and_manage() {
 }
 
 #[test]
+fn layer2_order_name_and_concurrency_survive_restart() {
+    let mut state = TuiState::default();
+    assert!(state.subtab_add_in_place(Some("scratch".into())));
+    assert!(state.subtab_rename(1, "renamed"));
+    assert!(state.subtab_concurrency(1, 3));
+    assert!(state.subtab_add_in_place(Some("two".into())));
+    assert!(state.subtab_move(1, 2));
+    assert!(state.subtab_select(1));
+
+    let before = state.subtabs();
+    let active = state.active_subtab();
+    assert_eq!(before.len(), 3);
+    assert_eq!(before[1].name, "two");
+    assert_eq!(before[2].name, "renamed");
+    assert_eq!(before[2].concurrency, 4);
+
+    let checkpoint = state.project_checkpoint();
+    let mut restored = TuiState::default();
+    assert!(restored.restore_project_checkpoint(&checkpoint));
+    assert_eq!(
+        restored.subtabs(),
+        before,
+        "order/name/concurrency restored"
+    );
+    assert_eq!(restored.active_subtab(), active, "active sub-tab restored");
+}
+
+#[test]
 fn worktree_helpers_create_list_and_remove() {
     use std::process::Command;
     let repo = tempdir().unwrap();
@@ -832,7 +861,7 @@ fn mouse_drag_reorders_project_and_subtab_rows() {
     state.handle_mouse(mouse(MouseEventKind::Drag(MouseButton::Left), two, trow));
     state.handle_mouse(mouse(MouseEventKind::Up(MouseButton::Left), two, trow));
     let names: Vec<String> = state.subtabs().into_iter().map(|tab| tab.name).collect();
-    assert_eq!(names, &["gamma", "two", "one"]);
+    assert_eq!(names, &["main", "two", "one"]);
 }
 
 #[test]

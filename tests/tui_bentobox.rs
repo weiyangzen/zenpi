@@ -268,6 +268,84 @@ fn resource_refresh_interval_is_five_seconds() {
     assert_eq!(RESOURCE_REFRESH_INTERVAL, std::time::Duration::from_secs(5));
 }
 
+fn lan_fixture_snapshot() -> zenpi::net_probe::LanSnapshot {
+    use zenpi::net_probe::{DeviceClass, LanBlock, LanHost, LanSnapshot};
+    let mut local = LanHost::new("10.20.30.14");
+    local.mac = Some("9c:76:0e:7d:3c:27".into());
+    local.vendor = Some("Apple".into());
+    local.class = DeviceClass::Local;
+    local.open_ports = vec![22, 5900];
+    let mut gateway = LanHost::new("10.20.30.1");
+    gateway.class = DeviceClass::Gateway;
+    gateway.open_ports = vec![80];
+    let mut nas = LanHost::new("10.20.30.177");
+    nas.class = DeviceClass::Nas;
+    nas.vendor = Some("Synology".into());
+    nas.open_ports = vec![445, 5000, 5001];
+    let hosts = vec![local, gateway, nas];
+    let blocks = vec![
+        LanBlock {
+            class: DeviceClass::Local,
+            title: "本机 (1)".into(),
+            host_indices: vec![0],
+        },
+        LanBlock {
+            class: DeviceClass::Gateway,
+            title: "网关 (1)".into(),
+            host_indices: vec![1],
+        },
+        LanBlock {
+            class: DeviceClass::Nas,
+            title: "存储(NAS) (1)".into(),
+            host_indices: vec![2],
+        },
+    ];
+    LanSnapshot {
+        local_ip: "10.20.30.14".into(),
+        gateway_ip: Some("10.20.30.1".into()),
+        hosts,
+        blocks,
+        scanned_at_ms: 1,
+        truncated: false,
+    }
+}
+
+#[test]
+fn resources_pane_groups_lan_hosts_into_blocks_with_drilldown() {
+    let mut terminal = Terminal::new(TestBackend::new(180, 70)).unwrap();
+    let mut state = TuiState::default();
+    state.set_lan_snapshot(lan_fixture_snapshot());
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+
+    let output: String = rendered(&terminal)
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    assert!(output.contains("LAN10.20.30.0/24"), "{output}");
+    assert!(output.contains("本机(1)"), "{output}");
+    assert!(output.contains("网关(1)"), "{output}");
+    assert!(output.contains("存储(NAS)(1)"), "{output}");
+
+    // Drill into the storage block and verify the detail table columns.
+    state.move_resource_block(2);
+    state.activate_resource_block();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    let detail = rendered(&terminal);
+    assert!(detail.contains("10.20.30.177"));
+    assert!(detail.contains("Synology"));
+    assert!(detail.contains("5000,5001"), "{detail}");
+
+    state.close_resource_block();
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    assert!(rendered(&terminal).contains("LAN 10.20.30.0/24"));
+}
+
 #[test]
 fn production_gantt_pane_renders_bounded_domain_projection() {
     let dir = tempdir().unwrap();
@@ -745,7 +823,7 @@ fn discussion_prompt_is_grouped_with_the_left_column_conversation() {
     assert!(output.contains("draft"));
     // The prompt is rendered inside the conversation pane, so it keeps the
     // left column width and never spills into the center/right columns.
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 28));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 29));
     let conversation = adapter.pane(PaneId::ProjectConversation).unwrap();
     let (_, prompt) = zenpi::layout::conversation_prompt_group(
         zenpi::layout::PaneRect::new(
@@ -864,7 +942,7 @@ fn arch_master_prompt_is_grouped_in_the_left_column() {
     assert!(output.contains("!echo hi"));
 
     // The rendered prompt shares the arch pane's exact left-column width.
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 28));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 29));
     let arch = adapter.pane(PaneId::Arch).unwrap().rect;
     let (_, prompt) = zenpi::layout::arch_prompt_group(
         zenpi::layout::PaneRect::new(arch.x, arch.y, arch.width, arch.height),

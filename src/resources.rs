@@ -33,6 +33,34 @@ pub const MAX_PROCESSES_SCANNED: usize = 8_192;
 pub const MAX_GPU_DEVICES: usize = 8;
 /// Longest device/command label retained from an external probe.
 pub const MAX_DEVICE_LABEL_CHARS: usize = 48;
+/// Widest proportional utilization bar rendered by the compact monitor.
+pub const MAX_BAR_WIDTH: usize = 24;
+
+/// Clamp a used/total ratio into a `0.0..=100.0` percentage. A zero total is
+/// reported as `0.0` rather than `NaN`/`inf`, so a caller can always render it.
+pub fn utilization_percent(used: u64, total: u64) -> f64 {
+    if total == 0 {
+        return 0.0;
+    }
+    ((used as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+}
+
+/// Render a fixed-width proportional bar such as `█████░░░`. The result is
+/// always exactly `width` display columns wide so a caller can align columns.
+pub fn render_bar(percent: f64, width: usize) -> String {
+    let width = width.min(MAX_BAR_WIDTH);
+    if width == 0 {
+        return String::new();
+    }
+    let clamped = percent.clamp(0.0, 100.0);
+    let filled = ((clamped / 100.0) * width as f64).round() as usize;
+    let filled = filled.min(width);
+    let mut bar = String::with_capacity(width * 3);
+    for index in 0..width {
+        bar.push(if index < filled { '█' } else { '░' });
+    }
+    bar
+}
 
 #[derive(Debug, Error)]
 pub enum ResourceError {
@@ -532,7 +560,7 @@ fn cpu_signal() -> CpuSignal {
     let logical_cpus = std::thread::available_parallelism()
         .map(usize::from)
         .unwrap_or(1);
-    let load_one_minute = linux_load_one_minute();
+    let load_one_minute = load_one_minute();
     CpuSignal {
         logical_cpus,
         load_one_minute,
@@ -564,7 +592,11 @@ fn memory_signal() -> MemorySignal {
             },
         };
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        macos_memory_signal()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         MemorySignal {
             total_bytes: None,
@@ -634,8 +666,10 @@ fn process_signal() -> ProcessSignal {
     let pid = std::process::id();
     #[cfg(target_os = "linux")]
     let resident_bytes = read_proc_statm_resident();
-    #[cfg(not(target_os = "linux"))]
-    let resident_bytes = None;
+    #[cfg(all(unix, not(target_os = "linux")))]
+    let resident_bytes = unix_ps_resident(pid);
+    #[cfg(not(unix))]
+    let resident_bytes: Option<u64> = None;
     ProcessSignal {
         pid,
         resident_bytes,
@@ -889,16 +923,136 @@ fn unix_process_summary() -> ProcessSummary {
     }
 }
 
-fn linux_load_one_minute() -> Option<f64> {
+#[cfg(all(unix, not(target_os = "linux")))]
+fn unix_ps_resident(pid: u32) -> Option<u64> {
+    let output = std::process::Command::new("ps")
+        .args(["-o", "rss=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let kib: u64 = text.trim().parse().ok()?;
+    kib.checked_mul(1024)
+}
+
+fn load_one_minute() -> Option<f64> {
     #[cfg(target_os = "linux")]
     {
         let text = fs::read_to_string("/proc/loadavg").ok()?;
         return text.split_whitespace().next()?.parse().ok();
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        macos_load_one_minute()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         None
     }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_load_one_minute() -> Option<f64> {
+    // `vm.loadavg` is an array of three C `double`s (1/5/15 minute). Reading it
+    // through `sysctlbyname` avoids spawning a process on every refresh.
+    let mut value = [0.0f64; 3];
+    let mut size = std::mem::size_of_val(&value);
+    let name = b"vm.loadavg\0";
+    // SAFETY: `name` is NUL-terminated, `value`/`size` describe a writable
+    // buffer of exactly `size` bytes, and the fourth/fifth arguments are null.
+    let result = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr() as *const libc::c_char,
+            value.as_mut_ptr() as *mut libc::c_void,
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if result != 0 || size < std::mem::size_of::<f64>() {
+        return None;
+    }
+    Some(value[0])
+}
+
+#[cfg(target_os = "macos")]
+fn macos_sysctl_u64(name: &str) -> Option<u64> {
+    let c_name = std::ffi::CString::new(name).ok()?;
+    let mut value = 0u64;
+    let mut size = std::mem::size_of::<u64>();
+    // SAFETY: `c_name` is NUL-terminated and `value`/`size` describe a
+    // writable buffer of exactly `size` bytes.
+    let result = unsafe {
+        libc::sysctlbyname(
+            c_name.as_ptr(),
+            &mut value as *mut u64 as *mut libc::c_void,
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if result != 0 || size < std::mem::size_of::<u64>() {
+        return None;
+    }
+    Some(value)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_memory_signal() -> MemorySignal {
+    let total_bytes = macos_sysctl_u64("hw.memsize");
+    let page_size = macos_sysctl_u64("hw.pagesize").unwrap_or(4096);
+    let available_bytes = macos_available_bytes(page_size);
+    MemorySignal {
+        status: if total_bytes.is_some() && available_bytes.is_some() {
+            SignalStatus::Available
+        } else {
+            SignalStatus::Unavailable
+        },
+        total_bytes,
+        available_bytes,
+    }
+}
+
+/// Best-effort "available" memory from `vm_stat`: free plus inactive plus
+/// speculative pages, which approximates what the OS can reclaim without
+/// swapping. Missing counters degrade to `None` instead of a fabricated value.
+#[cfg(target_os = "macos")]
+fn macos_available_bytes(page_size: u64) -> Option<u64> {
+    let output = std::process::Command::new("vm_stat").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut pages = 0u64;
+    let mut saw = false;
+    for line in text.lines() {
+        let Some((label, rest)) = line.split_once(':') else {
+            continue;
+        };
+        let label = label.trim();
+        if !matches!(
+            label,
+            "Pages free" | "Pages inactive" | "Pages speculative" | "Pages purgeable"
+        ) {
+            continue;
+        }
+        let value: u64 = rest
+            .trim()
+            .trim_end_matches('.')
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse()
+            .ok()?;
+        pages = pages.saturating_add(value);
+        saw = true;
+    }
+    if !saw {
+        return None;
+    }
+    pages.checked_mul(page_size)
 }
 
 #[cfg(target_os = "linux")]

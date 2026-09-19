@@ -158,3 +158,20 @@ fn workspace_walk_does_not_follow_symlinks() {
     assert_eq!(summary.files, 0);
     assert!(summary.truncated);
 }
+
+#[test]
+fn utilization_bars_are_fixed_width_and_clamped() {
+    use resources::{MAX_BAR_WIDTH, render_bar, utilization_percent};
+
+    assert_eq!(utilization_percent(0, 0), 0.0);
+    assert_eq!(utilization_percent(1, 2), 50.0);
+    assert_eq!(utilization_percent(3, 2), 100.0);
+
+    let bar = render_bar(50.0, 8);
+    assert_eq!(bar.chars().count(), 8);
+    assert!(bar.starts_with("████"), "{bar}");
+    assert!(render_bar(0.0, 4).chars().all(|c| c == '░'));
+    assert!(render_bar(100.0, 4).chars().all(|c| c == '█'));
+    assert_eq!(render_bar(50.0, 0), "");
+    assert!(render_bar(50.0, MAX_BAR_WIDTH + 5).chars().count() <= MAX_BAR_WIDTH);
+}

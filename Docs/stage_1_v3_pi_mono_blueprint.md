@@ -4,9 +4,9 @@
 
 ```yaml
 schema_version: execution-blueprint/stage1
-blueprint_version: 3.1.22
-revision_date: 2026-09-13
-review_date: 2026-09-13
+blueprint_version: 3.1.29
+revision_date: 2026-09-18
+review_date: 2026-09-18
 status: bootstrap-active
 authoritative: true
 predecessor: none
@@ -318,11 +318,14 @@ proposed 文件/脚本当前不存在：ZS1-001 创建 validator；产品项创�
 - [x] **ZS1-150** — Goal 并入 Gantt；Gantt 以红黄绿渲染三态；layer `L3` | Depends: ZS1-091 | Owner scope: Gantt 投影与配色 owner | Owned paths: `src/tui.rs`, `src/view_model.rs`, `src/layout.rs`, `tests/tui_bentobox.rs`, `tests/layout.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test layout | Rollback: 撤回配色与 Goal 合并，恢复原 Gantt/Goal | Estimate: [ ][_][x] → 柔和红黄绿；Plan 信息并入 Gantt | Estimated LOC: 900
 - [x] **ZS1-151** — 右下 Execution 区域改为内嵌终端；layer `L3` | Depends: ZS1-130,ZS1-129 | Owner scope: 内嵌 PTY 终端 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs`, `tools/tui_user_shell_smoke.py` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox；python3 tools/tui_user_shell_smoke.py --binary target/release/zenpi | Rollback: 撤回内嵌终端，恢复 Execution 只读投影 | Estimate: Execution pane 承载真实 PTY 终端 | Estimated LOC: 2000
 - [x] **ZS1-152** — 区域级 model 与并发语义：讨论区/arch 区各自可选模型且单并发，worker 并发=项目定义数；layer `L3` | Depends: ZS1-147,ZS1-148 | Owner scope: 区域模型选择与并发配额 owner | Owned paths: `src/tui.rs`, `src/config.rs`, `src/core.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE；cargo test --locked --test tui_interaction --test config | Rollback: 撤回区域级配置，恢复全局 model | Estimate: 讨论=单并发、arch=单并发、worker=项目定义数；每区可独立选模型 | Estimated LOC: 1800
-- [x] **ZS1-153** — 顶部 6 行信息头：左上竖排 ZENPI logo；右侧一层 workspaces（` zenpi [-] || name [-] || … || [+]`，名字=文件夹名，≤20 字符，自动换行最多 3 行，过多则按宽度均分截断）与二层 Worktrees（`└ Worktrees: name ↑N↓ [-] || … || [+]`，默认名=当前分支或 main，可编辑）；移除含糊的 Ready/model/token 状态行；layer `L3` | Depends: ZS1-146 | Owner scope: 头部信息区布局、命名与渲染 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/tui_bentobox.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test tui_project_workspace | Rollback: 撤回头部重排，恢复两行 tab+状态行 | Estimate: 6 行 header、双层换行与均分、命名对齐文件夹/分支 | Estimated LOC: 2200
-- [ ] **ZS1-154** — 资源区 htop/nvidia-smi 化：缺 htop/nvidia-smi 时启动请求权限自动安装并抽取；彩色利用率条；修复 CPU/GPU 不显示；大小写美观；layer `L3` | Depends: ZS1-149 | Owner scope: 外部监控工具与资源渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `tools/install_monitors.sh`, `tests/resources.rs` | Validators: G-CODE；cargo test --locked --test resources | Rollback: 撤回外部工具依赖，恢复纯内建采样 | Estimate: 安装/探测 htop+nvidia-smi，彩色 CPU/GPU/内存/网络 | Estimated LOC: 2200
+- [x] **ZS1-153** — 顶部 6 行信息头：左上竖排 ZENPI logo；右侧一层 workspaces（` zenpi [-] ｜ name [-] ｜ … ｜ [+]`，名字=文件夹名，≤20 字符，自动换行最多 3 行，过多则按宽度均分截断）与二层 Worktrees（`└ Worktrees: name ↑N↓ [-] ｜ … ｜ [+]`，默认名=当前分支或 main，可编辑）；移除含糊的 Ready/model/token 状态行；layer `L3` | Depends: ZS1-146 | Owner scope: 头部信息区布局、命名与渲染 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/tui_bentobox.rs`, `tests/tui_project_workspace.rs` | Validators: G-CODE；cargo test --locked --test tui_bentobox --test tui_project_workspace | Rollback: 撤回头部重排，恢复两行 tab+状态行 | Estimate: 6 行 header、双层换行与均分、命名对齐文件夹/分支 | Estimated LOC: 2200
+- [x] **ZS1-154** — 资源区 htop/nvidia-smi 化：缺 htop/nvidia-smi 时启动请求权限自动安装并抽取；彩色利用率条；修复 CPU/GPU 不显示；大小写美观；layer `L3` | Depends: ZS1-149 | Owner scope: 外部监控工具与资源渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `tools/install_monitors.sh`, `tests/resources.rs` | Validators: G-CODE；cargo test --locked --test resources | Rollback: 撤回外部工具依赖，恢复纯内建采样 | Estimate: 安装/探测 htop+nvidia-smi，彩色 CPU/GPU/内存/网络 | Estimated LOC: 2200
 - [x] **ZS1-155** — 右下 Shell（替换 Execution）：默认对齐当前项目 workspace/worktree 的交互式 shell；layer `L3` | Depends: ZS1-151 | Owner scope: 内嵌 shell 生命周期 owner | Owned paths: `src/tui.rs`, `src/layout.rs`, `src/tool_runtime.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_bentobox | Rollback: 撤回 shell 改造，恢复只读投影 | Estimate: pane 更名 Shell 并默认起交互 shell | Estimated LOC: 1600
-- [ ] **ZS1-156** — 左上 Conversation 与左下 Arch 各自独立 agent runtime session 与独立 model、独立 Prompt：两个逻辑会话同时打开，绝对独立；layer `L5` | Depends: ZS1-147,ZS1-148,ZS1-152 | Owner scope: 双独立会话 owner 与输入端口 owner | Owned paths: `src/tui.rs`, `src/core.rs`, `src/project_workspace.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_interaction --test config | Rollback: 撤回双会话，恢复单会话共享 | Estimate: 两个 runtime session 与各自 model/输入/审批 | Estimated LOC: 3000
-- [ ] **ZS1-157** — 退出重进持久化：进程中断/重启只影响一层 [+] 的默认 workspaces 添加逻辑，不丢失既有 workspaces/worktrees 及其顺序/命名/并发；layer `L3` | Depends: ZS1-146,ZS1-153 | Owner scope: 项目/子 tab 持久化与恢复 owner | Owned paths: `src/project_workspace.rs`, `src/tui.rs`, `src/session.rs`, `tests/tui_project_workspace.rs`, `tests/session_recovery.rs` | Validators: G-CODE；cargo test --locked --test tui_project_workspace --test session_recovery | Rollback: 撤回持久化扩展，保留内存态 | Estimate: workspaces/worktrees 顺序/命名/并发持久化与重启恢复 | Estimated LOC: 1400
+- [x] **ZS1-156** — 左上 Conversation 与左下 Arch 各自独立 agent runtime session 与独立 model、独立 Prompt：两个逻辑会话同时打开，绝对独立；layer `L5` | Depends: ZS1-147,ZS1-148,ZS1-152 | Owner scope: 双独立会话 owner 与输入端口 owner | Owned paths: `src/tui.rs`, `src/core.rs`, `src/project_workspace.rs`, `src/view_model.rs`, `tests/tui_interaction.rs`, `tests/config.rs` | Validators: G-CODE、G-HOST；cargo test --locked --test tui_interaction --test config | Rollback: 撤回双会话，恢复单会话共享 | Estimate: 两个 runtime session 与各自 model/输入/审批 | Estimated LOC: 3000
+- [x] **ZS1-157** — 退出重进持久化：进程中断/重启只影响一层 [+] 的默认 workspaces 添加逻辑，不丢失既有 workspaces/worktrees 及其顺序/命名/并发；layer `L3` | Depends: ZS1-146,ZS1-153 | Owner scope: 项目/子 tab 持久化与恢复 owner | Owned paths: `src/project_workspace.rs`, `src/tui.rs`, `src/session.rs`, `tests/tui_project_workspace.rs`, `tests/session_recovery.rs` | Validators: G-CODE；cargo test --locked --test tui_project_workspace --test session_recovery | Rollback: 撤回持久化扩展，保留内存态 | Estimate: workspaces/worktrees 顺序/命名/并发持久化与重启恢复 | Estimated LOC: 1400
+- [x] **ZS1-158** — 局域网资源网络感知：Resources 分区（本机/网关/各组主机/存储）+ 点进明细；无凭据时最大化感知（ARP/ICMP/端口指纹/mDNS/SSH banner），有凭据时用本地 secrets 抽取 CPU/内存/磁盘/GPU/服务；C 段扫描有界、只读、凭据不落库不打日志；layer `L3` | Depends: ZS1-149 | Owner scope: 局域网发现、凭据探测与渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `src/net_probe.rs`, `tools/net_probe.sh`, `tests/net_probe.rs` | Validators: G-CODE；cargo test --locked --test resources --test net_probe | Rollback: 撤回网络探测，恢复本机资源快照 | Estimate: 分区+明细、无凭据指纹、凭据抽取资源表 | Estimated LOC: 3200
+- [x] **ZS1-159** — Resources 网络分区块与点进明细：资源区先划分为「本机 / 网关 / 各组主机（mac / linux / 存储 / 其它）/ 存储」等可折叠块，每块只给汇总计数与最高层信息；键盘（Enter/方向键/Esc）与鼠标点击块进入该块明细表并返回；明细列含 IP、MAC、厂商、主机名/OS、开放端口/服务指纹，凭据可用时追加 CPU/内存/磁盘/GPU 列；layer `L3` | Depends: ZS1-158 | Owner scope: 区块投影、焦点导航与明细表渲染 owner | Owned paths: `src/resources.rs`, `src/tui.rs`, `src/layout.rs`, `src/view_model.rs`, `tests/net_probe.rs`, `tests/resources.rs`, `tests/tui_bentobox.rs` | Validators: G-CODE；cargo test --locked --test net_probe --test resources --test tui_bentobox | Rollback: 撤回分区块与明细导航，恢复 ZS1-158 的平铺列表 | Estimate: 块化渲染+块内焦点/返回+明细表（键盘+鼠标） | Estimated LOC: 1800
+- [x] **ZS1-160** — 无凭据局域网最大化感知与真实拓扑验收：无任何用户名/密码时在有界只读 /24 内做 ARP 表、ICMP 探测、常用端口指纹、mDNS/NetBIOS 名称、SSH banner 版本、HTTP title/Server 头与设备类型归类（thor / mac / linux / nas / printer / router / IoT / GPU 节点）；存在本地 secrets 时经 SSH 只读抽取 CPU 型号与核数、内存、磁盘总量/可用、GPU（nvidia-smi / rocm-smi / lspci）、发行版与内核、监听服务；凭据仅从本地 secrets 读取，不落库、不打日志、不外传；以真实 10.20.30.0/24 拓扑为验收夹具，须给出与 10.20.30.38 同组机器的列表、全段清单（1 thor + 若干 mac + 若干 linux + 2 NAS）及 CPU/内存/磁盘/GPU 表；layer `L3` | Depends: ZS1-158 | Owner scope: 无凭据指纹、凭据抽取与真实拓扑验收 owner | Owned paths: `src/net_probe.rs`, `src/resources.rs`, `src/tui.rs`, `tools/net_probe.sh`, `tests/net_probe.rs` | Validators: G-CODE；cargo test --locked --test net_probe | Rollback: 撤回指纹与凭据抽取，保留 ARP/ICMP 基本发现 | Estimate: 无凭据指纹+本地 secrets 抽取+真实拓扑验收 | Estimated LOC: 2200
 - [x] **ZS1-199** — Master 集成验收与阶段交付；layer `L6` | Depends: ZS1-065,ZS1-091,ZS1-117,ZS1-350,ZS1-128 | Owner scope: 仅整合本阶段证据与最终交付 | Owned paths: `Docs/stage_1_v3_pi_mono_blueprint.md`, `Docs/quality/stage1/acceptance.md`, `Docs/execution/active_requirement.json`, `README.md` | Validators: G-STAGE、G-RUST、G-PROD；所有依赖[x]且逐文件/目录覆盖闭包，零缺失或虚假行为证据 | Rollback: 撤回本阶段接受记录与活动指针切换，不删除用户或worker原始证据 | Estimate: 约1天独立主控复验与交付 | Estimated LOC: 0
 
 ## 6. 各产品项的完成定义
@@ -751,3 +754,27 @@ ZS1-128完成判据：逐个Codex交互条目映射实际操作与证据；每�
 ### 3.1.28 持久化与布局补充（ZS1-157）
 - 退出/中断/重启只影响一层 `[+]` 的“默认加 workspaces”逻辑；既有的 workspaces、worktrees 及其顺序、命名、并发数必须持久化并在重启后恢复，不能因 zenpi 进程中断导致工作中断。
 - 顶部 header 采用 logo（左，竖排 ZENPI，高 6 行）+ 双层 tab（右）**左右布局、无空隙**：一层 `workspaces` 最多 3 行换行，二层 `Worktrees` 最多 3 行换行；单项名字 ≤20 字符，过多时按宽度均分截断；二层默认名取当前分支（无则 `main`）且可编辑。
+
+### 3.1.29 局域网资源网络感知细化（新增 ZS1-159、ZS1-160，清单 144 项）
+
+用户要求（2026-09-18）：Resources 渲染**先划分成几个块，点进去看明细**；在没有用户名/密码时**最大化感知** C 段里自己能触达什么资源；下列真实拓扑同时作为验收夹具。3.1.29 只细化 ZS1-158 并新增 ZS1-159/ZS1-160，不改动此前已接受项的字节与义务。
+
+- **感知分层（无凭据优先）**：无任何凭据时，按有界只读顺序做 ARP 表读取、ICMP 存活探测、常用端口指纹、mDNS/NetBIOS 名称、SSH banner/版本、HTTP `title`/`Server` 头、TLS 证书 CN/SAN，并据 OUI 与端口归类设备类型（thor / mac / linux / nas / printer / router / IoT / GPU 节点）。任何一步失败都降级为该项 `Unavailable`，不得伪造或中止整轮扫描。
+- **有凭据增强**：仅当本地 secrets 中存在可用凭据时才经 SSH 只读抽取 CPU 型号与逻辑核数、内存总量、磁盘总量/可用、GPU（依次 `nvidia-smi`、`rocm-smi`、`lspci`）、发行版与内核、监听服务。凭据只从本地 secrets 读取，**不落库、不打日志、不写入结果文件、不外传**；在结果里只记“已用凭据/未用凭据”。
+- **区块与明细（ZS1-159）**：Resources 先渲染「本机 / 网关 / 各组主机（mac / linux / 存储 / 其它）/ 存储」等可折叠块，每块只显示汇总计数与最高层信息；键盘（Enter/方向键/Esc）与鼠标点击块进入该块明细表并返回上级；明细列含 IP、MAC、厂商、主机名/OS、开放端口/服务指纹，凭据可用时追加 CPU/内存/磁盘/GPU 列。
+- **边界**：/24 扫描有界（上限网段数、每主机端口数、并发数、每步超时、总时长），只读，不写入对端，不发起凭据猜测，不对公网地址扫描；所有输出走既有 `ResourceSnapshot`/渲染边界，截断必须显式标记。
+
+真实拓扑夹具（2026-09-18 从 `10.20.30.14` 观测；网关 `10.20.30.1` 为 MikroTik RouterBoard，全部同一二层 /24）：
+
+| 类别 | IP（观测） | 证据 |
+|---|---|---|
+| 网关 | `10.20.30.1` | RouterOS，22/80 |
+| thor（NVIDIA） | `10.20.30.167` | MAC `3c:6d:66`（NVIDIA）、OpenSSH Ubuntu、仅 22 |
+| mac | `.14`、`.15`、`.16`、`.182` | `netuser/REDACTED` 可连；M1 Ultra / M2 Max，macOS 26.x；另有 `.123` 等 AirPlay 端点 |
+| linux | `.21`、`.38`、`.55`、`.56`、`.155`、`.165`、`.168`、`.220`、`.228`、`.249` | `netuser/REDACTED` 可连，Ubuntu 22.04/24.04/26.04 |
+| NAS | `.177`（`nas-a`）、`.185` | Synology DiskStation，5000/5001/445/548 |
+| GPU 计算节点 | `.55`（EPYC 7B12、4×RTX3080）、`.56`（RTX4090D）、`.228`（RTX4090）、`.249`（9950X3D、2×RTX3090） | `lspci`+`nvidia-smi` |
+| `.38` 同型 7945HX 组 | `.21`、`.38`、`.155`、`.165`、`.168`、`.220` | 同批 AMD Ryzen 9 7945HX、32 逻辑核、约 92–96 GB 内存、约 3.6–3.7 TB 盘 |
+| 其它 | `.13` 得力 M2000DW 打印机、`.2/.3/.4` ASUS、`.19/.20` Mercury、`.254` Ruijie(MQTT)、若干随机 MAC 手机/IoT | 端口与 OUI |
+
+验收：在无凭据路径下也能给出上表的分类与 IP 清单；在提供上述凭据的夹具 run 中，须输出与 `10.20.30.38` 同组机器列表、全 50 网段清单（1 thor + 若干 mac + 若干 linux + 2 NAS）及每台 CPU/内存/磁盘/GPU 表格。夹具凭据只用于验收观测，不得进入产品代码、结果文件或日志。

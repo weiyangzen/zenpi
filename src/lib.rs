@@ -19,6 +19,7 @@ pub mod governance;
 pub mod headless;
 pub mod input_queue;
 pub mod layout;
+pub mod net_probe;
 pub mod persona;
 pub mod project_workspace;
 pub mod prompt_templates;

@@ -80,6 +80,9 @@ pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// cadence. Collection still runs on the single-slot worker so it never
 /// competes with interactive input.
 pub const RESOURCE_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
+/// The LAN topology changes slowly and a scan touches the network, so it
+/// refreshes far less often than the local host monitor (ZS1-158).
+pub const LAN_REFRESH_INTERVAL: Duration = Duration::from_secs(120);
 const MIN_LOOP_INTERVAL: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -2538,6 +2541,13 @@ pub struct TuiState {
     /// rendering only reads this small value and therefore never walks disk.
     resource_snapshot: Option<crate::resources::ResourceSnapshot>,
     resource_status: ResourcePaneStatus,
+    /// Last bounded LAN snapshot (ZS1-158). Global rather than per-project
+    /// because the local subnet does not depend on the active workspace.
+    lan_snapshot: Option<crate::net_probe::LanSnapshot>,
+    /// Selected block row in the Resources pane when no block is open.
+    resource_block_index: usize,
+    /// Block whose detail table is currently open, if any.
+    resource_open_block: Option<crate::net_probe::DeviceClass>,
     /// Last valid Blueprint/Goal projection. Collection and store validation
     /// happen on a dedicated bounded worker in the production host.
     gantt_snapshot: Option<GanttPaneSnapshot>,
@@ -2606,6 +2616,9 @@ pub struct TuiState {
     /// Last classified arch submission, drained by the host that owns the
     /// master session. The view layer never executes a command itself.
     arch_intent: Option<MasterSessionCommand>,
+    /// Set by an arch submission so the host routes it to the independent arch
+    /// runtime owner instead of the discussion owner (ZS1-156).
+    arch_submit_pending: bool,
     /// Whether the current frame renders the prompt inside the left column.
     dock_prompt: bool,
     palette_area: Rect,
@@ -2690,6 +2703,9 @@ impl TuiState {
             layout_resets: BTreeSet::new(),
             resource_snapshot: None,
             resource_status: ResourcePaneStatus::Idle,
+            lan_snapshot: None,
+            resource_block_index: 0,
+            resource_open_block: None,
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
             terminal_snapshot: "No local shell result".into(),
@@ -2727,6 +2743,7 @@ impl TuiState {
             arch_prompt_rect: None,
             master_busy: false,
             arch_intent: None,
+            arch_submit_pending: false,
             dock_prompt: false,
             palette_area: Rect::default(),
             palette_start: 0,
@@ -3056,7 +3073,7 @@ impl TuiState {
             self.project_subtabs.insert(
                 project.clone(),
                 vec![SubTab {
-                    name: project.clone(),
+                    name: "main".to_owned(),
                     root,
                     kind: SubTabKind::Main,
                     concurrency: 1,
@@ -3067,16 +3084,27 @@ impl TuiState {
     }
 
     /// Layer-2 tabs of the active project (default reuses the layer-1 data).
-    pub fn subtabs(&mut self) -> Vec<SubTab> {
-        self.ensure_subtabs();
-        self.project_subtabs
-            .get(self.active_project())
-            .cloned()
-            .unwrap_or_default()
+    pub fn subtabs(&self) -> Vec<SubTab> {
+        let project = self.active_project();
+        if let Some(tabs) = self.project_subtabs.get(project) {
+            return tabs.clone();
+        }
+        // Default layer-2 view reuses layer 1 and reads as the `main` worktree.
+        let root = self
+            .project_metadata
+            .get(project)
+            .map(|meta| meta.cwd.clone())
+            .filter(|cwd| !cwd.is_empty())
+            .unwrap_or_else(|| self.project_cwd().display().to_string());
+        vec![SubTab {
+            name: "main".to_owned(),
+            root,
+            kind: SubTabKind::Main,
+            concurrency: 1,
+        }]
     }
 
-    pub fn active_subtab(&mut self) -> usize {
-        self.ensure_subtabs();
+    pub fn active_subtab(&self) -> usize {
         *self.active_subtab.get(self.active_project()).unwrap_or(&0)
     }
 
@@ -3101,6 +3129,7 @@ impl TuiState {
             .unwrap_or(0);
         if index < len {
             self.active_subtab.insert(project, index);
+            self.project_checkpoint_dirty = true;
             true
         } else {
             false
@@ -3128,6 +3157,7 @@ impl TuiState {
         });
         let index = tabs.len() - 1;
         self.active_subtab.insert(project, index);
+        self.project_checkpoint_dirty = true;
         true
     }
 
@@ -3161,6 +3191,7 @@ impl TuiState {
         });
         let index = tabs.len() - 1;
         self.active_subtab.insert(project, index);
+        self.project_checkpoint_dirty = true;
         Ok(name)
     }
 
@@ -3187,6 +3218,7 @@ impl TuiState {
         } else if *active > index {
             *active -= 1;
         }
+        self.project_checkpoint_dirty = true;
         true
     }
 
@@ -3217,6 +3249,7 @@ impl TuiState {
         {
             self.active_subtab.insert(project, position);
         }
+        self.project_checkpoint_dirty = true;
         true
     }
 
@@ -3269,6 +3302,7 @@ impl TuiState {
             return false;
         }
         tabs[index].name = name.to_owned();
+        self.project_checkpoint_dirty = true;
         true
     }
 
@@ -3287,6 +3321,7 @@ impl TuiState {
             return false;
         }
         tabs[index].concurrency = next;
+        self.project_checkpoint_dirty = true;
         true
     }
 
@@ -3369,39 +3404,61 @@ impl TuiState {
     }
     pub fn project_label(&self, index: usize) -> String {
         let key = &self.project_tabs[index];
-        self.project_workspace
-            .as_ref()
-            .and_then(|w| w.tabs().iter().find(|t| t.id().as_str() == key))
-            .map(|tab| {
-                let duplicate = self
-                    .project_workspace
+        let cwd_of = |i: usize| -> Option<String> {
+            let k = &self.project_tabs[i];
+            self.project_metadata
+                .get(k)
+                .map(|meta| meta.cwd.clone())
+                .filter(|cwd| !cwd.is_empty())
+                .or_else(|| {
+                    self.project_workspace.as_ref().and_then(|workspace| {
+                        workspace
+                            .tabs()
+                            .iter()
+                            .find(|tab| tab.id().as_str() == k)
+                            .map(|tab| tab.cwd().display().to_string())
+                    })
+                })
+        };
+        let basename = |i: usize| -> Option<String> {
+            let cwd = cwd_of(i)?;
+            std::path::Path::new(&cwd)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned)
+        };
+        // Layer-1 tabs read as folder names, never as project-id hashes.
+        let name = basename(index)
+            .or_else(|| {
+                self.project_workspace
                     .as_ref()
-                    .unwrap()
-                    .tabs()
-                    .iter()
-                    .filter(|t| t.title() == tab.title())
-                    .count()
-                    > 1;
-                if duplicate {
-                    format!(
-                        "{} ·{} #{}",
-                        truncate_to_width(tab.title(), 12),
-                        truncate_to_width(
-                            &tab.cwd()
-                                .parent()
-                                .unwrap_or(tab.cwd())
-                                .file_name()
-                                .unwrap_or_default()
-                                .to_string_lossy(),
-                            6
-                        ),
-                        &tab.id().as_str()[..6]
-                    )
-                } else {
-                    tab.title().to_owned()
-                }
+                    .and_then(|workspace| {
+                        workspace
+                            .tabs()
+                            .iter()
+                            .find(|tab| tab.id().as_str() == key)
+                            .map(|tab| tab.title().to_owned())
+                    })
+                    .filter(|title| !title.is_empty() && !looks_like_hash(title))
             })
-            .unwrap_or_else(|| key.clone())
+            .unwrap_or_else(|| key.chars().take(12).collect());
+        let duplicates = (0..self.project_tabs.len())
+            .filter(|i| basename(*i).as_deref() == Some(name.as_str()))
+            .count();
+        if duplicates > 1
+            && let Some(parent) = cwd_of(index)
+                .and_then(|cwd| {
+                    std::path::Path::new(&cwd)
+                        .parent()
+                        .and_then(|parent| parent.file_name())
+                        .and_then(|name| name.to_str())
+                        .map(str::to_owned)
+                })
+        {
+            return format!("{name} ·{parent}");
+        }
+        name
     }
 
     /// Migrate legacy display-name keys to canonical directory IDs, preserving
@@ -3456,6 +3513,14 @@ impl TuiState {
             .position(|id| Some(id.as_str()) == workspace.active().map(|t| t.id().as_str()))
             .unwrap_or(0);
         self.project_name = self.project_tabs[self.active_project].clone();
+        for tab in workspace.tabs() {
+            let id = tab.id().as_str().to_owned();
+            let cwd = tab.cwd().display().to_string();
+            let entry = self.project_metadata.entry(id).or_default();
+            if entry.cwd.is_empty() {
+                entry.cwd = cwd;
+            }
+        }
         self.project_workspace = Some(workspace);
         self.project_checkpoint_dirty = true;
         self.cached_transcript = None;
@@ -3591,12 +3656,29 @@ impl TuiState {
                             "presets":draft.presets,"reasoning_folded":draft.ux.reasoning_folded})
                     }).unwrap_or_default()
                 };
+                // Persist layer-2 sub-tabs so a restart keeps their order,
+                // names, and harness concurrency (ZS1-157). The lazily created
+                // default `Main` tab is omitted so an untouched project keeps
+                // its historical checkpoint bytes.
+                let is_default_main = |tabs: &Vec<SubTab>| {
+                    tabs.len() == 1
+                        && tabs[0].kind == SubTabKind::Main
+                        && tabs[0].name == name.as_str()
+                        && tabs[0].concurrency == 1
+                };
+                let subtabs = self
+                    .project_subtabs
+                    .get(name)
+                    .filter(|tabs| !is_default_main(tabs));
+                let active_subtab = subtabs.and(self.active_subtab.get(name));
                 serde_json::json!({
                     "draft": draft,
                     "name": name,
                     "metadata": self.project_metadata.get(name),
                     "layout": layout,
                     "messages": messages,
+                    "subtabs": subtabs,
+                    "active_subtab": active_subtab,
                 })
             })
             .collect::<Vec<_>>();
@@ -3732,6 +3814,8 @@ impl TuiState {
         self.project_layouts.clear();
         self.project_metadata.clear();
         self.project_session_cursors.clear();
+        self.project_subtabs.clear();
+        self.active_subtab.clear();
         if let Some(metadata) = value.get("metadata") {
             self.project_metadata = serde_json::from_value(metadata.clone()).unwrap_or_default();
         }
@@ -3844,6 +3928,24 @@ impl TuiState {
                         serde_json::from_value::<ProjectTabMetadata>(metadata.clone())
                 {
                     self.project_metadata.insert(name.to_owned(), metadata);
+                }
+                if let Some(subtabs) = state.get("subtabs")
+                    && let Ok(subtabs) = serde_json::from_value::<Vec<SubTab>>(subtabs.clone())
+                {
+                    let bounded: Vec<SubTab> = subtabs
+                        .into_iter()
+                        .take(crate::project_workspace::MAX_PROJECT_SUBTABS)
+                        .filter(|tab| !tab.name.is_empty() && tab.name.len() <= 128)
+                        .collect();
+                    if !bounded.is_empty() {
+                        let active = state
+                            .get("active_subtab")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as usize;
+                        let active = active.min(bounded.len().saturating_sub(1));
+                        self.active_subtab.insert(name.to_owned(), active);
+                        self.project_subtabs.insert(name.to_owned(), bounded);
+                    }
                 }
             }
         }
@@ -4085,6 +4187,64 @@ impl TuiState {
     /// that a refresh reached the UI without coupling to rendered text.
     pub fn resource_snapshot(&self) -> Option<&crate::resources::ResourceSnapshot> {
         self.resource_snapshot.as_ref()
+    }
+
+    /// Publish a completed LAN scan for the Resources pane block list.
+    pub fn set_lan_snapshot(&mut self, snapshot: crate::net_probe::LanSnapshot) {
+        if snapshot.blocks.is_empty() {
+            self.resource_block_index = 0;
+        } else {
+            self.resource_block_index = self.resource_block_index.min(snapshot.blocks.len() - 1);
+        }
+        self.lan_snapshot = Some(snapshot);
+        self.dirty = true;
+    }
+
+    pub fn lan_snapshot(&self) -> Option<&crate::net_probe::LanSnapshot> {
+        self.lan_snapshot.as_ref()
+    }
+
+    pub fn resource_block_count(&self) -> usize {
+        self.lan_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.blocks.len())
+            .unwrap_or(0)
+    }
+
+    /// Move the block selection, wrapping at both ends so the list is always
+    /// reachable from the keyboard.
+    pub fn move_resource_block(&mut self, delta: isize) {
+        let count = self.resource_block_count();
+        if count == 0 {
+            self.resource_block_index = 0;
+            return;
+        }
+        let current = self.resource_block_index as isize;
+        let next = (current + delta).rem_euclid(count as isize);
+        self.resource_block_index = next as usize;
+        self.dirty = true;
+    }
+
+    /// Open the selected block's detail table. Returns a redraw either way.
+    pub fn activate_resource_block(&mut self) -> TuiAction {
+        let Some(snapshot) = self.lan_snapshot.as_ref() else {
+            return TuiAction::Redraw;
+        };
+        if let Some(block) = snapshot.blocks.get(self.resource_block_index) {
+            self.resource_open_block = Some(block.class);
+        }
+        self.dirty = true;
+        TuiAction::Redraw
+    }
+
+    pub fn open_resource_block(&mut self, class: crate::net_probe::DeviceClass) {
+        self.resource_open_block = Some(class);
+        self.dirty = true;
+    }
+
+    pub fn close_resource_block(&mut self) {
+        self.resource_open_block = None;
+        self.dirty = true;
     }
 
     /// Publish the active conversation's context usage so the resource monitor
@@ -4647,6 +4807,16 @@ impl TuiState {
     /// Which left-column prompt currently owns keyboard focus (ZS1-148).
     pub fn left_prompt(&self) -> LeftPrompt {
         self.left_prompt
+    }
+
+    /// Mark the next submission as an arch master-session turn so the host
+    /// routes it to the independent arch runtime owner (ZS1-156).
+    pub fn set_arch_submit_pending(&mut self) {
+        self.arch_submit_pending = true;
+    }
+
+    pub fn take_arch_submit_pending(&mut self) -> bool {
+        std::mem::take(&mut self.arch_submit_pending)
     }
 
     /// Focus a left-column prompt without mutating either draft.
@@ -6684,6 +6854,24 @@ impl TuiState {
                         return TuiAction::Redraw;
                     }
                 }
+                if pane.id == PaneId::Resources {
+                    // Clicking a block row enters its detail table; clicking
+                    // again closes it. Content line 0 is the LAN header, so the
+                    // first block row is two cells below the pane's top border.
+                    if self.resource_open_block.is_some() {
+                        self.close_resource_block();
+                        return TuiAction::Redraw;
+                    }
+                    let scroll =
+                        usize::from(*self.pane_scroll.get(&PaneId::Resources).unwrap_or(&0));
+                    let row =
+                        usize::from(mouse.row.saturating_sub(pane.rect.y.saturating_add(2))) + scroll;
+                    if row < self.resource_block_count() {
+                        self.resource_block_index = row;
+                        self.activate_resource_block();
+                        return TuiAction::Redraw;
+                    }
+                }
             }
         }
         if let Some((top, bottom, origin, top_weight, bottom_weight, scale)) = self.dragging_row
@@ -7393,6 +7581,33 @@ impl TuiState {
                     self.visible_line_boundary(true)
                 };
                 self.preferred_column = None;
+            }
+            KeyCode::Up
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::Resources) =>
+            {
+                self.move_resource_block(-1);
+                return TuiAction::Redraw;
+            }
+            KeyCode::Down
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::Resources) =>
+            {
+                self.move_resource_block(1);
+                return TuiAction::Redraw;
+            }
+            KeyCode::Enter
+                if self.input.is_empty()
+                    && self.workspace_layout.focused == Some(PaneId::Resources) =>
+            {
+                return self.activate_resource_block();
+            }
+            KeyCode::Esc
+                if self.workspace_layout.focused == Some(PaneId::Resources)
+                    && self.resource_open_block.is_some() =>
+            {
+                self.close_resource_block();
+                return TuiAction::Redraw;
             }
             KeyCode::Up
                 if self.input.is_empty()
@@ -8662,7 +8877,7 @@ impl TuiState {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(6),
+                Constraint::Length(5),
                 Constraint::Min(1),
                 Constraint::Length(input_height),
                 Constraint::Length(1),
@@ -8700,19 +8915,25 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        // Left: vertical ZENPI wordmark. Right: the double-row tab block,
-        // side by side with no gap. Both occupy the six header rows.
-        let logo_width = if area.width >= 24 { 6 } else { 0 };
+        // Left: a six-row pixel-art ZENPI banner. Right: the double-row tab
+        // block, side by side with no gap. There is no narrow-screen fallback:
+        // if the banner does not fit, it disappears entirely.
+        let banner = zenpi_banner();
+        let banner_width = banner.first().map(|line| line.chars().count()).unwrap_or(0) as u16;
+        let logo_width = if banner_width > 0 && area.width >= banner_width + 40 {
+            banner_width
+        } else {
+            0
+        };
         if logo_width > 0 {
-            for (index, glyph) in ["Z", "E", "N", "P", "I"].iter().enumerate() {
-                let row = area.y + index as u16;
-                if row >= area.bottom() {
+            for (row, line) in zenpi_banner_lines().into_iter().enumerate() {
+                let y = area.y + row as u16;
+                if y >= area.bottom() {
                     break;
                 }
                 frame.render_widget(
-                    Paragraph::new(format!(" {glyph}"))
-                        .style(Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
-                    Rect::new(area.x, row, logo_width, 1),
+                    Paragraph::new(line),
+                    Rect::new(area.x, y, banner_width, 1),
                 );
             }
         }
@@ -8722,7 +8943,8 @@ impl TuiState {
             area.width.saturating_sub(logo_width),
             area.height,
         );
-        let top_height = (info.height / 2).max(1).min(info.height);
+        // Layer-1 workspaces get up to three rows; layer-2 Worktrees up to two.
+        let top_height = 3u16.min(info.height);
         let top = Rect::new(info.x, info.y, info.width, top_height);
         let bottom = Rect::new(
             info.x,
@@ -8746,17 +8968,16 @@ impl TuiState {
             " \u{2514} Worktrees: "
         };
         let entries: Vec<(usize, String)> = if layer1 {
-            self.project_tabs
-                .iter()
-                .enumerate()
-                .map(|(index, name)| {
+            (0..self.project_tabs.len())
+                .map(|index| {
                     let approvals = self.project_approval_count(index);
                     let attention = if approvals > 0 {
                         format!("!{approvals} ")
                     } else {
                         String::new()
                     };
-                    (index, format!("{attention}{name}"))
+                    // Folder name (project_label), never the raw project-id key.
+                    (index, format!("{attention}{}", self.project_label(index)))
                 })
                 .collect()
         } else {
@@ -9172,13 +9393,86 @@ impl TuiState {
         content
     }
 
+    /// Bounded LAN section (ZS1-158/159): either the class block list or, when
+    /// a block is open, that block's per-host detail table.
+    fn resource_lan_content(&self) -> Option<String> {
+        let snapshot = self.lan_snapshot.as_ref()?;
+        let cidr = short_cidr(&snapshot.local_ip);
+        if snapshot.hosts.is_empty() {
+            return Some(format!("LAN {cidr}  无存活主机"));
+        }
+        if let Some(class) = self.resource_open_block {
+            let Some(block) = snapshot.block(class) else {
+                return Some(format!("LAN {cidr}  块已消失（Esc 返回）"));
+            };
+            let mut lines = vec![
+                format!(
+                    "LAN {cidr}  {}  共 {} 台  [Esc 返回]",
+                    block.title,
+                    block.count()
+                ),
+                "  IP              MAC                厂商       主机/OS            端口                    资源".into(),
+            ];
+            for index in &block.host_indices {
+                let host = &snapshot.hosts[*index];
+                let mac = host.mac.as_deref().unwrap_or("-");
+                let vendor = host.vendor.as_deref().unwrap_or("-");
+                let name = host.hostname.as_deref().unwrap_or("-");
+                let os = host
+                    .resources
+                    .as_ref()
+                    .and_then(|resources| resources.os.clone())
+                    .unwrap_or_else(|| "-".into());
+                let ports = host
+                    .open_ports
+                    .iter()
+                    .map(u16::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",");
+                let resource = format_host_resources(host.resources.as_ref());
+                lines.push(format!(
+                    "  {:<15} {:<19} {:<10} {:<16} {:<22} {resource}",
+                    host.ip,
+                    truncate_cells(mac, 19),
+                    truncate_cells(vendor, 10),
+                    truncate_cells(&format!("{name}/{os}"), 16),
+                    truncate_cells(&ports, 22),
+                ));
+            }
+            if snapshot.truncated {
+                lines.push("  (truncated)".into());
+            }
+            return Some(lines.join("\n"));
+        }
+        let mut lines = vec![format!(
+            "LAN {cidr}  共 {} 台  (↑↓ 选择, Enter 进入)",
+            snapshot.hosts.len()
+        )];
+        for (index, block) in snapshot.blocks.iter().enumerate() {
+            let marker = if index == self.resource_block_index {
+                '▶'
+            } else {
+                ' '
+            };
+            lines.push(format!("{marker} {}", block.title));
+        }
+        if snapshot.truncated {
+            lines.push("  (truncated)".into());
+        }
+        Some(lines.join("\n"))
+    }
+
     fn resource_pane_content(&self) -> String {
+        let lan = self.resource_lan_content();
         let Some(snapshot) = self.resource_snapshot.as_ref() else {
-            return match &self.resource_status {
-                ResourcePaneStatus::Idle => "Waiting for workspace snapshot".into(),
-                ResourcePaneStatus::Collecting => "Collecting workspace snapshot...".into(),
-                ResourcePaneStatus::Failed(error) => format!("Snapshot failed\n{error}"),
-                ResourcePaneStatus::Ready => "Workspace snapshot unavailable".into(),
+            return match (&self.resource_status, lan) {
+                (_, Some(lan)) => lan,
+                (ResourcePaneStatus::Idle, None) => "Waiting for workspace snapshot".into(),
+                (ResourcePaneStatus::Collecting, None) => {
+                    "Collecting workspace snapshot...".into()
+                }
+                (ResourcePaneStatus::Failed(error), None) => format!("Snapshot failed\n{error}"),
+                (ResourcePaneStatus::Ready, None) => "Workspace snapshot unavailable".into(),
             };
         };
         let workspace = &snapshot.workspace;
@@ -9201,10 +9495,29 @@ impl TuiState {
             .load_one_minute
             .map(|value| format!("{value:.2}"))
             .unwrap_or_else(|| "unavailable".into());
+        let cpu_util = snapshot.cpu.load_one_minute.unwrap_or(0.0)
+            / (snapshot.cpu.logical_cpus.max(1) as f64)
+            * 100.0;
+        let memory_util = match (snapshot.memory.total_bytes, snapshot.memory.available_bytes) {
+            (Some(total), Some(available)) => {
+                crate::resources::utilization_percent(total.saturating_sub(available), total)
+            }
+            _ => 0.0,
+        };
+        let memory_bar = if snapshot.memory.total_bytes.is_some() {
+            format!("  [{}] {memory_util:.0}%", crate::resources::render_bar(memory_util, 16))
+        } else {
+            String::new()
+        };
         let mut lines = vec![
-            format!("CPU {} cores  load {load}  util ~{util:.0}%", snapshot.cpu.logical_cpus, util = snapshot.cpu.load_one_minute.unwrap_or(0.0) / (snapshot.cpu.logical_cpus.max(1) as f64) * 100.0),
-            format!("Mem free {memory}"),
+            format!(
+                "CPU {} cores  load {load}  [{}] {cpu_util:.0}%",
+                snapshot.cpu.logical_cpus,
+                crate::resources::render_bar(cpu_util, 16)
+            ),
+            format!("Mem free {memory}{memory_bar}"),
             format_gpu_signal(&snapshot.gpu),
+            format_disk_signal(&snapshot.disk),
             format_network_signal(&snapshot.network),
             format_process_summary(&snapshot.processes),
         ];
@@ -9249,7 +9562,13 @@ impl TuiState {
             ResourcePaneStatus::Failed(error) => lines.push(format!("refresh failed: {error}")),
             ResourcePaneStatus::Idle | ResourcePaneStatus::Ready => {}
         }
-        lines.join("\n")
+        let mut output = String::new();
+        if let Some(lan) = lan {
+            output.push_str(&lan);
+            output.push_str("\n\n");
+        }
+        output.push_str(&lines.join("\n"));
+        output
     }
 
     fn gantt_pane_content(&self) -> String {
@@ -9307,6 +9626,77 @@ impl TuiState {
             self.terminal_snapshot.clone()
         }
     }
+}
+
+/// Five-row block-glyph pixel banner for the header's left logo column.
+/// Each letter is a 5x5 bitmap joined by a single space (29 columns wide).
+const ZENPI_LETTERS: [[&str; 5]; 5] = [
+    ["█████", "    █", "  █  ", "█    ", "█████"], // Z
+    ["█████", "█    ", "████ ", "█    ", "█████"], // E
+    ["█   █", "██  █", "█ █ █", "█  ██", "█   █"], // N
+    ["████ ", "█   █", "████ ", "█    ", "█    "], // P
+    ["█████", "  █  ", "  █  ", "  █  ", "█████"], // I
+];
+
+fn zenpi_banner() -> Vec<String> {
+    (0..5)
+        .map(|row| {
+            ZENPI_LETTERS
+                .iter()
+                .map(|letter| letter[row])
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect()
+}
+
+/// The banner with a right-edge drop shadow (`▓`, dark cyan) composited inline
+/// so it stays within the five header rows. One unified cyan colour family.
+fn zenpi_banner_lines() -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::text::Span;
+    let main = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let shadow = Style::default().fg(Color::Rgb(0, 90, 102));
+    let mut lines = Vec::new();
+    for row in zenpi_banner() {
+        let chars: Vec<char> = row.chars().collect();
+        let mut shadow_marks = vec![false; chars.len()];
+        for index in 0..chars.len() {
+            if chars[index] == '█'
+                && index + 1 < chars.len()
+                && chars[index + 1] != '█'
+                && !shadow_marks[index]
+            {
+                shadow_marks[index + 1] = true;
+            }
+        }
+        let mut spans: Vec<Span> = Vec::new();
+        let mut index = 0;
+        while index < chars.len() {
+            if chars[index] == '█' {
+                let start = index;
+                while index < chars.len() && chars[index] == '█' {
+                    index += 1;
+                }
+                spans.push(Span::styled(
+                    chars[start..index].iter().collect::<String>(),
+                    main,
+                ));
+            } else if shadow_marks[index] {
+                let start = index;
+                while index < chars.len() && shadow_marks[index] && chars[index] != '█' {
+                    index += 1;
+                }
+                spans.push(Span::styled("▓".repeat(index - start), shadow));
+            } else {
+                spans.push(Span::raw(chars[index].to_string()));
+                index += 1;
+            }
+        }
+        lines.push(ratatui::text::Line::from(spans));
+    }
+    lines
 }
 
 /// Colour the blueprint three-state marks with a soft, low-glare red/yellow/
@@ -9380,6 +9770,9 @@ fn resource_line_style(trimmed: &str) -> (Color, bool) {
     }
     if lower.starts_with("mem") {
         return (Color::Green, true);
+    }
+    if lower.starts_with("disk") {
+        return (Color::LightYellow, true);
     }
     if lower.starts_with("gpu") {
         return (Color::Magenta, true);
@@ -11605,6 +11998,14 @@ impl ProjectRuntimeHost {
             .owner(state.active_project())
             .expect("committed project owner")
     }
+
+    /// Independent arch master-session owner for the active project (ZS1-156).
+    pub fn active_arch(
+        &mut self,
+        state: &TuiState,
+    ) -> Result<Arc<Mutex<crate::core::Agent>>, String> {
+        self.pool.arch_agent(state.active_project())
+    }
     /// Resume through the shared durable owner before changing any view state.
     /// The same path serves slash actions and the session-list control.
     pub fn resume_session(
@@ -12287,6 +12688,69 @@ fn format_byte_count(bytes: u64) -> String {
     }
 }
 
+fn format_disk_signal(disk: &crate::resources::DiskSignal) -> String {
+    match (disk.total_bytes, disk.available_bytes) {
+        (Some(total), Some(available)) if total > 0 => {
+            let used = total.saturating_sub(available);
+            let percent = crate::resources::utilization_percent(used, total);
+            format!(
+                "Disk {} used  {} free / {}  [{}] {percent:.0}%",
+                format_byte_count(used),
+                format_byte_count(available),
+                format_byte_count(total),
+                crate::resources::render_bar(percent, 16)
+            )
+        }
+        _ => "Disk unavailable".into(),
+    }
+}
+
+fn short_cidr(ip: &str) -> String {
+    match ip.rsplit_once('.') {
+        Some((prefix, _)) => format!("{prefix}.0/24"),
+        None => ip.to_owned(),
+    }
+}
+
+fn truncate_cells(value: &str, max: usize) -> String {
+    if value.chars().count() <= max {
+        return value.to_owned();
+    }
+    if max <= 1 {
+        return value.chars().take(max).collect();
+    }
+    let mut truncated: String = value.chars().take(max - 1).collect();
+    truncated.push('…');
+    truncated
+}
+
+fn format_host_resources(resources: Option<&crate::net_probe::HostResources>) -> String {
+    let Some(resources) = resources else {
+        return "-".into();
+    };
+    let mut parts = Vec::new();
+    if let Some(cpu) = &resources.cpu {
+        parts.push(cpu.clone());
+    }
+    if let Some(cpus) = resources.logical_cpus {
+        parts.push(format!("{cpus} core"));
+    }
+    if let Some(memory) = resources.memory_total_bytes {
+        parts.push(format_byte_count(memory));
+    }
+    if let Some(free) = resources.disk_available_bytes {
+        parts.push(format!("{} free", format_byte_count(free)));
+    }
+    if !resources.gpus.is_empty() {
+        parts.push(format!("GPU {}", resources.gpus.join("+")));
+    }
+    if parts.is_empty() {
+        "-".into()
+    } else {
+        parts.join(" · ")
+    }
+}
+
 fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
     if gpu.devices.is_empty() {
         return "GPU unavailable".into();
@@ -12305,7 +12769,11 @@ fn format_gpu_signal(gpu: &crate::resources::GpuSignal) -> String {
                 }
                 _ => "mem --".into(),
             };
-            format!("{} {utilization} {memory}", device.name)
+            let bar = device
+                .utilization_percent
+                .map(|value| format!(" [{}] {value:.0}%", crate::resources::render_bar(value, 12)))
+                .unwrap_or_default();
+            format!("{} {utilization} {memory}{bar}", device.name)
         })
         .collect();
     let mut line = format!("GPU {}", devices.join("; "));
@@ -13839,6 +14307,34 @@ pub fn run_async_with_profile(
             poll_interval: Duration::from_millis(10),
         },
     );
+    // LAN discovery is read-only and bounded, but still touches the network,
+    // so it runs on its own single-slot worker with a slow cadence.
+    let lan_runner = BackgroundRunner::spawn(
+        |_: (), token| -> Result<crate::net_probe::LanSnapshot, String> {
+            if token.is_cancelled() {
+                return Err("lan scan cancelled".into());
+            }
+            let local = crate::net_probe::local_ipv4().ok_or_else(|| "no local ipv4".to_string())?;
+            let backend = crate::net_probe::SystemProbeBackend::new();
+            let credentials = crate::net_probe::NetCredentials::from_env();
+            let scanner = crate::net_probe::LanScanner::new(local);
+            // The ARP table already lists recent peers; scanning it avoids a
+            // 254-address ping sweep on every automatic refresh. Hosts without
+            // an ARP entry can be probed by an explicit deep scan later.
+            let snapshot = scanner.scan(&backend, &[], &credentials);
+            if token.is_cancelled() {
+                return Err("lan scan cancelled".into());
+            }
+            token.mark_completed();
+            Ok(snapshot)
+        },
+        RuntimeConfig {
+            command_capacity: 1,
+            event_capacity: 4,
+            max_pending: 1,
+            poll_interval: Duration::from_millis(25),
+        },
+    );
     let mut state = TuiState {
         async_session_browser: true,
         ..TuiState::default()
@@ -13884,6 +14380,8 @@ pub fn run_async_with_profile(
     };
     let mut active_resource_project = state.active_project().to_owned();
     let mut last_resource_refresh = Instant::now();
+    let mut active_lan_job = lan_runner.try_submit(()).ok();
+    let mut last_lan_refresh = Instant::now();
     let mut active_gantt_generation = Some(gantt_tracker.generation);
     let mut active_gantt_job = match gantt_runner.try_submit(gantt_tracker.request()) {
         Ok(id) => {
@@ -13911,6 +14409,7 @@ pub fn run_async_with_profile(
             let _ = resource_runner.shutdown_and_join();
             let _ = completion_runner.shutdown_and_join();
             let _ = gantt_runner.shutdown_and_join();
+            let _ = lan_runner.shutdown_and_join();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
     };
@@ -13923,6 +14422,7 @@ pub fn run_async_with_profile(
             let _ = resource_runner.shutdown_and_join();
             let _ = completion_runner.shutdown_and_join();
             let _ = gantt_runner.shutdown_and_join();
+            let _ = lan_runner.shutdown_and_join();
             guard.leave();
             return Err(crate::error::ZenpiError::Message(error.to_string()));
         }
@@ -13938,6 +14438,7 @@ pub fn run_async_with_profile(
     let mut active_job_kind = None;
     let mut active_job_project: Option<String> = None;
     let mut active_job_owner: Option<Arc<Mutex<crate::core::Agent>>> = None;
+    let mut active_job_is_arch = false;
     let mut pending_inputs = TuiPendingInputs::default();
     let mut input_controls = TuiInputControls::default();
     if let Ok(agent) = shared.try_lock() {
@@ -14107,7 +14608,46 @@ pub fn run_async_with_profile(
                     _ => {}
                 }
             }
+            while let Ok(event) = lan_runner.try_next_event() {
+                match event {
+                    RuntimeEvent::Completed { id, outcome } => {
+                        if Some(id) != active_lan_job {
+                            continue;
+                        }
+                        active_lan_job = None;
+                        match outcome {
+                            JobOutcome::Succeeded(snapshot) => state.set_lan_snapshot(snapshot),
+                            JobOutcome::Failed(error) => state.resource_refresh_failed(error),
+                            JobOutcome::Cancelled => {}
+                            JobOutcome::Panicked => {
+                                state.resource_refresh_failed("lan worker panicked")
+                            }
+                        }
+                        last_lan_refresh = Instant::now();
+                        scheduler.request();
+                    }
+                    RuntimeEvent::Rejected { id, reason } => {
+                        if Some(id) != active_lan_job {
+                            continue;
+                        }
+                        active_lan_job = None;
+                        last_lan_refresh = Instant::now();
+                        state.resource_refresh_failed(reason.to_string());
+                    }
+                    RuntimeEvent::Closed => {}
+                    _ => {}
+                }
+            }
             let now = Instant::now();
+            if active_lan_job.is_none()
+                && now.saturating_duration_since(last_lan_refresh) >= LAN_REFRESH_INTERVAL
+            {
+                if let Ok(id) = lan_runner.try_submit(()) {
+                    active_lan_job = Some(id);
+                    last_lan_refresh = now;
+                    scheduler.request();
+                }
+            }
             if active_resource_job.is_none()
                 && now.saturating_duration_since(last_resource_refresh) >= RESOURCE_REFRESH_INTERVAL
             {
@@ -14293,7 +14833,8 @@ pub fn run_async_with_profile(
                         // A final provider delta can race the runtime
                         // completion notification. Drain this job's buffer
                         // once more before replacing its provisional line.
-                        if let Some(events) = events
+                        if !active_job_is_arch
+                            && let Some(events) = events
                             && drain_tui_provider_events(&mut state, id.get(), &events)
                         {
                             scheduler.request();
@@ -14315,12 +14856,22 @@ pub fn run_async_with_profile(
                         match outcome {
                             JobOutcome::Succeeded(TuiJobResult::Model(result)) => {
                                 if let Some(assistant) = result.assistant {
-                                    finish_turn_reasoning(&mut state, id.get(), &assistant);
-                                    state.finish_stream_for_job(
-                                        id.get(),
-                                        MessageRole::Assistant,
-                                        assistant.content,
-                                    );
+                                    if active_job_is_arch {
+                                        // Independent arch lane: the reply
+                                        // belongs to the arch transcript, not
+                                        // the discussion lane (ZS1-156).
+                                        state.push_arch_message(
+                                            MessageRole::Assistant,
+                                            assistant.content,
+                                        );
+                                    } else {
+                                        finish_turn_reasoning(&mut state, id.get(), &assistant);
+                                        state.finish_stream_for_job(
+                                            id.get(),
+                                            MessageRole::Assistant,
+                                            assistant.content,
+                                        );
+                                    }
                                 } else {
                                     state.discard_stream();
                                 }
@@ -14466,6 +15017,7 @@ pub fn run_async_with_profile(
             if active_job.is_none() {
                 active_job_project = None;
                 active_job_owner = None;
+                active_job_is_arch = false;
             }
             // Admit exactly one queued input after the previous job has crossed
             // its terminal boundary. FIFO admission prevents a later prompt
@@ -14621,7 +15173,12 @@ pub fn run_async_with_profile(
                 // for bash so the shared parser selects the user-shell owner,
                 // while steering text reaches the existing Steer/Prompt path.
                 let action = match state.handle_event(event) {
-                    TuiAction::SubmitArch(command) => TuiAction::Submit(command.display()),
+                    TuiAction::SubmitArch(command) => {
+                        // Route this turn to the independent arch runtime owner
+                        // instead of the discussion owner (ZS1-156).
+                        state.set_arch_submit_pending();
+                        TuiAction::Submit(command.display())
+                    }
                     other => other,
                 };
                 match action {
@@ -14726,6 +15283,8 @@ pub fn run_async_with_profile(
                         }
                     }
                     TuiAction::Submit(text) => {
+                        // Consumed exactly once: true only for an arch lane turn.
+                        let arch_submit = state.take_arch_submit_pending();
                         if new_sessions.owns(state.active_project())
                             && !text.trim_start().starts_with('/')
                         {
@@ -15233,17 +15792,24 @@ pub fn run_async_with_profile(
                                         &mut state,
                                     );
                                 } else {
+                                    let owner = if arch_submit {
+                                        project_host
+                                            .active_arch(&state)
+                                            .unwrap_or_else(|_| Arc::clone(&shared))
+                                    } else {
+                                        Arc::clone(&shared)
+                                    };
                                     let (request, events) = TuiRequest::with_kind(
                                         format!("!{command}"),
                                         TuiRequestKind::UserShell,
                                     );
                                     let mut request = request;
-                                    request.owner = Some(Arc::clone(&shared));
-                                    if let Ok(agent) = shared.try_lock() {
+                                    request.owner = Some(Arc::clone(&owner));
+                                    if let Ok(agent) = owner.try_lock() {
                                         input_controls
                                             .remember_owner(state.active_project(), &agent);
                                     }
-                                    approval = shared
+                                    approval = owner
                                         .try_lock()
                                         .ok()
                                         .and_then(|agent| agent.approval_coordinator())
@@ -15263,8 +15829,9 @@ pub fn run_async_with_profile(
                                             active_job = Some(id);
                                             active_job_project =
                                                 Some(state.active_project().to_owned());
-                                            active_job_owner = Some(Arc::clone(&shared));
+                                            active_job_owner = Some(Arc::clone(&owner));
                                             active_job_kind = Some(TuiRequestKind::UserShell);
+                                            active_job_is_arch = arch_submit;
                                         }
                                         Err(error) => {
                                             state.push_message(
@@ -15314,14 +15881,21 @@ pub fn run_async_with_profile(
                                         input_controls.submit(&mut state, &shared, action, text);
                                     }
                                 } else {
+                                    let owner = if arch_submit {
+                                        project_host
+                                            .active_arch(&state)
+                                            .unwrap_or_else(|_| Arc::clone(&shared))
+                                    } else {
+                                        Arc::clone(&shared)
+                                    };
                                     let (request, events) = TuiRequest::new(text);
                                     let mut request = request;
-                                    request.owner = Some(Arc::clone(&shared));
-                                    if let Ok(agent) = shared.try_lock() {
+                                    request.owner = Some(Arc::clone(&owner));
+                                    if let Ok(agent) = owner.try_lock() {
                                         input_controls
                                             .remember_owner(state.active_project(), &agent);
                                     }
-                                    approval = shared
+                                    approval = owner
                                         .try_lock()
                                         .ok()
                                         .and_then(|agent| agent.approval_coordinator())
@@ -15332,12 +15906,15 @@ pub fn run_async_with_profile(
                                         Ok(id) => {
                                             submitted_inputs.insert(id, submitted_text);
                                             stream_buffers.insert(id, events);
-                                            state.begin_stream_for_job(id.get());
+                                            if !arch_submit {
+                                                state.begin_stream_for_job(id.get());
+                                            }
                                             active_job = Some(id);
                                             active_job_project =
                                                 Some(state.active_project().to_owned());
-                                            active_job_owner = Some(Arc::clone(&shared));
+                                            active_job_owner = Some(Arc::clone(&owner));
                                             active_job_kind = Some(TuiRequestKind::Model);
+                                            active_job_is_arch = arch_submit;
                                             state.set_busy(true);
                                             state.set_status("Working");
                                         }
@@ -15443,6 +16020,7 @@ pub fn run_async_with_profile(
     let resource_join_result = resource_runner.shutdown_and_join();
     let completion_join_result = completion_runner.shutdown_and_join();
     let gantt_join_result = gantt_runner.shutdown_and_join();
+    let lan_join_result = lan_runner.shutdown_and_join();
     project_host.pool.close_all();
     match loop_result {
         Err(error) => {
@@ -15454,6 +16032,7 @@ pub fn run_async_with_profile(
             .and(resource_join_result)
             .and(completion_join_result)
             .and(gantt_join_result)
+            .and(lan_join_result)
             .map_err(|_| crate::error::ZenpiError::Message("runtime worker panicked".into())),
     }
 }
@@ -16399,6 +16978,10 @@ fn menu_prefix(text: &str, width: usize) -> String {
         result.push_str(grapheme);
     }
     result
+}
+
+fn looks_like_hash(value: &str) -> bool {
+    value.len() >= 16 && value.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 fn truncate_chars(text: &str, max_chars: usize) -> String {

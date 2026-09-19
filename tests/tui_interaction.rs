@@ -103,7 +103,7 @@ fn mouse_focus_tabs_and_split_drag_preserve_draft_and_layout() {
     terminal
         .draw(|f| state.render_bentobox(f, "zenpi"))
         .unwrap();
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 30));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 31));
     let conversation = adapter.pane(PaneId::ProjectConversation).unwrap().rect;
     // The Project tab keeps one conversation lane; the former Goal pane is
     // now carried by Gantt, so the lower-left pane is Arch.
@@ -502,7 +502,7 @@ fn horizontal_split_drag_is_persisted_without_overlaps() {
     terminal
         .draw(|f| state.render_bentobox(f, "zenpi"))
         .unwrap();
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 30));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 31));
     let upper = adapter.pane(PaneId::ProjectConversation).unwrap().rect;
     state.handle_mouse(mouse(
         MouseEventKind::Down(MouseButton::Left),
@@ -586,7 +586,7 @@ fn clicking_the_arch_prompt_focuses_the_master_console() {
     terminal
         .draw(|f| state.render_bentobox(f, "zenpi"))
         .unwrap();
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 6, 140, 30));
+    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 31));
     let arch = adapter.pane(PaneId::Arch).unwrap().rect;
     let (_, arch_prompt) = zenpi::layout::arch_prompt_group(
         zenpi::layout::PaneRect::new(arch.x, arch.y, arch.width, arch.height),

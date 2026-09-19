@@ -273,3 +273,41 @@ fn project_workspace_restart_child() {
         restored
     );
 }
+
+#[test]
+fn arch_owner_uses_an_independent_journal() {
+    use std::sync::{Arc, Mutex};
+
+    let root = tempdir().unwrap();
+    let cwd = root.path().canonicalize().unwrap();
+    let session = root.path().join("session.jsonl");
+    let agent = zenpi::core::Agent::prepare_project_with_options(
+        &session,
+        &cwd,
+        zenpi::config::ConfigOverrides::default(),
+        true,
+    )
+    .unwrap();
+    let discussion_path = agent.session().path().to_path_buf();
+    let mut pool =
+        zenpi::project_workspace::ProjectOwnerPool::new(Arc::new(Mutex::new(agent))).unwrap();
+    let id = pool.workspace().active().unwrap().id().as_str().to_owned();
+
+    let arch = pool.arch_agent(&id).unwrap();
+    let arch_path = arch.lock().unwrap().session().path().to_path_buf();
+    assert_ne!(
+        arch_path, discussion_path,
+        "arch must not share the discussion journal"
+    );
+    assert_eq!(arch_path.file_name().unwrap(), "arch.jsonl");
+
+    // Preparing arch never rewrites the discussion owner's session path.
+    let discussion = pool.owner(&id).unwrap();
+    assert_eq!(
+        discussion.lock().unwrap().session().path(),
+        discussion_path.as_path()
+    );
+    // Repeated calls reuse the same independent owner handle.
+    let again = pool.arch_agent(&id).unwrap();
+    assert!(Arc::ptr_eq(&arch, &again));
+}

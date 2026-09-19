@@ -405,6 +405,11 @@ pub struct ProjectOwnerPool {
     workspace: ProjectWorkspace,
     owners:
         std::collections::BTreeMap<String, std::sync::Arc<std::sync::Mutex<crate::core::Agent>>>,
+    /// Independent arch master-session owners (ZS1-156). They are created
+    /// lazily, use a distinct journal, and are never part of the durable
+    /// project checkpoint, so the discussion lane cannot adopt their history.
+    arch_owners:
+        std::collections::BTreeMap<String, std::sync::Arc<std::sync::Mutex<crate::core::Agent>>>,
     sessions: std::collections::BTreeMap<String, PathBuf>,
     overrides: crate::config::ConfigOverrides,
     echo_fixture: bool,
@@ -442,6 +447,7 @@ impl ProjectOwnerPool {
         Ok(Self {
             workspace,
             owners: [(id.clone(), std::sync::Arc::clone(&agent))].into(),
+            arch_owners: std::collections::BTreeMap::new(),
             initial_session: (id.clone(), session.clone()),
             contexts: [(id.clone(), ProjectContext::from_agent(&id, &owner))].into(),
             checkpoint: None,
@@ -600,8 +606,57 @@ impl ProjectOwnerPool {
     pub fn owner(&self, id: &str) -> Option<std::sync::Arc<std::sync::Mutex<crate::core::Agent>>> {
         self.owners.get(id).cloned()
     }
+
+    /// Lazily prepare the independent arch master-session owner for a project
+    /// (ZS1-156). It opens `<session dir>/arch.jsonl`, so it has its own
+    /// journal, model, and approval coordinator distinct from the discussion
+    /// owner.
+    pub fn arch_agent(
+        &mut self,
+        id: &str,
+    ) -> Result<std::sync::Arc<std::sync::Mutex<crate::core::Agent>>, String> {
+        if let Some(existing) = self.arch_owners.get(id) {
+            return Ok(existing.clone());
+        }
+        let active = self
+            .owners
+            .get(id)
+            .cloned()
+            .ok_or("project owner not found")?;
+        let (arch_session, cwd, overrides, echo_fixture) = {
+            let agent = active.lock().map_err(|_| "project owner lock poisoned")?;
+            let session = agent.session().path().to_path_buf();
+            let arch_session = session.with_file_name("arch.jsonl");
+            let cwd = agent
+                .attachment_workspace_root()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from(agent.session().header().cwd.clone()));
+            (
+                arch_session,
+                cwd,
+                agent.project_overrides(),
+                agent.backend_name() == "echo",
+            )
+        };
+        let agent = crate::core::Agent::prepare_project_with_options(
+            &arch_session,
+            &cwd,
+            overrides,
+            echo_fixture,
+        )
+        .map_err(|error| error.to_string())?;
+        let handle = std::sync::Arc::new(std::sync::Mutex::new(agent));
+        self.arch_owners.insert(id.to_owned(), handle.clone());
+        Ok(handle)
+    }
+
     pub fn close_all(&self) {
         for owner in self.owners.values() {
+            if let Ok(mut agent) = owner.lock() {
+                agent.close();
+            }
+        }
+        for owner in self.arch_owners.values() {
             if let Ok(mut agent) = owner.lock() {
                 agent.close();
             }
@@ -693,6 +748,13 @@ impl ProjectOwnerPool {
             keep
         });
         self.contexts.retain(|id, _| self.owners.contains_key(id));
+        self.arch_owners.retain(|key, owner| {
+            let keep = self.owners.contains_key(key);
+            if !keep && let Ok(mut agent) = owner.try_lock() {
+                agent.close();
+            }
+            keep
+        });
         if let Some(agent) = prepared {
             self.contexts
                 .insert(id.clone(), ProjectContext::from_agent(&id, &agent));
