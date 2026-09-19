@@ -37,7 +37,17 @@ BUDGETS = {
     "render_max_us": 10000.0,
     "layout_max_us": 100.0,
     "coalesced_frames_max": 1,
+    # Per-headless-process footprint ceilings (ZS1-162). Idle bounds a worker
+    # blocked on stdin/provider I/O; busy bounds one executing a turn. CPU is a
+    # percentage of one logical CPU, averaged since the worker started.
+    "headless_idle_cpu_percent_max": 5.0,
+    "headless_idle_rss_bytes_max": 32 * 1024 * 1024,
+    "headless_busy_cpu_percent_max": 100.0,
+    "headless_busy_rss_bytes_max": 512 * 1024 * 1024,
+    "headless_footprint_processes_max": 64,
 }
+
+HEADLESS_FOOTPRINT_SCHEMA_VERSION = 1
 
 
 def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -254,6 +264,142 @@ def build_and_measure_near_cap(binary: pathlib.Path) -> dict[str, Any]:
         }
 
 
+def parse_ps_duration_seconds(text: str) -> float | None:
+    """Parse a `ps` duration (`MM:SS`, `HH:MM:SS`, `DD-HH:MM:SS`) into seconds."""
+    days = 0
+    clock = text
+    if '-' in text:
+        raw_days, _, clock = text.partition('-')
+        try:
+            days = int(raw_days)
+        except ValueError:
+            return None
+    parts = clock.split(':')
+    if not 1 <= len(parts) <= 3:
+        return None
+    try:
+        values = [float(part) for part in parts]
+    except ValueError:
+        return None
+    while len(values) < 3:
+        values.insert(0, 0.0)
+    hours, minutes, seconds = values
+    return days * 86400.0 + hours * 3600.0 + minutes * 60.0 + seconds
+
+
+def sample_process_footprint(pid: int) -> dict[str, Any] | None:
+    """Read one process' RSS and average CPU from the platform `ps` owner."""
+    output = subprocess.run(
+        ["ps", "-o", "rss=,time=,etime=", "-p", str(pid)],
+        text=True, capture_output=True,
+    )
+    if output.returncode != 0:
+        return None
+    fields = output.stdout.split()
+    if len(fields) < 3:
+        return None
+    try:
+        rss_kib = int(fields[0])
+    except ValueError:
+        return None
+    cpu_seconds = parse_ps_duration_seconds(fields[1])
+    elapsed_seconds = parse_ps_duration_seconds(fields[2])
+    if cpu_seconds is None or elapsed_seconds is None:
+        return None
+    cpu_percent = 0.0 if elapsed_seconds <= 0 else (cpu_seconds / elapsed_seconds) * 100.0
+    return {
+        "pid": pid,
+        "rss_bytes": rss_kib * 1024,
+        "cpu_percent": cpu_percent,
+        "elapsed_seconds": elapsed_seconds,
+        "cpu_seconds": cpu_seconds,
+    }
+
+
+def footprint_gates(row: dict[str, Any], *, phase: str) -> dict[str, bool]:
+    return {
+        f"{phase}_rss": row["max_rss_bytes"] <= BUDGETS[f"headless_{phase}_rss_bytes_max"],
+        f"{phase}_cpu": row["max_cpu_percent"] <= BUDGETS[f"headless_{phase}_cpu_percent_max"],
+    }
+
+
+def measure_headless_footprint(
+    binary: pathlib.Path, *, workers: int = 1, samples: int = 5, interval: float = 0.2,
+    timeout: float = 15,
+) -> dict[str, Any]:
+    """Measure idle per-process RSS/CPU for `workers` long-lived headless hosts.
+
+    Each worker is started under the same no-network fixture as the startup
+    gate, sampled while blocked on stdin, then asked to shut down cleanly. Rows
+    are emitted per PID so the gate is a per-process check, not a host average.
+    """
+    if not 1 <= workers <= BUDGETS["headless_footprint_processes_max"]:
+        raise ValueError("workers exceeds the headless_footprint_processes_max budget")
+    with tempfile.TemporaryDirectory(prefix="zenpi-bench-footprint-") as fixture_root:
+        env = os.environ.copy()
+        env.update({
+            "ZENPI_HOME": str(pathlib.Path(fixture_root) / "zenpi"),
+            "ZENPI_BACKEND": "openai",
+            "ZENPI_BASE_URL": "http://127.0.0.1:1",
+            "ZENPI_MODEL": "benchmark-no-network",
+            "ZENPI_API_KEY": "benchmark-placeholder",
+        })
+        processes = []
+        sessions = []
+        for index in range(workers):
+            session = pathlib.Path(fixture_root) / f"footprint-{index}.jsonl"
+            sessions.append(session)
+            processes.append(subprocess.Popen(
+                [str(binary), "--mode", "headless", "--session", str(session)],
+                cwd=ROOT, env=env, stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            ))
+        rows: list[dict[str, Any]] = []
+        try:
+            for index, process in enumerate(processes):
+                samples_for_pid: list[dict[str, Any]] = []
+                for _ in range(samples):
+                    time.sleep(interval)
+                    sample = sample_process_footprint(process.pid)
+                    if sample is not None:
+                        samples_for_pid.append(sample)
+                if not samples_for_pid:
+                    raise RuntimeError(f"could not sample headless worker pid={process.pid}")
+                row = {
+                    "pid": process.pid,
+                    "session": str(sessions[index]),
+                    "samples": samples_for_pid,
+                    "max_rss_bytes": max(sample["rss_bytes"] for sample in samples_for_pid),
+                    "max_cpu_percent": max(sample["cpu_percent"] for sample in samples_for_pid),
+                    "phase": "idle",
+                }
+                row["gates"] = footprint_gates(row, phase="idle")
+                row["ok"] = all(row["gates"].values())
+                rows.append(row)
+            for process in processes:
+                process.stdin.write(b'{"type":"shutdown","id":"bench-footprint"}\n')
+                process.stdin.flush()
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=timeout)
+                if process.returncode != 0 or b'"success":true' not in stdout:
+                    raise RuntimeError(
+                        f"headless footprint worker failed: rc={process.returncode} stderr={stderr!r}"
+                    )
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+    return {
+        "schema_version": HEADLESS_FOOTPRINT_SCHEMA_VERSION,
+        "workers": workers,
+        "samples_per_worker": samples,
+        "rows": rows,
+        "processes_within_cap": workers <= BUDGETS["headless_footprint_processes_max"],
+        "ok": all(row["ok"] for row in rows),
+    }
+
+
 def run_probe() -> dict[str, Any]:
     command = [
             "cargo",
@@ -277,7 +423,7 @@ def evaluate(report: dict[str, Any]) -> dict[str, bool]:
     elapsed = report["cold_start"]["elapsed_ms"]
     rss = report["cold_start"]["process_peak_rss_bytes"]
     probe = report["runtime_probe"]
-    return {
+    gates = {
         "normal_dependencies": report["dependencies"]["normal_count"] <= BUDGETS["normal_dependencies_max"],
         "release_binary": report["release_binary_bytes"] <= BUDGETS["release_binary_bytes_max"],
         "cold_start": elapsed["max"] <= BUDGETS["cold_start_max_ms_max"],
@@ -287,6 +433,13 @@ def evaluate(report: dict[str, Any]) -> dict[str, bool]:
         "layout": probe["per_operation_us"]["layout"] <= BUDGETS["layout_max_us"],
         "render_coalescing": probe["scheduler_frames_after_10000_dirty_requests"] <= BUDGETS["coalesced_frames_max"],
     }
+    footprint = report.get("headless_footprint")
+    if footprint is not None:
+        gates["headless_footprint_processes"] = footprint["processes_within_cap"]
+        for index, row in enumerate(footprint["rows"]):
+            for name, value in row["gates"].items():
+                gates[f"headless_footprint[{index}].{name}"] = value
+    return gates
 
 
 def main() -> int:
@@ -295,11 +448,17 @@ def main() -> int:
     parser.add_argument("--output", type=pathlib.Path, help="also write the JSON receipt atomically")
     parser.add_argument("--no-fail", action="store_true", help="report budget failures without a nonzero exit")
     parser.add_argument("--near-cap", action="store_true", help="also measure one valid journal near the 256 MiB startup cap")
+    parser.add_argument("--headless-footprint", action="store_true",
+                        help="also measure per-process idle CPU/RSS for long-lived headless workers")
+    parser.add_argument("--headless-workers", type=int, default=1,
+                        help="headless workers to sample with --headless-footprint (1-64)")
     parser.add_argument("--startup-evidence-dir", type=pathlib.Path,
                         help="new directory for durable per-sample output/PID/phase receipts; defaults to .ops/runtime-budget/<UTC timestamp>")
     args = parser.parse_args()
     if not 3 <= args.samples <= 50:
         parser.error("--samples must be between 3 and 50")
+    if not 1 <= args.headless_workers <= BUDGETS["headless_footprint_processes_max"]:
+        parser.error(f"--headless-workers must be between 1 and {BUDGETS['headless_footprint_processes_max']}")
     evidence_dir = args.startup_evidence_dir or ROOT / '.ops/runtime-budget' / dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if not evidence_dir.is_absolute():
         evidence_dir = ROOT / evidence_dir
@@ -321,6 +480,10 @@ def main() -> int:
     }
     if args.near_cap:
         report["near_cap_journal"] = build_and_measure_near_cap(binary)
+    if args.headless_footprint:
+        report["headless_footprint"] = measure_headless_footprint(
+            binary, workers=args.headless_workers, samples=args.samples,
+        )
     report["gates"] = evaluate(report)
     report["ok"] = all(report["gates"].values())
     encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"

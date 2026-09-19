@@ -643,6 +643,34 @@ fn service_name(port: u16) -> &'static str {
     }
 }
 
+/// True for a private RFC1918 IPv4 address that is safe to treat as a LAN
+/// peer. Loopback, link-local, unspecified, multicast, and CGNAT
+/// (`100.64/10`) addresses are rejected so a cluster never dispatches to the
+/// public internet or to a shared-carrier address.
+pub fn is_lan_address(ip: &str) -> bool {
+    let Ok(address) = ip.parse::<Ipv4Addr>() else {
+        return false;
+    };
+    if address.is_loopback()
+        || address.is_link_local()
+        || address.is_unspecified()
+        || address.is_multicast()
+        || address.is_broadcast()
+    {
+        return false;
+    }
+    let octets = address.octets();
+    let cgnat = octets[0] == 100 && (64..128).contains(&octets[1]);
+    if cgnat {
+        return false;
+    }
+    match octets {
+        [10, _, _, _] | [192, 168, _, _] => true,
+        [172, second, _, _] => (16..32).contains(&second),
+        _ => false,
+    }
+}
+
 fn same_subnet(candidate: &str, local: &str) -> bool {
     let (Ok(candidate), Ok(local)) = (candidate.parse::<Ipv4Addr>(), local.parse::<Ipv4Addr>())
     else {

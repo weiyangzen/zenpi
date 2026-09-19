@@ -2548,6 +2548,10 @@ pub struct TuiState {
     resource_block_index: usize,
     /// Block whose detail table is currently open, if any.
     resource_open_block: Option<crate::net_probe::DeviceClass>,
+    /// Last bounded LAN headless cluster projection (ZS1-160). The local
+    /// control plane owns dispatch and aggregation; rendering only reads this
+    /// small, credential-free value.
+    cluster_snapshot: Option<crate::cluster::ClusterSnapshot>,
     /// Last valid Blueprint/Goal projection. Collection and store validation
     /// happen on a dedicated bounded worker in the production host.
     gantt_snapshot: Option<GanttPaneSnapshot>,
@@ -2706,6 +2710,7 @@ impl TuiState {
             lan_snapshot: None,
             resource_block_index: 0,
             resource_open_block: None,
+            cluster_snapshot: None,
             gantt_snapshot: None,
             gantt_status: GanttPaneStatus::Idle,
             terminal_snapshot: "No local shell result".into(),
@@ -4245,6 +4250,45 @@ impl TuiState {
     pub fn close_resource_block(&mut self) {
         self.resource_open_block = None;
         self.dirty = true;
+    }
+
+    /// Publish a completed cluster projection (ZS1-160). The projection never
+    /// carries credentials; it is a read-only aggregation for the Resources
+    /// pane.
+    pub fn set_cluster_snapshot(&mut self, snapshot: crate::cluster::ClusterSnapshot) {
+        self.cluster_snapshot = Some(snapshot);
+        self.dirty = true;
+    }
+
+    pub fn cluster_snapshot(&self) -> Option<&crate::cluster::ClusterSnapshot> {
+        self.cluster_snapshot.as_ref()
+    }
+
+    /// Drop the cluster projection (e.g. after authorization is withdrawn).
+    pub fn clear_cluster_snapshot(&mut self) {
+        self.cluster_snapshot = None;
+        self.dirty = true;
+    }
+
+    /// Number of hosts currently running at least one worker.
+    pub fn cluster_active_hosts(&self) -> usize {
+        self.cluster_snapshot
+            .as_ref()
+            .map(|snapshot| {
+                snapshot
+                    .hosts
+                    .iter()
+                    .filter(|host| host.worker_count > 0)
+                    .count()
+            })
+            .unwrap_or(0)
+    }
+
+    pub fn cluster_running_workers(&self) -> usize {
+        self.cluster_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.running_workers)
+            .unwrap_or(0)
     }
 
     /// Publish the active conversation's context usage so the resource monitor
@@ -8944,7 +8988,7 @@ impl TuiState {
             area.height,
         );
         // Layer-1 workspaces get up to three rows; layer-2 Worktrees up to two.
-        let top_height = 3u16.min(info.height);
+        let top_height = 2u16.min(info.height);
         let top = Rect::new(info.x, info.y, info.width, top_height);
         let bottom = Rect::new(
             info.x,
@@ -8967,27 +9011,34 @@ impl TuiState {
         } else {
             " \u{2514} Worktrees: "
         };
-        let entries: Vec<(usize, String)> = if layer1 {
-            (0..self.project_tabs.len())
-                .map(|index| {
-                    let approvals = self.project_approval_count(index);
-                    let attention = if approvals > 0 {
-                        format!("!{approvals} ")
-                    } else {
-                        String::new()
-                    };
-                    // Folder name (project_label), never the raw project-id key.
-                    (index, format!("{attention}{}", self.project_label(index)))
-                })
-                .collect()
+        let separator = "  \u{2502}  ";
+        // (text, kind): 0 select, 1 close, 2 conc-up, 3 conc-down, 4 value
+        let mut entries: Vec<(usize, Vec<(String, u8)>)> = Vec::new();
+        if layer1 {
+            for index in 0..self.project_tabs.len() {
+                let approvals = self.project_approval_count(index);
+                let attention = if approvals > 0 {
+                    format!("!{approvals} ")
+                } else {
+                    String::new()
+                };
+                let label = format!("{attention}{}", self.project_label(index));
+                entries.push((index, vec![(label, 0), (" [-]".to_owned(), 1)]));
+            }
         } else {
-            self.subtabs()
-                .into_iter()
-                .enumerate()
-                .map(|(index, tab)| (index, format!("{} \u{2191}{}\u{2193}", tab.name, tab.concurrency)))
-                .collect()
-        };
-        let active = if layer1 { self.active_project } else { self.active_subtab() };
+            for (index, tab) in self.subtabs().into_iter().enumerate() {
+                entries.push((
+                    index,
+                    vec![
+                        (tab.name.clone(), 0),
+                        (" \u{2191}".to_owned(), 2),
+                        (format!("{}", tab.concurrency), 4),
+                        ("\u{2193}".to_owned(), 3),
+                        (" [-]".to_owned(), 1),
+                    ],
+                ));
+            }
+        }
         let width = usize::from(area.width);
         let max_rows = usize::from(area.height).max(1);
         let mut row = 0usize;
@@ -9002,53 +9053,49 @@ impl TuiState {
             row += 1;
             column = 0;
         }
-        for (index, label) in &entries {
-            let token = format!(" {label} [-] || ");
-            let len = token.chars().count();
-            if column > 0 && column + len.min(width) > width {
-                row += 1;
-                column = 0;
-            }
-            if row >= max_rows {
-                break;
-            }
-            let available = width.saturating_sub(column).max(1);
-            let shown = truncate_chars(&token, available);
-            let shown_len = shown.chars().count();
-            let colour = if *index == active {
-                Color::Cyan
-            } else if layer1 {
-                self.project_style_color(*index).unwrap_or(Color::White)
-            } else {
-                Color::White
-            };
-            let rect = Rect::new(area.x + column as u16, area.y + row as u16, shown_len as u16, 1);
-            let close_offset = shown
-                .find("[-]")
-                .map(|byte| shown[..byte].chars().count());
-            frame.render_widget(Paragraph::new(shown).style(Style::default().fg(colour)), rect);
-            // Whole token selects; the embedded `[-]` closes that entry.
-            if layer1 {
-                self.project_hits.push((rect, *index));
-            } else {
-                self.subtab_hits.push((rect, SubTabHit::Select(*index)));
-            }
-            if let Some(offset) = close_offset {
-                let close = Rect::new(
-                    area.x + (column + offset) as u16,
-                    area.y + row as u16,
-                    3.min((width - column - offset) as u16),
-                    1,
-                );
-                if layer1 {
-                    self.project_hits.push((close, usize::MAX - 3 - *index));
+        let active = if layer1 { self.active_project } else { self.active_subtab() };
+        let mut hits: Vec<(Rect, u8, usize)> = Vec::new();
+        'entries: for (index, segments) in entries.iter() {
+            for (text, kind) in segments {
+                let len = text.chars().count();
+                if column > 0 && column + len > width {
+                    row += 1;
+                    column = 0;
+                }
+                if row >= max_rows {
+                    break 'entries;
+                }
+                let available = width.saturating_sub(column).max(1);
+                let shown = truncate_chars(text, available);
+                let shown_len = shown.chars().count();
+                let colour = if *kind == 0 && *index == active {
+                    Color::Cyan
+                } else if *kind == 1 {
+                    Color::Red
+                } else if *kind == 2 || *kind == 3 {
+                    Color::Yellow
+                } else if *kind == 4 {
+                    Color::White
+                } else if layer1 {
+                    self.project_style_color(*index).unwrap_or(Color::White)
                 } else {
-                    self.subtab_hits.push((close, SubTabHit::Close(*index)));
+                    Color::Gray
+                };
+                let rect = Rect::new(area.x + column as u16, area.y + row as u16, shown_len as u16, 1);
+                frame.render_widget(Paragraph::new(shown).style(Style::default().fg(colour)), rect);
+                hits.push((rect, *kind, *index));
+                column += shown_len;
+                if shown_len < len {
+                    break 'entries;
                 }
             }
-            column += shown_len;
-            if shown_len < len {
-                break;
+            let sep_len = separator.chars().count();
+            if column + sep_len <= width && row < max_rows {
+                frame.render_widget(
+                    Paragraph::new(separator).style(Style::default().fg(Color::DarkGray)),
+                    Rect::new(area.x + column as u16, area.y + row as u16, sep_len as u16, 1),
+                );
+                column += sep_len;
             }
         }
         let plus = " [+]";
@@ -9064,6 +9111,22 @@ impl TuiState {
                 self.project_hits.push((rect, self.project_tabs.len()));
             } else {
                 self.subtab_hits.push((rect, SubTabHit::AddWorktree));
+            }
+        }
+        for (rect, kind, index) in hits {
+            if layer1 {
+                if kind == 1 {
+                    self.project_hits.push((rect, usize::MAX - 3 - index));
+                } else {
+                    self.project_hits.push((rect, index));
+                }
+            } else {
+                match kind {
+                    1 => self.subtab_hits.push((rect, SubTabHit::Close(index))),
+                    2 => self.subtab_hits.push((rect, SubTabHit::ConcurrencyUp(index))),
+                    3 => self.subtab_hits.push((rect, SubTabHit::ConcurrencyDown(index))),
+                    _ => self.subtab_hits.push((rect, SubTabHit::Select(index))),
+                }
             }
         }
     }
@@ -9462,18 +9525,73 @@ impl TuiState {
         Some(lines.join("\n"))
     }
 
+    /// Bounded cluster section (ZS1-160): aggregate worker/host counts plus one
+    /// line per admitted host. It is credential-free by construction.
+    fn cluster_pane_content(&self) -> Option<String> {
+        let snapshot = self.cluster_snapshot.as_ref()?;
+        let mut lines = vec![format!(
+            "Cluster {} host(s) authorized {}  workers {} run / {} reclaimed / {} failed",
+            snapshot.hosts.len(),
+            snapshot.authorized_hosts,
+            snapshot.running_workers,
+            snapshot.reclaimed_workers,
+            snapshot.failed_workers,
+        )];
+        const MAX_CLUSTER_ROWS: usize = 12;
+        for host in snapshot.hosts.iter().take(MAX_CLUSTER_ROWS) {
+            let name = host
+                .hostname
+                .clone()
+                .unwrap_or_else(|| host.class.label().to_owned());
+            let auth = if host.authorized { "auth" } else { "     " };
+            let cred = if host.has_credentials {
+                "cred"
+            } else {
+                "     "
+            };
+            let gpu = if host.gpus > 0 {
+                format!(" gpu{}", host.gpus)
+            } else {
+                String::new()
+            };
+            lines.push(format!(
+                "  {:<15} {:<12} {auth} {cred} cpu {:>3}/{:<3} mem {:>5}/{:<5}{gpu} w{}",
+                host.ip,
+                truncate_cells(&name, 12),
+                host.available_cpu_slots,
+                host.logical_cpus,
+                format_byte_count(host.available_memory_bytes),
+                format_byte_count(host.memory_total_bytes),
+                host.worker_count,
+            ));
+        }
+        if snapshot.hosts.len() > MAX_CLUSTER_ROWS {
+            lines.push(format!(
+                "  ... {} more host(s)",
+                snapshot.hosts.len() - MAX_CLUSTER_ROWS
+            ));
+        }
+        Some(lines.join("\n"))
+    }
+
     fn resource_pane_content(&self) -> String {
         let lan = self.resource_lan_content();
+        let cluster = self.cluster_pane_content();
         let Some(snapshot) = self.resource_snapshot.as_ref() else {
-            return match (&self.resource_status, lan) {
+            let base = match (&self.resource_status, lan) {
                 (_, Some(lan)) => lan,
                 (ResourcePaneStatus::Idle, None) => "Waiting for workspace snapshot".into(),
-                (ResourcePaneStatus::Collecting, None) => {
-                    "Collecting workspace snapshot...".into()
-                }
+                (ResourcePaneStatus::Collecting, None) => "Collecting workspace snapshot...".into(),
                 (ResourcePaneStatus::Failed(error), None) => format!("Snapshot failed\n{error}"),
                 (ResourcePaneStatus::Ready, None) => "Workspace snapshot unavailable".into(),
             };
+            let mut output = String::new();
+            if let Some(cluster) = cluster {
+                output.push_str(&cluster);
+                output.push_str("\n\n");
+            }
+            output.push_str(&base);
+            return output;
         };
         let workspace = &snapshot.workspace;
         let memory = snapshot
@@ -9563,6 +9681,10 @@ impl TuiState {
             ResourcePaneStatus::Idle | ResourcePaneStatus::Ready => {}
         }
         let mut output = String::new();
+        if let Some(cluster) = cluster {
+            output.push_str(&cluster);
+            output.push_str("\n\n");
+        }
         if let Some(lan) = lan {
             output.push_str(&lan);
             output.push_str("\n\n");

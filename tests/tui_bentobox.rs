@@ -122,6 +122,7 @@ fn resource_snapshot() -> ResourceSnapshot {
             truncated: false,
             status: SignalStatus::Available,
         },
+        headless: Default::default(),
     }
 }
 

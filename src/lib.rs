@@ -3,6 +3,7 @@
 pub mod approval;
 pub mod b3;
 pub mod backend;
+pub mod cluster;
 pub mod config;
 pub mod context;
 pub mod core;

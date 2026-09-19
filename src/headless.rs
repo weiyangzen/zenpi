@@ -1123,6 +1123,28 @@ pub fn collect_resource_snapshot_at(
     };
     crate::resources::ResourceCollector::new(root)?.collect()
 }
+
+/// Score every `--mode headless` process (including the current one) against a
+/// per-process CPU/RSS budget. This is the headless-facing entry point for the
+/// resource gate: a denied verdict means at least one worker exceeded a ceiling
+/// or the host could not measure it.
+pub fn footprint_gate(
+    budget: crate::resources::HeadlessFootprintBudget,
+) -> Result<crate::resources::HeadlessFootprintSummary, crate::resources::ResourceError> {
+    budget.validate()?;
+    Ok(crate::resources::headless_gate(budget))
+}
+
+/// Measure the running process once against a fresh CPU/RSS baseline. Hosts
+/// that collect repeatedly should prefer [`collect_resource_snapshot`], which
+/// reuses the process-wide baseline so CPU is averaged over the process
+/// lifetime rather than reset to zero on every sample.
+pub fn own_footprint(
+    phase: crate::resources::FootprintPhase,
+) -> crate::resources::HeadlessProcessFootprint {
+    crate::resources::HeadlessFootprintSampler::new().sample(phase)
+}
+
 fn owner_workspace(agent: Option<&Agent>) -> Result<PathBuf, SlashDispatchError> {
     let agent = agent.ok_or_else(|| SlashDispatchError {
         code: "agent_busy",

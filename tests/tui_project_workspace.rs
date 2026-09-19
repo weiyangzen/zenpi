@@ -912,3 +912,33 @@ fn worktree_rename_and_concurrency_commands_parse() {
         other => panic!("unexpected: {other:?}"),
     }
 }
+
+#[test]
+fn header_controls_click_to_add_close_and_change_concurrency() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let mut state = TuiState::default();
+    assert!(state.open_project_tab("alpha"));
+    assert!(state.subtab_add_in_place(Some("one".into())));
+    let mut terminal = Terminal::new(TestBackend::new(160, 40)).unwrap();
+    terminal.draw(|f| state.render_bentobox(f, "zenpi")).unwrap();
+
+    // Click the layer-2 concurrency "up" glyph beside the active sub-tab.
+    // The first ↑ belongs to the first sub-tab ("main").
+    let (up_col, up_row) = find_pos(&terminal, "↑");
+    let before = state.subtabs()[0].concurrency;
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), up_col, up_row));
+    assert_eq!(
+        state.subtabs()[0].concurrency,
+        before + 1,
+        "clicking ↑ must raise concurrency"
+    );
+
+    // Click a project "-" to close that tab.
+    let projects = state.project_tab_count();
+    let (close_col, close_row) = find_pos(&terminal, "[-]");
+    state.handle_mouse(mouse(MouseEventKind::Down(MouseButton::Left), close_col, close_row));
+    assert_eq!(state.project_tab_count(), projects - 1, "close control wired");
+
+    // Confirm Esc still works after clicks.
+    let _ = state.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+}
