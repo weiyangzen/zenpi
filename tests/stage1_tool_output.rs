@@ -62,6 +62,50 @@ fn preserves_exact_raw_bytes_with_split_utf8_and_bounded_display() {
     assert!(q.drain().iter().any(|p| p.dropped_updates > 0));
 }
 #[test]
+fn canonical_progress_sanitizes_controls_without_changing_raw_output() {
+    use zenpi::view_model::{ViewBlock, ViewEvent, ViewEventKind};
+    let root = tempdir().unwrap();
+    let store = OutputArtifactStore::open(root.path().join("raw"), limits()).unwrap();
+    let raw = "\x1b[32mcolor\x1b[0m\0\x07\x08\x7f\u{9b}\r\n\t\u{4f60}";
+    for stream in [OutputStream::Stdout, OutputStream::Stderr] {
+        let queue = store.progress_queue();
+        let mut writer = store.begin("session", "call", stream, 100, queue).unwrap();
+        writer.append(raw.as_bytes()).unwrap();
+        let snapshot = writer.snapshot();
+        assert_eq!(snapshot.text, raw);
+        assert_eq!(snapshot.display_end, raw.len() as u64);
+        let reference = writer.finish(true).unwrap();
+        assert!(reference.complete);
+        assert_eq!(read_all(&store, &reference), raw.as_bytes());
+        assert_eq!(reference.sha256, Some(digest(raw.as_bytes())));
+        let event = ViewEvent::from_agent_event(
+            1,
+            None,
+            &zenpi::core::AgentEvent::ToolProgress {
+                turn_id: "turn".into(),
+                progress: OutputProgress {
+                    call_id: "call".into(),
+                    stream,
+                    snapshot,
+                    dropped_updates: 1,
+                },
+            },
+        )
+        .unwrap();
+        let ViewEventKind::Block {
+            block:
+                ViewBlock::ToolStatus {
+                    output: Some(output),
+                    ..
+                },
+        } = event.event
+        else {
+            panic!("expected tool status");
+        };
+        assert!(output.ends_with("[1 output updates dropped]\n?[32mcolor?[0m?????\r\n\t\u{4f60}"));
+    }
+}
+#[test]
 fn per_file_quota_keeps_verified_prefix_and_never_claims_full_output() {
     let root = tempdir().unwrap();
     let mut l = limits();
@@ -1293,7 +1337,7 @@ fn async_jsonl_delivers_canonical_output_before_shell_exit() {
     let host =
         std::thread::spawn(move || zenpi::headless::run_async_streams(agent, reader, writer));
     writeln!(input, "{}", json!({"schema_version":2,"id":"live-shell","type":"user_shell",
-        "text":"!printf jsonl-first; while [ ! -f jsonl-release ]; do sleep 0.01; done; printf jsonl-last"})).unwrap();
+        "text":"!printf '\\033[32mjsonl-first\\033[0m\\000\\007'; printf '\\033[31mjsonl-error\\033[0m' >&2; while [ ! -f jsonl-release ]; do sleep 0.01; done; printf jsonl-last"})).unwrap();
     let mut output = BufReader::new(output);
     let mut records = Vec::new();
     let mut saw_live = false;
@@ -1308,6 +1352,12 @@ fn async_jsonl_delivers_canonical_output_before_shell_exit() {
             panic!("missing bounded JSONL progress/terminal: {read:?}; {records:?}");
         }
         let record: serde_json::Value = serde_json::from_str(&line).unwrap();
+        if record["event"]["type"] == "tool_progress" {
+            let view: zenpi::view_model::ViewEvent =
+                serde_json::from_value(record["event"]["view"].clone()).unwrap();
+            view.validate().unwrap();
+            assert_eq!(record["event"]["block"], record["event"]["view"]["block"]);
+        }
         if record["event"]["type"] == "tool_progress"
             && record["event"]["progress"]["snapshot"]["text"]
                 .as_str()
@@ -1333,11 +1383,13 @@ fn async_jsonl_delivers_canonical_output_before_shell_exit() {
         }
     }
     assert!(saw_live, "progress must reach JSONL before shell can exit");
-    assert!(
-        records.last().unwrap()["data"]["stdout"]
-            .as_str()
-            .unwrap()
-            .contains("jsonl-last")
+    assert_eq!(
+        records.last().unwrap()["data"]["stdout"],
+        "\x1b[32mjsonl-first\x1b[0m\0\x07jsonl-last"
+    );
+    assert_eq!(
+        records.last().unwrap()["data"]["stderr"],
+        "\x1b[31mjsonl-error\x1b[0m"
     );
     let last_progress = records
         .iter()
