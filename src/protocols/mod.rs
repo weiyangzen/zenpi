@@ -1,7 +1,7 @@
 //! Shared provider wire encoding and bounded response decoding.
 pub(crate) mod anthropic;
 pub(crate) mod chat;
-mod content;
+pub(crate) mod content;
 pub(crate) mod google;
 mod responses;
 
@@ -775,10 +775,10 @@ pub(crate) fn encode_request_for_route(
     if request.response_format.is_some() && !route.options().response_format {
         return Err(configuration("route does not support this response format"));
     }
-    if route.dialect() == Dialect::Codex {
-        if !route.streaming() || route.protocol() != Protocol::OpenAiCodexResponses {
-            return Err(configuration("Codex requires streamed Responses"));
-        }
+    if route.dialect() == Dialect::Codex
+        && (!route.streaming() || route.protocol() != Protocol::OpenAiCodexResponses)
+    {
+        return Err(configuration("Codex requires streamed Responses"));
     }
     if options.wire_api == OpenAiWireApi::Responses {
         for turn in request.turns {

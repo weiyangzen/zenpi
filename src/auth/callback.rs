@@ -266,11 +266,10 @@ fn handle_http(bytes: &[u8], submission: &ManualSubmission) -> u16 {
         let Some((name, value)) = line.split_once(':') else {
             return 400;
         };
-        if name.eq_ignore_ascii_case("host") {
-            if host.replace(value.trim()).is_some() {
+        if name.eq_ignore_ascii_case("host")
+            && host.replace(value.trim()).is_some() {
                 return 400;
             }
-        }
         if name.eq_ignore_ascii_case("transfer-encoding")
             || (name.eq_ignore_ascii_case("content-length") && value.trim() != "0")
         {

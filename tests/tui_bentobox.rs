@@ -799,7 +799,10 @@ fn short_workspace_narrow_cycle_reveals_each_selected_pane() {
 }
 
 #[test]
-fn discussion_prompt_is_grouped_with_the_left_column_conversation() {
+fn discussion_prompt_keeps_the_full_width_bottom_strip() {
+    fn prompt_row(output: &str) -> Option<usize> {
+        output.lines().position(|line| line.contains("Prompt"))
+    }
     let mut terminal = Terminal::new(TestBackend::new(140, 40)).unwrap();
     let mut state = TuiState::default();
     state.set_input("draft");
@@ -811,21 +814,16 @@ fn discussion_prompt_is_grouped_with_the_left_column_conversation() {
     assert!(output.contains("Prompt"));
     assert!(output.contains("Alt-G edit"));
     assert!(output.contains("draft"));
-    // The prompt is rendered inside the conversation pane, so it keeps the
-    // left column width and never spills into the center/right columns.
-    let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 29));
-    let conversation = adapter.pane(PaneId::ProjectConversation).unwrap();
-    let (_, prompt) = zenpi::layout::conversation_prompt_group(
-        zenpi::layout::PaneRect::new(
-            conversation.rect.x,
-            conversation.rect.y,
-            conversation.rect.width,
-            conversation.rect.height,
-        ),
-        zenpi::tui::PROMPT_PANE_ROWS,
-    );
-    assert_eq!(prompt.x, conversation.rect.x);
-    assert_eq!(prompt.width, conversation.rect.width);
+    let idle_row = prompt_row(&output);
+    // Opening the command palette no longer moves the prompt: the strip keeps
+    // its bottom row and only the title reflects the active palette.
+    state.set_input("/ne");
+    terminal
+        .draw(|frame| state.render_bentobox(frame, "zenpi"))
+        .unwrap();
+    let output = rendered(&terminal);
+    assert!(output.contains("command palette active"));
+    assert_eq!(prompt_row(&output), idle_row);
 }
 
 #[test]
@@ -879,7 +877,7 @@ fn open_goal_editor_replaces_the_docked_prompt_in_place() {
 }
 
 #[test]
-fn narrow_viewport_falls_back_to_the_bottom_prompt_strip() {
+fn narrow_viewport_keeps_the_bottom_prompt_strip() {
     let mut terminal = Terminal::new(TestBackend::new(60, 20)).unwrap();
     let mut state = TuiState::default();
     state.set_input("kept");

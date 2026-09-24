@@ -17,6 +17,15 @@ use crate::tools::ToolSideEffect;
 
 pub const MAX_APPROVAL_ID_BYTES: usize = 128;
 
+/// `source` on an `approval_resolved` record that a host answered.  It is the
+/// only source that may create a standing grant: the field separates "a person
+/// or client decided this" from every decision an agent reached on its own.
+pub(crate) const HOST_ANSWER_SOURCE: &str = "host_answer";
+
+/// `source` on the record a worker-preflight allow writes.  It is named here
+/// so the rule that decides and the rule that records cannot drift apart.
+pub(crate) const WORKER_PREFLIGHT_SOURCE: &str = "worker_allow_after_preflight";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalMode {
@@ -202,18 +211,27 @@ impl ApprovalCoordinator {
         let id = request.request_id.clone();
         let tool = request.tool.clone();
         let (lock, wake) = &*self.inner;
-        let mut state = lock
-            .lock()
-            .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
-        if state.pending.contains_key(&id) || state.decisions.contains_key(&id) {
-            return Err(ApprovalError::Invalid(
-                "request_id is already pending".into(),
-            ));
+        {
+            let mut state = lock
+                .lock()
+                .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
+            if state.pending.contains_key(&id) || state.decisions.contains_key(&id) {
+                return Err(ApprovalError::Invalid(
+                    "request_id is already pending".into(),
+                ));
+            }
+            state.visible.remove(&id);
+            state.pending.insert(id.clone(), request);
         }
-        state.visible.remove(&id);
-        state.pending.insert(id.clone(), request);
         loop {
+            // The cancellation predicate belongs to the caller and can do real
+            // work: the core's closure services the session input queue.  It
+            // therefore runs with no coordinator lock held, so a host draining
+            // or answering a request never queues behind that work.
             if cancelled() {
+                let mut state = lock
+                    .lock()
+                    .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
                 state.pending.remove(&id);
                 state.visible.remove(&id);
                 state.decisions.remove(&id);
@@ -222,6 +240,12 @@ impl ApprovalCoordinator {
                     .retain(|accepted| accepted.response.request_id != id);
                 return Err(ApprovalError::Cancelled);
             }
+            // Checking for a decision and re-entering the wait share one
+            // critical section, so a response arriving between the two cannot
+            // be lost.
+            let mut state = lock
+                .lock()
+                .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
             if let Some(response) = state.decisions.get(&id).cloned() {
                 if !retain_accepted {
                     state
@@ -238,16 +262,30 @@ impl ApprovalCoordinator {
                 }
                 return Ok(response);
             }
-            let (next, _) = wake
+            // `wait_timeout` releases the lock while it sleeps; the guard it
+            // hands back is dropped here so the next iteration re-reads state
+            // without holding it across the cancellation check.
+            let (guard, _) = wake
                 .wait_timeout(state, Duration::from_millis(50))
                 .map_err(|_| ApprovalError::Invalid("approval coordinator poisoned".into()))?;
-            state = next;
+            drop(guard);
         }
     }
 
     /// Return each newly pending request once. Calling this is what marks a
     /// request as visible to a host, preventing a slow renderer from emitting
     /// duplicate approval prompts.
+    /// Whether any request is still awaiting a host decision.
+    ///
+    /// Used as a connection-selection fence: swapping the backend while a tool
+    /// is blocked on approval would change the account under a decision the
+    /// host is already looking at. A poisoned coordinator reports pending, so
+    /// the fence fails closed rather than open.
+    pub fn has_pending(&self) -> bool {
+        let (lock, _) = &*self.inner;
+        lock.lock().map_or(true, |state| !state.pending.is_empty())
+    }
+
     pub fn drain_pending(&self) -> Vec<ApprovalRequest> {
         let (lock, _) = &*self.inner;
         let Ok(mut state) = lock.lock() else {
@@ -500,30 +538,43 @@ impl ApprovalPolicy {
         tool: &str,
         worker_preflight: bool,
     ) -> Option<ApprovalDecision> {
+        self.decide_after_preflight_source(side_effect, tool, worker_preflight)
+            .map(|(decision, _)| decision)
+    }
+
+    /// [`Self::decide_after_preflight`] plus the rule that decided it, so the
+    /// caller can record why a side effect ran without a host ever seeing it.
+    /// `None` means no rule decided: the host must answer.
+    pub(crate) fn decide_after_preflight_source(
+        &self,
+        side_effect: ToolSideEffect,
+        tool: &str,
+        worker_preflight: bool,
+    ) -> Option<(ApprovalDecision, &'static str)> {
         if self.per_tool.get(tool) == Some(&ApprovalDecision::Deny) {
-            return Some(ApprovalDecision::Deny);
+            return Some((ApprovalDecision::Deny, "per_tool_deny"));
         }
         if self.mode == ApprovalMode::WorkerAllowAfterPreflight {
             return Some(if worker_preflight {
-                ApprovalDecision::Allow
+                (ApprovalDecision::Allow, WORKER_PREFLIGHT_SOURCE)
             } else {
-                ApprovalDecision::Deny
+                (ApprovalDecision::Deny, "worker_preflight_deny")
             });
         }
         if side_effect == ToolSideEffect::ReadOnly {
-            return Some(ApprovalDecision::Allow);
+            return Some((ApprovalDecision::Allow, "policy_read_only"));
         }
         if let Some(decision) = self.per_tool.get(tool) {
-            return Some(*decision);
+            return Some((*decision, "per_tool_grant"));
         }
         match self.mode {
             ApprovalMode::TrustedWorkspace
                 if self.trusted_tools.iter().any(|item| item == tool) =>
             {
-                Some(ApprovalDecision::Allow)
+                Some((ApprovalDecision::Allow, "trusted_workspace"))
             }
-            ApprovalMode::Headless => Some(ApprovalDecision::Deny),
-            ApprovalMode::Never => Some(ApprovalDecision::Allow),
+            ApprovalMode::Headless => Some((ApprovalDecision::Deny, "policy_headless")),
+            ApprovalMode::Never => Some((ApprovalDecision::Allow, "policy_never")),
             _ => None,
         }
     }
@@ -539,6 +590,15 @@ impl ApprovalPolicy {
                     event.get("origin").and_then(|v| v.as_str()),
                     Some("agent_tool" | "user_shell")
                 )
+            {
+                continue;
+            }
+            // Only a host answer creates a standing grant.  Records written
+            // before this field existed came from that same path, so a missing
+            // `source` stays acceptable; any other value is refused outright
+            // rather than promoted into a persistent permission.
+            if let Some(source) = event.get("source").and_then(|v| v.as_str())
+                && source != HOST_ANSWER_SOURCE
             {
                 continue;
             }
@@ -692,6 +752,64 @@ mod tests {
                 message: None,
             })
             .unwrap();
+        assert_eq!(join.join().unwrap().unwrap(), ApprovalDecision::Allow);
+    }
+
+    /// The cancellation predicate belongs to the core, where it services the
+    /// session input queue, so it can take real time.  Holding the coordinator
+    /// lock across that call would make every host wait for it before it could
+    /// drain or answer, so the predicate must run with the lock released.
+    #[test]
+    fn slow_cancellation_predicate_does_not_block_a_host_draining_or_answering() {
+        let coordinator = ApprovalCoordinator::new();
+        let worker = coordinator.clone();
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let (returned_tx, returned_rx) = std::sync::mpsc::channel::<()>();
+        let join = thread::spawn(move || {
+            let mut policy = ApprovalPolicy::default();
+            worker.request(
+                ApprovalRequest {
+                    request_id: "approval-slow-cancel".into(),
+                    turn_id: "turn-1".into(),
+                    call_id: "call-1".into(),
+                    tool: "write_file".into(),
+                    side_effect: ToolSideEffect::WorkspaceWrite,
+                    arguments: serde_json::json!({"path":"x"}),
+                    preview: None,
+                    origin: crate::tools::ToolOrigin::AgentTool,
+                    policy_digest: None,
+                    lease_id: None,
+                },
+                &mut policy,
+                &|| {
+                    entered_tx.send(()).ok();
+                    // Stands in for session I/O.  Bounded so a regression
+                    // fails the assertion below instead of hanging the suite.
+                    let _ = release_rx.recv_timeout(Duration::from_secs(5));
+                    returned_tx.send(()).ok();
+                    false
+                },
+            )
+        });
+        entered_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the worker reached the cancellation check");
+        let mut pending = coordinator.drain_pending();
+        assert!(
+            returned_rx.try_recv().is_err(),
+            "draining had to wait for the cancellation predicate to finish"
+        );
+        let request = pending.pop().expect("the request is pending");
+        coordinator
+            .respond(ApprovalResponse {
+                request_id: request.request_id.clone(),
+                decision: ApprovalDecision::Allow,
+                remember: false,
+                message: None,
+            })
+            .expect("answering had to wait for the cancellation predicate to finish");
+        release_tx.send(()).ok();
         assert_eq!(join.join().unwrap().unwrap(), ApprovalDecision::Allow);
     }
 

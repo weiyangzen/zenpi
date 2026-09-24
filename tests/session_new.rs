@@ -841,7 +841,21 @@ fn worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_n
             revoke.revoke();
         }
         let response = wire.prompt("after-new", "write after session switch");
-        assert_eq!(response["success"], true, "{scenario}: {response}");
+        // A revoked lease fails the turn closed: the provider request is
+        // scope-checked against the live blueprint gate before any tool is
+        // prepared, so switching sessions is not a window in which a revoked
+        // worker still acts.  The other scenarios keep the ordinary denied-tool
+        // result and let the turn finish.
+        let revoked = scenario == "revoked";
+        assert_eq!(response["success"], !revoked, "{scenario}: {response}");
+        if revoked {
+            assert!(
+                response["error"]
+                    .as_str()
+                    .is_some_and(|error| error.contains("lease_revoked")),
+                "{scenario}: {response}"
+            );
+        }
         assert_eq!(
             root.path().join("note-1.txt").exists(),
             scenario == "allowed",
@@ -853,13 +867,25 @@ fn worker_gate_binding_prohibitions_revocation_and_action_budget_survive_jsonl_n
             .map(|line| serde_json::from_str::<Value>(line).unwrap())
             .collect();
         let events: Vec<&Value> = records.iter().map(|row| &row["event"]).collect();
-        let tool = records
-            .iter()
-            .find(|row| {
+        assert!(
+            !records.iter().any(|row| {
                 row["turn"]["role"] == "tool"
                     && row["turn"]["metadata"]["tool_call_id"] == "write-1"
-            })
-            .expect("the second write must have a real tool result, including when denied");
+            }) == revoked,
+            "{scenario}: a revoked lease must not reach a tool result"
+        );
+        let Some(tool) = (!revoked).then(|| {
+            records
+                .iter()
+                .find(|row| {
+                    row["turn"]["role"] == "tool"
+                        && row["turn"]["metadata"]["tool_call_id"] == "write-1"
+                })
+                .expect("the second write must have a real tool result, including when denied")
+        }) else {
+            wire.finish();
+            continue;
+        };
         if scenario == "allowed" {
             let resolved = events
                 .iter()

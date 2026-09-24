@@ -2458,7 +2458,12 @@ fn serialized_session_summary(summary: &SessionSummary) -> serde_json::Value {
 fn serialized_agent_snapshot(agent: &Agent) -> Result<serde_json::Value, serde_json::Error> {
     let mut snapshot = agent.snapshot();
     snapshot.session.path = redact_session_path(&snapshot.session.path);
-    serde_json::to_value(snapshot)
+    let mut value = serde_json::to_value(snapshot)?;
+    // Declared in the existing status response rather than in a new startup
+    // handshake: a client that has not seen a capability must not send the
+    // command it gates, and an older server rejects the unknown command.
+    value["capabilities"] = json!(crate::protocol::CAPABILITIES);
+    Ok(value)
 }
 
 fn redact_session_path(raw: &str) -> String {
@@ -4657,8 +4662,13 @@ fn run_async_stdio<R: io::Read + Send + 'static, W: Write>(
                         agent.register_live_owner(replay.owner_epoch, cwd, now)?;
                     }
                     pool.refresh_owner_context(&id, &agent);
-                    access.insert(id, (agent.input_port(), agent.approval_coordinator()));
                 }
+            }
+            // Control handles are published when an owner is created, so a busy
+            // owner stays answerable: taking its execution lock is not a
+            // precondition for draining or answering its approval requests.
+            for (id, control) in pool.control_handles() {
+                access.insert(id, (control.input_port, control.approval));
             }
             let project = pool.active_context().clone();
             if let Some((port, coordinator)) = access.get(&project.project_id) {
@@ -6465,7 +6475,15 @@ where
             )?,
             Err(_) => write_cached_versioned_response(
                 output,
-                StdioResponse::success(id, name, Some(json!({"phase": "running", "busy": true}))),
+                StdioResponse::success(
+                    id,
+                    name,
+                    Some(json!({
+                        "phase": "running",
+                        "busy": true,
+                        "capabilities": crate::protocol::CAPABILITIES,
+                    })),
+                ),
                 request_version,
                 replay,
             )?,
@@ -8288,6 +8306,135 @@ fn bound_slash_text(value: &str, max_bytes: usize) -> String {
     value[..end].to_owned()
 }
 
+/// Answer one typed connection command.
+///
+/// The wire mapping is deliberately one-to-one with the outcome: an applied or
+/// repeated command carries the committed snapshot, a rejection carries a
+/// typed code and **no** data, and an uncertain commit says so instead of
+/// claiming either.  Nothing here reads a token: `select` manages a non-secret
+/// reference, and `status` reports the running selection.
+fn connection_response(
+    agent: &mut Agent,
+    request: crate::protocol::ConnectionRequest,
+) -> StdioResponse {
+    use crate::protocol::{ConnectionAction, ConnectionRequest};
+    let ConnectionRequest {
+        id,
+        session_id,
+        connection,
+        ..
+    } = request;
+    let id = Some(id);
+    let owner = agent.owner_label().to_owned();
+    // The session id is a read-only fence: a command addressed to another
+    // session must not reach this owner.
+    if session_id != agent.session().session_id() {
+        return StdioResponse::error_with_code(
+            id,
+            "connection",
+            "connection_stale",
+            "this session is not the one addressed by the command",
+        );
+    }
+    match connection {
+        ConnectionAction::Status { .. } => {
+            let selection = match agent.selection_state() {
+                Ok(selection) => selection,
+                Err(error) => {
+                    return StdioResponse::error_with_code(
+                        id,
+                        "connection",
+                        error.code(),
+                        error.to_string(),
+                    );
+                }
+            };
+            StdioResponse::success(
+                id,
+                "connection",
+                Some(json!({
+                    "outcome": "status",
+                    "owner": owner,
+                    "session_id": agent.session().session_id(),
+                    "selection_revision": agent.selection_revision(),
+                    "selection": selection,
+                    // A reason the owner cannot serve new inference right now;
+                    // absent means nothing is blocked.
+                    "blocked_reason": match agent.phase() {
+                        crate::core::AgentPhase::Running => Some("a turn is running"),
+                        crate::core::AgentPhase::Closed => Some("this owner is closed"),
+                        crate::core::AgentPhase::Idle => None,
+                    },
+                })),
+            )
+        }
+        ConnectionAction::Select {
+            owner: _,
+            profile,
+            model,
+            expected_selection_revision,
+        } => {
+            // The host builds the candidate; a headless client never supplies a
+            // backend, only the profile and model it wants selected.
+            let candidate = match crate::core::connection_candidate(&profile, model.as_deref()) {
+                Ok(candidate) => candidate,
+                Err(error) => {
+                    return StdioResponse::error_with_code(
+                        id,
+                        "connection",
+                        "connection_invalid",
+                        error.to_string(),
+                    );
+                }
+            };
+            let candidate = crate::core::ConnectionSelection {
+                owner_id: owner.clone(),
+                profile: profile.clone(),
+                model: model.clone(),
+                expected_selection_revision: Some(expected_selection_revision),
+                backend: candidate,
+            };
+            match agent.select_connection(candidate) {
+                Ok(crate::core::ConnectionSelectionOutcome::Applied {
+                    selection_revision,
+                    snapshot,
+                }) => StdioResponse::success(
+                    id,
+                    "connection",
+                    Some(json!({
+                        "outcome": "applied",
+                        "owner": owner,
+                        "session_id": agent.session().session_id(),
+                        "selection_revision": selection_revision,
+                        "selection": snapshot,
+                    })),
+                ),
+                Ok(crate::core::ConnectionSelectionOutcome::Rejected { code, detail }) => {
+                    StdioResponse::error_with_code(id, "connection", code.as_str(), detail)
+                }
+                Err(AgentError::Session(error)) => {
+                    // An append that failed on I/O may or may not have landed,
+                    // so this is the one case that is neither applied nor
+                    // rejected; the owner keeps its old connection and a retry
+                    // of the same ID only re-reads this answer.
+                    StdioResponse::error_with_code(
+                        id,
+                        "connection",
+                        "connection_commit_uncertain",
+                        error.to_string(),
+                    )
+                }
+                Err(error) => StdioResponse::error_with_code(
+                    id,
+                    "connection",
+                    error.code(),
+                    error.to_string(),
+                ),
+            }
+        }
+    }
+}
+
 fn handle_command<W: Write>(
     agent: &mut Agent,
     id: Option<String>,
@@ -8311,6 +8458,10 @@ fn handle_command<W: Write>(
     };
     let name = crate::protocol::command_name(&command);
     match command {
+        Command::Connection(request) => {
+            let response = connection_response(agent, request);
+            write_cached_versioned_response(output, response, request_version, replay)?;
+        }
         Command::ToolOutput(request) => {
             let response = match agent.tool_output_control(request, &|| false) {
                 Ok(value) => StdioResponse::success(id, "tool_output", Some(value)),

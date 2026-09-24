@@ -304,6 +304,33 @@ impl Default for ModelRegistry {
         }
         model.sources.insert("reasoning_levels".into(),FieldSource::Builtin{reference:"https://ai.google.dev/gemini-api/docs/generate-content/thinking".into(),version:"zenpi-google-2026-09-11.1; budgets none=0 minimal=128 low=2048 medium=8192 high=24576".into()});
         registry.entries.insert(("google".into(), id.into()), model);
+        // DeepSeek is an OpenAI-compatible service whose route rules declare
+        // tool support, but an explicit connection only trusts a rich field
+        // whose source is builtin or a user override (`connection.rs` disables
+        // the rest).  Left uncatalogued, every DeepSeek field resolves through
+        // `unknown()` as `Conservative`, which silently removes `tools` and
+        // with it the whole tool and approval subsystem from the session.
+        for id in ["deepseek-flash", "deepseek-reasoner"] {
+            let source = FieldSource::Builtin {
+                reference: "https://api-docs.deepseek.com/".into(),
+                version: CATALOG_VERSION.into(),
+            };
+            let mut model = unknown("deepseek", id);
+            model.context_window = 131_072;
+            model.max_output_tokens = 65_536;
+            for field in [
+                "context_window",
+                "max_output_tokens",
+                "text",
+                "tools",
+                "streaming",
+            ] {
+                model.sources.insert(field.into(), source.clone());
+            }
+            registry
+                .entries
+                .insert(("deepseek".into(), id.into()), model);
+        }
         registry
     }
 }

@@ -13,7 +13,9 @@ use sha2::{Digest, Sha256};
 
 use super::{AllowedDestination, AuthIdentitySnapshot};
 
-const STORE_KEY: &str = "zenpi_auth_v1";
+/// Root key owned by this store.  Legacy writers must never carry a copy of it
+/// back into the document; the live value is always re-read under the lock.
+pub(crate) const STORE_KEY: &str = "zenpi_auth_v1";
 const MAX_FILE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_ACCOUNTS: usize = 128;
 const MAX_TOKEN_BYTES: usize = 16 * 1024;
@@ -279,6 +281,14 @@ impl CredentialStore {
         })
     }
 
+    /// Identifier for a credential that does not exist yet.  Random rather than
+    /// derived from a profile alias: an alias is a user-chosen name for a
+    /// connection, while this ID is what a grant and every bound profile refer
+    /// to, and several profiles may share one credential.
+    pub fn new_credential_id() -> Result<String, StoreError> {
+        Ok(format!("cred_{}", random_id()?))
+    }
+
     pub fn list_status(&self) -> Result<Vec<CredentialStatus>, StoreError> {
         Ok(self
             .read_document()?
@@ -302,6 +312,34 @@ impl CredentialStore {
             return Err(StoreError::Inactive);
         }
         Ok(value.identity(id))
+    }
+
+    /// Mutate only legacy root fields under the same stable lock as credentials.
+    /// A whole-document caller must remove or reject its namespace before entry.
+    pub(crate) fn update_legacy<T>(
+        &self,
+        wait: &LockWait<'_>,
+        update: impl FnOnce(&mut Map<String, Value>) -> Result<T, StoreError>,
+    ) -> Result<(T, bool), StoreError> {
+        self.transaction(wait, |document| {
+            let before = document.legacy.clone();
+            let result = update(&mut document.legacy)?;
+            if document.legacy.contains_key(STORE_KEY) {
+                return Err(StoreError::InvalidData("reserved credential namespace"));
+            }
+            let changed = document.legacy != before;
+            if changed {
+                // Apply the reader's size/string/depth constraints before any
+                // write, so caller-supplied JSON cannot poison the shared store.
+                let mut bytes = Vec::new();
+                serde_json::to_writer(&mut BoundedWriter(&mut bytes), &document.legacy)
+                    .map_err(|_| StoreError::InvalidData("file limit exceeded"))?;
+                check_json_string_bounds(&bytes)?;
+                serde_json::from_slice::<StrictValue>(&bytes)
+                    .map_err(|_| StoreError::InvalidData("invalid legacy JSON"))?;
+            }
+            Ok(((result, changed), changed))
+        })
     }
 
     fn read(&self, id: &str) -> Result<PrivateCredential, StoreError> {
@@ -750,10 +788,8 @@ impl PrivateCredential {
                 validate_text(field, MAX_METADATA_BYTES)?;
             }
         }
-        for field in [&self.account_id, &self.user_id] {
-            if let Some(value) = field {
-                validate_text(value, MAX_METADATA_BYTES)?;
-            }
+        for value in [&self.account_id, &self.user_id].into_iter().flatten() {
+            validate_text(value, MAX_METADATA_BYTES)?;
         }
         if self.revision == 0 || self.definition_version == 0 {
             return Err(StoreError::InvalidData("invalid revision"));
@@ -1502,6 +1538,190 @@ mod tests {
                 .mode()
                 & 0o7777,
             0o600
+        );
+    }
+
+    #[test]
+    fn legacy_updates_preserve_fresh_namespace_and_do_not_expose_it() {
+        let (_directory, store) = fixture();
+        insert(&store, true);
+        let guard = store
+            .lock_refresh("credential", &LockWait::default())
+            .unwrap();
+        let ticket = store
+            .begin_refresh(&guard, 1, 123, &LockWait::default())
+            .unwrap();
+        store
+            .finish_refresh(
+                &guard,
+                &ticket,
+                RefreshResolution::Tokens(tokens()),
+                &LockWait::default(),
+            )
+            .unwrap();
+        let fresh = store.read("credential").unwrap();
+        let previous_file_revision = store.read_document().unwrap().namespace.revision;
+        let result = store
+            .update_legacy(&LockWait::default(), |legacy| {
+                assert!(!legacy.contains_key(STORE_KEY));
+                legacy.insert(
+                    "OPENAI_API_KEY".into(),
+                    Value::String("synthetic-legacy".into()),
+                );
+                legacy.insert("other".into(), serde_json::json!({"retained": true}));
+                Ok(17)
+            })
+            .unwrap();
+        assert_eq!(result, (17, true));
+        let document = store.read_document().unwrap();
+        assert!(document.namespace.accounts["credential"] == fresh);
+        assert_eq!(document.namespace.revision, previous_file_revision + 1);
+        assert_eq!(document.legacy["OPENAI_API_KEY"], "synthetic-legacy");
+        assert_eq!(document.legacy["other"]["retained"], true);
+        assert_eq!(fs::metadata(&store.path).unwrap().mode() & 0o7777, 0o600);
+    }
+
+    #[test]
+    fn legacy_update_noop_and_closure_error_leave_bytes_unchanged() {
+        let (_directory, store) = fixture();
+        let (_, changed) = store
+            .update_legacy(&LockWait::default(), |_| Ok(()))
+            .unwrap();
+        assert!(!changed);
+        assert!(!store.path.exists());
+        write_raw(&store, b"{ \"OPENAI_API_KEY\": \"synthetic-existing\" }\n");
+        let before = fs::read(&store.path).unwrap();
+        let failed_write = CredentialStore {
+            fault: Some(WriteFault::BeforeWrite),
+            ..store.clone()
+        };
+        assert_eq!(
+            failed_write.update_legacy(&LockWait::default(), |legacy| {
+                legacy.insert(
+                    "OPENAI_API_KEY".into(),
+                    Value::String("synthetic-existing".into()),
+                );
+                Ok(21)
+            }),
+            Ok((21, false))
+        );
+        assert_eq!(fs::read(&store.path).unwrap(), before);
+        assert_eq!(
+            store.update_legacy::<()>(&LockWait::default(), |legacy| {
+                legacy.clear();
+                Err(StoreError::InvalidData("synthetic validation failure"))
+            }),
+            Err(StoreError::InvalidData("synthetic validation failure"))
+        );
+        assert_eq!(fs::read(&store.path).unwrap(), before);
+    }
+
+    #[test]
+    fn legacy_update_rejects_reserved_namespace_and_unreadable_values_before_write() {
+        let (_directory, store) = fixture();
+        insert(&store, false);
+        let before = fs::read(&store.path).unwrap();
+        assert_eq!(
+            store.update_legacy(&LockWait::default(), |legacy| {
+                legacy.insert(
+                    STORE_KEY.into(),
+                    serde_json::json!({"version": 1, "accounts": {}}),
+                );
+                Ok(())
+            }),
+            Err(StoreError::InvalidData("reserved credential namespace"))
+        );
+        assert_eq!(fs::read(&store.path).unwrap(), before);
+        for case in 0..3 {
+            let value = match case {
+                0 => Value::String("x".repeat(MAX_TOKEN_BYTES + 1)),
+                1 => Value::Array(vec![
+                    Value::String("x".repeat(MAX_TOKEN_BYTES));
+                    MAX_FILE_BYTES / MAX_TOKEN_BYTES + 1
+                ]),
+                _ => (0..130).fold(Value::Null, |value, _| Value::Array(vec![value])),
+            };
+            assert!(matches!(
+                store.update_legacy(&LockWait::default(), |legacy| {
+                    legacy.insert("invalid".into(), value);
+                    Ok(())
+                }),
+                Err(StoreError::InvalidData(_))
+            ));
+            assert_eq!(fs::read(&store.path).unwrap(), before);
+        }
+        assert_eq!(revision(&store), 1);
+    }
+
+    #[test]
+    fn legacy_update_interleaves_with_refresh_without_invalidating_credential_cas() {
+        let (_directory, store) = fixture();
+        let identity = insert(&store, true);
+        let guard = store
+            .lock_refresh("credential", &LockWait::default())
+            .unwrap();
+        let ticket = store
+            .begin_refresh(&guard, 1, 123, &LockWait::default())
+            .unwrap();
+        let marked = store.read("credential").unwrap();
+        store
+            .update_legacy(&LockWait::default(), |legacy| {
+                legacy.insert(
+                    "OPENAI_API_KEY".into(),
+                    Value::String("synthetic-interleaved".into()),
+                );
+                Ok(())
+            })
+            .unwrap();
+        assert!(store.read("credential").unwrap() == marked);
+        let committed = store
+            .finish_refresh(
+                &guard,
+                &ticket,
+                RefreshResolution::Tokens(tokens()),
+                &LockWait::default(),
+            )
+            .unwrap();
+        assert_eq!(committed.identity().unwrap().credential_revision, 3);
+        assert_eq!(
+            committed.identity().unwrap().identity_generation,
+            identity.identity_generation
+        );
+        store
+            .update_legacy(&LockWait::default(), |legacy| {
+                assert_eq!(legacy["OPENAI_API_KEY"], "synthetic-interleaved");
+                legacy.insert("other".into(), Value::Bool(true));
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            store.read("credential").unwrap().access_token.as_deref(),
+            Some("synthetic-new-access-token")
+        );
+        assert_eq!(store.read_document().unwrap().legacy["other"], true);
+    }
+
+    #[test]
+    fn legacy_update_uncertainty_returns_no_success_and_preserves_credentials() {
+        let (_directory, store) = fixture();
+        insert(&store, true);
+        let original = store.read("credential").unwrap();
+        let uncertain = store.with_uncertain_commit_for_test();
+        assert_eq!(
+            uncertain.update_legacy(&LockWait::default(), |legacy| {
+                legacy.insert("other".into(), Value::Bool(true));
+                Ok("only-after-readback")
+            }),
+            Err(StoreError::CommitUncertain)
+        );
+        assert!(store.read("credential").unwrap() == original);
+        assert_eq!(store.read_document().unwrap().legacy["other"], true);
+        assert_eq!(
+            store.update_legacy(&LockWait::default(), |legacy| {
+                legacy.insert("other".into(), Value::Bool(true));
+                Ok(())
+            }),
+            Ok(((), false))
         );
     }
 
@@ -2269,6 +2489,39 @@ mod tests {
     }
 
     #[test]
+    fn subprocess_legacy_updates_serialize_with_each_other_and_refresh() {
+        let (_directory, store) = fixture();
+        let identity = insert(&store, true);
+        let lock_path = store.path.with_extension("json.lock");
+        let inode = fs::metadata(&lock_path).unwrap().ino();
+        let first = child(&store, "legacy_increment").spawn().unwrap();
+        let second = child(&store, "legacy_increment").spawn().unwrap();
+        let refresh = child(&store, "refresh").spawn().unwrap();
+        for worker in [first, second, refresh] {
+            let output = worker.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "synthetic child failed: {}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        let document = store.read_document().unwrap();
+        assert_eq!(document.legacy["counter"], 20);
+        assert_eq!(document.namespace.revision, 23);
+        assert_eq!(revision(&store), 3);
+        assert_eq!(
+            store.identity("credential").unwrap().identity_generation,
+            identity.identity_generation
+        );
+        assert_eq!(
+            store.read("credential").unwrap().refresh_token.as_deref(),
+            Some("synthetic-new-refresh-token")
+        );
+        assert_eq!(fs::metadata(lock_path).unwrap().ino(), inode);
+    }
+
+    #[test]
     fn subprocess_worker() {
         let Ok(mode) = std::env::var("ZENPI_PA03_CHILD_MODE") else {
             return;
@@ -2278,6 +2531,18 @@ mod tests {
         assert_eq!(path.file_name().unwrap(), "auth.json");
         let store = CredentialStore::new(path).unwrap();
         match mode.as_str() {
+            "legacy_increment" => {
+                for _ in 0..10 {
+                    store
+                        .update_legacy(&LockWait::default(), |legacy| {
+                            let current =
+                                legacy.get("counter").and_then(Value::as_u64).unwrap_or(0);
+                            legacy.insert("counter".into(), Value::from(current + 1));
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+            }
             "lock_timeout" => {
                 let wait = LockWait {
                     deadline: Instant::now() + Duration::from_millis(40),

@@ -11,7 +11,7 @@ use std::{
 };
 use tempfile::tempdir;
 use zenpi::{
-    approval::{ApprovalMode, ApprovalPolicy},
+    approval::{ApprovalDecision, ApprovalMode, ApprovalPolicy},
     core::Agent,
     project_workspace::ProjectOwnerPool,
     session::SessionStore,
@@ -567,7 +567,18 @@ fn busy_switch_keeps_queued_owners_events_approval_and_tools_in_their_project() 
     let other = root.path().join("same-name");
     fs::create_dir(&other).unwrap();
     let process_cwd = std::env::current_dir().unwrap();
-    let mut wire = Wire::new(agent(root.path()));
+    // The pool marks itself auto-approving when the root owner is `Never`
+    // (ZS1-180) and passes that to every owner it prepares, so a root that
+    // auto-approves never raises the approval this test is about.  Let the
+    // root run its own shell without a prompt, but keep the mode prompting so
+    // a project opened later still asks.
+    let mut root_agent = agent(root.path());
+    root_agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::ReadOnly,
+        per_tool: [("user_shell".into(), ApprovalDecision::Allow)].into(),
+        ..Default::default()
+    });
+    let mut wire = Wire::new(root_agent);
     let a = wire.project("a", json!({"action":"list"}))["project"]["project_id"].clone();
     wire.send(json!({"schema_version":2,"type":"user_shell","id":"slow-a","text":"!sleep 0.4; printf original > marker.txt"}));
     loop {
@@ -689,6 +700,67 @@ fn shared_checkpoint_rejects_concurrent_stale_writer_and_corrupt_input_atomicall
     std::os::unix::fs::symlink(root.path().join("initial.jsonl"), &checkpoint).unwrap();
     assert!(second.restore_checkpoint().is_err());
     assert_eq!(second.workspace(), &before);
+}
+#[test]
+fn failed_workspace_restore_still_adopts_the_checkpoint() {
+    let root = tempdir().unwrap();
+    let one = root.path().join("one");
+    fs::create_dir(&one).unwrap();
+    let mut first = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    assert!(!first.restore_checkpoint().unwrap());
+    first.open(Some(&one)).unwrap();
+    let checkpoint = root.path().join("project-workspace.json");
+    let mut saved: Value = serde_json::from_slice(&fs::read(&checkpoint).unwrap()).unwrap();
+    // A session path that cannot load (a directory) fails owner preparation
+    // while the checkpoint itself stays valid.
+    let broken = root.path().join("broken");
+    fs::create_dir(&broken).unwrap();
+    let active = first.workspace().active().unwrap().id().as_str().to_owned();
+    saved["sessions"][active.as_str()] = json!(broken.display().to_string());
+    let stale = serde_json::to_vec(&saved).unwrap();
+    fs::write(&checkpoint, &stale).unwrap();
+
+    let mut second = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    assert!(second.restore_checkpoint().is_err());
+    // The failed restore still adopted the checkpoint, so a project change
+    // commits against the stale bytes instead of losing the durable owner.
+    let two = root.path().join("two");
+    fs::create_dir(&two).unwrap();
+    second.open(Some(&two)).unwrap();
+    let rewritten = fs::read(&checkpoint).unwrap();
+    assert_ne!(rewritten, stale);
+    assert!(String::from_utf8_lossy(&rewritten).contains("two"));
+}
+#[test]
+fn arch_new_resets_the_master_session_and_archives_the_journal() {
+    let root = tempdir().unwrap();
+    let mut pool = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    let id = pool.active_context().project_id.clone();
+    let before = pool.arch_agent(&id).unwrap();
+    let arch_path = root.path().join("arch.jsonl");
+    assert_eq!(
+        before.lock().unwrap().session().path(),
+        arch_path.as_path()
+    );
+    pool.reset_arch(&id).unwrap();
+    let fresh = pool.arch_agent(&id).unwrap();
+    assert!(!Arc::ptr_eq(&before, &fresh));
+    let fresh = fresh.lock().unwrap();
+    assert_eq!(fresh.session().path(), arch_path.as_path());
+    assert!(fresh.session().turns().is_empty());
+    // The old journal is archived next to the canonical path so a restart
+    // opens the fresh arch.jsonl instead of resurrecting the reset session.
+    let archives = fs::read_dir(root.path())
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("arch-"))
+        .count();
+    assert_eq!(archives, 1);
+    // The refreshed owner is registered for control like any other lane.
+    assert!(pool.control(&format!("arch:{id}")).is_some());
+    // A second reset on the fresh owner works.
+    drop(fresh);
+    pool.reset_arch(&id).unwrap();
 }
 #[test]
 fn tui_and_jsonl_share_the_checkpoint_and_actual_session_owner() {
@@ -987,19 +1059,98 @@ fn rejected_resume_checkpoint_keeps_actual_owner_and_host_usable() {
 }
 
 #[test]
-fn auto_approval_propagates_to_project_and_arch_owners() {
+fn auto_approval_propagates_only_from_an_explicit_auto_owner() {
     let root = tempdir().unwrap();
-    let mut pool = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    // An owner that merely happens not to prompt is not a blanket allow.  This
+    // is the whole point of recording `--auto` as its own value: any future
+    // path that sets `Never` for its own reasons must not silently arm every
+    // owner in the pool.
+    let plain = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    assert!(
+        !plain.auto_approve(),
+        "a Never mode on its own must not mark the pool as auto"
+    );
+    // ZS1-180: the explicit choice still reaches every owner the pool prepares.
+    let prepared = Agent::prepare_project_with_approval(
+        &root.path().join("auto.jsonl"),
+        root.path(),
+        Default::default(),
+        true,
+        true,
+    )
+    .unwrap();
+    let mut pool = ProjectOwnerPool::new(Arc::new(Mutex::new(prepared))).unwrap();
     assert!(
         pool.auto_approve(),
-        "a Never root owner marks the whole pool as auto"
+        "an explicitly prepared auto root marks the whole pool"
     );
     let id = pool.workspace().active().unwrap().id().as_str().to_owned();
     let arch = pool.arch_agent(&id).unwrap();
+    assert!(arch.lock().unwrap().auto_approve());
     assert_eq!(
         arch.lock().unwrap().approval_policy().unwrap().mode,
         ApprovalMode::Never
     );
+}
+
+#[test]
+fn owner_control_handles_stay_reachable_while_the_owner_is_busy() {
+    let root = tempdir().unwrap();
+    let owner = Arc::new(Mutex::new(agent(root.path())));
+    let pool = ProjectOwnerPool::new(Arc::clone(&owner)).unwrap();
+    let id = pool.workspace().active().unwrap().id().as_str().to_owned();
+    // Hold the execution lock on the owner's behalf. An owner is in this
+    // state for the whole of its turn, including while it waits for an
+    // approval, so reaching its coordinator must not need this lock.
+    let busy = owner.lock().unwrap();
+    assert!(
+        owner.try_lock().is_err(),
+        "the owner is busy, so the execution lock is unavailable"
+    );
+    let control = pool
+        .control(&id)
+        .expect("control handles are published before the owner can run");
+    assert!(
+        control.approval.is_some(),
+        "a prepared owner always has a coordinator"
+    );
+    assert_eq!(pool.control_handles().len(), 1);
+    drop(busy);
+}
+
+#[test]
+fn arch_lane_publishes_its_own_control_handles_for_the_same_project() {
+    let root = tempdir().unwrap();
+    let mut pool = ProjectOwnerPool::new(Arc::new(Mutex::new(agent(root.path())))).unwrap();
+    let id = pool.workspace().active().unwrap().id().as_str().to_owned();
+    let arch = pool.arch_agent(&id).unwrap();
+    let controls = pool.control_handles();
+    assert_eq!(
+        controls.len(),
+        2,
+        "the arch lane publishes a handle of its own"
+    );
+    assert!(
+        controls.iter().all(|(_, control)| control.project == id),
+        "an arch request still belongs to the project it was raised for"
+    );
+    let coordinators = controls
+        .iter()
+        .filter_map(|(_, control)| control.approval.as_ref())
+        .collect::<Vec<_>>();
+    assert_eq!(coordinators.len(), 2);
+    assert!(
+        coordinators
+            .iter()
+            .all(|coordinator| !coordinator.has_pending()),
+        "a freshly prepared pair has nothing waiting"
+    );
+    // The arch owner holds its execution lock for the whole of its turn, which
+    // is exactly when a host has to be able to answer it.
+    let busy = arch.lock().unwrap();
+    assert!(arch.try_lock().is_err());
+    assert_eq!(pool.control_handles().len(), 2);
+    drop(busy);
 }
 
 #[test]

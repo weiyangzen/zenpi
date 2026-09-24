@@ -206,6 +206,8 @@ pub struct StdioRequest {
     pub tree: Option<TreeAction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection: Option<ConnectionAction>,
 }
 
 /// A validated command.  The command owns its payload so admission can move
@@ -253,6 +255,9 @@ pub enum Command {
     InputQueue(InputQueueRequest),
     Tree(TreeRequest),
     ToolOutput(OutputRequest),
+    /// Typed connection control.  It manages non-secret references only: there
+    /// is deliberately no way to write a token through ordinary JSONL.
+    Connection(ConnectionRequest),
     UserShell(UserShellRequest),
     Approve {
         approval_id: String,
@@ -339,6 +344,40 @@ impl StdioRequest {
                 Ok(Command::Project(control))
             }
 
+            "connection" => {
+                // A connection command manages a non-secret reference.  Mixing
+                // it with a prompt, approval, or tree body would let one line
+                // carry two intents, so any of those is refused outright.
+                if self.text.is_some()
+                    || self.message.is_some()
+                    || self.approval_id.is_some()
+                    || self.decision.is_some()
+                    || !self.attachments.is_empty()
+                    || self.tree.is_some()
+                    || self.input_queue.is_some()
+                    || self.output.is_some()
+                    || self.checkpoint.is_some()
+                    || self.mailbox.is_some()
+                    || self.project.is_some()
+                {
+                    return Err(ProtocolError::InvalidField {
+                        field: "connection",
+                    });
+                }
+                let request = ConnectionRequest {
+                    schema_version: self.schema_version,
+                    id: self.id.ok_or(ProtocolError::EmptyField { field: "id" })?,
+                    kind: self.kind,
+                    session_id: self.session_id.ok_or(ProtocolError::EmptyField {
+                        field: "session_id",
+                    })?,
+                    connection: self.connection.ok_or(ProtocolError::EmptyField {
+                        field: "connection",
+                    })?,
+                };
+                request.validate()?;
+                Ok(Command::Connection(request))
+            }
             "input_queue" => {
                 let request = InputQueueRequest {
                     schema_version: self.schema_version,
@@ -1016,6 +1055,7 @@ pub fn command_name(command: &Command) -> &'static str {
         Command::InputQueue(_) => "input_queue",
         Command::Tree(_) => "tree",
         Command::ToolOutput(_) => "tool_output",
+        Command::Connection(_) => "connection",
         Command::UserShell(_) => "user_shell",
         Command::Approve { .. } => "approve",
         Command::Shutdown => "shutdown",
@@ -1156,6 +1196,94 @@ pub fn parse_input_queue_line(line: &str) -> Result<InputQueueRequest, ProtocolE
     let request: InputQueueRequest = serde_json::from_str(line.strip_suffix('\r').unwrap_or(line))?;
     request.validate()?;
     Ok(request)
+}
+
+/// Protocol capabilities a host declares in its `status` response.
+///
+/// A client that has not seen a capability must not send the command it
+/// gates: an older server rejects the unknown command instead of guessing,
+/// and no second RPC protocol is introduced for the same purpose.
+pub const CAPABILITIES: &[&str] = &["connection_v1", "ordered_content_v1"];
+
+/// Which owner a connection command addresses.
+///
+/// Only the two hosts that own a session can be addressed; an arbitrary
+/// external owner id is refused rather than treated as another agent.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionOwner {
+    Discussion,
+    Arch,
+}
+
+impl ConnectionOwner {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Discussion => "discussion",
+            Self::Arch => "arch",
+        }
+    }
+}
+
+/// Typed connection control.  `select` changes the connection a session uses;
+/// `status` only reports, and never refreshes or probes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ConnectionAction {
+    Select {
+        owner: ConnectionOwner,
+        profile: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        expected_selection_revision: u64,
+    },
+    Status {
+        owner: ConnectionOwner,
+    },
+}
+
+impl ConnectionAction {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        match self {
+            // A command that is stale or wrong is rejected with a typed error,
+            // so a `model` the caller omitted is not silently defaulted here.
+            Self::Select { profile, model, .. } => {
+                validate_identifier(profile, "profile")?;
+                if let Some(model) = model {
+                    validate_identifier(model, "model")?;
+                }
+            }
+            Self::Status { .. } => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConnectionRequest {
+    pub schema_version: u16,
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub session_id: String,
+    pub connection: ConnectionAction,
+}
+
+impl ConnectionRequest {
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if self.schema_version != PROTOCOL_VERSION {
+            return Err(ProtocolError::UnsupportedVersion {
+                found: self.schema_version,
+                expected: PROTOCOL_VERSION,
+            });
+        }
+        if self.kind != "connection" {
+            return Err(ProtocolError::InvalidField { field: "type" });
+        }
+        validate_queue_id(&self.id)?;
+        validate_queue_id(&self.session_id)?;
+        self.connection.validate()
+    }
 }
 
 /// Strict session-scoped tree control shared by terminal and JSONL hosts.

@@ -8,9 +8,10 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
+    io::{BufRead, IsTerminal, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,7 @@ use crate::{
     },
     error::ZenpiError,
     protocol::{MAX_ID_BYTES, MAX_TEXT_BYTES, TurnMode},
+    protocols::content,
     session::{SessionError, SessionStore, SessionSummary},
     tools::{SideEffectPolicy, ToolContext, ToolError, ToolRegistry},
 };
@@ -278,6 +280,143 @@ pub enum AgentPhase {
     Closed,
 }
 
+/// A complete, versioned connection selection.
+///
+/// This extends the existing `model_selected` event instead of adding a second
+/// one that could half commit: a reader that does not know the new fields still
+/// sees the model, descriptor, digest and reasoning effort it always did, and
+/// keeps its old behaviour.  Nothing here is secret — `credential_ref` is an
+/// identifier, and the route/identity fields are digests.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SelectionSnapshotV1 {
+    pub selection_version: u32,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub descriptor: Option<Value>,
+    #[serde(default)]
+    pub digest: Option<String>,
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
+    // Everything below was added after the first `model_selected` events were
+    // written, so every field defaults.  An event from an older writer stays
+    // readable and simply looks like a selection with no explicit connection.
+    #[serde(default)]
+    pub profile: String,
+    #[serde(default)]
+    pub provider: String,
+    #[serde(default)]
+    pub protocol: String,
+    #[serde(default)]
+    pub auth_kind: String,
+    #[serde(default)]
+    pub credential_ref: Option<String>,
+    #[serde(default)]
+    pub identity_scope: String,
+    #[serde(default)]
+    pub route_digest: String,
+    #[serde(default)]
+    pub definition_version: u32,
+    #[serde(default)]
+    pub config_revision: u64,
+}
+
+impl SelectionSnapshotV1 {
+    pub const VERSION: u32 = 1;
+
+    fn event(&self) -> Value {
+        let mut event = serde_json::to_value(self).unwrap_or(Value::Null);
+        event["type"] = Value::String("model_selected".into());
+        event
+    }
+}
+
+/// The model, reasoning effort, and connection a session last chose.
+struct SavedSelection {
+    model: Option<String>,
+    effort: Option<String>,
+    connection: Option<SelectionSnapshotV1>,
+    /// The saved descriptor digest no longer matches the registry, so the
+    /// selection is adopted under current metadata and that adoption is
+    /// recorded back into the journal.
+    drifted: bool,
+}
+
+/// A candidate connection prepared by the host.
+///
+/// The host owns turning configuration into a backend, because it already does
+/// that at startup and the core deliberately knows nothing about where
+/// configuration lives.  The core owns the fences, the durable event, and the
+/// swap.
+pub struct ConnectionSelection {
+    /// The owner this selection applies to.  It must be the agent's own owner;
+    /// a selection never reaches another owner or another project.
+    pub owner_id: String,
+    pub profile: String,
+    pub model: Option<String>,
+    /// `None` skips the revision check; a host that is applying a queued
+    /// command passes the revision it planned against.
+    pub expected_selection_revision: Option<u64>,
+    pub backend: Box<dyn Backend>,
+}
+
+impl std::fmt::Debug for ConnectionSelection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ConnectionSelection")
+            .field("owner_id", &self.owner_id)
+            .field("profile", &self.profile)
+            .field("model", &self.model)
+            .field(
+                "expected_selection_revision",
+                &self.expected_selection_revision,
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+/// Why a selection was refused.  A refusal always leaves the running
+/// connection, model, journal and UI exactly as they were.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionRejectCode {
+    /// The request named a different owner than this agent serves.
+    OwnerMismatch,
+    /// The owner is running, or has queued work that has not taken the lock.
+    ConnectionBusy,
+    /// The selection revision moved since the caller planned against it.
+    ConnectionStale,
+    /// The requested connection or model cannot serve this session.
+    ConnectionInvalid,
+}
+
+impl ConnectionRejectCode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::OwnerMismatch => "connection_owner_mismatch",
+            Self::ConnectionBusy => "connection_busy",
+            Self::ConnectionStale => "connection_stale",
+            Self::ConnectionInvalid => "connection_invalid",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionSelectionOutcome {
+    /// The event is durable and the swap has happened.  The snapshot is boxed
+    /// because it is far larger than a rejection, and this value is returned
+    /// once per selection rather than stored.
+    Applied {
+        selection_revision: u64,
+        snapshot: Box<SelectionSnapshotV1>,
+    },
+    Rejected {
+        code: ConnectionRejectCode,
+        detail: String,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AgentEvent {
@@ -402,9 +541,18 @@ impl AgentError {
 /// Shared state machine used by both runtime modes.
 pub struct Agent {
     request_owner_id: String,
+    /// The host-facing name of this owner.  `request_owner_id` is an opaque
+    /// per-process correlation id; the protocol names the two hosts that can
+    /// own a session, and a selection is addressed to one of those.
+    owner_label: String,
     output_store: crate::tool_output::SessionOutputStore,
     input_port: crate::input_queue::InputPort,
     project_overrides: crate::config::ConfigOverrides,
+    /// Whether this owner was prepared with `--auto` (ZS1-180).  Recorded as
+    /// its own value rather than inferred from the approval mode: "the user
+    /// asked for a blanket allow" and "this owner happens not to prompt" are
+    /// different facts, and only the first may spread to other owners.
+    auto_approve: bool,
     backend: Box<dyn Backend>,
     session: SessionStore,
     phase: AgentPhase,
@@ -609,9 +757,11 @@ impl Agent {
         let recovered = session.interrupted_operations();
         let mut agent = Self {
             request_owner_id: next_id("request-owner"),
+            owner_label: "discussion".into(),
             output_store: crate::tool_output::SessionOutputStore::default(),
             input_port: crate::input_queue::InputPort::new(session.session_id()),
             project_overrides: crate::config::ConfigOverrides::default(),
+            auto_approve: false,
             backend,
             session,
             phase: AgentPhase::Idle,
@@ -752,6 +902,13 @@ impl Agent {
         self.project_overrides.clone()
     }
 
+    /// True when this owner was prepared under `--auto` (ZS1-180).  Read this
+    /// instead of inspecting the approval mode: a `Never` mode says the owner
+    /// does not prompt, which is not the same statement.
+    pub fn auto_approve(&self) -> bool {
+        self.auto_approve
+    }
+
     pub fn prepare_project_with_options(
         session_path: &Path,
         cwd: &Path,
@@ -801,6 +958,7 @@ impl Agent {
             },
             ..ApprovalPolicy::default()
         });
+        agent.auto_approve = auto_approve;
         Ok(agent)
     }
 
@@ -1166,6 +1324,52 @@ impl Agent {
         self.session.turns()
     }
 
+    /// The opaque per-process owner id used for request-scope correlation.
+    pub fn request_owner_id(&self) -> &str {
+        &self.request_owner_id
+    }
+
+    /// The host-facing owner name, `discussion` or `arch`.
+    ///
+    /// A connection command addresses this label, not the opaque correlation
+    /// id, because that is what a client can name without inventing state.
+    pub fn owner_label(&self) -> &str {
+        &self.owner_label
+    }
+
+    /// Name the host this owner serves.  Arch owners are independent agents
+    /// with their own journal, so a selection must be able to tell them apart.
+    pub fn set_owner_label(&mut self, label: &str) -> Result<(), AgentError> {
+        if !matches!(label, "discussion" | "arch") {
+            return Err(AgentError::InvalidTurn(
+                "owner label must be discussion or arch".into(),
+            ));
+        }
+        self.owner_label = label.to_owned();
+        Ok(())
+    }
+
+    /// The active model identity, or `None` for the provider default.
+    pub fn model(&self) -> Option<&str> {
+        self.model.as_deref()
+    }
+
+    /// The complete, versioned selection this owner is running.
+    ///
+    /// Built from the running backend rather than from the journal, so a host
+    /// reports what is actually in effect.  It contains no secret: the
+    /// credential is an identifier and the route/identity fields are digests.
+    pub fn selection_state(&self) -> Result<SelectionSnapshotV1, AgentError> {
+        let descriptor = self.backend.model_descriptor(self.model.as_deref())?;
+        Self::selection_snapshot_for(
+            self.backend.as_ref(),
+            &self.profile_hint(),
+            self.model.clone(),
+            self.backend.reasoning_effort().map(str::to_owned),
+            descriptor.as_ref(),
+        )
+    }
+
     pub fn phase(&self) -> AgentPhase {
         self.phase
     }
@@ -1187,14 +1391,249 @@ impl Agent {
         let descriptor = self.backend.model_descriptor(model.as_deref())?;
         let selected = model.or_else(|| self.backend.model().map(str::to_owned));
         if let Some(descriptor) = &descriptor {
-            self.session.append_event(serde_json::json!({
-                "type": "model_selected", "model": selected,
-                "descriptor": descriptor, "digest": descriptor.digest(),
-                "reasoning_effort": self.backend.reasoning_effort(),
-            }))?;
+            let snapshot = Self::selection_snapshot_for(
+                self.backend.as_ref(),
+                &self.profile_hint(),
+                selected.clone(),
+                self.backend.reasoning_effort().map(str::to_owned),
+                Some(descriptor),
+            )?;
+            self.session.append_event(snapshot.event())?;
         }
         self.model = selected;
         Ok(())
+    }
+
+    /// The profile this agent is currently connected to, when it has one.
+    /// Recorded in the selection event so a reader can tell a same-profile
+    /// model change from a connection change.
+    fn profile_hint(&self) -> String {
+        self.backend
+            .connection_snapshot(self.model.as_deref())
+            .ok()
+            .flatten()
+            .map_or_else(String::new, |snapshot| snapshot.profile)
+    }
+
+    /// Sequence of the last durable selection event, or 0 when this session has
+    /// never selected a connection.
+    ///
+    /// This is the session's own selection revision.  It is not the
+    /// configuration revision and not a credential revision: an OAuth refresh
+    /// advances the credential without moving a selection, and editing the
+    /// configuration does not either.
+    pub fn selection_revision(&self) -> u64 {
+        self.session
+            .records()
+            .iter()
+            .rev()
+            .find(|record| {
+                record.kind == "event" && record.value["event"]["type"] == "model_selected"
+            })
+            .map_or(0, |record| record.sequence)
+    }
+
+    /// Everything that must be settled before the running connection may
+    /// change.
+    ///
+    /// `phase == Idle` is not enough on its own: the host can hold queued input
+    /// that has not taken the lock, staged or active attachments, an approval
+    /// the user is looking at, an admitted worker operation, or an operation
+    /// whose journal outcome is still unknown.  Swapping the account under any
+    /// of those would change the backend out from under work that is already
+    /// accounted for.
+    fn connection_change_fence(&self) -> Result<(), String> {
+        if !self.pending_attachments.is_empty() {
+            return Err("staged attachments must be sent or cleared first".into());
+        }
+        if !self.active_attachments.is_empty() {
+            return Err("a turn with attachments is still in flight".into());
+        }
+        if let Some(tools) = &self.tools
+            && tools.approval.has_pending()
+        {
+            return Err("an approval is still awaiting a decision".into());
+        }
+        if self.worker_admission_operation.is_some() {
+            return Err("an admitted worker operation has not settled".into());
+        }
+        if !self.session.operation_recovery().is_empty() {
+            return Err(
+                "an operation outcome is unknown; resolve it before changing the connection".into(),
+            );
+        }
+        let queue = crate::input_queue::InputQueue::recover(&self.session, Default::default())
+            .map_err(|error| error.to_string())?;
+        if queue.has_pending() {
+            return Err("queued input is still pending".into());
+        }
+        // A submitted ticket has not taken the owner lock yet, so `Idle` alone
+        // does not mean nothing is scheduled against the running connection.
+        if self.input_port.has_pending() {
+            return Err("host input is queued but not yet serviced".into());
+        }
+        Ok(())
+    }
+
+    /// Atomically replace the connection, model, and reasoning effort.
+    ///
+    /// The order is the contract: every fence and validation runs first, then
+    /// one durable selection event is appended, and only then is the swap done.
+    /// After the event is durable nothing below it can fail, so a reader that
+    /// recovers from the journal and one that stayed in memory agree.  A
+    /// rejection — including a fence rejection — leaves the running backend,
+    /// model, journal and UI exactly as they were.
+    pub fn select_connection(
+        &mut self,
+        selection: ConnectionSelection,
+    ) -> Result<ConnectionSelectionOutcome, AgentError> {
+        if self.phase == AgentPhase::Closed {
+            return Err(AgentError::Closed);
+        }
+        let reject = |code: ConnectionRejectCode, detail: &str| {
+            Ok(ConnectionSelectionOutcome::Rejected {
+                code,
+                detail: detail.to_owned(),
+            })
+        };
+        // A selection is scoped to one owner.  It is never broadcast to another
+        // owner, project, or worker.
+        if selection.owner_id != self.owner_label {
+            return reject(
+                ConnectionRejectCode::OwnerMismatch,
+                "the selection names a different owner",
+            );
+        }
+        if self.phase != AgentPhase::Idle {
+            return reject(
+                ConnectionRejectCode::ConnectionBusy,
+                "the owner is running a turn",
+            );
+        }
+        if let Err(detail) = self.connection_change_fence() {
+            return reject(ConnectionRejectCode::ConnectionBusy, &detail);
+        }
+        // Re-checked inside the fence: the caller planned against this revision
+        // and may have been overtaken while it prepared the candidate.
+        let current = self.selection_revision();
+        if let Some(expected) = selection.expected_selection_revision
+            && expected != current
+        {
+            return reject(
+                ConnectionRejectCode::ConnectionStale,
+                "the selection revision changed while the candidate was prepared",
+            );
+        }
+        // Prepare: validate the candidate against the session's own history
+        // before anything is written.
+        let model = selection.model.clone();
+        if let Err(error) = selection.backend.validate_model(model.as_deref()) {
+            return reject(ConnectionRejectCode::ConnectionInvalid, &error.to_string());
+        }
+        let history = self.selected_history()?;
+        if let Err(error) = selection
+            .backend
+            .validate_history_model(&history, model.as_deref())
+        {
+            return reject(ConnectionRejectCode::ConnectionInvalid, &error.to_string());
+        }
+        // A candidate that cannot describe the requested model is a rejection,
+        // not an internal error: nothing has been written yet and the running
+        // connection stays exactly as it was.
+        let descriptor = match selection.backend.model_descriptor(model.as_deref()) {
+            Ok(descriptor) => descriptor,
+            Err(error) => {
+                return reject(ConnectionRejectCode::ConnectionInvalid, &error.to_string());
+            }
+        };
+        let snapshot = Self::selection_snapshot_for(
+            selection.backend.as_ref(),
+            &selection.profile,
+            model,
+            selection.backend.reasoning_effort().map(str::to_owned),
+            descriptor.as_ref(),
+        )?;
+        // Durable first.  A failed append leaves the old connection running and
+        // the journal unchanged.
+        self.session.append_event(snapshot.event())?;
+        let selection_revision = self.selection_revision();
+        // Infallible swap: no fallible operation may sit below the event.
+        self.backend = selection.backend;
+        self.model = snapshot.model.clone();
+        self.backend
+            .commit_reasoning_effort(snapshot.reasoning_effort.clone());
+        Ok(ConnectionSelectionOutcome::Applied {
+            selection_revision,
+            snapshot: Box::new(snapshot),
+        })
+    }
+
+    /// Build the selection event for a backend.
+    ///
+    /// A model-only change inside a profile still writes a complete snapshot,
+    /// so a reader never has to combine two events to know what was selected.
+    fn selection_snapshot_for(
+        backend: &dyn Backend,
+        profile_hint: &str,
+        model: Option<String>,
+        effort: Option<String>,
+        descriptor: Option<&crate::providers::registry::ModelDescriptor>,
+    ) -> Result<SelectionSnapshotV1, AgentError> {
+        let connection = backend.connection_snapshot(model.as_deref())?;
+        let (
+            profile,
+            provider,
+            protocol,
+            auth_kind,
+            credential_ref,
+            identity_scope,
+            route_digest,
+            definition_version,
+            config_revision,
+        ) = match connection {
+            Some(connection) => (
+                connection.profile,
+                connection.provider,
+                connection.protocol,
+                connection.auth_kind,
+                connection.credential_ref,
+                connection.identity_scope,
+                connection.route_digest,
+                connection.definition_version,
+                connection.config_revision,
+            ),
+            // A backend that is not connection bound (legacy or a test
+            // backend) is recorded as such rather than given a invented
+            // profile.
+            None => (
+                profile_hint.to_owned(),
+                String::new(),
+                String::new(),
+                "legacy".into(),
+                None,
+                String::new(),
+                String::new(),
+                0,
+                0,
+            ),
+        };
+        Ok(SelectionSnapshotV1 {
+            selection_version: SelectionSnapshotV1::VERSION,
+            model,
+            descriptor: descriptor
+                .map(|descriptor| serde_json::to_value(descriptor).unwrap_or(Value::Null)),
+            digest: descriptor.map(|descriptor| descriptor.digest()),
+            reasoning_effort: effort,
+            profile,
+            provider,
+            protocol,
+            auth_kind,
+            credential_ref,
+            identity_scope,
+            route_digest,
+            definition_version,
+            config_revision,
+        })
     }
 
     /// None restores the provider default (omits the field); Some("none") is
@@ -1214,10 +1653,14 @@ impl Agent {
             .ok_or_else(|| {
                 AgentError::InvalidTurn("reasoning settings require a model registry".into())
             })?;
-        self.session.append_event(serde_json::json!({
-            "type":"model_selected", "model":self.model,
-            "descriptor":descriptor, "digest":descriptor.digest(), "reasoning_effort":effort,
-        }))?;
+        let snapshot = Self::selection_snapshot_for(
+            self.backend.as_ref(),
+            &self.profile_hint(),
+            self.model.clone(),
+            effort.clone(),
+            Some(&descriptor),
+        )?;
+        self.session.append_event(snapshot.event())?;
         self.backend.commit_reasoning_effort(effort);
         Ok(())
     }
@@ -1229,16 +1672,18 @@ impl Agent {
     fn selected_model_for_session(
         &self,
         session: &SessionStore,
-    ) -> Result<(Option<String>, Option<String>), AgentError> {
+    ) -> Result<SavedSelection, AgentError> {
         if self.backend.model_descriptor(None)?.is_none() {
             self.backend.validate_history_model(
                 &session.selected_tree_turns(&|| false)?,
                 self.model.as_deref(),
             )?;
-            return Ok((
-                self.model.clone(),
-                self.backend.reasoning_effort().map(str::to_owned),
-            ));
+            return Ok(SavedSelection {
+                model: self.model.clone(),
+                effort: self.backend.reasoning_effort().map(str::to_owned),
+                connection: None,
+                drifted: false,
+            });
         }
         let saved = session.records().iter().rev().find_map(|record| {
             let event = record.value.get("event")?;
@@ -1249,10 +1694,12 @@ impl Agent {
                 &session.selected_tree_turns(&|| false)?,
                 self.backend.model(),
             )?;
-            return Ok((
-                self.backend.model().map(str::to_owned),
-                self.backend.reasoning_effort().map(str::to_owned),
-            ));
+            return Ok(SavedSelection {
+                model: self.backend.model().map(str::to_owned),
+                effort: self.backend.reasoning_effort().map(str::to_owned),
+                connection: None,
+                drifted: false,
+            });
         };
         let selected = saved["model"]
             .as_str()
@@ -1273,21 +1720,98 @@ impl Agent {
             .backend
             .model_descriptor(Some(selected))?
             .ok_or_else(|| AgentError::InvalidTurn("saved model requires a registry".into()))?;
-        if saved["digest"].as_str() != Some(descriptor.digest().as_str()) {
-            return Err(AgentError::InvalidTurn(
-                "saved model metadata changed; explicitly select a model to adopt current metadata"
-                    .into(),
-            ));
-        }
+        // Registry metadata legitimately drifts as the catalogue evolves; the
+        // budget and capability checks here already run against the current
+        // descriptor, so a stale digest is adopted rather than fatal.
+        let drifted = saved["digest"].as_str() != Some(descriptor.digest().as_str());
         self.backend
             .validate_history_model(&session.selected_tree_turns(&|| false)?, Some(selected))?;
-        Ok((Some(selected.into()), effort))
+        // The connection fields are advisory for an event written before they
+        // existed; `serde(default)` makes such an event parse with no claim.
+        let connection = serde_json::from_value::<SelectionSnapshotV1>(saved.clone()).ok();
+        Ok(SavedSelection {
+            model: Some(selected.into()),
+            effort,
+            connection,
+            drifted,
+        })
     }
 
     pub fn restore_model_selection(&mut self) -> Result<(), AgentError> {
-        let (model, effort) = self.selected_model_for_session(&self.session)?;
-        self.model = model;
-        self.backend.commit_reasoning_effort(effort);
+        let saved = self.selected_model_for_session(&self.session)?;
+        self.require_same_connection(&saved.connection)?;
+        let drifted = saved.drifted;
+        self.model = saved.model;
+        self.backend.commit_reasoning_effort(saved.effort);
+        if drifted {
+            Self::record_selection_adoption(
+                self.backend.as_ref(),
+                &mut self.session,
+                self.model.clone(),
+                self.backend.reasoning_effort().map(str::to_owned),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Record that a drifted saved selection was adopted under the current
+    /// descriptor, so the next load no longer sees a digest mismatch.
+    fn record_selection_adoption(
+        backend: &dyn Backend,
+        session: &mut SessionStore,
+        model: Option<String>,
+        effort: Option<String>,
+    ) -> Result<(), AgentError> {
+        let Some(descriptor) = backend.model_descriptor(model.as_deref())? else {
+            return Ok(());
+        };
+        let profile = backend
+            .connection_snapshot(model.as_deref())
+            .ok()
+            .flatten()
+            .map_or_else(String::new, |connection| connection.profile);
+        let snapshot =
+            Self::selection_snapshot_for(backend, &profile, model, effort, Some(&descriptor))?;
+        session.append_event(snapshot.event())?;
+        Ok(())
+    }
+
+    /// Refuse to restore a saved model onto a connection the journal did not
+    /// record.
+    ///
+    /// This is deliberately a visible failure rather than a silent fallback to
+    /// the current default profile: restoring a model chosen for one account
+    /// onto another would send the session's history to the wrong service
+    /// without saying so.  An event written before the connection fields
+    /// existed carries no claim and is accepted.
+    fn require_same_connection(
+        &self,
+        saved: &Option<SelectionSnapshotV1>,
+    ) -> Result<(), AgentError> {
+        let Some(saved) = saved else {
+            return Ok(());
+        };
+        let current = self.backend.connection_snapshot(self.model.as_deref())?;
+        let profile = current
+            .as_ref()
+            .map_or_else(String::new, |snapshot| snapshot.profile.clone());
+        if !saved.profile.is_empty() && !profile.is_empty() && saved.profile != profile {
+            return Err(AgentError::InvalidTurn(format!(
+                "this session was selected on profile `{}` but the connection serves `{profile}`; explicitly select the connection to adopt it",
+                saved.profile
+            )));
+        }
+        let credential = current
+            .as_ref()
+            .and_then(|snapshot| snapshot.credential_ref.clone());
+        if let (Some(saved), Some(credential)) = (saved.credential_ref.as_ref(), credential)
+            && *saved != credential
+        {
+            return Err(AgentError::InvalidTurn(
+                "this session was selected on a different credential; explicitly select the connection to adopt it"
+                    .into(),
+            ));
+        }
         Ok(())
     }
 
@@ -3399,6 +3923,12 @@ impl Agent {
                 "attachments": attachment_journal_metadata(&materialized),
             }));
         }
+        // Ordered content is the protocol authority for what this turn holds;
+        // the attachment list above stays for readers that predate the field.
+        if let Some(content) = self.turn_content_metadata(&turn, &materialized)? {
+            turn.metadata.get_or_insert_with(|| serde_json::json!({}))
+                [content::STORED_CONTENT_FIELD] = content;
+        }
         if let Some(provenance) = provenance {
             turn.metadata.get_or_insert_with(|| serde_json::json!({}))["resource"] = provenance;
         }
@@ -3472,6 +4002,10 @@ impl Agent {
             turn.metadata = Some(serde_json::json!({
                 "attachments": attachment_journal_metadata(&materialized),
             }));
+        }
+        if let Some(content) = self.turn_content_metadata(&turn, &materialized)? {
+            turn.metadata.get_or_insert_with(|| serde_json::json!({}))
+                [content::STORED_CONTENT_FIELD] = content;
         }
         if let Some(provenance) = provenance {
             turn.metadata.get_or_insert_with(|| serde_json::json!({}))["resource"] = provenance;
@@ -3557,6 +4091,16 @@ impl Agent {
                 "attachments".into(),
                 serde_json::json!(attachment_journal_metadata(&materialized)),
             );
+        }
+        let stored = match self.turn_content_metadata(&turn, &materialized) {
+            Ok(stored) => stored,
+            Err(error) => {
+                self.pending_attachments = staged;
+                return Err(error.into());
+            }
+        };
+        if let Some(content) = stored {
+            metadata.insert(content::STORED_CONTENT_FIELD.into(), content);
         }
         if let Some(provenance) = provenance {
             metadata.insert("resource".into(), provenance);
@@ -3654,6 +4198,73 @@ impl Agent {
             });
         }
         Ok(materialized)
+    }
+
+    /// The identity a provider file reference is bound to: provider, credential
+    /// and route scope. A backend without an explicit connection still has a
+    /// stable binding of its own, so its files are scoped rather than unbound,
+    /// and a user cannot self-certify a scope through input.
+    fn media_scope(&self) -> Result<content::MediaScope, BackendError> {
+        let connection = self.backend.connection_snapshot(self.model.as_deref())?;
+        let identity_scope = match &connection {
+            Some(snapshot) if !snapshot.identity_scope.is_empty() => {
+                snapshot.identity_scope.clone()
+            }
+            _ => {
+                self.backend
+                    .request_binding(self.model.as_deref())?
+                    .identity_scope
+            }
+        };
+        Ok(content::MediaScope {
+            provider: connection
+                .as_ref()
+                .map(|snapshot| snapshot.provider.clone())
+                .filter(|provider| !provider.is_empty())
+                .unwrap_or_else(|| self.backend.name().to_owned()),
+            credential_id: connection
+                .as_ref()
+                .and_then(|snapshot| snapshot.credential_ref.clone())
+                .unwrap_or_default(),
+            identity_scope,
+        })
+    }
+
+    /// The ordered content recorded for one user turn: the turn text, then the
+    /// attachments in exactly the order they were admitted. Only references and
+    /// verified hashes are recorded; bytes, tokens and signed URLs never are.
+    fn turn_content_metadata(
+        &self,
+        turn: &Turn,
+        attachments: &[crate::backend::RequestAttachment],
+    ) -> Result<Option<Value>, BackendError> {
+        content::stored_content_metadata(&turn.content, attachments, &self.media_scope()?)
+    }
+
+    /// Ordered content is authority, so a session is only adopted while every
+    /// turn that records it still validates and still belongs to this
+    /// connection. A turn written before the field existed records nothing and
+    /// keeps its legacy text-only behaviour.
+    fn validate_stored_turn_content(&self, turns: &[Turn]) -> Result<(), AgentError> {
+        let mut recorded = Vec::new();
+        for turn in turns {
+            let Some(metadata) = turn.metadata.as_ref() else {
+                continue;
+            };
+            if let Some(stored) = content::parse_stored_content(metadata)? {
+                recorded.push(stored);
+            }
+        }
+        if recorded.is_empty() {
+            // Nothing here asserts ordered content, so no connection state is
+            // consulted and a legacy journal resumes exactly as it always did.
+            return Ok(());
+        }
+        let current = self.media_scope()?;
+        for stored in &recorded {
+            content::validate_stored_content_scope(stored, &current)?;
+        }
+        Ok(())
     }
 
     /// Run the currently admitted turn and append the normalized assistant
@@ -4760,15 +5371,35 @@ impl Agent {
             }
         };
         evidence.prohibition_gate_enforced = worker_preflight;
-        let approval = if runtime.policy.allows(definition.side_effect) {
-            runtime.approval_policy.decide_after_preflight(
+        let approval_source = if runtime.policy.allows(definition.side_effect) {
+            runtime.approval_policy.decide_after_preflight_source(
                 definition.side_effect,
                 &call.name,
                 worker_preflight,
             )
         } else {
-            Some(ApprovalDecision::Deny)
+            Some((ApprovalDecision::Deny, "side_effect_denied"))
         };
+        let approval = approval_source.map(|(decision, _)| decision);
+        // A policy that decides on its own never reaches a host, so without
+        // this record the journal cannot say why the side effect ran.  The
+        // worker-preflight allow is left out: it already writes the
+        // `approval_resolved` record that names its gate digest.
+        if let Some((decision, source)) = approval_source
+            && source != crate::approval::WORKER_PREFLIGHT_SOURCE
+        {
+            self.session.append_event(serde_json::json!({
+                "type": "authorization_decided",
+                "turn_id": turn_id,
+                "call_id": call.id,
+                "tool": call.name,
+                "side_effect": definition.side_effect,
+                "origin": runtime.context.origin(),
+                "policy_digest": evidence.policy_digest,
+                "decision": decision,
+                "source": source,
+            }))?;
+        }
         if approval == Some(ApprovalDecision::Deny) {
             return Ok(PreparedTool::Rejected(tool_failure(
                 call,
@@ -4851,6 +5482,7 @@ impl Agent {
                     }),
                     "decision": accepted.response.decision,
                     "remember": accepted.response.remember,
+                    "source": crate::approval::HOST_ANSWER_SOURCE,
                     "execution": evidence,
                 }))
             }).map_err(|error| match error {
@@ -4862,16 +5494,6 @@ impl Agent {
                     .approval_policy
                     .remember(call.name.clone(), response.decision);
             }
-            self.session.append_event(serde_json::json!({
-                "type": "approval_consumed",
-                "request_id": response.request_id,
-                "turn_id": turn_id,
-                "call_id": call.id,
-                "tool": call.name,
-                "decision": response.decision,
-                "remember": response.remember,
-                "execution": evidence,
-            }))?;
             if response.decision == ApprovalDecision::Deny {
                 // ZS1-182: operator feedback travels to the model as the
                 // denial reason so it can correct course.
@@ -4891,6 +5513,19 @@ impl Agent {
                     ToolInvocationOutcome::Denied,
                 )));
             }
+            // Only an approval hands out a permit, so only an approval
+            // consumes one.  A denial has nothing to consume, and recording
+            // one would claim the call was allowed through.
+            self.session.append_event(serde_json::json!({
+                "type": "approval_consumed",
+                "request_id": response.request_id,
+                "turn_id": turn_id,
+                "call_id": call.id,
+                "tool": call.name,
+                "decision": response.decision,
+                "remember": response.remember,
+                "execution": evidence,
+            }))?;
             approved_preview = preview;
         }
         if approval == Some(ApprovalDecision::Allow) && worker_preflight {
@@ -4902,7 +5537,7 @@ impl Agent {
                 "tool": call.name,
                 "decision": "allow",
                 "remember": false,
-                "source": "worker_allow_after_preflight",
+                "source": crate::approval::WORKER_PREFLIGHT_SOURCE,
                 "policy_digest": evidence.policy_digest,
                 "execution": evidence,
             }))?;
@@ -5170,7 +5805,9 @@ impl Agent {
                 .expect("one result per call"),
         );
         invocation.output_capture = output_capture;
-        if let crate::tools::ToolResult::Success { output, .. } = &invocation.result
+        if let crate::tools::ToolResult::Success {
+            output, content, ..
+        } = &invocation.result
             && let Some(extensions) = self
                 .extensions
                 .as_ref()
@@ -5178,10 +5815,13 @@ impl Agent {
         {
             match extensions.after_tool(call, output, is_cancelled) {
                 Ok(output) => {
+                    // The hook rewrites the compatibility record; typed content
+                    // is still the authority and is carried over unchanged.
                     let result = crate::tools::ToolResult::Success {
                         call_id: call.id.clone(),
                         tool: call.name.clone(),
                         output,
+                        content: content.clone(),
                     };
                     match crate::tools::compact_tool_result(&runtime.context, result) {
                         Ok(result) => invocation.result = result,
@@ -5231,10 +5871,13 @@ impl Agent {
         // Compaction errors from a registry must not replace the provider's
         // stable call identity with the artifact writer's identity.
         let result = match result {
-            crate::tools::ToolResult::Success { output, .. } => crate::tools::ToolResult::Success {
+            crate::tools::ToolResult::Success {
+                output, content, ..
+            } => crate::tools::ToolResult::Success {
                 call_id: call.id.clone(),
                 tool: call.name.clone(),
                 output,
+                content,
             },
             crate::tools::ToolResult::Error { error, .. } => crate::tools::ToolResult::Error {
                 call_id: call.id.clone(),
@@ -5547,14 +6190,17 @@ impl Agent {
         )?;
         let result = (|| {
             if let Some(descriptor) = self.backend.model_descriptor(self.model.as_deref())? {
-                file.append_event(
-                    &mut replacement,
-                    serde_json::json!({
-                        "type":"model_selected", "model":self.model,
-                        "descriptor":descriptor, "digest":descriptor.digest(),
-                        "reasoning_effort":self.backend.reasoning_effort(),
-                    }),
+                // A new session inherits the connection snapshot of the owner
+                // that created it, so it does not silently follow a different
+                // default profile later.
+                let snapshot = Self::selection_snapshot_for(
+                    self.backend.as_ref(),
+                    &self.profile_hint(),
+                    self.model.clone(),
+                    self.backend.reasoning_effort().map(str::to_owned),
+                    Some(&descriptor),
                 )?;
+                file.append_event(&mut replacement, snapshot.event())?;
             }
             file.append_event(
                 &mut replacement,
@@ -5652,6 +6298,11 @@ impl Agent {
             .map(|loader| restore_resource_state(&replacement, loader.paths().clone(), &cancelled))
             .transpose()?;
         let replacement_model = self.selected_model_for_session(&replacement)?;
+        self.require_same_connection(&replacement_model.connection)?;
+        // Ordered content is protocol authority, so a loaded journal is only
+        // adopted while every recorded version, reference and media scope still
+        // validates against this connection.
+        self.validate_stored_turn_content(replacement.turns())?;
         let replacement_extensions = self
             .extensions
             .as_ref()
@@ -5663,6 +6314,14 @@ impl Agent {
             return Err(BackendError::Cancelled.into());
         }
         commit(&mut replacement)?;
+        if replacement_model.drifted {
+            Self::record_selection_adoption(
+                self.backend.as_ref(),
+                &mut replacement,
+                replacement_model.model.clone(),
+                replacement_model.effort.clone(),
+            )?;
+        }
         // A saved port belongs to one session owner. Revoke that handle before
         // replacing it so old clones can never acquire the new turn's scope.
         self.input_port.set_scope(None);
@@ -5674,8 +6333,9 @@ impl Agent {
                 .configured_approval_policy
                 .with_remembered_events(self.session.events());
         }
-        self.model = replacement_model.0;
-        self.backend.commit_reasoning_effort(replacement_model.1);
+        self.model = replacement_model.model;
+        self.backend
+            .commit_reasoning_effort(replacement_model.effort);
         if let Some((loader, stale)) = replacement_resources {
             self.skills = loader.snapshot().skills.clone();
             self.resource_loader = Some(loader);
@@ -5933,6 +6593,17 @@ pub struct CliOptions {
     pub command_value2: Option<String>,
     pub retain_newest: Option<usize>,
     pub older_than_seconds: Option<u64>,
+    /// `--alias NAME` for the auth management commands.
+    pub alias: Option<String>,
+    /// `--stdin` for `config add auth apikey`: the key is read from standard
+    /// input rather than the argument list.
+    pub stdin: bool,
+    /// `--device` / `--no-browser` for `config add auth codex`.
+    pub device: bool,
+    pub no_browser: bool,
+    /// `--wire` / `--header` narrow which route an added API key authorizes.
+    pub wire_api: Option<String>,
+    pub auth_header: Option<String>,
     pub json: bool,
     pub yes: bool,
     pub help: bool,
@@ -5944,6 +6615,9 @@ pub enum CliCommand {
     ConfigDoctor,
     ConfigList,
     ConfigUse,
+    ConfigAuthList,
+    ConfigAddAuthCodex,
+    ConfigAddAuthApikey,
     PairImportCodex,
     PairStatus,
     PairRevoke,
@@ -5978,11 +6652,387 @@ impl Default for CliOptions {
             command_value2: None,
             retain_newest: None,
             older_than_seconds: None,
+            alias: None,
+            stdin: false,
+            device: false,
+            no_browser: false,
+            wire_api: None,
+            auth_header: None,
             json: false,
             yes: false,
             help: false,
         }
     }
+}
+
+/// Read one API key from standard input.
+///
+/// Keys are never taken from the argument list: argv is visible to other
+/// processes and lands in shell history.  Nothing read here is echoed, logged,
+/// or included in an error message.
+fn read_api_key_from_stdin() -> Result<String, ZenpiError> {
+    if std::io::stdin().is_terminal() {
+        eprint!("paste the API key, then press enter: ");
+        let _ = std::io::stderr().flush();
+    }
+    let mut line = String::new();
+    let read = std::io::stdin()
+        .lock()
+        .read_line(&mut line)
+        .map_err(|_| ZenpiError::arguments("could not read the API key from standard input"))?;
+    if read == 0 {
+        return Err(ZenpiError::arguments(
+            "no API key on standard input; pass it with --stdin",
+        ));
+    }
+    let key = line.trim_end_matches(['\n', '\r']).to_owned();
+    if key.trim().is_empty() {
+        return Err(ZenpiError::arguments("the supplied API key is empty"));
+    }
+    Ok(key)
+}
+
+fn print_auth_add_report(
+    report: &crate::config::AuthAddReport,
+    json: bool,
+) -> Result<(), ZenpiError> {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string(report)
+                .map_err(|error| ZenpiError::Message(error.to_string()))?
+        );
+        return Ok(());
+    }
+    // Human output goes to stderr so stdout stays machine-readable.
+    eprintln!(
+        "stored {} ({}) for {}; profile `{}` {}",
+        report.credential_id,
+        report.kind,
+        report.provider,
+        report.alias,
+        if report.profile_bound {
+            "bound"
+        } else {
+            "NOT bound"
+        }
+    );
+    for destination in &report.destinations {
+        eprintln!(
+            "  authorized: {}{} protocols={} headers={}",
+            destination.origin,
+            destination.path_prefix,
+            destination.protocols.join(","),
+            destination.headers.join(",")
+        );
+    }
+    Ok(())
+}
+
+fn login_state_label(state: crate::auth::LoginState) -> &'static str {
+    match state {
+        crate::auth::LoginState::Preparing => "preparing login",
+        crate::auth::LoginState::AwaitingAuthorization => "waiting for authorization",
+        crate::auth::LoginState::Exchanging => "exchanging the authorization code",
+        crate::auth::LoginState::Committing => "storing the credential",
+        crate::auth::LoginState::Succeeded => "login succeeded",
+        crate::auth::LoginState::Cancelled => "login cancelled",
+        crate::auth::LoginState::Failed => "login failed",
+        crate::auth::LoginState::CommitUncertain => "credential commit is uncertain",
+    }
+}
+
+/// One event from the login flow, handed to the terminal host.
+enum CliLoginEvent {
+    Browser {
+        flow_id: crate::auth::LoginFlowId,
+        prompt_id: u64,
+        url: String,
+        manual: crate::auth::callback::ManualSubmission,
+    },
+    Device {
+        flow_id: crate::auth::LoginFlowId,
+        prompt_id: u64,
+        uri: &'static str,
+        code: String,
+    },
+    Notice(crate::auth::LoginState),
+    Dismissed,
+    Pasted(String),
+    Finished(Box<crate::auth::LoginOutcome>),
+}
+
+/// Open a URL in the platform browser.  Best effort: a missing opener never
+/// fails a login, because the URL is printed either way.
+fn open_browser(url: &str) {
+    #[cfg(target_os = "macos")]
+    let opener = "open";
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let opener = "xdg-open";
+    #[cfg(windows)]
+    let opener = "explorer";
+    let _ = std::process::Command::new(opener)
+        .arg(url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+/// Forward pasted redirect URIs to the login flow.  The thread ends at EOF, so
+/// a non-interactive stdin simply never supplies a manual code.
+fn spawn_stdin_reader(sender: std::sync::mpsc::Sender<CliLoginEvent>) {
+    std::thread::spawn(move || {
+        let mut reader = std::io::BufReader::new(std::io::stdin());
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => return,
+                Ok(_) => {
+                    if sender.send(CliLoginEvent::Pasted(line.clone())).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// Drive one interactive Codex login from the terminal.
+///
+/// The authorization URL and any device code are written to stderr only; they
+/// never reach a journal, a log, or a status response.  The flow runs on a
+/// worker thread so the loopback callback keeps being pumped while this thread
+/// waits for a pasted redirect URI.
+///
+/// Cancellation is the process's own SIGINT — exiting closes the callback
+/// listener — and `LoginControl` bounds the whole flow to 15 minutes.
+pub(crate) fn run_cli_codex_login(
+    paths: &crate::config::ConfigPaths,
+    device: bool,
+    no_browser: bool,
+    alias: Option<&str>,
+    model: Option<&str>,
+) -> Result<(), ZenpiError> {
+    let store = crate::config::credential_store(paths, true)?;
+    let credential_id = crate::auth::store::CredentialStore::new_credential_id()
+        .map_err(|error| ZenpiError::Message(error.to_string()))?;
+    let (sender, receiver) = std::sync::mpsc::channel::<CliLoginEvent>();
+
+    let worker_sender = sender.clone();
+    let worker_id = credential_id.clone();
+    let worker = std::thread::spawn(move || {
+        let credential_id = worker_id;
+        let cancelled = || false;
+        let mut admission = |_kind: crate::auth::AuthHttpKind| Ok(());
+        let mut interaction = |event: crate::auth::AuthInteraction| {
+            let converted = match event {
+                crate::auth::AuthInteraction::Notify { state, .. } => CliLoginEvent::Notice(state),
+                crate::auth::AuthInteraction::Prompt {
+                    flow_id,
+                    prompt_id,
+                    prompt,
+                } => match prompt {
+                    crate::auth::AuthPrompt::Browser {
+                        authorization_url,
+                        manual,
+                    } => CliLoginEvent::Browser {
+                        flow_id,
+                        prompt_id,
+                        url: authorization_url,
+                        manual,
+                    },
+                    crate::auth::AuthPrompt::Device {
+                        verification_uri,
+                        user_code,
+                    } => CliLoginEvent::Device {
+                        flow_id,
+                        prompt_id,
+                        uri: verification_uri,
+                        code: user_code,
+                    },
+                },
+                crate::auth::AuthInteraction::CancelPrompt { .. } => CliLoginEvent::Dismissed,
+            };
+            // A closed receiver means the host gave up: fail the interaction
+            // rather than blocking the flow forever.
+            worker_sender
+                .send(converted)
+                .map_err(|_| crate::auth::AuthError::InteractionFailed)
+        };
+        let mut control = crate::auth::LoginControl::new(
+            &cancelled,
+            Instant::now() + Duration::from_secs(15 * 60),
+            MAX_CLI_LOGIN_SENDS,
+            &mut admission,
+            &mut interaction,
+        );
+        let request = crate::auth::LoginRequest {
+            store: &store,
+            credential_id: &credential_id,
+            expected_revision: None,
+        };
+        let outcome = if device {
+            crate::auth::codex::begin_device_login()
+                .and_then(|flow| crate::auth::codex::login_device(flow, request, &mut control))
+        } else {
+            crate::auth::codex::begin_browser_login()
+                .and_then(|flow| crate::auth::codex::login_browser(flow, request, &mut control))
+        };
+        let _ = worker_sender.send(CliLoginEvent::Finished(Box::new(outcome)));
+    });
+
+    let stdin = (!device).then(|| spawn_stdin_reader(sender.clone()));
+    // The manual code is only meaningful for the prompt that is currently open.
+    let mut pending = None;
+    let outcome = loop {
+        let Ok(event) = receiver.recv() else {
+            break Err(crate::auth::AuthError::LoginFailed);
+        };
+        match event {
+            CliLoginEvent::Browser {
+                flow_id,
+                prompt_id,
+                url,
+                manual,
+            } => {
+                eprintln!("authorize this login to continue:\n  {url}");
+                if !no_browser {
+                    open_browser(&url);
+                }
+                eprintln!(
+                    "if the browser did not complete it, paste the redirect URL here and press enter"
+                );
+                pending = Some((flow_id, prompt_id, manual));
+            }
+            CliLoginEvent::Device { uri, code, .. } => {
+                eprintln!("open {uri} and enter code: {code}");
+            }
+            CliLoginEvent::Notice(state) => eprintln!("{}", login_state_label(state)),
+            CliLoginEvent::Dismissed => pending = None,
+            CliLoginEvent::Pasted(line) => {
+                if let Some((flow_id, prompt_id, manual)) = &pending {
+                    match manual.submit(flow_id, *prompt_id, line.trim()) {
+                        Ok(()) => pending = None,
+                        // A late paste after the browser won is not an error the
+                        // user needs to see; anything else is worth reporting.
+                        Err(crate::auth::AuthError::StalePrompt) => {}
+                        Err(error) => eprintln!("the pasted code was rejected: {error}"),
+                    }
+                }
+            }
+            CliLoginEvent::Finished(result) => break *result,
+        }
+    };
+    let _ = stdin;
+    let _ = worker.join();
+
+    outcome.map_err(|error| ZenpiError::Message(format!("login failed: {error}")))?;
+
+    let alias = alias.unwrap_or("codex");
+    let binding = crate::config::bind_credential_profile(
+        paths,
+        alias,
+        "openai-codex",
+        model,
+        None,
+        "oauth",
+        &credential_id,
+        None,
+        None,
+    );
+    if let Err(error) = binding {
+        return Err(ZenpiError::Message(format!(
+            "credential {credential_id} was stored but profile `{alias}` was not bound: {error}"
+        )));
+    }
+    eprintln!("stored {credential_id}; profile `{alias}` bound");
+    Ok(())
+}
+
+/// HTTP sends one CLI login may make.  The browser flow needs a single code
+/// exchange; the device flow polls, so it needs a bounded budget rather than a
+/// single attempt.
+const MAX_CLI_LOGIN_SENDS: u32 = 256;
+
+/// Resolve the third selector token of `config auth …` / `config add auth …`.
+/// Returns `None` for the two-level commands, leaving their arguments alone.
+fn nested_command(
+    group: &str,
+    action: &str,
+    args: &mut std::iter::Peekable<impl Iterator<Item = String>>,
+) -> Result<Option<CliCommand>, ZenpiError> {
+    match (group, action) {
+        ("config", "auth") => {
+            let selector = args
+                .next()
+                .ok_or_else(|| ZenpiError::arguments("config auth requires an action"))?;
+            match selector.as_str() {
+                "list" => Ok(Some(CliCommand::ConfigAuthList)),
+                _ => Err(ZenpiError::arguments(format!(
+                    "unknown config auth action `{selector}`"
+                ))),
+            }
+        }
+        ("config", "add") => {
+            let target = args
+                .next()
+                .ok_or_else(|| ZenpiError::arguments("config add requires a target"))?;
+            if target != "auth" {
+                return Err(ZenpiError::arguments(format!(
+                    "unknown config add target `{target}`"
+                )));
+            }
+            let method = args
+                .next()
+                .ok_or_else(|| ZenpiError::arguments("config add auth requires codex or apikey"))?;
+            match method.as_str() {
+                "codex" => Ok(Some(CliCommand::ConfigAddAuthCodex)),
+                "apikey" => Ok(Some(CliCommand::ConfigAddAuthApikey)),
+                _ => Err(ZenpiError::arguments(format!(
+                    "unknown config add auth method `{method}`"
+                ))),
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+fn is_auth_add(command: Option<CliCommand>) -> bool {
+    matches!(
+        command,
+        Some(CliCommand::ConfigAddAuthCodex | CliCommand::ConfigAddAuthApikey)
+    )
+}
+
+fn lookup_command(group: &str, action: &str) -> Result<CliCommand, ZenpiError> {
+    Ok(match (group, action) {
+        ("config", "import-codex") => CliCommand::ConfigImportCodex,
+        ("config", "doctor") => CliCommand::ConfigDoctor,
+        ("config", "list") => CliCommand::ConfigList,
+        ("config", "use") => CliCommand::ConfigUse,
+        ("pair", "import-codex") => CliCommand::PairImportCodex,
+        ("pair", "status") => CliCommand::PairStatus,
+        ("pair", "revoke") => CliCommand::PairRevoke,
+        ("session", "list") => CliCommand::SessionList,
+        ("session", "inspect") => CliCommand::SessionInspect,
+        ("session", "fork") => CliCommand::SessionFork,
+        ("session", "export") => CliCommand::SessionExport,
+        ("session", "import") => CliCommand::SessionImport,
+        ("session", "gc") => CliCommand::SessionGc,
+        ("extension", "list") => CliCommand::ExtensionList,
+        ("extension", "install") => CliCommand::ExtensionInstall,
+        ("extension", "remove") => CliCommand::ExtensionRemove,
+        ("extension", "disable") => CliCommand::ExtensionDisable,
+        ("extension", "enable") => CliCommand::ExtensionEnable,
+        ("extension", "upgrade") => CliCommand::ExtensionUpgrade,
+        _ => {
+            return Err(ZenpiError::arguments(format!(
+                "unknown {group} action `{action}`"
+            )));
+        }
+    })
 }
 
 pub fn parse_args<I, S>(args: I) -> Result<CliOptions, ZenpiError>
@@ -6002,32 +7052,13 @@ where
         let action = args
             .next()
             .ok_or_else(|| ZenpiError::arguments(format!("{group} requires an action")))?;
-        options.command = Some(match (group.as_str(), action.as_str()) {
-            ("config", "import-codex") => CliCommand::ConfigImportCodex,
-            ("config", "doctor") => CliCommand::ConfigDoctor,
-            ("config", "list") => CliCommand::ConfigList,
-            ("config", "use") => CliCommand::ConfigUse,
-            ("pair", "import-codex") => CliCommand::PairImportCodex,
-            ("pair", "status") => CliCommand::PairStatus,
-            ("pair", "revoke") => CliCommand::PairRevoke,
-            ("session", "list") => CliCommand::SessionList,
-            ("session", "inspect") => CliCommand::SessionInspect,
-            ("session", "fork") => CliCommand::SessionFork,
-            ("session", "export") => CliCommand::SessionExport,
-            ("session", "import") => CliCommand::SessionImport,
-            ("session", "gc") => CliCommand::SessionGc,
-            ("extension", "list") => CliCommand::ExtensionList,
-            ("extension", "install") => CliCommand::ExtensionInstall,
-            ("extension", "remove") => CliCommand::ExtensionRemove,
-            ("extension", "disable") => CliCommand::ExtensionDisable,
-            ("extension", "enable") => CliCommand::ExtensionEnable,
-            ("extension", "upgrade") => CliCommand::ExtensionUpgrade,
-            _ => {
-                return Err(ZenpiError::arguments(format!(
-                    "unknown {group} action `{action}`"
-                )));
-            }
-        });
+        // `config auth …` and `config add auth …` carry a third selector token
+        // before the flags.
+        if let Some(command) = nested_command(&group, &action, &mut args)? {
+            options.command = Some(command);
+        } else {
+            options.command = Some(lookup_command(&group, &action)?);
+        }
         while let Some(argument) = args.next() {
             match argument.as_str() {
                 "--json"
@@ -6036,6 +7067,8 @@ where
                         Some(
                             CliCommand::ConfigDoctor
                                 | CliCommand::ConfigList
+                                | CliCommand::ConfigAuthList
+                                | CliCommand::ConfigAddAuthApikey
                                 | CliCommand::PairStatus
                                 | CliCommand::SessionList
                                 | CliCommand::SessionInspect
@@ -6045,6 +7078,50 @@ where
                 {
                     options.json = true;
                 }
+                "--alias" if is_auth_add(options.command) => {
+                    options.alias = Some(
+                        args.next()
+                            .ok_or_else(|| ZenpiError::arguments("--alias requires a name"))?,
+                    );
+                }
+                "--stdin" if options.command == Some(CliCommand::ConfigAddAuthApikey) => {
+                    options.stdin = true;
+                }
+                "--wire" if is_auth_add(options.command) => {
+                    options.wire_api = Some(
+                        args.next()
+                            .ok_or_else(|| ZenpiError::arguments("--wire requires a protocol"))?,
+                    );
+                }
+                "--header" if is_auth_add(options.command) => {
+                    options.auth_header = Some(
+                        args.next()
+                            .ok_or_else(|| ZenpiError::arguments("--header requires a policy"))?,
+                    );
+                }
+                "--device" if options.command == Some(CliCommand::ConfigAddAuthCodex) => {
+                    options.device = true;
+                }
+                "--no-browser" if options.command == Some(CliCommand::ConfigAddAuthCodex) => {
+                    options.no_browser = true;
+                }
+                // Positional values for the auth commands must not swallow an
+                // unrecognized flag: a stray `--json` would silently become a
+                // login's optional email and start a real flow.
+                value
+                    if is_auth_add(options.command)
+                        && !value.starts_with('-')
+                        && options.command_value.is_none() =>
+                {
+                    options.command_value = Some(value.to_owned());
+                }
+                value
+                    if options.command == Some(CliCommand::ConfigAddAuthApikey)
+                        && !value.starts_with('-')
+                        && options.command_value2.is_none() =>
+                {
+                    options.command_value2 = Some(value.to_owned());
+                }
                 "--yes"
                     if matches!(
                         options.command,
@@ -6053,10 +7130,25 @@ where
                 {
                     options.yes = true;
                 }
-                "--profile" => {
+                "--json" if options.command == Some(CliCommand::PairRevoke) => {
+                    options.json = true;
+                }
+                // The auth management commands take their profile from
+                // --alias and their own positional arguments; --profile would
+                // silently overwrite one of them.
+                "--profile"
+                    if !is_auth_add(options.command)
+                        && options.command != Some(CliCommand::ConfigAuthList) =>
+                {
                     options.command_value = Some(
                         args.next()
                             .ok_or_else(|| ZenpiError::arguments("--profile requires a name"))?,
+                    );
+                }
+                "--model" if is_auth_add(options.command) => {
+                    options.model = Some(
+                        args.next()
+                            .ok_or_else(|| ZenpiError::arguments("--model requires a name"))?,
                     );
                 }
                 value
@@ -6156,6 +7248,26 @@ where
             && options.command_value.is_none()
         {
             return Err(ZenpiError::arguments("session inspect requires PATH"));
+        }
+        if options.command == Some(CliCommand::ConfigAddAuthApikey) {
+            if options.command_value.is_none() || options.command_value2.is_none() {
+                return Err(ZenpiError::arguments(
+                    "config add auth apikey requires BASE_URL and PROVIDER",
+                ));
+            }
+            if !options.stdin {
+                return Err(ZenpiError::arguments(
+                    "config add auth apikey requires --stdin; keys are never taken from the argument list",
+                ));
+            }
+        }
+        if options.command == Some(CliCommand::ConfigAddAuthCodex)
+            && options.device
+            && options.no_browser
+        {
+            return Err(ZenpiError::arguments(
+                "--device and --no-browser select different login flows",
+            ));
         }
         if matches!(
             options.command,
@@ -6350,13 +7462,33 @@ fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
     }
 }
 
+/// Build a backend for a named profile without disturbing the running one.
+///
+/// A candidate is constructed and validated before the owner is asked to swap,
+/// so a profile that cannot be resolved, or whose credential is missing, leaves
+/// the running connection exactly as it was.
+pub(crate) fn connection_candidate(
+    profile: &str,
+    model: Option<&str>,
+) -> Result<Box<dyn Backend>, ZenpiError> {
+    let effective = crate::config::resolve_default(&crate::config::ConfigOverrides {
+        profile: Some(profile.to_owned()),
+        model: model.map(str::to_owned),
+        ..crate::config::ConfigOverrides::default()
+    })?;
+    backend_from_effective(effective)
+}
+
 fn backend_from_effective(
     effective: crate::config::EffectiveConfig,
 ) -> Result<Box<dyn Backend>, ZenpiError> {
     if let Some(connection) = effective.provider_connection(1)? {
         let paths = crate::config::ConfigPaths::discover()?;
-        let store = crate::auth::store::CredentialStore::new(std::path::absolute(paths.auth)?)
-            .map_err(|error| ZenpiError::Message(error.to_string()))?;
+        // The store opens every path component with O_NOFOLLOW, so an ancestor
+        // that is a link (macOS `/var` and `/tmp`) has to be resolved first;
+        // without that, an explicit connection cannot start under any temp
+        // home.  `credential_store` is the same helper the config commands use.
+        let store = crate::config::credential_store(&paths, false)?;
         let registry =
             crate::providers::registry::ModelRegistry::with_overrides(&effective.model_overrides)
                 .map_err(|error| ZenpiError::Message(error.to_string()))?;
@@ -6476,6 +7608,13 @@ fn print_help() {
     println!("zenpi config import-codex [--profile NAME]");
     println!("zenpi config doctor [--profile NAME] [--json]");
     println!("zenpi config list [--json] | config use NAME");
+    println!("zenpi config auth list [--json]");
+    println!(
+        "zenpi config add auth apikey BASE_URL PROVIDER --stdin [--wire W] [--header H] [--alias NAME] [--model NAME]"
+    );
+    println!(
+        "zenpi config add auth codex [EMAIL] [--alias NAME] [--model NAME] [--device | --no-browser]"
+    );
     println!("zenpi pair import-codex|status|revoke --yes [--profile NAME]");
     println!("zenpi session list [--json] | inspect PATH [--json]");
     println!("zenpi session fork|export|import SOURCE DESTINATION");
@@ -6502,6 +7641,81 @@ pub fn run() -> Result<(), ZenpiError> {
                     None => crate::config::import_codex()?,
                 };
                 println!("{}", summary.display());
+                Ok(())
+            }
+            CliCommand::ConfigAuthList => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                let entries = crate::config::auth_list(&paths)?;
+                if options.json {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&entries)
+                            .map_err(|error| ZenpiError::Message(error.to_string()))?
+                    );
+                } else if entries.is_empty() {
+                    println!("no stored credentials");
+                } else {
+                    for entry in &entries {
+                        println!(
+                            "{} provider={} kind={} state={} revision={} expires_at={} profiles={}",
+                            entry.credential_id,
+                            entry.provider,
+                            entry.kind,
+                            entry.state,
+                            entry.revision,
+                            display_option(
+                                entry
+                                    .expires_at_ms
+                                    .map(|value| value.to_string())
+                                    .as_deref()
+                            ),
+                            if entry.profiles.is_empty() {
+                                "-".to_owned()
+                            } else {
+                                entry.profiles.join(",")
+                            }
+                        );
+                    }
+                }
+                Ok(())
+            }
+            CliCommand::ConfigAddAuthApikey => {
+                let base_url = options.command_value.clone().unwrap_or_default();
+                let provider = options.command_value2.clone().unwrap_or_default();
+                // Read the key before touching anything on disk: a cancelled or
+                // empty read must not leave a credential behind.
+                let key = read_api_key_from_stdin()?;
+                let paths = crate::config::ConfigPaths::discover()?;
+                let report = crate::config::add_auth_apikey(
+                    &paths,
+                    &base_url,
+                    &provider,
+                    key,
+                    crate::config::ApiKeyProfile {
+                        alias: options.alias.as_deref(),
+                        model: options.model.as_deref(),
+                        wire: options.wire_api.as_deref(),
+                        auth_header: options.auth_header.as_deref(),
+                    },
+                )?;
+                print_auth_add_report(&report, options.json)?;
+                if let Some(error) = &report.binding_error {
+                    return Err(ZenpiError::Message(format!(
+                        "credential {} was stored but profile `{}` was not bound: {error}",
+                        report.credential_id, report.alias
+                    )));
+                }
+                Ok(())
+            }
+            CliCommand::ConfigAddAuthCodex => {
+                let paths = crate::config::ConfigPaths::discover()?;
+                run_cli_codex_login(
+                    &paths,
+                    options.device,
+                    options.no_browser,
+                    options.alias.as_deref(),
+                    options.model.as_deref(),
+                )?;
                 Ok(())
             }
             CliCommand::ConfigDoctor | CliCommand::PairStatus => {
@@ -6570,9 +7784,48 @@ pub fn run() -> Result<(), ZenpiError> {
             }
             CliCommand::PairRevoke => {
                 let paths = crate::config::ConfigPaths::discover()?;
-                let changed = crate::config::revoke(&paths, options.command_value.as_deref())?;
-                println!("revoked={changed}");
-                Ok(())
+                let Some(profile) = options.command_value.as_deref() else {
+                    // The legacy root key is not owned by any profile.
+                    let changed = crate::config::revoke(&paths, None)?;
+                    println!("revoked={changed} local_revoked=true remote_revoked=false");
+                    return Ok(());
+                };
+                match crate::config::profile_credential(&paths, profile)? {
+                    Some(_) => {
+                        let receipt = crate::config::revoke_credential(&paths, profile)?;
+                        if options.json {
+                            println!(
+                                "{}",
+                                serde_json::to_string(&receipt)
+                                    .map_err(|error| ZenpiError::Message(error.to_string()))?
+                            );
+                        } else {
+                            // The scope is what --yes confirmed, so it is shown
+                            // rather than summarised as a count.
+                            eprintln!(
+                                "revoking credential {} affects profiles: {}",
+                                receipt.credential_id,
+                                receipt.profiles.join(", ")
+                            );
+                            println!(
+                                "credential={} local_revoked={} remote_revoked={} profiles={}",
+                                receipt.credential_id,
+                                receipt.local_revoked,
+                                receipt.remote_revoked,
+                                receipt.profiles.join(",")
+                            );
+                        }
+                        // Unbinding the profiles is deliberately not part of
+                        // this command; the binding is how the operator sees
+                        // why the connection stopped working.
+                        Ok(())
+                    }
+                    None => {
+                        let changed = crate::config::revoke(&paths, Some(profile))?;
+                        println!("revoked={changed} local_revoked=true remote_revoked=false");
+                        Ok(())
+                    }
+                }
             }
             CliCommand::SessionList => {
                 let paths = crate::config::ConfigPaths::discover()?;
@@ -6718,6 +7971,27 @@ pub fn run() -> Result<(), ZenpiError> {
                 Ok(())
             }
         };
+    }
+    // A first run with no usable connection is handled before the host starts:
+    // the interactive host offers login, connection selection, or exit instead
+    // of building an agent that cannot serve anything.  Headless keeps its
+    // fail-closed behaviour (`stable error and exit status`), and anything that
+    // is merely broken still propagates as itself rather than as "not logged
+    // in".
+    if options.mode == RunMode::Tui {
+        let paths = crate::config::ConfigPaths::discover()?;
+        if let crate::tui::bootstrap::AuthGate::NeedsAuth(reason) =
+            crate::tui::bootstrap::auth_gate(&paths, options.profile.as_deref())?
+        {
+            match crate::tui::bootstrap::run_auth_bootstrap(
+                &paths,
+                options.profile.as_deref(),
+                &reason,
+            )? {
+                crate::tui::bootstrap::BootstrapOutcome::Ready => {}
+                crate::tui::bootstrap::BootstrapOutcome::Exited => return Ok(()),
+            }
+        }
     }
     let backend = make_backend(&options)?;
     // `-s NAME|ID` resolves against the cached zenpi sessions; `--session PATH`

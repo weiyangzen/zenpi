@@ -7,6 +7,8 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
+pub(crate) mod bootstrap;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt::Display;
@@ -669,6 +671,20 @@ pub enum HotZone {
     Shell,
 }
 
+impl HotZone {
+    /// Short name for user-facing feedback, matching the footer's zone table.
+    pub fn label(self) -> &'static str {
+        match self {
+            HotZone::None => "无热区",
+            HotZone::Conversation => "Conversation",
+            HotZone::Resources => "Resources",
+            HotZone::Arch => "Arch",
+            HotZone::Gantt => "Gantt",
+            HotZone::Shell => "Shell",
+        }
+    }
+}
+
 /// Which transcript receives host feedback while a command runs. The two left
 /// prompts are independent (ZS1-165), so a slash command launched from the arch
 /// console reports into the arch transcript and never the discussion one.
@@ -1257,12 +1273,23 @@ impl TuiState {
     }
 
     pub fn present_approval(&mut self, request: crate::approval::ApprovalRequest) {
+        let project = self.active_project().to_owned();
+        self.present_approval_for(project, request);
+    }
+
+    /// File a request under the project whose owner raised it.  A host that
+    /// tracks several owners at once must not attribute them all to whichever
+    /// tab happens to be active when the request is drained.
+    pub fn present_approval_for(
+        &mut self,
+        project: String,
+        request: crate::approval::ApprovalRequest,
+    ) {
         if let Err(error) = request.validate() {
             self.push_message(MessageRole::Error, format!("Invalid approval: {error}"));
             return;
         }
         let can_focus = self.directory_picker.is_none() && self.transcript_browser.is_none();
-        let project = self.active_project().to_owned();
         let view = self.approval_views.entry(project).or_default();
         if view
             .requests
@@ -1544,12 +1571,10 @@ impl TuiState {
             KeyCode::Home => view.scroll = 0,
             KeyCode::End => view.scroll = usize::MAX,
             KeyCode::Enter => {
-                if !view.allow {
-                    // A bare Enter on a not-yet-allowed request opens the
-                    // reject-feedback stage instead of silently denying.
-                    view.stage = ApprovalStage::RejectMessage;
-                    return Some(TuiAction::Redraw);
-                }
+                // Enter confirms the current selection in one press.  Denial
+                // is the default selection, so a bare Enter denies; leaving a
+                // note for the model is an explicit choice (`n`), not a step
+                // every denial has to walk through first.
                 let r = &view.requests[view.index];
                 view.stage = ApprovalStage::Select;
                 return Some(TuiAction::RespondApproval {
@@ -1671,7 +1696,12 @@ impl TuiState {
                     view.message
                 ),
                 ApprovalStage::Select => {
-                    format!("y allow · n deny · r remember · Enter confirm · {remember}")
+                    // Name the selection Enter would commit: "confirm" alone
+                    // leaves the user guessing which way the key goes.
+                    format!(
+                        "Enter {} now · y allow · n deny with a note · r remember · {remember}",
+                        if view.allow { "ALLOW" } else { "DENY" }
+                    )
                 }
             }
         };
@@ -1691,6 +1721,36 @@ impl TuiState {
 }
 
 /// Exact host correlation; coordinator remains the atomic decision authority.
+/// One control handle per live owner, keyed by owner.  Refreshed from the pool
+/// rather than discovered through an owner's execution lock, so a coordinator
+/// stays reachable while its owner runs -- which is exactly when it has a
+/// request to answer.
+fn owner_controls(
+    pool: &crate::project_workspace::ProjectOwnerPool,
+) -> std::collections::BTreeMap<String, crate::project_workspace::OwnerControl> {
+    pool.control_handles()
+        .into_iter()
+        .filter(|(_, control)| control.approval.is_some())
+        .collect()
+}
+
+/// The coordinator currently holding `request_id` pending for `project`.  A
+/// project can have both a discussion owner and an arch owner, and a request
+/// carries no owner key, so the pending request itself is the only reliable
+/// link back to the coordinator that must answer it.
+fn coordinator_holding(
+    approvals: &std::collections::BTreeMap<String, crate::project_workspace::OwnerControl>,
+    project: &str,
+    request_id: &str,
+) -> Option<crate::approval::ApprovalCoordinator> {
+    approvals
+        .values()
+        .filter(|control| control.project == project)
+        .filter_map(|control| control.approval.as_ref())
+        .find(|coordinator| coordinator.is_pending(request_id))
+        .cloned()
+}
+
 pub fn respond_tui_approval(
     state: &mut TuiState,
     coordinator: &crate::approval::ApprovalCoordinator,
@@ -2780,6 +2840,10 @@ pub struct TuiState {
     submitted_pastes: VecDeque<SubmittedPaste>,
     cursor: usize,
     status: String,
+    /// Short-lived line the footer shows ahead of the hot-zone hint.  A key
+    /// that was refused has to say so where the user is actually looking, and
+    /// `status` alone never reaches the production renderer.
+    footer_notice: Option<(String, Instant)>,
     busy: bool,
     scroll: usize,
     history: VecDeque<String>,
@@ -2902,7 +2966,7 @@ pub struct TuiState {
     goal_edit_intent: Option<String>,
     /// Rectangle of the docked discussion prompt while it is rendered in the
     /// left column. Used to anchor the command palette above the docked input.
-    docked_prompt_rect: Option<Rect>,
+    prompt_rect: Option<Rect>,
     /// Which left-column prompt owns keyboard focus (ZS1-148). The discussion
     /// prompt is the default so existing single-prompt behavior is unchanged.
     left_prompt: LeftPrompt,
@@ -3014,6 +3078,7 @@ impl TuiState {
             submitted_pastes: VecDeque::new(),
             cursor: 0,
             status: "Ready".into(),
+            footer_notice: None,
             busy: false,
             scroll: 0,
             history: VecDeque::new(),
@@ -3076,7 +3141,7 @@ impl TuiState {
             goal_edit: None,
             goal_text: String::new(),
             goal_edit_intent: None,
-            docked_prompt_rect: None,
+            prompt_rect: None,
             left_prompt: LeftPrompt::Discussion,
             arch_messages: VecDeque::new(),
             arch_input: String::new(),
@@ -3236,13 +3301,26 @@ impl TuiState {
         let opened = self.select_project_tab(insert_at);
         // A freshly opened project starts on the conversation prompt so the
         // operator can type immediately; only an explicit action enters the
-        // no-hot-zone state (ZS1-177).
-        if opened && self.workspace_layout.focused.is_none() {
+        // no-hot-zone state (ZS1-177). Restoring a saved layout is not that
+        // action, but it is also not this path: see the select handler.
+        if opened {
+            self.ensure_conversation_hot_zone();
+        }
+        opened
+    }
+
+    /// Put the operator back on a pane that accepts input when the active
+    /// layout has none.
+    ///
+    /// An unfocused layout is a state a deliberate action produces; restoring
+    /// one from persistence or from another project is not that action, and
+    /// leaving it in place silently swallows every ordinary keystroke.
+    pub(crate) fn ensure_conversation_hot_zone(&mut self) {
+        if self.workspace_layout.focused.is_none() {
             let pane = conversation_pane_for_tab(self.workspace_layout.tab);
             self.workspace_layout.focused = Some(pane);
             self.dirty = true;
         }
-        opened
     }
 
     pub fn select_project_tab(&mut self, index: usize) -> bool {
@@ -3755,7 +3833,15 @@ impl TuiState {
                     rename.buffer.pop();
                 }
             }
-            KeyCode::Char(character) if !character.is_control() => {
+            // A Ctrl chord arrives as `Char('c')` with CONTROL set, and
+            // `is_control()` is false for it, so without the modifier check
+            // Ctrl-C would be typed into the name as a literal `c`.
+            KeyCode::Char(character)
+                if !character.is_control()
+                    && !key.modifiers.intersects(
+                        KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER,
+                    ) =>
+            {
                 if let Some(rename) = self.tab_rename.as_mut()
                     && rename.buffer.len() + character.len_utf8() <= 64
                 {
@@ -4629,6 +4715,18 @@ impl TuiState {
         }
     }
 
+    /// Record the approval mode this project should be rebound with.
+    /// `bind_agent_to_active_project` reapplies the stored mode whenever the
+    /// tab changes, so a slash command that only edits the live policy has its
+    /// choice silently reverted on the next switch.
+    pub fn set_project_approval_mode(&mut self, mode: crate::approval::ApprovalMode) {
+        let name = self.active_project().to_owned();
+        let mut metadata = self.project_metadata(&name).cloned().unwrap_or_default();
+        metadata.approval_mode = mode;
+        self.set_project_metadata(name, metadata);
+        self.dirty = true;
+    }
+
     pub fn set_active_project_metadata(&mut self, metadata: ProjectTabMetadata) {
         let name = self.active_project().to_owned();
         self.set_project_metadata(name, metadata);
@@ -5380,9 +5478,34 @@ impl TuiState {
     pub fn set_status(&mut self, status: impl Into<String>) {
         let status = bound_text(status.into());
         if self.status != status {
+            // The production renderer draws the footer and nothing else, so a
+            // status that is not echoed there is a status nobody ever sees.
+            // The two values the footer already renders are left alone; every
+            // other one is posted as a short-lived notice so it cannot
+            // displace the hot-zone hint forever.
+            if status != "Ready"
+                && status != "Project closed"
+                && !status.starts_with("Project ready · ")
+            {
+                self.footer_notice = Some((status.clone(), Instant::now()));
+            }
             self.status = status;
             self.dirty = true;
         }
+    }
+
+    /// Show a short line in the footer for a few seconds.  Used where a key is
+    /// refused, but doing nothing visible would read as a dropped keystroke.
+    pub fn notice_footer(&mut self, notice: impl Into<String>) {
+        self.footer_notice = Some((bound_text(notice.into()), Instant::now()));
+        self.dirty = true;
+    }
+
+    fn live_footer_notice(&self) -> Option<&str> {
+        self.footer_notice
+            .as_ref()
+            .filter(|(_, at)| at.elapsed() < Duration::from_secs(4))
+            .map(|(text, _)| text.as_str())
     }
 
     pub fn set_busy(&mut self, busy: bool) {
@@ -5687,8 +5810,15 @@ impl TuiState {
     /// Keys owned by the Resources hot zone (ZS1-177): block selection,
     /// drill-down and leaving to the explicit no-hot-zone state.
     fn resources_zone_key(&mut self, key: KeyEvent) -> bool {
+        // Modified keys belong to the global layer. Without this, Ctrl-Up moves
+        // the resource block while Ctrl-Up in every other pane moves focus --
+        // one chord meaning two things depending on which pane happens to be
+        // hot. The same guard `handle_key` applies to the prompt chords.
+        if !key.modifiers.is_empty() {
+            return false;
+        }
         match key.code {
-            KeyCode::Char('z') if key.modifiers.is_empty() => self.open_resources_zoom(),
+            KeyCode::Char('z') => self.open_resources_zoom(),
             KeyCode::Up => self.move_resource_block(-1),
             KeyCode::Down => self.move_resource_block(1),
             KeyCode::PageUp => self.move_resource_block(-8),
@@ -5712,6 +5842,11 @@ impl TuiState {
     /// Keys owned by the Gantt hot zone (ZS1-177): keyboard scrolling mirrors
     /// the wheel/trackpad behavior; Esc leaves to the no-hot-zone state.
     fn gantt_zone_key(&mut self, key: KeyEvent) -> bool {
+        // Same rule as the Resources zone: modified keys go to the global
+        // layer, so a chord never means one thing here and another elsewhere.
+        if !key.modifiers.is_empty() {
+            return false;
+        }
         let scroll = self.pane_scroll.entry(PaneId::Gantt).or_insert(0);
         match key.code {
             KeyCode::Up => *scroll = scroll.saturating_sub(1),
@@ -5798,7 +5933,13 @@ impl TuiState {
                 }
                 self.dirty = true;
             }
-            KeyCode::Char(character) if !character.is_control() => {
+            // Same as the tab rename: a Ctrl chord must not land in the name.
+            KeyCode::Char(character)
+                if !character.is_control()
+                    && !key.modifiers.intersects(
+                        KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER,
+                    ) =>
+            {
                 if let Some(rename) = self.session_rename.as_mut()
                     && rename.text.len() < crate::session::MAX_SESSION_NAME_BYTES
                 {
@@ -5814,6 +5955,10 @@ impl TuiState {
     /// Keys owned by the SessionList pane. Kept outside the text zones so a
     /// stale discussion draft never steals its navigation.
     fn session_list_zone_key(&mut self, key: KeyEvent) -> Option<TuiAction> {
+        // Modified keys belong to the global layer, matching the other zones.
+        if !key.modifiers.is_empty() {
+            return None;
+        }
         match key.code {
             KeyCode::Up => {
                 self.move_session_browser_cursor(-1);
@@ -5927,6 +6072,13 @@ impl TuiState {
         while self.arch_messages.len() > self.max_messages {
             self.arch_messages.pop_front();
         }
+        self.pane_scroll.remove(&PaneId::Arch);
+        self.dirty = true;
+    }
+
+    /// Empty the arch console transcript after the master session was reset.
+    pub fn clear_arch_messages(&mut self) {
+        self.arch_messages.clear();
         self.pane_scroll.remove(&PaneId::Arch);
         self.dirty = true;
     }
@@ -7859,16 +8011,17 @@ impl TuiState {
         let adapter = BentoBoxLayoutAdapter::new(&self.workspace_layout, self.workspace_area);
         let panes: Vec<_> = adapter.visible_panes().collect();
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-            // A press in either left-column prompt moves keyboard focus there
-            // (ZS1-148). The prompt rectangles are recorded by the frame that
-            // was actually drawn, so a collapsed group never steals focus.
+            // A press in the arch prompt or the main prompt strip moves
+            // keyboard focus there (ZS1-148). The prompt rectangles are
+            // recorded by the frame that was actually drawn, so a collapsed
+            // group never steals focus.
             if self
                 .arch_prompt_rect
                 .is_some_and(|rect| rect.contains(position))
             {
                 self.set_hot_zone(HotZone::Arch);
             } else if self
-                .docked_prompt_rect
+                .prompt_rect
                 .is_some_and(|rect| rect.contains(position))
             {
                 self.set_hot_zone(HotZone::Conversation);
@@ -8158,17 +8311,7 @@ impl TuiState {
         // Modals own the keyboard before any hot zone: the Shell forward below
         // must never swallow an approval key, and the ordinary-paste buffer
         // must never fill while a picker/browser is open.
-        let modal_active = self.directory_picker.is_some()
-            || self.transcript_browser.is_some()
-            || self.history_search.is_some()
-            || self.goal_edit.is_some()
-            || self.resources_zoom.is_some()
-            || self.subtab_concurrency_edit.is_some()
-            || self.session_rename.is_some()
-            || self
-                .approval_views
-                .get(self.active_project())
-                .is_some_and(|view| view.focused && !view.requests.is_empty());
+        let modal_active = self.modal_active();
         // A hot Shell pane owns raw keystrokes. Forward them here, before the
         // ordinary-paste buffer can divert ASCII characters into the prompt
         // (ZS1-166); control chords the TUI reserves still fall through.
@@ -8290,8 +8433,14 @@ impl TuiState {
                             // Pasted slash text remains literal until a deliberate later key.
                             self.palette_dismissed = true;
                         }
-                        // Navigation zones have no text target.
-                        HotZone::Resources | HotZone::Gantt | HotZone::None => {}
+                        // Navigation zones have no text target. Dropping the
+                        // paste without a word looks like a broken terminal.
+                        zone @ (HotZone::Resources | HotZone::Gantt | HotZone::None) => {
+                            self.notice_footer(format!(
+                                "{} 不接受粘贴 · Tab 切换区域",
+                                zone.label()
+                            ));
+                        }
                     }
                 }
                 TuiAction::None
@@ -8302,6 +8451,23 @@ impl TuiState {
             }
             _ => TuiAction::None,
         }
+    }
+
+    /// Whether a modal owns the keyboard right now. A modal must be consulted
+    /// before any hot zone, or the zone swallows keys the modal is showing.
+    fn modal_active(&self) -> bool {
+        self.directory_picker.is_some()
+            || self.transcript_browser.is_some()
+            || self.history_search.is_some()
+            || self.goal_edit.is_some()
+            || self.resources_zoom.is_some()
+            || self.subtab_concurrency_edit.is_some()
+            || self.session_rename.is_some()
+            || self.tab_rename.is_some()
+            || self
+                .approval_views
+                .get(self.active_project())
+                .is_some_and(|view| view.focused && !view.requests.is_empty())
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> TuiAction {
@@ -8361,7 +8527,10 @@ impl TuiState {
         // PTY (ZS1-166) regardless of any discussion draft. Chords the TUI
         // reserves (tabs, pane cycling) return `None` from `key_bytes` and
         // still reach their usual handler.
-        if zone == HotZone::Shell && self.forward_shell_key(key) {
+        // `handle_event_at` already declines the forward while a modal is open.
+        // The same guard belongs here: a picker or browser opened from the
+        // Shell pane would otherwise have its keys typed into the PTY.
+        if zone == HotZone::Shell && !self.modal_active() && self.forward_shell_key(key) {
             return TuiAction::Redraw;
         }
         // ZS1-177: navigation zones own their keys before any text editing.
@@ -8415,20 +8584,22 @@ impl TuiState {
             return TuiAction::Redraw;
         }
         if key.modifiers == KeyModifiers::ALT {
+            // Alt-arrows edit and walk the discussion prompt, so they carry the
+            // same ownership guard as the Ctrl editing chords below.
             match key.code {
-                KeyCode::Left => {
+                KeyCode::Left if zone == HotZone::Conversation => {
                     self.move_word(false);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Right => {
+                KeyCode::Right if zone == HotZone::Conversation => {
                     self.move_word(true);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Up => {
+                KeyCode::Up if zone == HotZone::Conversation => {
                     self.history_move(-1);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Down => {
+                KeyCode::Down if zone == HotZone::Conversation => {
                     self.history_move(1);
                     return TuiAction::Redraw;
                 }
@@ -8621,7 +8792,7 @@ impl TuiState {
                     self.set_status("再按一次 Ctrl-C 强制终止 · Ctrl-D 退出");
                     return TuiAction::None;
                 }
-                KeyCode::Char('u') => {
+                KeyCode::Char('u') if zone == HotZone::Conversation => {
                     let start = self.visible_line_boundary(false);
                     let start = if start == self.cursor && start > 0 {
                         start - 1
@@ -8634,7 +8805,12 @@ impl TuiState {
                     self.dirty = true;
                     return TuiAction::None;
                 }
-                KeyCode::Char('y') => {
+                // Discussion-prompt editing. These chords are consulted before
+                // zone dispatch, so each one carries the same guard the zone
+                // block below states: a non-conversation zone must never edit
+                // the discussion draft. Without it, Ctrl-U in the Resources
+                // pane wipes a draft the user cannot even see.
+                KeyCode::Char('y') if zone == HotZone::Conversation => {
                     self.yank_input();
                     return TuiAction::Redraw;
                 }
@@ -8642,40 +8818,40 @@ impl TuiState {
                     self.begin_history_search();
                     return TuiAction::Redraw;
                 }
-                KeyCode::Char('p') => {
+                KeyCode::Char('p') if zone == HotZone::Conversation => {
                     self.history_move(-1);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Char('n') => {
+                KeyCode::Char('n') if zone == HotZone::Conversation => {
                     self.history_move(1);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Char('a') => {
+                KeyCode::Char('a') if zone == HotZone::Conversation => {
                     self.cursor = self.visible_line_boundary(false);
                     self.preferred_column = None;
                     self.dirty = true;
                     return TuiAction::None;
                 }
-                KeyCode::Char('e') => {
+                KeyCode::Char('e') if zone == HotZone::Conversation => {
                     self.cursor = self.visible_line_boundary(true);
                     self.preferred_column = None;
                     self.dirty = true;
                     return TuiAction::None;
                 }
-                KeyCode::Left if !self.input.is_empty() => {
+                KeyCode::Left if zone == HotZone::Conversation && !self.input.is_empty() => {
                     self.move_word(false);
                     return TuiAction::None;
                 }
-                KeyCode::Right if !self.input.is_empty() => {
+                KeyCode::Right if zone == HotZone::Conversation && !self.input.is_empty() => {
                     self.move_word(true);
                     return TuiAction::None;
                 }
-                KeyCode::Delete => {
+                KeyCode::Delete if zone == HotZone::Conversation => {
                     let end = self.word_boundary(true);
                     self.kill_input_range(self.cursor, end);
                     return TuiAction::Redraw;
                 }
-                KeyCode::Char('k') => {
+                KeyCode::Char('k') if zone == HotZone::Conversation => {
                     let end = self.visible_line_boundary(true);
                     let end = if end == self.cursor && end < self.input.len() {
                         end + 1
@@ -8690,7 +8866,7 @@ impl TuiState {
                         Some(ProjectIntent::Close(self.active_project().to_owned()));
                     return TuiAction::Redraw;
                 }
-                KeyCode::Char('w') | KeyCode::Backspace => {
+                KeyCode::Char('w') | KeyCode::Backspace if zone == HotZone::Conversation => {
                     self.delete_previous_word();
                     return TuiAction::None;
                 }
@@ -8748,7 +8924,7 @@ impl TuiState {
                 // Ctrl-J is the portable terminal spelling of a newline.
                 // Treat Ctrl-Enter the same way because a few terminals send
                 // that pair as `KeyCode::Enter` rather than `Char('j')`.
-                KeyCode::Char('j') | KeyCode::Enter => {
+                KeyCode::Char('j') | KeyCode::Enter if zone == HotZone::Conversation => {
                     self.insert_text("\n");
                     return TuiAction::None;
                 }
@@ -8771,7 +8947,16 @@ impl TuiState {
                     self.focus_previous_workspace_pane();
                     return TuiAction::Redraw;
                 }
-                _ => {}
+                _ => {
+                    // Swallowing the key silently reads as a dead terminal.
+                    // Say which pane owns the keys and how to leave it; the
+                    // return value stays `None` so the explicit-action shape
+                    // callers depend on is unchanged.
+                    self.notice_footer(format!(
+                        "{} 不接受普通输入 · Tab 切换区域 · Esc 返回",
+                        zone.label()
+                    ));
+                }
             }
             return TuiAction::None;
         }
@@ -9825,19 +10010,15 @@ impl TuiState {
                         "no match"
                     }
                 )
-            } else if self.docked_prompt_rect == Some(area) {
-                if self.goal_text.is_empty() {
-                    " Prompt · Goal: — · Alt-G edit ".to_owned()
-                } else {
-                    format!(
-                        " Prompt · Goal: {} · Alt-G edit ",
-                        inline_token(&self.goal_text, 48)
-                    )
-                }
             } else if self.paste.folds.is_empty() && self.input.starts_with('/') {
                 " Prompt  • command palette active ".to_owned()
+            } else if self.goal_text.is_empty() {
+                " Prompt · Goal: — · Alt-G edit · Ctrl-R history · Ctrl-J newline ".to_owned()
             } else {
-                " Prompt · Ctrl-R history · Ctrl-J newline ".to_owned()
+                format!(
+                    " Prompt · Goal: {} · Alt-G edit · Ctrl-R history ",
+                    inline_token(&self.goal_text, 48)
+                )
             });
         let inner = block.inner(area);
         let width = usize::from(inner.width).max(1);
@@ -10111,6 +10292,7 @@ impl TuiState {
         } else {
             None
         };
+        let footer_notice = self.live_footer_notice().map(|notice| format!(" {notice}"));
         let text = truncate_to_width(
             if let Some(warning) = unsaved.as_deref() {
                 warning
@@ -10120,6 +10302,8 @@ impl TuiState {
                 hint
             } else if let Some(status) = project_status.as_deref() {
                 status
+            } else if let Some(notice) = footer_notice.as_deref() {
+                notice
             } else if self.adjacent_paste().is_some() {
                 " Alt-Enter expand paste · Left/Right move · Backspace/Delete remove · Enter send "
             } else {
@@ -10199,23 +10383,10 @@ impl TuiState {
         let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
         let prompt_lines = wrap_plain(&self.projection().text, prompt_width).len();
         let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
-        // Conversation + Prompt are one resident group. At a roomy viewport on
-        // the project workspace the prompt is rendered inside the top-left
-        // conversation pane, so it is exactly as wide as the left column.
-        // Active overlays (palette, completion, history search, pickers) and
-        // narrow/compact viewports keep the full-width bottom strip so menus
-        // and long lines retain room.
-        let overlay_active = !self.slash_choices().is_empty()
-            || self.current_file_completion().is_some()
-            || self.history_search.is_some()
-            || self.directory_picker.is_some()
-            || self.transcript_browser.is_some();
-        let group_prompt = !overlay_active
-            && self.workspace_layout.tab == TabId::Project
-            && matches!(
-                Breakpoint::for_size(area.width, area.height),
-                Breakpoint::Standard | Breakpoint::Wide
-            );
+        // The prompt always keeps the full-width bottom strip: a fixed home
+        // never jumps when overlays (palette, completion, history search,
+        // pickers) open or close, and menus retain their room above it.
+        let group_prompt = false;
         let input_height = if area.height > 4 {
             u16::try_from(desired_input_height)
                 .unwrap_or(u16::MAX)
@@ -10233,21 +10404,22 @@ impl TuiState {
             ])
             .split(area);
         self.render_workspace_tabs(frame, chunks[0]);
-        self.docked_prompt_rect = None;
+        self.prompt_rect = None;
         self.dock_prompt = group_prompt;
         self.render_workspace(frame, chunks[1]);
-        // When the group could not render the prompt (for example the
-        // conversation pane is collapsed) fall back to the bottom strip so the
-        // prompt is never unreachable.
-        if self.docked_prompt_rect.is_none() {
+        // The prompt normally keeps the bottom strip; the workspace group only
+        // renders it in the docked layout. Record the rect either way so mouse
+        // focus can always find the prompt.
+        if self.prompt_rect.is_none() {
             if self.goal_edit.is_some() {
                 self.render_goal_editor(frame, chunks[2]);
             } else {
                 self.render_input(frame, chunks[2]);
             }
+            self.prompt_rect = Some(chunks[2]);
         }
         self.render_footer(frame, chunks[3]);
-        let prompt_anchor = self.docked_prompt_rect.unwrap_or(chunks[2]);
+        let prompt_anchor = self.prompt_rect.unwrap_or(chunks[2]);
         self.render_slash_choices(frame, prompt_anchor);
         if let Some(picker) = self.directory_picker.as_mut() {
             picker.render(frame);
@@ -10678,7 +10850,7 @@ impl TuiState {
                 );
                 let prompt = Rect::new(prompt.x, prompt.y, prompt.width, prompt.height);
                 self.render_transcript(frame, transcript);
-                self.docked_prompt_rect = Some(prompt);
+                self.prompt_rect = Some(prompt);
                 if self.goal_edit.is_some() {
                     self.render_goal_editor(frame, prompt);
                 } else {
@@ -12582,6 +12754,48 @@ pub fn dispatch_reasoning_input(
     true
 }
 
+/// Run a slash command submitted from the arch console (ZS1-165), reporting
+/// into the arch transcript. `/new` is intercepted here: it resets the arch
+/// master session itself, never the discussion lane, which has its own
+/// prompt and async owner flow for that.
+fn dispatch_arch_slash(
+    command: SlashCommand,
+    state: &mut TuiState,
+    project_host: &mut ProjectRuntimeHost,
+    text: &str,
+) -> SlashDispatchAction {
+    if matches!(
+        &command,
+        SlashCommand::Session {
+            action: crate::slash::SessionAction::New
+        }
+    ) {
+        if state.master_busy() {
+            state.push_arch_message(MessageRole::User, text);
+            state.push_arch_message(
+                MessageRole::Error,
+                "new session requires an idle arch session",
+            );
+            return SlashDispatchAction::Continue;
+        }
+        let project = state.active_project().to_owned();
+        match project_host.pool.reset_arch(&project) {
+            Ok(()) => {
+                state.clear_arch_messages();
+                state.push_arch_message(MessageRole::User, text);
+                state.push_arch_message(MessageRole::System, "arch session reset");
+            }
+            Err(error) => {
+                state.push_arch_message(MessageRole::User, text);
+                state.push_arch_message(MessageRole::Error, error);
+            }
+        }
+        return SlashDispatchAction::Continue;
+    }
+    state.push_arch_message(MessageRole::User, text);
+    dispatch_slash_command(command, state, None)
+}
+
 /// Execute the local, transport-independent part of a slash command.
 ///
 /// The function is intentionally side-effect-light: it updates the visible
@@ -12784,13 +12998,18 @@ pub fn dispatch_slash_command(
         }
         SlashCommand::Yolo { enabled } => {
             if let Some(agent) = agent.as_deref_mut() {
-                let mut policy = agent.configured_approval_policy().unwrap_or_default();
-                policy.mode = if enabled {
+                let mode = if enabled {
                     crate::approval::ApprovalMode::Never
                 } else {
                     crate::approval::ApprovalMode::ReadOnly
                 };
+                let mut policy = agent.configured_approval_policy().unwrap_or_default();
+                policy.mode = mode;
                 agent.set_approval_policy(policy);
+                // Write the choice where rebinding reads it.  Editing only the
+                // live policy let the next project switch revert it.
+                state.set_project_approval_mode(mode);
+                state.set_auto_approve(enabled);
                 state.push_message(
                     MessageRole::System,
                     format!("yolo {}", if enabled { "on" } else { "off" }),
@@ -12808,13 +13027,17 @@ pub fn dispatch_slash_command(
                 );
             } else {
                 if let Some(agent) = agent.as_deref_mut() {
-                    let mut policy = agent.configured_approval_policy().unwrap_or_default();
-                    policy.mode = match mode.as_str() {
+                    let chosen = match mode.as_str() {
                         "ask" => crate::approval::ApprovalMode::ReadOnly,
                         "always" => crate::approval::ApprovalMode::Always,
                         _ => crate::approval::ApprovalMode::Never,
                     };
+                    let mut policy = agent.configured_approval_policy().unwrap_or_default();
+                    policy.mode = chosen;
                     agent.set_approval_policy(policy);
+                    // Durable for the same reason `/yolo` is: this project is
+                    // rebound with the stored mode on every tab change.
+                    state.set_project_approval_mode(chosen);
                     state.push_message(MessageRole::System, format!("approval mode: {mode}"));
                 } else {
                     state.push_message(MessageRole::Error, "approval requires an idle owner");
@@ -14355,6 +14578,12 @@ impl ProjectRuntimeHost {
         }
         if let Some(index) = state.project_index(&id) {
             state.select_project_tab(index);
+            // A user action moved the operator to another project, so the
+            // conversation prompt must accept input: an unfocused saved layout
+            // would otherwise swallow every ordinary keystroke (ZS1-177).
+            if matches!(intent, ProjectIntent::Select(_) | ProjectIntent::Open(_)) {
+                state.ensure_conversation_hot_zone();
+            }
         } else {
             state.open_project_tab(id.clone());
         }
@@ -16402,10 +16631,11 @@ pub fn run_async_with_profile(
     let mut session_browser_host = SessionBrowserHost::new()?;
     let mut editor = ExternalEditorHost::capture_startup();
     let mut shared = Arc::new(Mutex::new(agent));
-    let mut approval = shared
-        .lock()
-        .ok()
-        .and_then(|agent| agent.approval_coordinator());
+    // Every live owner's control handle, refreshed from the pool each pass.
+    // One owner's request must never be missed because another owner was
+    // submitted to most recently.
+    let mut approvals: std::collections::BTreeMap<String, crate::project_workspace::OwnerControl> =
+        std::collections::BTreeMap::new();
     let worker_state = Arc::clone(&shared);
     // Keep provider events bounded independently of the transcript. A slow
     // terminal must not turn an unbounded stream into unbounded memory.
@@ -16650,6 +16880,12 @@ pub fn run_async_with_profile(
             format!("Shared project workspace could not be restored: {error}"),
         );
     }
+    // The app has to open able to accept input: a persisted layout with no
+    // focused pane would silently drop every ordinary keystroke, and a
+    // restored layout is not the explicit action that state is reserved for
+    // (ZS1-177).  Applied here rather than in `restore_workspace_layouts`, so
+    // that restoring stays a faithful data round-trip.
+    state.ensure_conversation_hot_zone();
     shared = project_host.active(&state);
     if let Ok(agent) = shared.lock() {
         gantt_tracker.switch_session(agent.session().path().to_path_buf());
@@ -17044,11 +17280,18 @@ pub fn run_async_with_profile(
                     scheduler.request();
                 }
             }
-            if let Some(coordinator) = approval.as_ref() {
+            approvals = owner_controls(&project_host.pool);
+            if !approvals.is_empty() {
+                // A request is stale only when no live owner still holds it:
+                // the owner that raised it need not be the one most recently
+                // submitted to, or even the active tab.
                 let stale: Vec<_> = pending_approvals
                     .iter()
                     .filter(|r: &&crate::approval::ApprovalRequest| {
-                        !coordinator.is_pending(&r.request_id)
+                        !approvals
+                            .values()
+                            .filter_map(|control| control.approval.as_ref())
+                            .any(|coordinator| coordinator.is_pending(&r.request_id))
                     })
                     .cloned()
                     .collect();
@@ -17056,8 +17299,20 @@ pub fn run_async_with_profile(
                     state.retire_approval_request(&request);
                     pending_approvals.retain(|r| !TuiState::same_approval_request(r, &request));
                 }
-                for request in coordinator.drain_pending() {
-                    state.present_approval(request.clone());
+                let mut drained = Vec::new();
+                for control in approvals.values() {
+                    let Some(coordinator) = control.approval.as_ref() else {
+                        continue;
+                    };
+                    drained.extend(
+                        coordinator
+                            .drain_pending()
+                            .into_iter()
+                            .map(|request| (control.project.clone(), request)),
+                    );
+                }
+                for (project, request) in drained {
+                    state.present_approval_for(project, request.clone());
                     let preview = request.preview.as_ref().map(|preview| {
                         let text = format!("\n\nProposed change:\n{}", preview.display_text());
                         let block = match preview {
@@ -17340,11 +17595,6 @@ pub fn run_async_with_profile(
                 if let Ok(agent) = owner.try_lock() {
                     input_controls.remember_owner(state.active_project(), &agent);
                 }
-                approval = owner
-                    .try_lock()
-                    .ok()
-                    .and_then(|agent| agent.approval_coordinator())
-                    .or(approval.clone());
                 let submitted_text = SubmittedInput {
                     text: request.text.clone(),
                     paste,
@@ -17494,8 +17744,8 @@ pub fn run_async_with_profile(
                         // (ZS1-165): run here and report into the arch
                         // transcript, never the discussion one.
                         state.set_message_target(MessageTarget::Arch);
-                        state.push_arch_message(MessageRole::User, &text);
-                        let result = dispatch_slash_command(command, &mut state, None);
+                        let result =
+                            dispatch_arch_slash(command, &mut state, &mut project_host, &text);
                         state.set_message_target(MessageTarget::Discussion);
                         match result {
                             SlashDispatchAction::Quit => TuiAction::Quit,
@@ -17518,13 +17768,12 @@ pub fn run_async_with_profile(
                         allow,
                         remember,
                     } => {
-                        let result = approval
-                            .as_ref()
+                        let result = coordinator_holding(&approvals, &project, &request_id)
                             .ok_or(crate::approval::ApprovalError::UnknownRequest)
                             .and_then(|owner| {
                                 respond_tui_approval(
                                     &mut state,
-                                    owner,
+                                    &owner,
                                     active_job_project.as_deref(),
                                     (&project, &request_id, &turn_id, &call_id),
                                     (allow, remember),
@@ -17986,12 +18235,14 @@ pub fn run_async_with_profile(
                                         .as_ref()
                                         .ok_or(crate::approval::ApprovalError::UnknownRequest)
                                         .and_then(|request| {
-                                            let coordinator = approval.as_ref().ok_or(
-                                                crate::approval::ApprovalError::UnknownRequest,
-                                            )?;
+                                            let coordinator =
+                                                coordinator_holding(&approvals, &project, &id)
+                                                    .ok_or(
+                                                    crate::approval::ApprovalError::UnknownRequest,
+                                                )?;
                                             respond_tui_approval(
                                                 &mut state,
-                                                coordinator,
+                                                &coordinator,
                                                 active_job_project.as_deref(),
                                                 (&project, &id, &request.turn_id, &request.call_id),
                                                 (
@@ -18093,8 +18344,12 @@ pub fn run_async_with_profile(
                                                 cancel_result,
                                                 Err(crate::runtime::SubmitError::QueueFull)
                                             ) {
-                                                if let Some(approval) = approval.as_ref() {
-                                                    approval.emergency_cancel();
+                                                for control in approvals.values() {
+                                                    if let Some(approval) =
+                                                        control.approval.as_ref()
+                                                    {
+                                                        approval.emergency_cancel();
+                                                    }
                                                 }
                                                 pending_approvals.clear();
                                                 state.clear_activity_approvals();
@@ -18162,11 +18417,6 @@ pub fn run_async_with_profile(
                                         input_controls
                                             .remember_owner(state.active_project(), &agent);
                                     }
-                                    approval = owner
-                                        .try_lock()
-                                        .ok()
-                                        .and_then(|agent| agent.approval_coordinator())
-                                        .or(approval.clone());
                                     let submitted_text = state.bind_submitted_input(text.clone());
                                     match runner.try_submit(request) {
                                         Ok(id) => {
@@ -18309,11 +18559,6 @@ pub fn run_async_with_profile(
                                         input_controls
                                             .remember_owner(state.active_project(), &agent);
                                     }
-                                    approval = owner
-                                        .try_lock()
-                                        .ok()
-                                        .and_then(|agent| agent.approval_coordinator())
-                                        .or(approval.clone());
                                     let submitted_text =
                                         state.bind_submitted_input(request.text.clone());
                                     match runner.try_submit(request) {
@@ -18368,8 +18613,10 @@ pub fn run_async_with_profile(
                                 // The cancel command is admitted (or the
                                 // worker is already closed), so no approval
                                 // from this turn can be answered safely.
-                                if let Some(approval) = approval.as_ref() {
-                                    approval.emergency_cancel();
+                                for control in approvals.values() {
+                                    if let Some(approval) = control.approval.as_ref() {
+                                        approval.emergency_cancel();
+                                    }
                                 }
                                 pending_approvals.clear();
                                 state.clear_activity_approvals();
@@ -18386,8 +18633,10 @@ pub fn run_async_with_profile(
                         pending_inputs.cancel(&mut state);
                         if let Some(id) = active_job {
                             let _ = runner.try_cancel(id);
-                            if let Some(approval) = approval.as_ref() {
-                                approval.emergency_cancel();
+                            for control in approvals.values() {
+                                if let Some(approval) = control.approval.as_ref() {
+                                    approval.emergency_cancel();
+                                }
                             }
                             pending_approvals.clear();
                             state.clear_activity_approvals();
@@ -18434,8 +18683,8 @@ pub fn run_async_with_profile(
                         // Synchronous host: still honor an arch slash command so
                         // both prompts behave alike (ZS1-165).
                         state.set_message_target(MessageTarget::Arch);
-                        state.push_arch_message(MessageRole::User, &text);
-                        let result = dispatch_slash_command(command, &mut state, None);
+                        let result =
+                            dispatch_arch_slash(command, &mut state, &mut project_host, &text);
                         state.set_message_target(MessageTarget::Discussion);
                         match result {
                             SlashDispatchAction::Quit => break 'outer,
@@ -21678,7 +21927,7 @@ mod local_diff_host_tests {
         });
         assert_eq!(before, vec!["default".to_owned(), "other".to_owned()]);
         assert_eq!(state.project_tabs(), &["default".to_owned()]);
-        assert!(!state.project_metadata("other").is_some());
+        assert!(state.project_metadata("other").is_none());
     }
     #[test]
     fn ctrl_w_requests_project_close_only_for_an_empty_prompt() {

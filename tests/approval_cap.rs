@@ -163,9 +163,7 @@ fn real_owner_truncation_is_visible_before_allowing() {
         body.contains("Preview truncated"),
         "owner truncation must be visible without scrolling through raw arguments"
     );
-    // ZS1-182: Enter on a not-yet-allowed request opens the reject-feedback
-    // stage; a second Enter submits the (empty) denial.
-    assert_eq!(key(&mut state, KeyCode::Enter), TuiAction::Redraw);
+    // A bare Enter decides in one press: denial is the default selection.
     assert!(matches!(
         key(&mut state, KeyCode::Enter),
         TuiAction::RespondApproval { allow: false, .. }
@@ -182,8 +180,6 @@ fn approval_navigation_preserves_draft_defaults_and_request_identity() {
     key(&mut state, KeyCode::Char('y'));
     key(&mut state, KeyCode::Tab);
     frame(&mut state, 84, 30, true, "second-home");
-    // ZS1-182: the first Enter opens the reject stage; the second submits.
-    assert_eq!(key(&mut state, KeyCode::Enter), TuiAction::Redraw);
     match key(&mut state, KeyCode::Enter) {
         TuiAction::RespondApproval {
             project: p,

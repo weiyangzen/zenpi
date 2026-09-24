@@ -654,6 +654,12 @@ pub enum ToolResult {
         call_id: String,
         tool: String,
         output: Value,
+        /// Typed content the model should receive for this result. When it is
+        /// present it is the authority and `output` is only a compatibility
+        /// record that must not be sent a second time. A tool that produces
+        /// JSON alone leaves it absent, and nothing changes for it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        content: Option<Vec<crate::backend::InputContentPart>>,
     },
     Error {
         call_id: String,
@@ -1307,6 +1313,7 @@ impl ToolRegistry {
                 call_id,
                 tool: tool_name,
                 output,
+                content: None,
             },
             Err(error) => ToolResult::Error {
                 call_id,
@@ -1411,6 +1418,7 @@ pub fn compact_tool_result(
         call_id,
         tool,
         output,
+        content,
     } = result
     else {
         return Ok(result);
@@ -1421,6 +1429,7 @@ pub fn compact_tool_result(
             call_id,
             tool,
             output,
+            content,
         });
     }
     if context.checked_gate()?.is_some() {
@@ -1433,6 +1442,9 @@ pub fn compact_tool_result(
                 "artifact": null, "reason": "worker_artifact_write_not_granted",
                 "policy_evidence": context.policy_evidence(),
             }),
+            // Compaction rewrites the compatibility record only: typed content
+            // must never be truncated into an artifact reference.
+            content,
         });
     }
     use sha2::{Digest, Sha256};
@@ -1459,6 +1471,7 @@ pub fn compact_tool_result(
             "preview": preview,
             "compacted": true,
         }),
+        content,
     })
 }
 

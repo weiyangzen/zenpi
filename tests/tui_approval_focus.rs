@@ -39,8 +39,7 @@ fn deny_default_and_explicit_allow_keep_draft_cursor() {
     plain(&mut s, KeyCode::Left);
     let cursor = s.cursor();
     s.present_approval(request("a"));
-    // ZS1-182: Enter opens the reject-feedback stage; the second Enter denies.
-    assert_eq!(plain(&mut s, KeyCode::Enter), TuiAction::Redraw);
+    // A bare Enter decides in one press: denial is the default selection.
     assert!(matches!(
         plain(&mut s, KeyCode::Enter),
         TuiAction::RespondApproval {
@@ -69,8 +68,8 @@ fn escape_and_paste_never_grant_or_discard_draft() {
         key(&mut s, KeyCode::Char('y'), KeyModifiers::CONTROL),
         TuiAction::None
     ));
-    // ZS1-182: Enter opens the reject-feedback stage; the second Enter denies.
-    assert_eq!(plain(&mut s, KeyCode::Enter), TuiAction::Redraw);
+    // Leaving a note for the model is still reachable, just explicit (`n`).
+    plain(&mut s, KeyCode::Char('n'));
     assert!(matches!(
         plain(&mut s, KeyCode::Enter),
         TuiAction::RespondApproval { allow: false, .. }
@@ -92,8 +91,6 @@ fn multiple_requests_reset_selection_and_projects_do_not_share_focus() {
     s.present_approval(request("b"));
     plain(&mut s, KeyCode::Char('y'));
     plain(&mut s, KeyCode::Tab);
-    // ZS1-182: Enter opens the reject stage; the second Enter submits.
-    assert_eq!(plain(&mut s, KeyCode::Enter), TuiAction::Redraw);
     assert!(
         matches!(plain(&mut s,KeyCode::Enter),TuiAction::RespondApproval{request_id,allow:false,..} if request_id=="b")
     );
@@ -106,8 +103,6 @@ fn multiple_requests_reset_selection_and_projects_do_not_share_focus() {
     s.select_project_tab(0);
     assert_eq!(s.approval_count(), 2);
     s.retire_approval("b");
-    // ZS1-182: Enter opens the reject stage; the second Enter submits.
-    assert_eq!(plain(&mut s, KeyCode::Enter), TuiAction::Redraw);
     assert!(
         matches!(plain(&mut s,KeyCode::Enter),TuiAction::RespondApproval{request_id,allow:false,..} if request_id=="a")
     );
@@ -421,6 +416,50 @@ fn replay_never_promotes_worker_or_malformed_records_or_overrides_configured_den
 }
 
 #[test]
+fn only_a_host_answer_source_creates_a_standing_grant() {
+    use zenpi::approval::ApprovalDecision;
+    let policy = ApprovalPolicy::default();
+    let base = serde_json::json!({"type":"approval_resolved","request_id":"request","turn_id":"turn","call_id":"call","origin":"agent_tool","tool":"write_file","remember":true,"decision":"allow"});
+    // Records written before the field existed came from the host path, so a
+    // missing source still restores.
+    assert_eq!(
+        policy
+            .with_remembered_events(&[base.clone()])
+            .per_tool
+            .get("write_file"),
+        Some(&ApprovalDecision::Allow)
+    );
+    let mut host = base.clone();
+    host["source"] = serde_json::json!("host_answer");
+    assert_eq!(
+        policy
+            .with_remembered_events(&[host])
+            .per_tool
+            .get("write_file"),
+        Some(&ApprovalDecision::Allow)
+    );
+    // Any other source is a decision an agent reached on its own.  Recording
+    // it under the same event type must not promote it into a standing grant.
+    for source in [
+        "policy_never",
+        "policy_read_only",
+        "policy_deny",
+        "per_tool_grant",
+        "worker_allow_after_preflight",
+    ] {
+        let mut impostor = base.clone();
+        impostor["source"] = serde_json::json!(source);
+        assert!(
+            !policy
+                .with_remembered_events(&[impostor])
+                .per_tool
+                .contains_key("write_file"),
+            "{source} must not mint a standing grant"
+        );
+    }
+}
+
+#[test]
 fn directory_picker_owns_keys_over_existing_or_new_approval_view() {
     let mut s = TuiState::default();
     s.present_approval(request("first"));
@@ -434,8 +473,6 @@ fn directory_picker_owns_keys_over_existing_or_new_approval_view() {
     assert_eq!(s.approval_count(), 1);
     plain(&mut s, KeyCode::Esc);
     key(&mut s, KeyCode::Char('a'), KeyModifiers::ALT);
-    // ZS1-182: Enter opens the reject stage; the second Enter submits.
-    assert_eq!(plain(&mut s, KeyCode::Enter), TuiAction::Redraw);
     assert!(matches!(
         plain(&mut s, KeyCode::Enter),
         TuiAction::RespondApproval { allow: false, .. }
@@ -450,7 +487,7 @@ fn directory_picker_owns_keys_over_existing_or_new_approval_view() {
 }
 
 #[test]
-fn staged_confirm_requires_a_second_enter_and_carries_reject_feedback() {
+fn remember_confirm_and_reject_feedback_are_explicit_steps() {
     let mut s = TuiState::default();
     s.present_approval(request("stage"));
     // Remember asks for a confirmation step; Esc returns to the selector.

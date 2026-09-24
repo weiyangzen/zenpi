@@ -4,6 +4,7 @@ mod search;
 #[path = "../src/tool_output.rs"]
 #[allow(dead_code)]
 mod tool_output;
+use zenpi::backend;
 use zenpi::view_model;
 
 #[path = "../src/security.rs"]

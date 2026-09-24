@@ -73,6 +73,9 @@ fn approval_preview_keeps_character_after_wide_emoji_visible_without_allowing() 
     eprintln!("approval narrow frame:\n{rendered}");
     assert_eq!(state.approval_count(), 1);
     assert_eq!(state.input(), "approval draft");
+    // A bare Enter decides in one press, and denial is the default selection.
+    // What this test is about — the wide emoji staying visible while the draft
+    // survives — is asserted on the frame captured above.
     assert!(matches!(
         state.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
         TuiAction::RespondApproval { allow: false, .. }

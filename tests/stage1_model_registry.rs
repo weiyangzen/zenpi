@@ -215,7 +215,7 @@ fn failed_model_switch_preserves_journal_and_budget_and_restart_selection() {
 }
 
 #[test]
-fn changed_saved_metadata_requires_explicit_selection_before_resume() {
+fn drifted_saved_metadata_is_adopted_and_recorded() {
     let dir = tempdir().unwrap();
     let session = dir.path().join("session.jsonl");
     let mut agent = Agent::new(
@@ -241,10 +241,23 @@ fn changed_saved_metadata_requires_explicit_selection_before_resume() {
             &[entry],
         )),
     );
-    assert!(restored.restore_model_selection().is_err());
-    restored.set_model(Some("gpt-4.1".into())).unwrap();
+    // A stale descriptor digest is adopted under the current registry metadata
+    // instead of bricking the session, and the adoption is journaled once.
     restored.restore_model_selection().unwrap();
     assert_eq!(restored.context_budget().max_tokens, 48000);
+    let selected = fs::read_to_string(&session)
+        .unwrap()
+        .matches("\"type\":\"model_selected\"")
+        .count();
+    assert_eq!(selected, 2);
+    restored.restore_model_selection().unwrap();
+    assert_eq!(
+        fs::read_to_string(&session)
+            .unwrap()
+            .matches("\"type\":\"model_selected\"")
+            .count(),
+        selected
+    );
 }
 
 #[test]

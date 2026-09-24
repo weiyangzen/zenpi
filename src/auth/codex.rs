@@ -120,11 +120,10 @@ impl ActiveLogin {
 }
 impl Drop for ActiveLogin {
     fn drop(&mut self) {
-        if let Ok(mut active) = ACTIVE.lock() {
-            if active.as_ref().is_some_and(|entry| entry.id == self.id) {
+        if let Ok(mut active) = ACTIVE.lock()
+            && active.as_ref().is_some_and(|entry| entry.id == self.id) {
                 *active = None;
             }
-        }
     }
 }
 
@@ -134,8 +133,8 @@ pub(crate) enum CancelDisposition {
     NotActive,
 }
 pub(crate) fn cancel_login(flow_id: &LoginFlowId) -> CancelDisposition {
-    if let Ok(active) = ACTIVE.lock() {
-        if let Some(cancelled) = active
+    if let Ok(active) = ACTIVE.lock()
+        && let Some(cancelled) = active
             .as_ref()
             .filter(|entry| entry.id == *flow_id)
             .and_then(|entry| entry.cancelled.upgrade())
@@ -143,7 +142,6 @@ pub(crate) fn cancel_login(flow_id: &LoginFlowId) -> CancelDisposition {
             cancelled.store(true, Ordering::Release);
             return CancelDisposition::Requested;
         }
-    }
     CancelDisposition::NotActive
 }
 

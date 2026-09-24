@@ -267,19 +267,42 @@ fn explicit_cli_route_overrides_are_revalidated_and_model_override_is_allowed() 
     }
 }
 
+/// Write an auth file the way zenpi does.  The credential store refuses a
+/// credential file that is not owner-only, so a fixture has to be private too.
+fn write_private(path: &Path, contents: &str) {
+    fs::write(path, contents).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+}
+
 #[test]
 fn explicit_doctor_is_unresolved_and_never_reads_legacy_auth_or_codex_fallback() {
     let temp = tempdir().unwrap();
     write_codex_fixture(temp.path(), "synthetic-codex-secret");
     let paths = ConfigPaths::for_home(temp.path());
     fs::create_dir_all(&paths.root).unwrap();
+    // The credential store refuses a root it does not consider private, and an
+    // explicit profile's status now consults it.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&paths.root, fs::Permissions::from_mode(0o700)).unwrap();
+    }
     fs::write(
         &paths.config,
         "provider='openai-codex'\nauth_method='oauth'\nauth_ref='codex-account'\n",
     )
     .unwrap();
-    // Invalid legacy JSON proves this explicit diagnostic path does not open it.
-    fs::write(&paths.auth, "not legacy JSON").unwrap();
+    // A legacy key that the explicit diagnostic path must ignore: it is
+    // readable, so a report of "no API key" proves it was not consumed, rather
+    // than proving only that a corrupt file was skipped.
+    write_private(
+        &paths.auth,
+        "{\"OPENAI_API_KEY\":\"synthetic-legacy-file-secret\"}\n",
+    );
     let output = Command::new(env!("CARGO_BIN_EXE_zenpi"))
         .args(["config", "doctor", "--json"])
         .env_clear()
@@ -298,7 +321,9 @@ fn explicit_doctor_is_unresolved_and_never_reads_legacy_auth_or_codex_fallback()
             )
         });
     assert_eq!(status["auth_method"], "oauth");
-    assert_eq!(status["auth_binding_state"], "unresolved");
+    // The profile names a credential the store does not have: that is
+    // unconfigured, not "fields are complete, so assume it works".
+    assert_eq!(status["auth_binding_state"], "unconfigured");
     assert_eq!(status["api_key_present"], false);
     assert_eq!(status["wire_api"], "openai_codex_responses");
     assert!(status["model"].is_null());
@@ -1050,6 +1075,348 @@ fn short_session_reference_parses_without_changing_the_path_form() {
     assert_eq!(options.session_ref, None);
     assert!(options.session.ends_with("journal.jsonl"));
     assert!(parse_args(["-s", "  "]).is_err());
+}
+
+/// Run the built binary against an isolated home, so the test exercises the
+/// same command entry point a user does.  `HOME`, `ZENPI_HOME`, and
+/// `CODEX_HOME` all point inside the temporary directory and the environment is
+/// otherwise cleared, so no user configuration or credential can be reached.
+fn zenpi(home: &Path) -> Command {
+    let root = home.canonicalize().unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_zenpi"));
+    command
+        .env_clear()
+        .env("HOME", &root)
+        .env("ZENPI_HOME", root.join(".zenpi"))
+        .env("CODEX_HOME", root.join("codex"))
+        .current_dir(&root);
+    command
+}
+
+fn run(command: &mut Command, stdin: &str) -> (bool, String, String) {
+    use std::io::Write as _;
+    use std::process::Stdio;
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(stdin.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    (
+        output.status.success(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+#[test]
+fn auth_list_is_empty_and_read_only_before_any_credential_exists() {
+    let home = tempdir().unwrap();
+    let (ok, stdout, _) = run(
+        zenpi(home.path()).args(["config", "auth", "list", "--json"]),
+        "",
+    );
+    assert!(ok, "listing an absent store must succeed");
+    assert_eq!(stdout.trim(), "[]");
+    // A read-only command must not create the state directory.
+    assert!(!home.path().join(".zenpi").exists());
+}
+
+#[test]
+fn adding_an_api_key_stores_a_scoped_credential_and_never_echoes_the_key() {
+    let home = tempdir().unwrap();
+    let secret = "synthetic-cli-secret-key";
+    let (ok, stdout, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "https://api.deepseek.com",
+            "deepseek",
+            "--stdin",
+            "--model",
+            "deepseek-flash",
+            "--json",
+        ]),
+        &format!("{secret}\n"),
+    );
+    assert!(ok, "add failed: {stderr}");
+    assert!(!stdout.contains(secret), "the key must never reach stdout");
+    assert!(!stderr.contains(secret), "the key must never reach stderr");
+
+    let report: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    let credential_id = report["credential_id"].as_str().unwrap().to_owned();
+    assert_eq!(report["credential_committed"], true);
+    assert_eq!(report["profile_bound"], true);
+    assert_eq!(report["binding_error"], serde_json::Value::Null);
+    // A built-in multi-protocol provider authorizes every wire it serves, so
+    // the key works on all of them without a second login.
+    let mut prefixes: Vec<&str> = report["destinations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|grant| grant["path_prefix"].as_str().unwrap())
+        .collect();
+    prefixes.sort_unstable();
+    assert_eq!(
+        prefixes,
+        ["/anthropic/v1/messages", "/chat/completions", "/responses"]
+    );
+
+    let paths = ConfigPaths::for_home(home.path());
+    let stored = fs::read_to_string(&paths.auth).unwrap();
+    assert!(
+        stored.contains(secret),
+        "the credential is stored, not dropped"
+    );
+    assert_eq!(load_auth(&paths).unwrap().openai_api_key(), None);
+    assert!(
+        load_auth(&paths)
+            .unwrap()
+            .api_key_for_profile(Some("deepseek"))
+            .is_none(),
+        "a stored credential is not also written as a legacy profile key"
+    );
+
+    let entries = zenpi::config::auth_list(&paths).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].credential_id, credential_id);
+    assert_eq!(entries[0].state, "ready");
+    assert_eq!(entries[0].profiles, ["deepseek"]);
+
+    let profile = load_config(&paths).unwrap().profiles["deepseek"].clone();
+    assert_eq!(profile.auth_method.as_deref(), Some("api_key"));
+    assert_eq!(profile.auth_ref.as_deref(), Some(credential_id.as_str()));
+    assert_eq!(profile.provider.as_deref(), Some("deepseek"));
+    assert_eq!(profile.model.as_deref(), Some("deepseek-flash"));
+    assert_eq!(profile.wire_api.as_deref(), Some("chat_completions"));
+    // The URL of a built-in provider comes from its definition.
+    assert_eq!(profile.base_url, None);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(&paths.auth).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "the credential file stays owner-only");
+    }
+}
+
+#[test]
+fn api_keys_are_refused_from_the_argument_list_or_a_non_https_endpoint() {
+    let home = tempdir().unwrap();
+    // There is no flag that accepts a key, so an attempt to pass one is just an
+    // unsupported argument rather than a silent acceptance.
+    let (ok, _, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "https://api.deepseek.com",
+            "deepseek",
+            "--api-key",
+            "synthetic-argv-secret",
+        ]),
+        "",
+    );
+    assert!(!ok);
+    assert!(!stderr.contains("synthetic-argv-secret"));
+    assert!(!home.path().join(".zenpi").exists());
+
+    let (ok, _, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "https://api.deepseek.com",
+            "deepseek",
+        ]),
+        "synthetic-secret\n",
+    );
+    assert!(!ok, "--stdin is required");
+    assert!(stderr.contains("never taken from the argument list"));
+    assert!(!home.path().join(".zenpi").exists());
+
+    let (ok, _, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "http://gateway.test/v1",
+            "custom",
+            "--stdin",
+            "--wire",
+            "responses",
+            "--header",
+            "bearer",
+        ]),
+        "synthetic-secret\n",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("require HTTPS"));
+
+    // A built-in name may not be pointed at someone else's service.
+    let (ok, _, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "https://not-deepseek.test",
+            "deepseek",
+            "--stdin",
+        ]),
+        "synthetic-secret\n",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("must address that provider's own service"));
+}
+
+#[test]
+fn revoking_a_profile_revokes_its_whole_credential_and_reports_the_scope() {
+    let home = tempdir().unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+
+    let (ok, _, stderr) = run(
+        zenpi(home.path()).args([
+            "config",
+            "add",
+            "auth",
+            "apikey",
+            "https://gateway.test/v1",
+            "custom",
+            "--stdin",
+            "--wire",
+            "responses",
+            "--header",
+            "bearer",
+            "--alias",
+            "first",
+        ]),
+        "synthetic-secret\n",
+    );
+    assert!(ok, "add failed: {stderr}");
+
+    // Two profiles sharing one credential: revoking either must report the
+    // other as affected rather than silently changing a single binding.
+    let mut config = load_config(&paths).unwrap();
+    let shared = config.profiles["first"].auth_ref.clone().unwrap();
+    let mut second = config.profiles["first"].clone();
+    second.auth_ref = Some(shared.clone());
+    config.profiles.insert("second".into(), second);
+    save_config(&paths, &config).unwrap();
+
+    let (ok, stdout, stderr) = run(
+        zenpi(home.path()).args(["pair", "revoke", "--profile", "first", "--yes", "--json"]),
+        "",
+    );
+    assert!(ok, "revoke failed: {stderr}");
+    let receipt: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(receipt["credential_id"], shared.as_str());
+    assert_eq!(receipt["local_revoked"], true);
+    assert_eq!(receipt["remote_revoked"], false);
+    assert_eq!(receipt["profiles"], serde_json::json!(["first", "second"]));
+
+    let entries = zenpi::config::auth_list(&paths).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].state, "revoked");
+    // Revoking is not unbinding: the profiles still name the credential, which
+    // is how the operator sees why the connection stopped working.
+    assert_eq!(entries[0].profiles, ["first", "second"]);
+    assert_eq!(load_config(&paths).unwrap().profiles.len(), 2);
+
+    // The tombstone keeps the identifier from being revived by a later add.
+    assert!(
+        zenpi::config::profile_credential(&paths, "first")
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[test]
+fn auth_management_commands_reject_unrecognized_flags() {
+    // A stray flag must never be absorbed as an optional positional argument:
+    // for `add auth codex` that positional is an email, and absorbing it would
+    // start a real login on a typo.
+    for arguments in [
+        vec!["config", "add", "auth", "codex", "--json"],
+        vec!["config", "add", "auth", "codex", "--bogus"],
+        vec!["config", "auth", "bogus"],
+        vec!["config", "add", "bogus"],
+        vec!["config", "add", "auth"],
+    ] {
+        assert!(
+            parse_args(arguments.clone()).is_err(),
+            "{arguments:?} must be rejected"
+        );
+    }
+    assert!(parse_args(["config", "add", "auth", "codex", "--device", "--no-browser"]).is_err());
+    assert!(parse_args(["config", "auth", "list", "--json"]).is_ok());
+    assert!(parse_args(["config", "auth", "list", "--profile", "x"]).is_err());
+    let options = parse_args([
+        "config",
+        "add",
+        "auth",
+        "apikey",
+        "https://gateway.test/v1",
+        "custom",
+        "--stdin",
+        "--alias",
+        "gateway",
+        "--model",
+        "gateway-model",
+    ])
+    .unwrap();
+    assert_eq!(
+        options.command_value.as_deref(),
+        Some("https://gateway.test/v1")
+    );
+    assert_eq!(options.command_value2.as_deref(), Some("custom"));
+    assert_eq!(options.alias.as_deref(), Some("gateway"));
+    assert_eq!(options.model.as_deref(), Some("gateway-model"));
+    assert!(options.stdin);
+}
+
+#[test]
+fn a_corrupt_credential_store_is_reported_rather_than_read_as_unconfigured() {
+    let home = tempdir().unwrap();
+    let paths = ConfigPaths::for_home(home.path());
+    fs::create_dir_all(&paths.root).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&paths.root, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    fs::write(
+        &paths.config,
+        "provider='openai-codex'\nauth_method='oauth'\nauth_ref='codex-account'\n",
+    )
+    .unwrap();
+    // Bad JSON must not be treated as an empty store: a profile would then look
+    // merely unconfigured while the real file is unreadable.
+    write_private(&paths.auth, "not legacy JSON");
+
+    let (ok, stdout, stderr) = run(zenpi(home.path()).args(["config", "doctor", "--json"]), "");
+    assert!(!ok);
+    assert!(
+        stdout.trim().is_empty(),
+        "no status is claimed for a corrupt store"
+    );
+    assert!(
+        stderr.contains("credential store"),
+        "the reason must name the store: {stderr}"
+    );
+    assert!(!stderr.contains("synthetic-"));
 }
 
 #[test]

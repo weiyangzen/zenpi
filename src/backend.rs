@@ -47,6 +47,82 @@ pub enum AttachmentKind {
     File,
 }
 
+/// Bounds shared by host input and the stored content DTO.  One reference must
+/// not be valid on the way in and invalid on the way out, so both sides read the
+/// same limits.
+pub(crate) const MAX_ATTACHMENT_MIME_BYTES: usize = 255;
+pub(crate) const MAX_ATTACHMENT_PATH_BYTES: usize = 4_096;
+pub(crate) const MAX_ATTACHMENT_URL_BYTES: usize = 2_048;
+pub(crate) const MAX_ATTACHMENT_FILE_ID_BYTES: usize = 512;
+
+/// Audio and video are explicitly unsupported: a host must reject them before
+/// any bytes move, never encode them as an image or drop them silently.
+pub(crate) fn unsupported_media_type(mime_type: &str) -> bool {
+    mime_type.starts_with("audio/") || mime_type.starts_with("video/")
+}
+
+/// The MIME rules a bounded reference must satisfy, shared by host input and
+/// the stored content DTO so a type cannot be valid on one side only.
+pub(crate) fn validate_attachment_mime(
+    kind: AttachmentKind,
+    mime_type: &str,
+) -> Result<(), BackendError> {
+    if mime_type.trim().is_empty()
+        || mime_type.len() > MAX_ATTACHMENT_MIME_BYTES
+        || !mime_type.contains('/')
+        || mime_type.chars().any(char::is_control)
+    {
+        return Err(BackendError::Configuration(
+            "attachment MIME type is invalid".into(),
+        ));
+    }
+    if kind == AttachmentKind::Image && !mime_type.starts_with("image/") {
+        return Err(BackendError::Configuration(
+            "image attachment requires an image/* MIME type".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// A provider file ID is a reference, not a path or a token: it is bounded and
+/// free of control characters wherever it is recorded.
+pub(crate) fn validate_provider_file_id(file_id: &str) -> Result<(), BackendError> {
+    if file_id.trim().is_empty()
+        || file_id.len() > MAX_ATTACHMENT_FILE_ID_BYTES
+        || file_id.chars().any(char::is_control)
+    {
+        return Err(BackendError::Configuration(
+            "provider file ID is invalid".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// A workspace reference must stay inside the workspace by syntax alone, before
+/// any path resolution can be tempted to follow `..` or an absolute path.
+pub(crate) fn validate_relative_attachment_path(path: &str) -> Result<(), BackendError> {
+    use std::path::{Component, Path};
+
+    let parsed = Path::new(path);
+    if path.is_empty()
+        || path.len() > MAX_ATTACHMENT_PATH_BYTES
+        || path.contains('\0')
+        || path.chars().any(char::is_control)
+        || parsed.is_absolute()
+        || parsed.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(BackendError::Configuration(
+            "attachment path is not a relative workspace path".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// A user-visible attachment reference. Exactly one source is accepted. A
 /// workspace source is persisted as a relative path and materialized only for
 /// the current bounded provider request; bytes never enter the journal.
@@ -65,20 +141,7 @@ pub struct InputAttachment {
 
 impl InputAttachment {
     pub fn validate(&self) -> Result<(), BackendError> {
-        if self.mime_type.trim().is_empty()
-            || self.mime_type.len() > 255
-            || !self.mime_type.contains('/')
-            || self.mime_type.chars().any(char::is_control)
-        {
-            return Err(BackendError::Configuration(
-                "attachment MIME type is invalid".into(),
-            ));
-        }
-        if self.kind == AttachmentKind::Image && !self.mime_type.starts_with("image/") {
-            return Err(BackendError::Configuration(
-                "image attachment requires an image/* MIME type".into(),
-            ));
-        }
+        validate_attachment_mime(self.kind, &self.mime_type)?;
         let source_count = usize::from(self.path.is_some())
             + usize::from(self.url.is_some())
             + usize::from(self.file_id.is_some());
@@ -88,7 +151,9 @@ impl InputAttachment {
             ));
         }
         if let Some(path) = &self.path
-            && (path.trim().is_empty() || path.len() > 4096 || path.contains('\0'))
+            && (path.trim().is_empty()
+                || path.len() > MAX_ATTACHMENT_PATH_BYTES
+                || path.contains('\0'))
         {
             return Err(BackendError::Configuration(
                 "attachment path is invalid".into(),
@@ -96,7 +161,7 @@ impl InputAttachment {
         }
         if let Some(url) = &self.url
             && (self.kind != AttachmentKind::Image
-                || url.len() > 2048
+                || url.len() > MAX_ATTACHMENT_URL_BYTES
                 || !url.starts_with("https://")
                 || url.chars().any(char::is_whitespace))
         {
@@ -104,17 +169,121 @@ impl InputAttachment {
                 "remote attachments must be HTTPS image URLs".into(),
             ));
         }
-        if let Some(file_id) = &self.file_id
-            && (file_id.trim().is_empty()
-                || file_id.len() > 512
-                || file_id.chars().any(char::is_control))
-        {
-            return Err(BackendError::Configuration(
-                "provider file ID is invalid".into(),
-            ));
+        if let Some(file_id) = &self.file_id {
+            validate_provider_file_id(file_id)?;
         }
         Ok(())
     }
+}
+
+/// Ordered content submitted by a host for a prompt or a typed tool result.
+///
+/// This is the only public content shape.  A client never names an internal
+/// handle, an identity scope or a hash: the trusted entry binds those itself,
+/// which is what keeps a provider file ID from being re-scoped by its caller.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum InputContentPart {
+    Text {
+        text: String,
+    },
+    Image {
+        mime_type: String,
+        source: InputContentSource,
+    },
+    File {
+        mime_type: String,
+        source: InputContentSource,
+    },
+}
+
+/// Where the bytes of an ordered content part come from.  Exactly one source,
+/// by construction rather than by counting optional fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum InputContentSource {
+    Path { value: String },
+    Url { value: String },
+    FileId { value: String },
+}
+
+impl InputContentPart {
+    pub fn validate(&self) -> Result<(), BackendError> {
+        match self {
+            Self::Text { text } => {
+                if text.len() > crate::protocol::MAX_TEXT_BYTES {
+                    return Err(BackendError::Configuration(format!(
+                        "content text exceeds {} bytes",
+                        crate::protocol::MAX_TEXT_BYTES
+                    )));
+                }
+                Ok(())
+            }
+            Self::Image { mime_type, source } => {
+                validate_content_reference(AttachmentKind::Image, mime_type, source)
+            }
+            Self::File { mime_type, source } => {
+                validate_content_reference(AttachmentKind::File, mime_type, source)
+            }
+        }
+    }
+
+    /// The existing attachment form of this part.  Text is carried by the prompt
+    /// itself, so it has no attachment to map onto.
+    pub fn to_attachment(&self) -> Result<InputAttachment, BackendError> {
+        match self {
+            Self::Text { .. } => Err(BackendError::Configuration(
+                "text content has no attachment source".into(),
+            )),
+            Self::Image { mime_type, source } => {
+                source.to_attachment(AttachmentKind::Image, mime_type)
+            }
+            Self::File { mime_type, source } => {
+                source.to_attachment(AttachmentKind::File, mime_type)
+            }
+        }
+    }
+}
+
+impl InputContentSource {
+    fn to_attachment(
+        &self,
+        kind: AttachmentKind,
+        mime_type: &str,
+    ) -> Result<InputAttachment, BackendError> {
+        let mut attachment = InputAttachment {
+            kind,
+            mime_type: mime_type.to_owned(),
+            path: None,
+            url: None,
+            file_id: None,
+        };
+        match self {
+            Self::Path { value } => attachment.path = Some(value.clone()),
+            Self::Url { value } => attachment.url = Some(value.clone()),
+            Self::FileId { value } => attachment.file_id = Some(value.clone()),
+        }
+        Ok(attachment)
+    }
+}
+
+fn validate_content_reference(
+    kind: AttachmentKind,
+    mime_type: &str,
+    source: &InputContentSource,
+) -> Result<(), BackendError> {
+    // Unsupported media is refused first, so an audio or video file is never
+    // reported as a mere MIME mismatch and never reaches a provider as bytes.
+    if unsupported_media_type(mime_type) {
+        return Err(BackendError::Configuration(
+            "audio and video content are not supported".into(),
+        ));
+    }
+    source.to_attachment(kind, mime_type)?.validate()?;
+    if let InputContentSource::Path { value } = source {
+        validate_relative_attachment_path(value)?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -346,6 +515,25 @@ pub struct BackendRequestBinding {
     pub identity_scope: String,
 }
 
+/// Non-secret description of the connection a backend was built for.
+///
+/// A selection event has to describe what was selected without carrying a
+/// token or a credential, so this is the only form of "which account" that may
+/// reach the journal.  `credential_ref` is an identifier, never material.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectionSnapshot {
+    pub profile: String,
+    pub provider: String,
+    pub protocol: String,
+    pub auth_kind: String,
+    pub credential_ref: Option<String>,
+    pub identity_scope: String,
+    pub route_digest: String,
+    pub definition_version: u32,
+    pub config_revision: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestScope {
     pub owner_id: String,
@@ -476,6 +664,13 @@ impl BackendError {
         match self {
             Self::Configuration(_) => "backend_configuration",
             Self::Transport(_) => "backend_transport",
+            // Refine the statuses a host must act on differently.  A 401 is
+            // the credential being refused, a 403 is the account not being
+            // allowed to do this, and a 429 is a quota the operator can wait
+            // out; lumping them under one code hides which remedy applies.
+            Self::HttpStatus { status: 401, .. } => "auth_login_required",
+            Self::HttpStatus { status: 403, .. } => "provider_permission_denied",
+            Self::HttpStatus { status: 429, .. } => "provider_usage_limit",
             Self::HttpStatus { .. } => "backend_http_status",
             Self::CircuitOpen { .. } => "backend_circuit_open",
             Self::InvalidResponse(_) => "backend_invalid_response",
@@ -529,6 +724,18 @@ pub trait Backend: Send + Sync {
             model: completion.model.clone(),
         })?;
         Ok(completion)
+    }
+
+    /// The connection this backend serves, when it is bound to an explicit one.
+    ///
+    /// `None` means the backend is not connection bound (a legacy or test
+    /// backend), which is what a selection event records as "no explicit
+    /// connection" rather than inventing one.
+    fn connection_snapshot(
+        &self,
+        _model: Option<&str>,
+    ) -> Result<Option<ConnectionSnapshot>, BackendError> {
+        Ok(None)
     }
 
     fn request_binding(&self, model: Option<&str>) -> Result<BackendRequestBinding, BackendError> {
@@ -1466,6 +1673,42 @@ impl OpenAiCompatibleBackend {
 }
 
 impl Backend for OpenAiCompatibleBackend {
+    fn connection_snapshot(
+        &self,
+        model: Option<&str>,
+    ) -> Result<Option<ConnectionSnapshot>, BackendError> {
+        let Some(state) = &self.explicit else {
+            return Ok(None);
+        };
+        // The route digest and identity scope are per model, so a snapshot
+        // without a model describes the connection but not a route.
+        let model = model.unwrap_or(self.model.as_str());
+        let route = self.explicit_route(model)?;
+        let (auth_kind, credential_ref) = match &state.connection.auth {
+            AuthBinding::LegacyApiKey => ("legacy_api_key", None),
+            AuthBinding::StoredApiKey { credential_id } => ("api_key", Some(credential_id.clone())),
+            AuthBinding::CodexOAuth { credential_id } => ("oauth", Some(credential_id.clone())),
+            AuthBinding::Anonymous => ("anonymous", None),
+        };
+        Ok(Some(ConnectionSnapshot {
+            profile: state.connection.profile.clone(),
+            provider: state.connection.provider.clone(),
+            protocol: state.connection.protocol.as_str().to_owned(),
+            auth_kind: auth_kind.to_owned(),
+            credential_ref,
+            identity_scope: route
+                .as_ref()
+                .map(|route| route.identity_scope().to_owned())
+                .unwrap_or_default(),
+            route_digest: route
+                .as_ref()
+                .map(|route| route.route_digest().to_owned())
+                .unwrap_or_default(),
+            definition_version: route.as_ref().map_or(0, |route| route.definition_version()),
+            config_revision: state.connection.config_revision,
+        }))
+    }
+
     fn request_binding(&self, model: Option<&str>) -> Result<BackendRequestBinding, BackendError> {
         let model = model.unwrap_or(&self.model);
         if let Some(route) = self.explicit_route(model)? {

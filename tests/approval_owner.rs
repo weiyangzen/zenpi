@@ -488,4 +488,76 @@ fn auto_approval_executes_side_effects_without_pending_requests() {
         "approved"
     );
     assert_eq!(agent.phase(), zenpi::core::AgentPhase::Idle);
+    // A decision no host ever saw still has to be explainable afterwards.
+    let events = agent.session().events();
+    assert!(events.iter().any(|event| {
+        event.get("type").and_then(serde_json::Value::as_str) == Some("authorization_decided")
+            && event.get("tool").and_then(serde_json::Value::as_str) == Some("write_file")
+            && event.get("source").and_then(serde_json::Value::as_str) == Some("policy_never")
+            && event.get("decision").and_then(serde_json::Value::as_str) == Some("allow")
+    }));
+    // Nothing reached a host, so there is no host record to find either.
+    assert!(!events.iter().any(|event| {
+        matches!(
+            event.get("type").and_then(serde_json::Value::as_str),
+            Some("approval_resolved" | "approval_consumed")
+        )
+    }));
+}
+
+#[test]
+fn a_policy_denial_is_recorded_even_though_no_host_saw_it() {
+    let workspace = tempdir().unwrap();
+    let mut agent = configured_agent(workspace.path());
+    agent.set_approval_policy(ApprovalPolicy {
+        mode: ApprovalMode::Never,
+        per_tool: [("write_file".into(), ApprovalDecision::Deny)].into(),
+        ..ApprovalPolicy::default()
+    });
+    let coordinator = agent.approval_coordinator().unwrap();
+
+    agent.process(TurnInputRequest::new("write it")).unwrap();
+    assert!(coordinator.drain_pending().is_empty());
+    assert!(!workspace.path().join("note.txt").exists());
+    let events = agent.session().events();
+    assert!(events.iter().any(|event| {
+        event.get("type").and_then(serde_json::Value::as_str) == Some("authorization_decided")
+            && event.get("tool").and_then(serde_json::Value::as_str) == Some("write_file")
+            && event.get("source").and_then(serde_json::Value::as_str) == Some("per_tool_deny")
+            && event.get("decision").and_then(serde_json::Value::as_str) == Some("deny")
+    }));
+    // A denial hands out no permit, so it must not consume one.
+    assert!(!events.iter().any(|event| {
+        event.get("type").and_then(serde_json::Value::as_str) == Some("approval_consumed")
+    }));
+}
+
+#[test]
+fn yolo_records_the_choice_where_rebinding_reads_it() {
+    let workspace = tempdir().unwrap();
+    let mut state = TuiState::default();
+    let mut agent = configured_agent(workspace.path());
+    let project = state.active_project().to_owned();
+    dispatch_slash_command(
+        SlashCommand::Yolo { enabled: true },
+        &mut state,
+        Some(&mut agent),
+    );
+    // Editing the live policy is not enough: the next project switch rebinds
+    // this owner from the stored mode and would silently revert the choice.
+    assert_eq!(
+        state.project_metadata(&project).unwrap().approval_mode,
+        ApprovalMode::Never
+    );
+    assert!(state.auto_approve());
+    dispatch_slash_command(
+        SlashCommand::Yolo { enabled: false },
+        &mut state,
+        Some(&mut agent),
+    );
+    assert_eq!(
+        state.project_metadata(&project).unwrap().approval_mode,
+        ApprovalMode::ReadOnly
+    );
+    assert!(!state.auto_approve());
 }

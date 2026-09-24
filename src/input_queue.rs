@@ -710,6 +710,20 @@ impl InputPort {
             ..Default::default()
         })))
     }
+    /// Whether the host has submitted input that this owner has not taken yet.
+    ///
+    /// Connection selection uses this as a fence: a queued ticket means work is
+    /// already scheduled against the running connection, so changing accounts
+    /// would change the backend under input the host believes it admitted.
+    pub fn has_pending(&self) -> bool {
+        !self
+            .0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .pending
+            .is_empty()
+    }
+
     /// Observable preparation state for host progress; it grants no boundary.
     pub fn is_preparing(&self) -> bool {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).preparing

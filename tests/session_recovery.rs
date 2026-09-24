@@ -1543,3 +1543,319 @@ fn session_listing_rejects_a_symlinked_directory() {
     assert!(matches!(error, SessionError::Symlink(path) if path == alias));
     assert!(session_path.is_file());
 }
+
+/// Connection selection is atomic: the fences, the revision check and the
+/// history validation all run before anything is written, one durable event
+/// records the whole selection, and only then does the running backend change.
+/// A rejection leaves the backend, model and journal exactly as they were.
+mod connection_selection {
+    use super::*;
+    use serde_json::json;
+    use zenpi::{
+        backend::{Backend, OpenAiCompatibleBackend, OpenAiWireApi},
+        core::{Agent, ConnectionRejectCode, ConnectionSelection, ConnectionSelectionOutcome},
+    };
+
+    fn backend(model: &str, url: &str) -> OpenAiCompatibleBackend {
+        OpenAiCompatibleBackend::new_with_settings(
+            url,
+            None,
+            model,
+            OpenAiWireApi::Responses,
+            None,
+            None,
+        )
+        .unwrap()
+        // A registry is what makes the journal the authority for the selection;
+        // without one the backend's own model wins and the event is not read.
+        .with_model_registry(
+            "openai".into(),
+            zenpi::providers::registry::ModelRegistry::default(),
+        )
+        .unwrap()
+    }
+
+    fn agent(path: &std::path::Path, url: &str) -> Agent {
+        Agent::new(
+            SessionStore::open(path).unwrap(),
+            Box::new(backend("gpt-5.2", url)),
+        )
+    }
+
+    fn candidate(model: &str) -> Box<dyn Backend> {
+        Box::new(backend(model, "https://switch.invalid/v1"))
+    }
+
+    fn apply(agent: &mut Agent, model: &str) -> ConnectionSelectionOutcome {
+        let owner = agent.owner_label().to_owned();
+        agent
+            .select_connection(ConnectionSelection {
+                owner_id: owner,
+                profile: "next-profile".into(),
+                model: Some(model.into()),
+                expected_selection_revision: None,
+                backend: candidate(model),
+            })
+            .unwrap()
+    }
+
+    fn record_count(agent: &Agent) -> usize {
+        agent.session().records().len()
+    }
+
+    #[test]
+    fn a_successful_selection_is_durable_and_replays_after_a_reopen() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let mut agent = agent(&path, "https://first.invalid/v1");
+        assert_eq!(agent.selection_revision(), 0);
+        assert_eq!(agent.model(), Some("gpt-5.2"));
+
+        let before = record_count(&agent);
+        let outcome = apply(&mut agent, "gpt-4.1");
+        let ConnectionSelectionOutcome::Applied {
+            selection_revision,
+            snapshot,
+        } = outcome
+        else {
+            panic!("a valid selection must apply");
+        };
+        // Exactly one record, and it is the selection revision.
+        assert_eq!(record_count(&agent), before + 1);
+        assert!(selection_revision > 0);
+        assert_eq!(snapshot.selection_version, 1);
+        assert_eq!(snapshot.model.as_deref(), Some("gpt-4.1"));
+        assert_eq!(agent.model(), Some("gpt-4.1"));
+
+        // The event is what a reader recovers from: reopen the session and the
+        // selected model comes back without any in-memory state.
+        drop(agent);
+        let mut reopened = Agent::new(
+            SessionStore::open(&path).unwrap(),
+            Box::new(backend("gpt-5.2", "https://first.invalid/v1")),
+        );
+        assert_eq!(reopened.model(), Some("gpt-5.2"));
+        reopened.restore_model_selection().unwrap();
+        assert_eq!(reopened.model(), Some("gpt-4.1"));
+        assert_eq!(reopened.selection_revision(), selection_revision);
+    }
+
+    #[test]
+    fn a_selection_naming_another_owner_changes_nothing() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let mut agent = agent(&path, "https://first.invalid/v1");
+        let before = record_count(&agent);
+
+        let outcome = agent
+            .select_connection(ConnectionSelection {
+                owner_id: "arch".into(),
+                profile: "other".into(),
+                model: Some("gpt-4.1".into()),
+                expected_selection_revision: None,
+                backend: candidate("gpt-4.1"),
+            })
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            ConnectionSelectionOutcome::Rejected {
+                code: ConnectionRejectCode::OwnerMismatch,
+                ..
+            }
+        ));
+        assert_eq!(agent.model(), Some("gpt-5.2"));
+        assert_eq!(record_count(&agent), before);
+        assert_eq!(agent.selection_revision(), 0);
+    }
+
+    #[test]
+    fn a_stale_or_busy_owner_is_rejected_without_writing() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let mut agent = agent(&path, "https://first.invalid/v1");
+        apply(&mut agent, "gpt-4.1");
+        let revision = agent.selection_revision();
+        let records = record_count(&agent);
+
+        // Planned against a revision that has since moved.
+        let owner = agent.owner_label().to_owned();
+        let outcome = agent
+            .select_connection(ConnectionSelection {
+                owner_id: owner.clone(),
+                profile: "next-profile".into(),
+                model: Some("gpt-5.2".into()),
+                expected_selection_revision: Some(revision - 1),
+                backend: candidate("gpt-5.2"),
+            })
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            ConnectionSelectionOutcome::Rejected {
+                code: ConnectionRejectCode::ConnectionStale,
+                ..
+            }
+        ));
+        assert_eq!(agent.model(), Some("gpt-4.1"));
+        assert_eq!(record_count(&agent), records);
+        assert_eq!(agent.selection_revision(), revision);
+
+        // The same revision is accepted.
+        let outcome = agent
+            .select_connection(ConnectionSelection {
+                owner_id: owner.clone(),
+                profile: "next-profile".into(),
+                model: Some("gpt-5.2".into()),
+                expected_selection_revision: Some(revision),
+                backend: candidate("gpt-5.2"),
+            })
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            ConnectionSelectionOutcome::Applied { .. }
+        ));
+
+        // Staged attachments are work already addressed to the running
+        // connection, so they fence the switch even while the owner is idle.
+        agent
+            .stage_attachment(zenpi::backend::InputAttachment {
+                kind: zenpi::backend::AttachmentKind::Image,
+                mime_type: "image/png".into(),
+                path: None,
+                url: Some("https://example.test/image.png".into()),
+                file_id: None,
+            })
+            .unwrap();
+        let records = record_count(&agent);
+        let outcome = agent
+            .select_connection(ConnectionSelection {
+                owner_id: owner,
+                profile: "third".into(),
+                model: Some("gpt-4.1".into()),
+                expected_selection_revision: None,
+                backend: candidate("gpt-4.1"),
+            })
+            .unwrap();
+        assert!(
+            matches!(
+                outcome,
+                ConnectionSelectionOutcome::Rejected {
+                    code: ConnectionRejectCode::ConnectionBusy,
+                    ..
+                }
+            ),
+            "a staged attachment must fence the switch: {outcome:?}"
+        );
+        assert_eq!(agent.model(), Some("gpt-5.2"));
+        assert_eq!(record_count(&agent), records);
+    }
+
+    #[test]
+    fn a_candidate_that_cannot_serve_this_session_is_refused_before_the_journal() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let mut agent = agent(&path, "https://first.invalid/v1");
+        apply(&mut agent, "gpt-4.1");
+        let records = record_count(&agent);
+
+        // The candidate backend is well formed; the model the caller asked it
+        // to serve is not, so the selection is refused before the journal.
+        let owner = agent.owner_label().to_owned();
+        let revision = agent.selection_revision();
+        let outcome = agent
+            .select_connection(ConnectionSelection {
+                owner_id: owner,
+                profile: "next-profile".into(),
+                model: Some("not a model identity".into()),
+                expected_selection_revision: None,
+                backend: candidate("gpt-4.1"),
+            })
+            .unwrap();
+        assert!(
+            matches!(
+                outcome,
+                ConnectionSelectionOutcome::Rejected {
+                    code: ConnectionRejectCode::ConnectionInvalid,
+                    ..
+                }
+            ),
+            "{outcome:?}"
+        );
+        assert_eq!(agent.model(), Some("gpt-4.1"));
+        assert_eq!(record_count(&agent), records);
+        assert_eq!(agent.selection_revision(), revision);
+    }
+
+    #[test]
+    fn a_restore_that_names_a_different_profile_is_visible_not_silent() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let descriptor = Backend::model_descriptor(
+            &backend("gpt-5.2", "https://first.invalid/v1"),
+            Some("gpt-4.1"),
+        )
+        .unwrap()
+        .expect("the registry knows this model");
+        let mut store = SessionStore::open(&path).unwrap();
+        // A complete selection event, including the connection fields a newer
+        // writer records.
+        store
+            .append_event(json!({
+                "type": "model_selected",
+                "model": "gpt-4.1",
+                "descriptor": descriptor,
+                "digest": descriptor.digest(),
+                "selection_version": 1,
+                "profile": "another-profile",
+                "provider": "openai",
+                "protocol": "responses",
+                "auth_kind": "api_key",
+                "credential_ref": "cred_elsewhere",
+                "identity_scope": "scope-elsewhere",
+                "route_digest": "digest-elsewhere",
+                "definition_version": 1,
+                "config_revision": 1,
+            }))
+            .unwrap();
+        drop(store);
+
+        // The running backend is not connection bound, so it makes no claim of
+        // its own and the saved selection is adopted rather than refused.
+        let mut agent = Agent::new(
+            SessionStore::open(&path).unwrap(),
+            Box::new(backend("gpt-5.2", "https://first.invalid/v1")),
+        );
+        agent.restore_model_selection().unwrap();
+        assert_eq!(agent.model(), Some("gpt-4.1"));
+    }
+
+    #[test]
+    fn an_event_without_connection_fields_still_restores_its_model() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let descriptor = Backend::model_descriptor(
+            &backend("gpt-5.2", "https://first.invalid/v1"),
+            Some("gpt-4.1"),
+        )
+        .unwrap()
+        .expect("the registry knows this model");
+        let mut store = SessionStore::open(&path).unwrap();
+        // Exactly the shape an older writer produced: the model fields and no
+        // connection fields at all.  It must keep its old meaning.
+        store
+            .append_event(json!({
+                "type": "model_selected",
+                "model": "gpt-4.1",
+                "descriptor": descriptor,
+                "digest": descriptor.digest(),
+            }))
+            .unwrap();
+        drop(store);
+
+        let mut agent = Agent::new(
+            SessionStore::open(&path).unwrap(),
+            Box::new(backend("gpt-5.2", "https://first.invalid/v1")),
+        );
+        agent.restore_model_selection().unwrap();
+        assert_eq!(agent.model(), Some("gpt-4.1"));
+    }
+}

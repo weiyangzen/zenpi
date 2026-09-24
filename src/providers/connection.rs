@@ -12,7 +12,7 @@ use crate::backend::{BackendError, ProviderCapabilities};
 use super::registry::{FieldSource, ModelDescriptor, ModelRegistry, validate_identity};
 use super::{
     AuthHeaderPolicy, CUSTOM, Dialect, EndpointOperation, EndpointRule, OptionPolicy, Protocol,
-    ProviderDefinition, get_provider_definition,
+    ProviderDefinition, RouteRule, get_provider_definition,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +35,139 @@ pub(crate) struct ProviderConnection {
     pub header_policy: Option<AuthHeaderPolicy>,
     pub config_revision: u64,
     pub model_routes: Vec<ModelRoute>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ApiKeyDestination {
+    pub protocol: Protocol,
+    pub definition_version: u32,
+    /// The one destination this route authorizes, headers included.
+    pub grant: AllowedDestination,
+}
+
+/// Build a login grant from the same service policy used to prepare requests.
+/// Google grants cover only the final `models` subtree, since both the model
+/// and generation operation are selected later. Other grants bind one operation.
+pub(crate) fn api_key_destination(
+    provider: &str,
+    base_url: Option<&str>,
+    wire: Option<&str>,
+    auth_header: Option<&str>,
+) -> Result<ApiKeyDestination, BackendError> {
+    validate_identity(provider, "credential-scope")
+        .map_err(|_| invalid("invalid provider identity"))?;
+    let definition = get_provider_definition(provider).unwrap_or(&CUSTOM);
+    if definition.id == super::codex::definition().id {
+        return Err(invalid("Codex requires its OAuth binding"));
+    }
+    if definition.id == CUSTOM.id && (wire.is_none() || auth_header.is_none()) {
+        return Err(invalid(
+            "custom API key providers require explicit protocol and header policy",
+        ));
+    }
+    let protocol = match wire {
+        Some(wire) => Protocol::parse(wire)?,
+        None => match definition.routes {
+            [route] => route.protocol,
+            _ => return Err(invalid("provider requires an explicit protocol")),
+        },
+    };
+    let rule = service_route(definition, protocol)?;
+    let header_policy = api_key_header(
+        rule,
+        protocol,
+        auth_header.map(AuthHeaderPolicy::parse).transpose()?,
+    )?;
+    let mut url = final_url(rule.endpoint, base_url, "credential-scope", false)?;
+    if url.scheme() != "https" {
+        return Err(invalid("credential-bearing destinations require HTTPS"));
+    }
+    if matches!(
+        rule.endpoint,
+        EndpointRule::PrefixAndOperation {
+            operation: EndpointOperation::GoogleGenerateContent,
+            ..
+        }
+    ) {
+        url.path_segments_mut()
+            .map_err(|_| invalid("invalid hierarchical API prefix"))?
+            .pop();
+    }
+    let grant = AllowedDestination {
+        origin: url.origin().ascii_serialization(),
+        path_prefix: url.path().into(),
+        protocols: vec![protocol.as_str().into()],
+        headers: header_policy
+            .headers()
+            .iter()
+            .map(|s| (*s).into())
+            .collect(),
+    };
+    validate_grant(&grant)?;
+    Ok(ApiKeyDestination {
+        protocol,
+        definition_version: definition.definition_version,
+        grant,
+    })
+}
+
+/// Grants for a login that does not name a wire.
+///
+/// A provider with several routes cannot be reduced to one destination, and
+/// guessing one would hide the others.  The caller gets the whole set and shows
+/// it to the user, which is what a built-in multi-protocol provider needs at
+/// key-add time.  Naming a wire selects exactly that route.
+pub(crate) fn api_key_destinations(
+    provider: &str,
+    base_url: Option<&str>,
+    wire: Option<&str>,
+    auth_header: Option<&str>,
+) -> Result<Vec<ApiKeyDestination>, BackendError> {
+    if wire.is_some() {
+        return Ok(vec![api_key_destination(
+            provider,
+            base_url,
+            wire,
+            auth_header,
+        )?]);
+    }
+    validate_identity(provider, "credential-scope")
+        .map_err(|_| invalid("invalid provider identity"))?;
+    let definition = get_provider_definition(provider).unwrap_or(&CUSTOM);
+    if definition.id == CUSTOM.id {
+        // The custom definition's routes exist to be selected, not inferred.
+        return Err(invalid(
+            "custom API key providers require explicit protocol and header policy",
+        ));
+    }
+    // Each route keeps its own precise grant: a built-in provider's routes do
+    // not all live at one path (DeepSeek's Messages route is under
+    // `/anthropic/v1`), and collapsing them into one broader prefix would
+    // authorize more of the service than the caller asked for.
+    let destinations: Vec<ApiKeyDestination> = definition
+        .routes
+        .iter()
+        .map(|route| {
+            api_key_destination(provider, None, Some(route.protocol.as_str()), auth_header)
+        })
+        .collect::<Result<_, _>>()?;
+    // A built-in name identifies a service, so a base URL for one may only
+    // name that same service.  The routes themselves stay definition-fixed.
+    if let Some(base) = base_url {
+        let origin = parse_prefix(base)?.origin().ascii_serialization();
+        let expected = destinations
+            .first()
+            .ok_or_else(|| invalid("provider has no route to authorize"))?
+            .grant
+            .origin
+            .clone();
+        if origin != expected {
+            return Err(invalid(
+                "a builtin provider base URL must address that provider's own service",
+            ));
+        }
+    }
+    Ok(destinations)
 }
 
 /// Only this module can construct a route. Encoders may inspect, not replace,
@@ -213,16 +346,7 @@ pub(crate) fn resolve_model_route(
     {
         return Err(invalid("model/provider definition mismatch"));
     }
-    let mut rules = definition
-        .routes
-        .iter()
-        .filter(|rule| rule.protocol == connection.protocol);
-    let rule = rules
-        .next()
-        .ok_or_else(|| invalid("unsupported provider protocol"))?;
-    if rules.next().is_some() {
-        return Err(invalid("ambiguous provider protocol definition"));
-    }
+    let rule = service_route(definition, connection.protocol)?;
     let url = final_url(
         rule.endpoint,
         connection.base_url.as_deref(),
@@ -258,14 +382,7 @@ pub(crate) fn resolve_model_route(
             AuthHeaderPolicy::Codex
         }
         AuthBinding::StoredApiKey { .. } => {
-            if connection.protocol == Protocol::OpenAiCodexResponses {
-                return Err(invalid("Codex requires its OAuth binding"));
-            }
-            let selected = connection.header_policy.unwrap_or(rule.header_policy);
-            if !rule.allowed_headers.contains(&selected) {
-                return Err(invalid("header policy is not allowed by the service route"));
-            }
-            selected
+            api_key_header(rule, connection.protocol, connection.header_policy)?
         }
     };
     let identity_scope = if header == AuthHeaderPolicy::None {
@@ -365,6 +482,38 @@ pub(crate) fn resolve_model_route(
     })
 }
 
+fn service_route(
+    definition: &ProviderDefinition,
+    protocol: Protocol,
+) -> Result<&RouteRule, BackendError> {
+    let mut rules = definition
+        .routes
+        .iter()
+        .filter(|rule| rule.protocol == protocol);
+    let rule = rules
+        .next()
+        .ok_or_else(|| invalid("unsupported provider protocol"))?;
+    if rules.next().is_some() {
+        return Err(invalid("ambiguous provider protocol definition"));
+    }
+    Ok(rule)
+}
+
+fn api_key_header(
+    rule: &RouteRule,
+    protocol: Protocol,
+    configured: Option<AuthHeaderPolicy>,
+) -> Result<AuthHeaderPolicy, BackendError> {
+    if protocol == Protocol::OpenAiCodexResponses {
+        return Err(invalid("Codex requires its OAuth binding"));
+    }
+    let selected = configured.unwrap_or(rule.header_policy);
+    if !rule.allowed_headers.contains(&selected) {
+        return Err(invalid("header policy is not allowed by the service route"));
+    }
+    Ok(selected)
+}
+
 fn intersect(a: ProviderCapabilities, b: ProviderCapabilities) -> ProviderCapabilities {
     ProviderCapabilities {
         text: a.text && b.text,
@@ -421,14 +570,13 @@ fn validate_destination(
     {
         return Err(invalid("credential identity does not match the connection"));
     }
-    if let Some(account) = &identity.account_id {
-        if account.is_empty()
+    if let Some(account) = &identity.account_id
+        && (account.is_empty()
             || account.len() > 256
-            || account.chars().any(|c| c.is_control() || c.is_whitespace())
+            || account.chars().any(|c| c.is_control() || c.is_whitespace()))
         {
             return Err(invalid("invalid account identity"));
         }
-    }
     if matches!(auth, AuthBinding::CodexOAuth { .. }) && identity.account_id.is_none() {
         return Err(invalid("Codex requires an account identity"));
     }
@@ -569,13 +717,12 @@ fn final_url(
                     .or(default_prefix)
                     .ok_or_else(|| invalid("custom provider requires an explicit API prefix"))?,
             )?;
-            if let Some(canonical) = canonical_prefix {
-                if url != parse_prefix(canonical)? {
+            if let Some(canonical) = canonical_prefix
+                && url != parse_prefix(canonical)? {
                     return Err(invalid(
                         "noncanonical builtin API prefix; use an explicitly scoped custom provider",
                     ));
                 }
-            }
             let mut segments = url
                 .path_segments_mut()
                 .map_err(|_| invalid("invalid hierarchical API prefix"))?;
@@ -1397,5 +1544,183 @@ mod tests {
         let error = resolve(&c, None).unwrap_err().to_string();
         assert!(!error.contains("synthetic-secret"));
         assert!(!error.contains("user:"));
+    }
+
+    /// A grant minted at login and the route built for a request come from the
+    /// same service policy.  If they ever drift, a freshly added credential
+    /// would be unable to reach the endpoint it was created for.
+    #[test]
+    fn login_grants_admit_the_request_route_of_every_builtin_definition() {
+        let mut checked = 0;
+        for provider in ["openai", "deepseek", "anthropic", "google"] {
+            let definition = get_provider_definition(provider).unwrap();
+            for rule in definition.routes {
+                let wire = rule.protocol.as_str();
+                let destination = api_key_destination(provider, None, Some(wire), None).unwrap();
+                let mut connection = connection(provider, rule.protocol);
+                connection.header_policy = None;
+                let identity = AuthIdentitySnapshot {
+                    provider: provider.into(),
+                    credential_id: "cred_test".into(),
+                    account_id: Some("account_test".into()),
+                    identity_generation: "generation_1".into(),
+                    credential_revision: 1,
+                    allowed_destinations: vec![destination.grant.clone()],
+                };
+                let route = resolve_connection(
+                    &connection,
+                    "test-model",
+                    &ModelRegistry::default(),
+                    Some(&identity),
+                    true,
+                )
+                .unwrap_or_else(|error| {
+                    panic!("{provider}/{wire} login grant rejects its own route: {error}")
+                });
+                // The grant carries exactly the header the request will use.
+                assert_eq!(destination.grant.headers, route.header_policy().headers());
+                assert_eq!(
+                    destination.definition_version,
+                    definition.definition_version
+                );
+                checked += 1;
+            }
+            match definition.routes {
+                // A single-route provider must not require an explicit wire.
+                [only] => {
+                    let inferred = api_key_destination(provider, None, None, None).unwrap();
+                    assert_eq!(inferred.protocol, only.protocol);
+                    let explicit =
+                        api_key_destination(provider, None, Some(only.protocol.as_str()), None)
+                            .unwrap();
+                    assert_eq!(inferred.grant, explicit.grant);
+                }
+                // A provider with several routes cannot guess which one a key
+                // is for, so the caller has to name it.
+                routes => {
+                    assert!(routes.len() > 1);
+                    let error = api_key_destination(provider, None, None, None)
+                        .unwrap_err()
+                        .to_string();
+                    assert!(error.contains("explicit protocol"), "{provider}: {error}");
+                }
+            }
+        }
+        assert_eq!(checked, 7, "every built-in route must be covered");
+    }
+
+    /// Google selects the model and the generation operation after login, so
+    /// its grant stops at the `models` subtree rather than naming one model.
+    #[test]
+    fn google_grants_stop_at_the_models_subtree() {
+        let destination = api_key_destination("google", None, None, None).unwrap();
+        assert_eq!(
+            destination.grant.origin,
+            "https://generativelanguage.googleapis.com"
+        );
+        // Segment-boundary matching means the subtree covers every model and
+        // operation below it without naming one.
+        assert_eq!(destination.grant.path_prefix, "/v1beta/models");
+        assert_eq!(destination.grant.protocols, ["google_generative_ai"]);
+        assert_eq!(destination.grant.headers, ["x-goog-api-key"]);
+    }
+
+    #[test]
+    fn login_grants_refuse_codex_and_unscoped_custom_providers() {
+        let error = api_key_destination("openai-codex", None, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("OAuth binding"), "{error}");
+
+        let error = api_key_destination(
+            "custom",
+            Some("https://gateway.test/v1"),
+            Some("responses"),
+            None,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("explicit protocol and header policy"),
+            "{error}"
+        );
+
+        let error = api_key_destination(
+            "custom",
+            Some("https://gateway.test/v1"),
+            None,
+            Some("bearer"),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("explicit protocol and header policy"),
+            "{error}"
+        );
+
+        // A custom provider has several routes, so the protocol is required.
+        let error = api_key_destination("custom", Some("https://gateway.test/v1"), None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("explicit protocol and header policy"),
+            "{error}"
+        );
+
+        let error = api_key_destination("no such provider!", None, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("invalid provider identity"), "{error}");
+    }
+
+    #[test]
+    fn login_grants_require_https_and_a_route_allowed_header() {
+        let error = api_key_destination(
+            "custom",
+            Some("http://gateway.test/v1"),
+            Some("responses"),
+            Some("bearer"),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("require HTTPS"), "{error}");
+
+        // openai only allows the bearer header on its routes.
+        let error = api_key_destination("openai", None, Some("responses"), Some("x_api_key"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("not allowed by the service route"),
+            "{error}"
+        );
+
+        let error = api_key_destination("openai", None, Some("responses"), Some("google_api_key"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("not allowed by the service route"),
+            "{error}"
+        );
+
+        // An unknown header name is rejected before any route is consulted.
+        let error = api_key_destination("openai", None, Some("responses"), Some("authorization"))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("unsupported API key header policy"),
+            "{error}"
+        );
+
+        // A custom provider may pick any header its own route allows.
+        let destination = api_key_destination(
+            "custom",
+            Some("https://gateway.test/v1"),
+            Some("responses"),
+            Some("x_api_key"),
+        )
+        .unwrap();
+        assert_eq!(destination.grant.headers, ["x-api-key"]);
+        assert_eq!(destination.grant.origin, "https://gateway.test");
+        assert_eq!(destination.grant.path_prefix, "/v1/responses");
     }
 }

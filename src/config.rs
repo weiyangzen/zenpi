@@ -24,11 +24,16 @@ use thiserror::Error;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 
-use crate::auth::AuthBinding;
+use crate::auth::store::{
+    CredentialKind, CredentialState, CredentialStore, LockWait, Mutation, Replacement, STORE_KEY,
+};
+use crate::auth::{AllowedDestination, AuthBinding};
 use crate::layout::{
     LayoutError, LayoutModel, LayoutPreferences, MAX_LAYOUT_PREFERENCES_BYTES, TabId,
 };
-use crate::providers::connection::{ModelRoute, ProviderConnection, validate_model_routes};
+use crate::providers::connection::{
+    ModelRoute, ProviderConnection, api_key_destinations, validate_model_routes,
+};
 use crate::providers::{AuthHeaderPolicy, EndpointRule, Protocol, get_provider_definition};
 use crate::security::{SecretHandle, SecretRevocation};
 use crate::view_model::ZoneModels;
@@ -1453,12 +1458,17 @@ pub fn import_codex_profile(profile: &str) -> Result<ConfigSummary, ConfigError>
     );
     config.default_profile = Some(profile.to_owned());
     config.validate()?;
-    let mut auth = load_auth(&paths)?;
-    if let Some(key) = import.api_key {
-        auth.set_profile_api_key(profile, key)?;
-    }
+    // The credential file is updated under its own lock rather than by
+    // rewriting a snapshot loaded before the TOML write above.
+    let imported_key = import.api_key;
     let config_changed = save_config(&paths, &config)?;
-    let auth_changed = save_auth(&paths, &auth)?;
+    let auth_changed = update_auth_legacy(&paths, |auth| match imported_key {
+        Some(key) => {
+            auth.set_profile_api_key(profile, key)?;
+            Ok(true)
+        }
+        None => Ok(false),
+    })?;
     let mut summary = doctor_for_profile(&paths, Some(profile))?;
     summary.operation = "import-codex".into();
     summary.changed = Some(config_changed || auth_changed);
@@ -1518,16 +1528,18 @@ fn pair_from_codex_with_root(
         config.supports_websockets = import.config.supports_websockets;
     }
     config.validate()?;
-    let mut auth = load_auth(paths)?;
-    let key_imported = if let Some(key) = import.api_key {
-        let changed = auth.openai_api_key() != Some(key.as_str());
-        auth.set_openai_api_key(key)?;
-        changed
-    } else {
-        false
-    };
+    let imported_key = import.api_key;
     let config_changed = write_config_if_changed(paths, &config)?;
-    let auth_changed = write_auth_if_changed(paths, &auth)?;
+    let mut key_imported = false;
+    let auth_changed = update_auth_legacy(paths, |auth| match imported_key {
+        Some(key) => {
+            // Report a real value change, not merely a requested import.
+            key_imported = auth.openai_api_key() != Some(key.as_str());
+            auth.set_openai_api_key(key)?;
+            Ok(key_imported)
+        }
+        None => Ok(false),
+    })?;
     let backend = config.backend.clone().unwrap_or_else(|| "openai".into());
     Ok(PairReport {
         changed: config_changed || auth_changed,
@@ -1613,15 +1625,316 @@ pub fn use_profile(paths: &ConfigPaths, profile: &str) -> Result<bool, ConfigErr
 /// Remove only credentials owned by zenpi. Codex config/auth files are never
 /// opened for writing by this path.
 pub fn revoke(paths: &ConfigPaths, profile: Option<&str>) -> Result<bool, ConfigError> {
-    let mut auth = load_auth(paths)?;
-    let changed = match profile {
-        Some(profile) => auth.remove_profile_api_key(profile)?,
-        None => auth.remove_openai_api_key(),
-    };
-    if changed {
-        save_auth(paths, &auth)?;
+    update_auth_legacy(paths, |auth| match profile {
+        Some(profile) => auth.remove_profile_api_key(profile),
+        None => Ok(auth.remove_openai_api_key()),
+    })
+}
+
+/// The stored credential a profile names, if it names one.  Read-only.
+///
+/// A legacy profile keeps its key in the auth file rather than referencing a
+/// stored credential, and is reported as `None` so callers take the legacy path
+/// instead of pretending there is a credential to revoke.
+pub fn profile_credential(
+    paths: &ConfigPaths,
+    profile: &str,
+) -> Result<Option<String>, ConfigError> {
+    validate_profile_name(profile)?;
+    Ok(load_config(paths)?
+        .profiles
+        .get(profile)
+        .and_then(|entry| entry.auth_ref.clone()))
+}
+
+/// Receipt for revoking a stored credential.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CredentialRevocation {
+    pub credential_id: String,
+    /// Every profile that names this credential — the whole scope `--yes`
+    /// confirms.  Revoking is not the same as unbinding one profile.
+    pub profiles: Vec<String>,
+    pub local_revoked: bool,
+    /// zenpi has no server-side revocation, so this is always false.  It is
+    /// reported explicitly rather than left to be inferred from silence.
+    pub remote_revoked: bool,
+}
+
+/// Revoke the whole credential a profile names.
+///
+/// Revocation keeps a tombstone, so a later login cannot silently revive this
+/// identity, and it clears the secrets rather than leaving them readable.
+pub fn revoke_credential(
+    paths: &ConfigPaths,
+    profile: &str,
+) -> Result<CredentialRevocation, ConfigError> {
+    let credential_id = profile_credential(paths, profile)?.ok_or_else(|| {
+        ConfigError::Invalid(format!(
+            "profile `{profile}` is not bound to a stored credential"
+        ))
+    })?;
+    let config = load_config(paths)?;
+    let profiles: Vec<String> = config
+        .profiles
+        .iter()
+        .filter(|(_, entry)| entry.auth_ref.as_deref() == Some(credential_id.as_str()))
+        .map(|(name, _)| name.clone())
+        .collect();
+    let store = credential_store(paths, true)?;
+    let revision = store
+        .list_status()?
+        .into_iter()
+        .find(|status| status.credential_id == credential_id)
+        .map(|status| status.revision)
+        .ok_or_else(|| {
+            ConfigError::Invalid(format!("credential `{credential_id}` is not stored"))
+        })?;
+    store.modify(
+        &credential_id,
+        Some(revision),
+        Mutation::Revoke,
+        &LockWait::default(),
+    )?;
+    Ok(CredentialRevocation {
+        credential_id,
+        profiles,
+        local_revoked: true,
+        remote_revoked: false,
+    })
+}
+
+/// One stored credential and the profiles that refer to it.  Never a secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AuthListEntry {
+    pub credential_id: String,
+    pub provider: String,
+    pub kind: &'static str,
+    pub state: &'static str,
+    pub revision: u64,
+    pub expires_at_ms: Option<u64>,
+    pub profiles: Vec<String>,
+}
+
+/// Project the credential a profile names onto the state a reader is shown.
+///
+/// Local only: it reads a non-secret snapshot and never refreshes, probes, or
+/// repairs anything.  A profile that names a credential the store does not have
+/// is `unconfigured` rather than an error, because that is exactly the state a
+/// half-finished setup is in.
+fn credential_binding_state(
+    paths: &ConfigPaths,
+    credential_id: &str,
+) -> Result<String, ConfigError> {
+    let store = credential_store(paths, false)?;
+    Ok(store
+        .list_status()?
+        .into_iter()
+        .find(|status| status.credential_id == credential_id)
+        .map_or_else(
+            || "unconfigured".to_owned(),
+            |status| credential_state_label(status.state, status.expires_at_ms).to_owned(),
+        ))
+}
+
+/// Project a stored credential onto the states a user is shown.  This is a
+/// clock-only projection of a non-secret snapshot; it never refreshes, probes,
+/// or repairs anything.
+pub(crate) fn credential_state_label(
+    state: CredentialState,
+    expires_at_ms: Option<u64>,
+) -> &'static str {
+    match state {
+        CredentialState::Active => match expires_at_ms {
+            Some(expiry) if u128::from(expiry) <= now_ms() => "expired",
+            _ => "ready",
+        },
+        CredentialState::RefreshInFlight => "refreshing",
+        CredentialState::RefreshUncertain => "uncertain",
+        CredentialState::LoginRequired => "login_required",
+        CredentialState::Revoked => "revoked",
     }
-    Ok(changed)
+}
+
+/// Read-only credential listing.  Local only: no refresh, no probe, no command.
+pub fn auth_list(paths: &ConfigPaths) -> Result<Vec<AuthListEntry>, ConfigError> {
+    let store = credential_store(paths, false)?;
+    let statuses = store.list_status()?;
+    let config = load_config(paths)?;
+    Ok(statuses
+        .into_iter()
+        .map(|status| AuthListEntry {
+            profiles: config
+                .profiles
+                .iter()
+                .filter(|(_, profile)| profile.auth_ref.as_deref() == Some(&status.credential_id))
+                .map(|(name, _)| name.clone())
+                .collect(),
+            credential_id: status.credential_id,
+            provider: status.provider,
+            kind: match status.kind {
+                CredentialKind::ApiKey => "api_key",
+                CredentialKind::Oauth => "oauth",
+            },
+            state: credential_state_label(status.state, status.expires_at_ms),
+            revision: status.revision,
+            expires_at_ms: status.expires_at_ms,
+        })
+        .collect())
+}
+
+/// Outcome of adding a credential.  The credential and the profile that names
+/// it live in different files, so a partial success is reported as one rather
+/// than hidden behind a single success flag.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AuthAddReport {
+    pub credential_id: String,
+    pub alias: String,
+    pub provider: String,
+    pub kind: &'static str,
+    /// The non-secret destinations the credential is authorized for.
+    pub destinations: Vec<AllowedDestination>,
+    pub credential_committed: bool,
+    pub profile_bound: bool,
+    /// Set when the credential committed but its profile did not: the account
+    /// exists and can be rebound by ID, so this is not an authentication
+    /// failure.
+    pub binding_error: Option<String>,
+}
+
+/// The profile a newly added API key is bound to.  Grouped so the call sites
+/// name what each optional value is for instead of trailing positional `None`s.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ApiKeyProfile<'a> {
+    pub alias: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub wire: Option<&'a str>,
+    pub auth_header: Option<&'a str>,
+}
+
+/// Add a provider API key.
+///
+/// The key is passed in already read from standard input; this function never
+/// takes it from an argument list, never logs it, and never returns it.  The
+/// credential is committed before the profile that names it, because the two
+/// live in different files.
+pub fn add_auth_apikey(
+    paths: &ConfigPaths,
+    base_url: &str,
+    provider: &str,
+    key: String,
+    profile: ApiKeyProfile<'_>,
+) -> Result<AuthAddReport, ConfigError> {
+    let ApiKeyProfile {
+        alias,
+        model,
+        wire,
+        auth_header,
+    } = profile;
+    validate_api_key(&key)?;
+    let destinations = api_key_destinations(provider, Some(base_url), wire, auth_header)
+        .map_err(config_backend_error)?;
+    let Some(first) = destinations.first() else {
+        return Err(ConfigError::Invalid(
+            "provider has no route to authorize".into(),
+        ));
+    };
+    // Without an explicit wire the profile names the provider's first route;
+    // the credential is authorized for all of them, so switching later is a
+    // profile edit, not a new login.
+    let profile_wire = wire
+        .map(str::to_owned)
+        .or_else(|| (destinations.len() > 1).then(|| first.protocol.as_str().to_owned()));
+    let alias = alias.unwrap_or(provider).to_owned();
+    let credential_id = CredentialStore::new_credential_id()?;
+    let pending = crate::auth::api_key_credential(
+        provider,
+        first.definition_version,
+        key,
+        destinations
+            .iter()
+            .map(|destination| destination.grant.clone())
+            .collect(),
+    );
+    let store = credential_store(paths, true)?;
+    store.modify(
+        &credential_id,
+        None,
+        Mutation::Replace(Replacement::Login(pending)),
+        &LockWait::default(),
+    )?;
+    let binding = bind_credential_profile(
+        paths,
+        &alias,
+        provider,
+        model,
+        // A built-in provider's endpoints come from its definition; every
+        // other provider — including an unknown one, which routes as custom —
+        // needs its URL recorded in the profile.
+        if is_builtin_provider(provider) {
+            None
+        } else {
+            Some(base_url)
+        },
+        "api_key",
+        &credential_id,
+        profile_wire.as_deref(),
+        auth_header,
+    );
+    Ok(AuthAddReport {
+        credential_id,
+        alias,
+        provider: provider.to_owned(),
+        kind: "api_key",
+        destinations: destinations
+            .into_iter()
+            .map(|destination| destination.grant)
+            .collect(),
+        credential_committed: true,
+        profile_bound: binding.is_ok(),
+        binding_error: binding.err().map(|error| error.to_string()),
+    })
+}
+
+/// Bind `alias` to a stored credential.
+///
+/// An alias that already names a different credential is never overwritten:
+/// replacing it is an explicit `pair revoke` plus re-add, not a side effect of
+/// adding a second credential.
+#[allow(clippy::too_many_arguments)]
+pub fn bind_credential_profile(
+    paths: &ConfigPaths,
+    alias: &str,
+    provider: &str,
+    model: Option<&str>,
+    base_url: Option<&str>,
+    auth_method: &str,
+    credential_id: &str,
+    wire_api: Option<&str>,
+    auth_header: Option<&str>,
+) -> Result<bool, ConfigError> {
+    validate_profile_name(alias)?;
+    let mut config = load_config(paths)?;
+    if let Some(existing) = config.profiles.get(alias)
+        && let Some(bound) = existing.auth_ref.as_deref()
+        && bound != credential_id
+    {
+        return Err(ConfigError::Invalid(format!(
+            "profile `{alias}` already names credential `{bound}`; revoke it before rebinding"
+        )));
+    }
+    let profile = ProviderProfile {
+        provider: Some(provider.into()),
+        model: model.map(str::to_owned),
+        base_url: base_url.map(str::to_owned),
+        wire_api: wire_api.map(str::to_owned),
+        auth_method: Some(auth_method.into()),
+        auth_ref: Some(credential_id.into()),
+        auth_header: auth_header.map(str::to_owned),
+        ..ProviderProfile::default()
+    };
+    profile.validate()?;
+    config.profiles.insert(alias.to_owned(), profile);
+    save_config(paths, &config)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1710,14 +2023,27 @@ pub struct ConfigStatus {
 }
 
 impl ConfigStatus {
-    /// Whether this configuration has the minimum fields needed to start the
-    /// selected provider. This is deliberately local-only: it does not claim
-    /// that the endpoint is reachable or that the credential has quota.
+    /// Whether this configuration has the minimum needed to start the selected
+    /// provider. This is deliberately local-only: it does not claim that the
+    /// endpoint is reachable or that the credential has quota.
+    ///
+    /// An explicit credential binding is ready only when the stored credential
+    /// is, so a profile whose fields are complete but whose account is missing,
+    /// expired, or revoked never reports ready.
     pub fn is_ready(&self) -> bool {
-        !explicit_auth(self.auth_method.as_deref())
-            && (!self.requires_openai_auth || self.api_key_present)
-            && self.base_url.is_some()
-            && self.model.is_some()
+        self.is_authenticated() && self.base_url.is_some() && self.model.is_some()
+    }
+
+    /// The authentication check on its own, so the per-check report and the
+    /// overall readiness cannot disagree about why a configuration is not
+    /// ready.  A legacy or anonymous setup is judged by its own fields; an
+    /// explicit binding is judged by the stored credential.
+    pub fn is_authenticated(&self) -> bool {
+        match self.auth_method.as_deref() {
+            None | Some("legacy_api_key") => !self.requires_openai_auth || self.api_key_present,
+            Some("none") => true,
+            Some(_) => self.auth_binding_state.as_deref() == Some("ready"),
+        }
     }
 }
 
@@ -1852,11 +2178,7 @@ pub fn doctor_value(profile: Option<&str>) -> Result<Value, ConfigError> {
     let ready = status.is_ready();
     let mut checks = BTreeMap::new();
     checks.insert("config_file".to_owned(), status.config_exists);
-    checks.insert(
-        "auth".to_owned(),
-        !explicit_auth(status.auth_method.as_deref())
-            && (!status.requires_openai_auth || status.api_key_present),
-    );
+    checks.insert("auth".to_owned(), status.is_authenticated());
     checks.insert("endpoint".to_owned(), status.base_url.is_some());
     checks.insert("model".to_owned(), status.model.is_some());
     Ok(serde_json::json!({
@@ -1953,14 +2275,16 @@ pub fn status_for_profile(
         )?
     };
     let (wire_api, base_url) = diagnostic_route(&resolved)?;
-    let auth_binding_state = explicit_auth(resolved.auth_method.as_deref()).then(|| {
-        if resolved.auth_method.as_deref() == Some("none") {
-            "anonymous_pending_route"
-        } else {
-            "unresolved"
-        }
-        .to_owned()
-    });
+    let auth_binding_state = match resolved.auth_method.as_deref() {
+        None | Some("legacy_api_key") => None,
+        Some("none") => Some("anonymous_pending_route".to_owned()),
+        // The state comes from the stored credential, never from the presence
+        // of the config fields that name it.
+        Some(_) => Some(match resolved.auth_ref.as_deref() {
+            Some(id) => credential_binding_state(paths, id)?,
+            None => "unresolved".to_owned(),
+        }),
+    };
     Ok(ConfigStatus {
         profile: resolved.profile,
         config_exists,
@@ -2180,15 +2504,105 @@ pub fn save_config(paths: &ConfigPaths, config: &ConfigFile) -> Result<bool, Con
     atomic_write_if_changed(&paths.config, text.as_bytes())
 }
 
+/// Whether the provider comes from a built-in definition.  An unknown provider
+/// name is not a built-in: it routes as an explicitly configured custom service
+/// and must therefore carry its own endpoints and protocol.
+fn is_builtin_provider(provider: &str) -> bool {
+    get_provider_definition(provider).is_some()
+}
+
+/// Credential store over this configuration's auth file.
+///
+/// `create` makes the owner-only root directory when it is missing; read-only
+/// commands pass `false` so `auth list` and `doctor` never create state.  The
+/// store walks every component with `O_NOFOLLOW`, so an ancestor that is a link
+/// (macOS `/var` and `/tmp`) has to be resolved first — a missing root is left
+/// as an absolute path, which the store reports as an empty document.
+pub(crate) fn credential_store(
+    paths: &ConfigPaths,
+    create: bool,
+) -> Result<CredentialStore, ConfigError> {
+    if create {
+        paths.ensure_root()?;
+    }
+    Ok(CredentialStore::new(resolve_existing_prefix(&paths.auth)?)?)
+}
+
+/// Resolve the deepest existing ancestor of `path` and re-append the rest.
+///
+/// The store walks every component with `O_NOFOLLOW`, so a symlinked ancestor
+/// (macOS `/var` and `/tmp`) has to be resolved before it opens the path.  The
+/// path itself may not exist yet — a read of a missing store is an empty store,
+/// not an error — so only the part that exists can be canonicalized.
+fn resolve_existing_prefix(path: &Path) -> Result<PathBuf, ConfigError> {
+    let absolute = std::path::absolute(path)?;
+    let mut missing = Vec::new();
+    let mut current = absolute.as_path();
+    loop {
+        if let Ok(resolved) = current.canonicalize() {
+            let mut out = resolved;
+            for part in missing.iter().rev() {
+                out.push(part);
+            }
+            return Ok(out);
+        }
+        match (current.parent(), current.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name.to_os_string());
+                current = parent;
+            }
+            // Nothing on this path exists; the store reports it as empty.
+            _ => return Ok(absolute),
+        }
+    }
+}
+
+/// Mutate the legacy root of `auth.json` through the credential store's stable
+/// lock.  Reading and writing under that lock is what keeps a legacy write from
+/// reverting a credential that another process committed in the meantime, and
+/// it is why the `zenpi_auth_v1` namespace is always taken from the live
+/// document instead of a caller's snapshot.
+///
+/// The closure reports whether it changed the document.  Returning `false`, or
+/// failing, leaves the stored bytes untouched.
+fn update_auth_legacy(
+    paths: &ConfigPaths,
+    update: impl FnOnce(&mut AuthFile) -> Result<bool, ConfigError>,
+) -> Result<bool, ConfigError> {
+    let store = credential_store(paths, true)?;
+    let (outcome, _) = store.update_legacy(&LockWait::default(), |legacy| {
+        let before = legacy.clone();
+        let mut auth = AuthFile(before.clone().into_iter().collect());
+        let outcome = update(&mut auth);
+        // Only a reported change may replace the live roots; a rejected or
+        // no-op mutation must not rewrite the file at all.
+        *legacy = if outcome.as_ref().is_ok_and(|changed| *changed) {
+            auth.0.into_iter().collect()
+        } else {
+            before
+        };
+        Ok(outcome)
+    })?;
+    outcome
+}
+
+/// Whole-file legacy write.  The reserved namespace is stripped from the
+/// caller's snapshot: the store owns that key and re-reads its live value.
 pub fn save_auth(paths: &ConfigPaths, auth: &AuthFile) -> Result<bool, ConfigError> {
     if let Some(key) = auth.openai_api_key()
         && (key.trim().is_empty() || key.chars().any(char::is_control))
     {
         return Err(ConfigError::Invalid("OPENAI_API_KEY is invalid".into()));
     }
-    paths.ensure_root()?;
-    let text = serde_json::to_string_pretty(auth)? + "\n";
-    atomic_write_if_changed(&paths.auth, text.as_bytes())
+    let mut roots = auth.clone();
+    roots.0.remove(STORE_KEY);
+    update_auth_legacy(paths, |legacy| {
+        if *legacy == roots {
+            return Ok(false);
+        }
+        *legacy = roots;
+        Ok(true)
+    })
 }
 
 fn write_config_if_changed(paths: &ConfigPaths, config: &ConfigFile) -> Result<bool, ConfigError> {
@@ -2196,17 +2610,6 @@ fn write_config_if_changed(paths: &ConfigPaths, config: &ConfigFile) -> Result<b
     paths.ensure_root()?;
     let text = toml::to_string_pretty(config)?;
     atomic_write_if_changed(&paths.config, text.as_bytes())
-}
-
-fn write_auth_if_changed(paths: &ConfigPaths, auth: &AuthFile) -> Result<bool, ConfigError> {
-    if let Some(key) = auth.openai_api_key()
-        && (key.trim().is_empty() || key.chars().any(char::is_control))
-    {
-        return Err(ConfigError::Invalid("OPENAI_API_KEY is invalid".into()));
-    }
-    paths.ensure_root()?;
-    let text = serde_json::to_string_pretty(auth)? + "\n";
-    atomic_write_if_changed(&paths.auth, text.as_bytes())
 }
 
 #[derive(Debug, Error)]
@@ -2231,6 +2634,8 @@ pub enum ConfigError {
     Json(#[from] serde_json::Error),
     #[error("layout preferences: {0}")]
     Layout(#[from] LayoutError),
+    #[error("credential store: {0}")]
+    Credential(#[from] crate::auth::store::StoreError),
 }
 
 fn choose<'a>(
@@ -2629,5 +3034,251 @@ mod environment_snapshot_tests {
             original.get(std::ffi::OsStr::new("VISUAL")).unwrap(),
             &OsString::from_vec(vec![0xff])
         );
+    }
+}
+
+/// The legacy writers share one stable lock with the credential store.  These
+/// tests pin the two properties that lock exists for: a legacy write never
+/// carries a stale namespace over a newer credential, and it never drops a
+/// credential it did not own.
+#[cfg(all(test, unix))]
+mod legacy_lock_tests {
+    use super::*;
+    use crate::auth::AllowedDestination;
+    use crate::auth::store::{CredentialKind, LockWait, Mutation, PendingCredential, Replacement};
+    use std::os::unix::fs::PermissionsExt;
+
+    fn fixture() -> (tempfile::TempDir, ConfigPaths) {
+        let directory = tempfile::tempdir().unwrap();
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let paths = ConfigPaths::for_home(directory.path());
+        paths.ensure_root().unwrap();
+        (directory, paths)
+    }
+
+    fn store_for(paths: &ConfigPaths) -> CredentialStore {
+        credential_store(paths, true).unwrap()
+    }
+
+    fn pending(refresh_token: &str) -> PendingCredential {
+        PendingCredential {
+            kind: CredentialKind::Oauth,
+            provider: "synthetic-provider".into(),
+            definition_version: 1,
+            issuer: "https://issuer.example.test".into(),
+            client_id: "synthetic-client".into(),
+            account_id: Some("synthetic-account".into()),
+            user_id: Some("synthetic-user".into()),
+            allowed_destinations: vec![AllowedDestination {
+                origin: "https://issuer.example.test".into(),
+                path_prefix: "/v1".into(),
+                protocols: vec!["responses".into()],
+                headers: vec!["authorization".into()],
+            }],
+            api_key: None,
+            access_token: Some("synthetic-access-token".into()),
+            refresh_token: Some(refresh_token.into()),
+            expires_at_ms: Some(1),
+        }
+    }
+
+    /// The stored document as written.  Reading the file directly keeps the
+    /// assertions about on-disk state independent of the store's private API.
+    fn document(paths: &ConfigPaths) -> Value {
+        match fs::read(&paths.auth) {
+            Ok(bytes) => serde_json::from_slice(&bytes).unwrap(),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Value::Null,
+            Err(error) => panic!("unreadable auth file: {error}"),
+        }
+    }
+
+    fn namespace_revision(paths: &ConfigPaths) -> u64 {
+        document(paths)[STORE_KEY]["revision"].as_u64().unwrap()
+    }
+
+    fn credential(paths: &ConfigPaths) -> Value {
+        document(paths)[STORE_KEY]["accounts"]["credential"].clone()
+    }
+
+    fn stored_refresh_token(paths: &ConfigPaths) -> String {
+        credential(paths)["refresh_token"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    /// Log in the way the CLI does: commit against the revision that is
+    /// actually on disk, so a second login replaces the first.
+    fn relogin(paths: &ConfigPaths, refresh_token: &str, expires_at_ms: Option<u64>) {
+        let expected = credential(paths)["revision"].as_u64();
+        let mut pending = pending(refresh_token);
+        pending.expires_at_ms = expires_at_ms;
+        store_for(paths)
+            .modify(
+                "credential",
+                expected,
+                Mutation::Replace(Replacement::Login(pending)),
+                &LockWait::default(),
+            )
+            .unwrap();
+    }
+
+    fn login(paths: &ConfigPaths, refresh_token: &str) {
+        relogin(paths, refresh_token, Some(1));
+    }
+
+    #[test]
+    fn legacy_write_preserves_a_credential_committed_after_its_snapshot() {
+        let (_directory, paths) = fixture();
+        login(&paths, "synthetic-first-refresh-token");
+
+        // What a command that reads credentials before mutating legacy roots
+        // would hold: a snapshot that still carries the namespace.
+        let snapshot = load_auth(&paths).unwrap();
+        assert!(
+            snapshot.0.contains_key(STORE_KEY),
+            "the snapshot must really carry the namespace for this test to mean anything"
+        );
+
+        // Another process logs in while that command is running.
+        login(&paths, "synthetic-second-refresh-token");
+        let committed = credential(&paths);
+
+        save_auth(&paths, &snapshot).unwrap();
+
+        assert_eq!(
+            stored_refresh_token(&paths),
+            "synthetic-second-refresh-token",
+            "a legacy write must not revert a newer credential"
+        );
+        assert_eq!(
+            credential(&paths),
+            committed,
+            "the namespace must survive a legacy write untouched"
+        );
+    }
+
+    #[test]
+    fn revoke_and_import_reach_the_same_locked_document() {
+        let (_directory, paths) = fixture();
+        login(&paths, "synthetic-refresh-token");
+        let before = credential(&paths);
+        let revision = namespace_revision(&paths);
+
+        let mut auth = load_auth(&paths).unwrap();
+        auth.set_openai_api_key("synthetic-legacy-key").unwrap();
+        assert!(save_auth(&paths, &auth).unwrap());
+
+        assert_eq!(document(&paths)["OPENAI_API_KEY"], "synthetic-legacy-key");
+        assert_eq!(credential(&paths), before);
+        // The write went through the store, so the file revision advanced even
+        // though only legacy roots changed.
+        assert_eq!(namespace_revision(&paths), revision + 1);
+
+        assert!(revoke(&paths, None).unwrap());
+        assert!(document(&paths).get("OPENAI_API_KEY").is_none());
+        assert_eq!(namespace_revision(&paths), revision + 2);
+
+        // Both directions of the command-facing read survive legacy traffic.
+        let store = store_for(&paths);
+        let stored = store.list_status().unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].credential_id, "credential");
+        assert!(store.identity("credential").unwrap().credential_revision > 0);
+    }
+
+    #[test]
+    fn no_op_legacy_writes_leave_the_file_untouched() {
+        let (_directory, paths) = fixture();
+        login(&paths, "synthetic-refresh-token");
+        let before = fs::read(&paths.auth).unwrap();
+
+        assert!(!save_auth(&paths, &load_auth(&paths).unwrap()).unwrap());
+        assert!(!revoke(&paths, None).unwrap());
+        assert!(!revoke(&paths, Some("codex")).unwrap());
+        assert_eq!(fs::read(&paths.auth).unwrap(), before);
+
+        // A profile entry that owns no key is still not a change: the mutation
+        // reports nothing removed, so the document is left alone.
+        let mut auth = load_auth(&paths).unwrap();
+        auth.0
+            .insert("profiles".into(), serde_json::json!({"codex": {}}));
+        assert!(save_auth(&paths, &auth).unwrap());
+        let with_empty_profile = fs::read(&paths.auth).unwrap();
+        assert!(!revoke(&paths, Some("codex")).unwrap());
+        assert_eq!(fs::read(&paths.auth).unwrap(), with_empty_profile);
+
+        assert_eq!(stored_refresh_token(&paths), "synthetic-refresh-token");
+    }
+
+    #[test]
+    fn status_projects_the_stored_credential_not_the_config_fields() {
+        let (_directory, paths) = fixture();
+        login(&paths, "synthetic-refresh-token");
+        let mut config = load_config(&paths).unwrap();
+        config.profiles.insert(
+            "bound".into(),
+            ProviderProfile {
+                provider: Some("openai-codex".into()),
+                model: Some("gpt-test".into()),
+                auth_method: Some("oauth".into()),
+                auth_ref: Some("credential".into()),
+                ..ProviderProfile::default()
+            },
+        );
+        save_config(&paths, &config).unwrap();
+
+        // The stored credential here expired in 1970, so the projection reports
+        // the clock rather than the presence of the fields.
+        let status = status_for_profile(&paths, Some("bound")).unwrap();
+        assert_eq!(status.auth_binding_state.as_deref(), Some("expired"));
+        assert!(!status.is_ready());
+
+        let future = u64::try_from(now_ms()).unwrap() + 3_600_000;
+        relogin(&paths, "synthetic-refresh-token", Some(future));
+        let status = status_for_profile(&paths, Some("bound")).unwrap();
+        assert_eq!(status.auth_binding_state.as_deref(), Some("ready"));
+        assert!(status.is_authenticated());
+        assert!(status.is_ready());
+
+        // A profile that merely names a credential is not ready on the
+        // strength of having named one.
+        let mut config = load_config(&paths).unwrap();
+        config.profiles.get_mut("bound").unwrap().auth_ref = Some("missing".into());
+        save_config(&paths, &config).unwrap();
+        let status = status_for_profile(&paths, Some("bound")).unwrap();
+        assert_eq!(status.auth_binding_state.as_deref(), Some("unconfigured"));
+        assert!(!status.is_authenticated());
+        assert!(!status.is_ready());
+
+        // And revoking the credential is what changes the answer back.
+        let mut config = load_config(&paths).unwrap();
+        config.profiles.get_mut("bound").unwrap().auth_ref = Some("credential".into());
+        save_config(&paths, &config).unwrap();
+        revoke_credential(&paths, "bound").unwrap();
+        let status = status_for_profile(&paths, Some("bound")).unwrap();
+        assert_eq!(status.auth_binding_state.as_deref(), Some("revoked"));
+        assert!(!status.is_ready());
+    }
+
+    #[test]
+    fn a_forged_namespace_in_the_caller_snapshot_cannot_replace_the_store() {
+        let (_directory, paths) = fixture();
+        let store = store_for(&paths);
+        login(&paths, "synthetic-refresh-token");
+
+        let mut forged = AuthFile::default();
+        forged.0.insert(
+            STORE_KEY.into(),
+            serde_json::json!({"version": 1, "revision": 99, "accounts": {}}),
+        );
+        save_auth(&paths, &forged).unwrap();
+
+        assert_eq!(
+            stored_refresh_token(&paths),
+            "synthetic-refresh-token",
+            "the reserved namespace belongs to the store, not to a caller snapshot"
+        );
+        assert_eq!(store.list_status().unwrap().len(), 1);
     }
 }

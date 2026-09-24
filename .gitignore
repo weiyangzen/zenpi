@@ -45,3 +45,6 @@ layout.json
 *.swo
 .idea/
 .vscode/
+
+# Smoke/scratch output written by tools/stage1_host_smoke.py
+/.ops/

@@ -2514,3 +2514,128 @@ fn steer_shell_guard_keeps_expected_turn_rejection_before_side_effects() {
 fn steer_shell_guard_preserves_valid_owned_shell_execution() {
     exercise_steer_shell_guard(serde_json::json!({}), true);
 }
+
+/// Typed connection control over the production JSONL surface: capabilities are
+/// declared before a client may use them, the command is idempotent by request
+/// ID, and a refusal carries a typed code with no data payload.
+#[test]
+fn headless_connection_control_declares_capabilities_and_is_idempotent() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("connection.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let session_id = agent.session().session_id().to_owned();
+    let input = format!(
+        concat!(
+            "{{\"schema_version\":2,\"type\":\"status\",\"id\":\"cap\"}}\n",
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"st\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"status\",\"owner\":\"discussion\"}}}}\n",
+            // A profile that cannot be resolved is refused, not applied.
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"sel-bad\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"select\",\"owner\":\"discussion\",\"profile\":\"no-such-profile\",\"model\":\"m\",\"expected_selection_revision\":0}}}}\n",
+            // A connection command may not also carry a prompt body.
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"mix\",\"session_id\":\"{session}\",\"text\":\"hello\",\"connection\":{{\"action\":\"status\",\"owner\":\"discussion\"}}}}\n",
+            // Repeating the same ID with the same body replays the terminal.
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"st\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"status\",\"owner\":\"discussion\"}}}}\n",
+            // Reusing it for a different body is a conflict.
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"st\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"select\",\"owner\":\"discussion\",\"profile\":\"x\",\"model\":\"m\",\"expected_selection_revision\":0}}}}\n",
+            // The connection command does not exist at v1.
+            "{{\"schema_version\":1,\"type\":\"connection\",\"id\":\"v1\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"status\",\"owner\":\"discussion\"}}}}\n",
+            "{{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"q\"}}\n",
+        ),
+        session = session_id
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    let by_id = |id: &str| {
+        records
+            .iter()
+            .find(|record| record["id"] == id)
+            .unwrap_or_else(|| panic!("no response for {id}"))
+    };
+
+    // A client learns the capabilities from the status response it already gets.
+    let capabilities = by_id("cap")["data"]["capabilities"]
+        .as_array()
+        .expect("status declares capabilities")
+        .clone();
+    assert!(capabilities.contains(&serde_json::json!("connection_v1")));
+    assert!(capabilities.contains(&serde_json::json!("ordered_content_v1")));
+
+    let status = by_id("st");
+    assert_eq!(status["success"], true);
+    assert_eq!(status["data"]["outcome"], "status");
+    assert_eq!(status["data"]["owner"], "discussion");
+    assert_eq!(status["data"]["session_id"], session_id.as_str());
+    assert_eq!(status["data"]["selection_revision"], 0);
+
+    // A refusal carries a code and no data at all.
+    let refused = by_id("sel-bad");
+    assert_eq!(refused["success"], false);
+    assert!(refused["code"].as_str().is_some());
+    assert!(
+        refused.get("data").is_none(),
+        "a refusal must not carry data"
+    );
+
+    // An unrecognized owner is a schema violation, not another agent: it is
+    // rejected where it is parsed rather than treated as a third owner.
+    assert!(
+        parse_line(&format!(
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"own\",\"session_id\":\"{session_id}\",\"connection\":{{\"action\":\"status\",\"owner\":\"worker\"}}}}"
+        ))
+        .is_err()
+    );
+    assert_eq!(by_id("mix")["success"], false);
+    assert_eq!(by_id("mix")["code"], "invalid_field");
+    assert_eq!(by_id("v1")["success"], false);
+    assert_eq!(by_id("v1")["code"], "unsupported_version");
+
+    // The repeat replays the same terminal answer byte for byte, and reusing
+    // the id for a different body is refused rather than re-executed.
+    let repeated: Vec<&Value> = records
+        .iter()
+        .filter(|record| record["id"] == "st")
+        .collect();
+    assert_eq!(repeated.len(), 3, "{repeated:?}");
+    assert_eq!(
+        repeated[0], repeated[1],
+        "a repeat must replay the terminal"
+    );
+    assert_eq!(repeated[0]["success"], true);
+    assert_eq!(repeated[0]["data"]["outcome"], "status");
+    assert_eq!(repeated[2]["success"], false);
+    assert_eq!(repeated[2]["code"], "request_id_conflict");
+    assert!(repeated[2].get("data").is_none());
+}
+
+/// A connection selection is only accepted when the caller names the revision
+/// it planned against, and a stale plan is refused rather than applied.
+#[test]
+fn headless_connection_selection_requires_and_checks_the_revision() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("connection-revision.jsonl");
+    let mut agent = Agent::with_echo(SessionStore::open(&path).unwrap());
+    let session_id = agent.session().session_id().to_owned();
+    // The selection fields are required: omitting the revision is a schema
+    // error rather than an implicit "force".
+    let input = format!(
+        concat!(
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"missing\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"select\",\"owner\":\"discussion\",\"profile\":\"p\",\"model\":\"m\"}}}}\n",
+            "{{\"schema_version\":2,\"type\":\"connection\",\"id\":\"neg\",\"session_id\":\"{session}\",\"connection\":{{\"action\":\"select\",\"owner\":\"discussion\",\"profile\":\"p\",\"model\":\"m\",\"expected_selection_revision\":-1}}}}\n",
+            "{{\"schema_version\":2,\"type\":\"shutdown\",\"id\":\"q\"}}\n",
+        ),
+        session = session_id
+    );
+    let mut output = Vec::new();
+    run_headless(&mut agent, Cursor::new(input.as_bytes()), &mut output).unwrap();
+    let records = json_lines(&output);
+    // An unparseable request has no id to correlate a response to, so what
+    // matters is that nothing was applied and the run still reached shutdown.
+    assert!(
+        records
+            .iter()
+            .all(|record| record["data"]["outcome"] != "applied"),
+        "{records:?}"
+    );
+    assert!(records.iter().any(|record| record["id"] == "q"));
+    assert_eq!(agent.selection_revision(), 0);
+}

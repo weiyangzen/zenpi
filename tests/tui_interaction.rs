@@ -1392,6 +1392,206 @@ fn no_hot_zone_blocks_text_and_tab_restores_a_zone() {
     assert_ne!(state.hot_zone(), HotZone::None);
 }
 
+/// A refused key used to vanish without a trace, which reads as a dead
+/// terminal.  It has to say so somewhere the production renderer actually
+/// draws -- the footer, not `status`, which only the legacy host renders.
+#[test]
+fn a_key_refused_by_the_hot_zone_says_so_in_the_footer() {
+    let mut state = TuiState::default();
+    assert!(state.set_hot_zone(HotZone::None));
+    // A fresh backend per frame: reusing one leaves cells from the previous
+    // frame between the wide glyphs of the next.
+    let footer = |state: &mut TuiState| {
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal
+            .draw(|frame| state.render_bentobox(frame, "zenpi"))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        // The renderer pads every wide glyph with a space, so compare on the
+        // text with its spacing removed.
+        (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .map(|(x, y)| buffer[(x, y)].symbol())
+            .collect::<String>()
+            .replace(' ', "")
+    };
+    assert!(
+        footer(&mut state).contains("无热区"),
+        "the zone hint is what the footer shows before anything is refused"
+    );
+    let _ = state.handle_key(key(KeyCode::Char('q')));
+    let line = footer(&mut state);
+    assert!(
+        line.contains("不接受普通输入"),
+        "a dropped key has to say so: {line:?}"
+    );
+    assert_eq!(state.input(), "", "the draft stays untouched");
+}
+
+/// The conflict net. Per-binding tests say what one key does; none of them says
+/// that a key does nothing anywhere else. A shortcut added to the wrong branch,
+/// or a zone that forgets to decline a key, shows up as a diff here.
+///
+/// Every case starts from a fresh state, so one key's action cannot leak into
+/// the next case through accumulated state.
+#[test]
+fn a_key_sweep_leaves_drafts_alone_in_every_non_text_zone() {
+    let mut ordinary = Vec::new();
+    for character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        .chars()
+        .chain(" /?-_.,;:'\"!@#$%^&*()[]{}<>|\\`~+=".chars())
+    {
+        ordinary.push(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+    }
+    for code in [
+        KeyCode::Enter,
+        KeyCode::Esc,
+        KeyCode::Backspace,
+        KeyCode::Delete,
+        KeyCode::Insert,
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::Left,
+        KeyCode::Right,
+        KeyCode::Home,
+        KeyCode::End,
+        KeyCode::PageUp,
+        KeyCode::PageDown,
+        KeyCode::Tab,
+        KeyCode::BackTab,
+    ] {
+        ordinary.push(KeyEvent::new(code, KeyModifiers::NONE));
+    }
+    // Ctrl-G spawns an external editor and Ctrl-D quits; neither belongs in a
+    // draft-leak sweep.
+    let mut chords = Vec::new();
+    for character in 'a'..='z' {
+        for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+            if modifier == KeyModifiers::CONTROL && matches!(character, 'g' | 'd') {
+                continue;
+            }
+            chords.push(KeyEvent::new(KeyCode::Char(character), modifier));
+        }
+    }
+    for code in [
+        KeyCode::Left,
+        KeyCode::Right,
+        KeyCode::Delete,
+        KeyCode::Backspace,
+        KeyCode::Home,
+        KeyCode::End,
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::PageUp,
+        KeyCode::PageDown,
+    ] {
+        for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+            chords.push(KeyEvent::new(code, modifier));
+        }
+    }
+
+    // Resources, Gantt and None own no text; Conversation and Arch do.
+    // Collect every leak rather than stopping at the first: the point of the
+    // sweep is the shape of the whole set.
+    let mut leaks = Vec::new();
+    for zone in [HotZone::Resources, HotZone::Gantt, HotZone::None] {
+        for (label, keys) in [("ordinary", &ordinary), ("chord", &chords)] {
+            for event in keys.iter() {
+                let mut state = TuiState::default();
+                state.set_input("discussion draft");
+                assert!(state.set_left_prompt(LeftPrompt::Arch));
+                let _ = state.handle_key(key(KeyCode::Char('z')));
+                assert_eq!(state.arch_input(), "z", "arch draft seed failed");
+                assert!(state.set_hot_zone(zone));
+                // The cursor counts too: Ctrl-A/Ctrl-E move it without changing
+                // the text, which is the same leak from a draft nobody can see.
+                let cursor = state.cursor();
+
+                let _ = state.handle_key(*event);
+
+                if state.input() != "discussion draft" {
+                    leaks.push(format!(
+                        "{zone:?} {label} {event:?} → discussion draft became {:?}",
+                        state.input()
+                    ));
+                }
+                if state.arch_input() != "z" {
+                    leaks.push(format!(
+                        "{zone:?} {label} {event:?} → arch draft became {:?}",
+                        state.arch_input()
+                    ));
+                }
+                if state.cursor() != cursor {
+                    leaks.push(format!(
+                        "{zone:?} {label} {event:?} → discussion cursor moved {cursor} → {}",
+                        state.cursor()
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        leaks.is_empty(),
+        "{} bindings reached a draft from a zone that owns no text:\n{}",
+        leaks.len(),
+        leaks.join("\n")
+    );
+}
+
+/// The other direction: the two text zones each own exactly one draft. A key
+/// that reaches both is the same conflict seen from the other side.
+#[test]
+fn each_text_zone_edits_only_its_own_draft() {
+    // The discussion prompt owns the discussion draft.
+    let mut state = TuiState::default();
+    state.set_input("seed");
+    let _ = state.set_left_prompt(LeftPrompt::Discussion);
+    let _ = state.handle_key(key(KeyCode::Char('x')));
+    assert_eq!(state.input(), "seedx");
+    assert_eq!(state.arch_input(), "");
+
+    // The arch console owns the arch draft, even with a discussion draft in
+    // progress: a character reaches exactly one of the two.
+    let mut state = TuiState::default();
+    state.set_input("seed");
+    let _ = state.set_left_prompt(LeftPrompt::Arch);
+    let _ = state.handle_key(key(KeyCode::Char('x')));
+    assert_eq!(state.input(), "seed");
+    assert_eq!(state.arch_input(), "x");
+}
+
+/// A navigation zone owns unmodified keys only. One chord meaning two
+/// different things depending on which pane happens to be hot is the conflict
+/// this rules out: Ctrl-Up moves pane focus everywhere, so it must not scroll
+/// the Gantt just because the Gantt is focused.
+#[test]
+fn a_chord_keeps_its_global_meaning_while_a_navigation_zone_is_hot() {
+    let mut state = TuiState::default();
+    assert!(state.focus_workspace_pane(PaneId::Gantt));
+    assert_eq!(state.hot_zone(), HotZone::Gantt);
+
+    // The plain key still scrolls, so the zone is not simply inert.
+    let before = state.pane_scroll_offset(PaneId::Gantt);
+    let _ = state.handle_key(key(KeyCode::Down));
+    let scrolled = state.pane_scroll_offset(PaneId::Gantt);
+    assert!(
+        scrolled > before,
+        "a plain Down must still scroll the Gantt"
+    );
+
+    let _ = state.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::CONTROL));
+    assert_eq!(
+        state.pane_scroll_offset(PaneId::Gantt),
+        scrolled,
+        "Ctrl-Up scrolled the Gantt instead of doing its global job"
+    );
+    assert_ne!(
+        state.hot_zone(),
+        HotZone::Gantt,
+        "Ctrl-Up should have moved pane focus"
+    );
+}
+
 #[test]
 fn resources_zone_owns_navigation_and_esc_leaves_to_no_hot_zone() {
     let mut state = TuiState::default();

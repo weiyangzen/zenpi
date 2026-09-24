@@ -277,3 +277,149 @@ pub(crate) struct LoginSuccess {
     pub(crate) credential: store::CommittedCredential,
 }
 pub(crate) type LoginOutcome = Result<LoginSuccess, AuthError>;
+
+/// Credential shape for a provider API key.
+///
+/// The allowed destinations are handed in rather than derived here: they come
+/// from the same service policy the request path uses
+/// (`providers::connection::api_key_destinations`), and this module owns
+/// credential shape, not routing.  An API key has no issuer, session, or
+/// expiry; those belong to OAuth bindings.
+pub(crate) fn api_key_credential(
+    provider: &str,
+    definition_version: u32,
+    key: String,
+    grants: Vec<AllowedDestination>,
+) -> store::PendingCredential {
+    store::PendingCredential {
+        kind: store::CredentialKind::ApiKey,
+        provider: provider.to_owned(),
+        definition_version,
+        issuer: String::new(),
+        client_id: String::new(),
+        account_id: None,
+        user_id: None,
+        allowed_destinations: grants,
+        api_key: Some(key),
+        access_token: None,
+        refresh_token: None,
+        expires_at_ms: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_key_credentials_carry_no_oauth_identity_and_only_their_grants() {
+        let destination = crate::providers::connection::api_key_destination(
+            "openai",
+            None,
+            Some("responses"),
+            None,
+        )
+        .unwrap();
+        let pending = api_key_credential(
+            "openai",
+            destination.definition_version,
+            "synthetic-key".into(),
+            vec![destination.grant.clone()],
+        );
+        assert_eq!(pending.kind, store::CredentialKind::ApiKey);
+        assert_eq!(pending.provider, "openai");
+        assert_eq!(pending.definition_version, destination.definition_version);
+        assert!(pending.issuer.is_empty());
+        assert!(pending.client_id.is_empty());
+        assert!(pending.account_id.is_none());
+        assert!(pending.user_id.is_none());
+        assert!(pending.access_token.is_none());
+        assert!(pending.refresh_token.is_none());
+        assert!(pending.expires_at_ms.is_none());
+        assert_eq!(pending.api_key.as_deref(), Some("synthetic-key"));
+        assert_eq!(pending.allowed_destinations, [destination.grant]);
+    }
+
+    /// A provider with several wires authorizes all of them at once, so a key
+    /// added for one protocol is not silently unusable on the others.
+    #[test]
+    fn unnamed_wires_authorize_every_route_of_a_builtin_provider() {
+        let destinations =
+            crate::providers::connection::api_key_destinations("deepseek", None, None, None)
+                .unwrap();
+        let definition = crate::providers::get_provider_definition("deepseek").unwrap();
+        assert_eq!(destinations.len(), definition.routes.len());
+        assert_eq!(
+            destinations.iter().map(|d| d.protocol).collect::<Vec<_>>(),
+            definition
+                .routes
+                .iter()
+                .map(|route| route.protocol)
+                .collect::<Vec<_>>()
+        );
+        for destination in &destinations {
+            assert_eq!(destination.grant.origin, "https://api.deepseek.com");
+        }
+
+        // A named wire still selects exactly one route.
+        let named = crate::providers::connection::api_key_destinations(
+            "deepseek",
+            None,
+            Some("chat_completions"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(named.len(), 1);
+        assert_eq!(named[0].protocol, destinations[0].protocol);
+    }
+
+    /// The whole point of deriving a login grant from the service policy is
+    /// that the credential can immediately reach the routes it authorizes.
+    #[test]
+    fn every_grant_of_a_multi_route_provider_admits_its_request_route() {
+        use crate::providers::connection::{ProviderConnection, resolve_connection};
+        use crate::providers::registry::ModelRegistry;
+
+        let destinations =
+            crate::providers::connection::api_key_destinations("deepseek", None, None, None)
+                .unwrap();
+        let identity = AuthIdentitySnapshot {
+            provider: "deepseek".into(),
+            credential_id: "cred_test".into(),
+            account_id: None,
+            identity_generation: "generation_1".into(),
+            credential_revision: 1,
+            allowed_destinations: destinations
+                .iter()
+                .map(|destination| destination.grant.clone())
+                .collect(),
+        };
+        for destination in &destinations {
+            let connection = ProviderConnection {
+                profile: "test-profile".into(),
+                provider: "deepseek".into(),
+                protocol: destination.protocol,
+                base_url: None,
+                auth: AuthBinding::StoredApiKey {
+                    credential_id: "cred_test".into(),
+                },
+                header_policy: None,
+                config_revision: 1,
+                model_routes: vec![],
+            };
+            resolve_connection(
+                &connection,
+                "test-model",
+                &ModelRegistry::default(),
+                Some(&identity),
+                true,
+            )
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{:?} grant rejects its own route: {error}",
+                    destination.protocol
+                )
+            });
+        }
+    }
+}
