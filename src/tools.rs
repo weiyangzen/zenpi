@@ -50,6 +50,7 @@ pub const MAX_DIFF_BYTES: usize = 64 * 1024;
 pub const MAX_COMMAND_BYTES: usize = 16 * 1024;
 pub const MAX_COMMAND_OUTPUT_BYTES: usize = 256 * 1024;
 pub const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 30_000;
+pub const MAX_COMMAND_TIMEOUT_MS: u64 = 600_000;
 
 const DEFAULT_READ_BYTES: usize = 256 * 1024;
 const DEFAULT_LIST_ENTRIES: usize = 64;
@@ -189,7 +190,7 @@ impl BlueprintGate {
         }
         if policy.max_actions == 0
             || policy.max_actions > 1_000_000
-            || !(1..=120_000).contains(&policy.max_command_timeout_ms)
+            || !(1..=MAX_COMMAND_TIMEOUT_MS).contains(&policy.max_command_timeout_ms)
             || !(1..=MAX_COMMAND_OUTPUT_BYTES).contains(&policy.max_command_output_bytes)
         {
             return Err(invalid(
@@ -2328,7 +2329,7 @@ impl RunCommandTool {
             "timeout_ms",
             default_timeout as usize,
             1,
-            120_000,
+            MAX_COMMAND_TIMEOUT_MS as usize,
         )? as u64;
         let output_cap = gate.map_or(MAX_COMMAND_OUTPUT_BYTES, |gate| {
             gate.policy.max_command_output_bytes
@@ -2837,7 +2838,10 @@ impl Tool for RunCommandTool {
                 "type": "object",
                 "properties": {
                     "command": { "type": "string", "maxLength": MAX_COMMAND_BYTES },
-                    "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 120000 }
+                    "timeout_ms": {
+                        "type": "integer", "minimum": 1, "maximum": MAX_COMMAND_TIMEOUT_MS,
+                        "description": "Timeout in milliseconds (default 30000, or the worker policy budget). Set 300000-600000 for long builds/typechecks; tighter worker budgets still apply."
+                    }
                 },
                 "required": ["command"],
                 "additionalProperties": false

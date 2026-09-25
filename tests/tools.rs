@@ -537,12 +537,67 @@ fn command_tool_is_bounded_and_scrubs_environment() {
         call("run_command", json!({"command":"printf ok"})),
     ));
     assert_eq!(output["stdout"], "ok");
+    assert_eq!(output["timeout_ms"], 30_000);
     let timed_out = registry.execute(
         &context,
         policy,
         call("run_command", json!({"command":"sleep 1","timeout_ms":10})),
     );
     assert_eq!(error_code(timed_out), ToolErrorCode::CommandTimeout);
+}
+
+#[cfg(unix)]
+#[test]
+fn command_timeout_accepts_long_validations_but_remains_bounded() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let tool = tools::RunCommandTool;
+    let output = tool
+        .invoke(
+            &context,
+            json!({"command":"printf ok", "timeout_ms":600_000})
+                .as_object()
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(output["stdout"], "ok");
+    assert_eq!(output["timeout_ms"], 600_000);
+    let schema = tool.definition().input_schema;
+    assert_eq!(schema["properties"]["timeout_ms"]["maximum"], 600_000);
+    for timeout_ms in [0, 600_001] {
+        let error = tool
+            .invoke(
+                &context,
+                json!({"command":"touch must-not-run", "timeout_ms":timeout_ms})
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap_err();
+        assert_eq!(error.code(), ToolErrorCode::InvalidArguments);
+    }
+    assert!(!directory.path().join("must-not-run").exists());
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "runs a real 121-second command to cross the former timeout ceiling"]
+fn command_can_run_beyond_two_minutes() {
+    let directory = tempdir().unwrap();
+    let context = ToolContext::new(directory.path()).unwrap();
+    let began = std::time::Instant::now();
+    let output = tools::RunCommandTool
+        .invoke(
+            &context,
+            json!({"command":"sleep 121; printf completed", "timeout_ms":150_000})
+                .as_object()
+                .unwrap(),
+        )
+        .unwrap();
+    assert!(began.elapsed() >= std::time::Duration::from_secs(121));
+    assert_eq!(output["stdout"], "completed");
+    assert_eq!(output["exit_code"], 0);
+    assert_eq!(output["timed_out"], false);
+    assert_eq!(output["child_reaped"], true);
 }
 
 #[cfg(unix)]
@@ -661,6 +716,28 @@ fn worker_context(
     (context.with_blueprint_gate(gate).unwrap(), revoke)
 }
 
+#[cfg(unix)]
+#[test]
+fn longer_host_ceiling_does_not_override_worker_timeout_budget() {
+    let root = tempdir().unwrap();
+    for budget in [1_000, 600_000] {
+        let mut spec = worker_policy();
+        spec.max_command_timeout_ms = budget;
+        let (context, _) = worker_context(root.path(), spec);
+        let result = tools::RunCommandTool.invoke(
+            &context,
+            json!({"command":"echo safe", "timeout_ms":600_000})
+                .as_object()
+                .unwrap(),
+        );
+        if budget == 1_000 {
+            assert_eq!(result.unwrap_err().code(), ToolErrorCode::PolicyDenied);
+        } else {
+            assert_eq!(result.unwrap()["stdout"], "safe\n");
+        }
+    }
+}
+
 #[test]
 fn worker_gate_is_immutable_digest_bound_and_deny_over_allow() {
     let root = tempdir().unwrap();
@@ -765,6 +842,11 @@ fn worker_preflight_rejects_unknown_effects_network_and_general_shell() {
     let mut network = worker_policy();
     network.network_hosts.insert("example.com".into());
     for spec in [unknown, network] {
+        assert!(tools::BlueprintGate::compile(&context, spec, lease.clone(), now).is_err());
+    }
+    for timeout_ms in [0, 600_001] {
+        let mut spec = worker_policy();
+        spec.max_command_timeout_ms = timeout_ms;
         assert!(tools::BlueprintGate::compile(&context, spec, lease.clone(), now).is_err());
     }
     for command in [
@@ -903,7 +985,7 @@ fn precancelled_command_does_not_spawn_and_user_shell_keeps_exit_evidence() {
     let context = ToolContext::new(root.path()).unwrap();
     let error = tools::RunCommandTool::invoke_with_cancel(
         &context,
-        json!({"command":"printf ran > marker"})
+        json!({"command":"printf ran > marker", "timeout_ms":600_000})
             .as_object()
             .unwrap(),
         &|| true,
@@ -962,7 +1044,7 @@ fn term_resistant_descendants_die_after_timeout_and_host_cancel() {
         let command = "(trap '' TERM; sleep 0.3; printf leaked > marker) & wait";
         let error = tools::RunCommandTool::invoke_with_cancel(
             &context,
-            json!({"command":command,"timeout_ms":30})
+            json!({"command":command,"timeout_ms":if host_cancel {600_000} else {30}})
                 .as_object()
                 .unwrap(),
             &|| host_cancel && start.elapsed() > std::time::Duration::from_millis(20),
