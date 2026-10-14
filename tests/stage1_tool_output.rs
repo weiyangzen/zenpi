@@ -908,7 +908,7 @@ fn real_http_model_command_sends_capture_reference_in_next_request() {
             };
             requests.push(request);
             let delta = if index == 0 {
-                json!({"tool_calls":[{"index":0,"id":"actual-output-call","type":"function","function":{"name":"run_command","arguments":"{\"command\":\"printf actual-model-output; while [ ! -f model-release ]; do sleep 0.01; done\"}"}}]})
+                json!({"tool_calls":[{"index":0,"id":"actual-output-call","type":"function","function":{"name":"run_command","arguments":"{\"command\":\"printf actual-model-output; while [ ! -f model-release ]; do sleep 0.01; done\",\"timeout_ms\":600000}"}}]})
             } else {
                 json!({"content":"done"})
             };
@@ -985,6 +985,7 @@ fn real_http_model_command_sends_capture_reference_in_next_request() {
         .find(|m| m["role"] == "tool")
         .unwrap();
     let payload: Value = serde_json::from_str(message["content"].as_str().unwrap()).unwrap();
+    assert_eq!(payload["output"]["timeout_ms"], 600_000);
     let report: CaptureReport = serde_json::from_value(payload["output_capture"].clone()).unwrap();
     assert_eq!(report.artifacts.len(), 2);
     assert!(

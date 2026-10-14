@@ -68,6 +68,23 @@ approval was pending. Plain stdin EOF drains an accepted model turn; when EOF
 leaves nobody able to answer a side-effect approval, that approval is denied
 rather than hanging or silently executing.
 
+Model `run_command` calls accept `timeout_ms` from 1 to 600000 (10 minutes).
+The ordinary default remains 30000 (30 seconds); for slow builds or typechecks,
+ask the worker to explicitly request a suitable budget, for example
+`{"command":"pnpm typecheck","timeout_ms":600000}` as tool arguments (not a
+top-level headless request). A Blueprint worker still uses its host-approved
+budget, and lease expiry or cancellation can stop a command sooner. An outer
+driver must also allow enough time for the command and subsequent model reply.
+The provider HTTP timeout is separate; increasing it does not extend a command.
+Actual command timeouts remain unknown-outcome barriers for model tool calls:
+do not automatically retry a command that may have partially modified files.
+
+Write/edit tools use same-directory atomic replacement. A per-file OS sandbox
+must allow the destination and its temporary sibling
+`.<filename>.zenpi-<pid>-<counter>`, including rename; approving the tool alone
+does not grant OS permissions. Keep unrelated adjacent files denied rather than
+granting write access to the entire directory.
+
 Session startup reads have a hard 256 MiB journal-byte cap: an oversized
 existing journal is rejected before parsing or permission changes, while a
 valid journal at or below the cap is still loaded eagerly. For Responses SSE
