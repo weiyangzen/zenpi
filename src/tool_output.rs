@@ -341,9 +341,14 @@ impl OutputProgress {
             OutputStream::Stdout => "stdout",
             OutputStream::Stderr => "stderr",
         };
+        // Canonical views reject terminal controls; raw snapshots/artifacts stay intact.
         let mut output = format!(
             "[{stream}: {} bytes]\n{prefix}{}",
             self.snapshot.bytes_observed, self.snapshot.text
+        )
+        .replace(
+            |c: char| c.is_control() && !matches!(c, '\n' | '\r' | '\t'),
+            "?",
         );
         if output.len() > crate::view_model::MAX_VIEW_TEXT_BYTES {
             let mut end = crate::view_model::MAX_VIEW_TEXT_BYTES;
