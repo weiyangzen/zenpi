@@ -299,6 +299,7 @@ pub fn spawn_detached(
     max_errors: usize,
 ) -> Result<Value, String> {
     let session = absolute_path(session)?;
+    let _ = goal_state(&session, target)?;
     let paths = DaemonPaths::for_session(&session, target)?;
     if let Some(pid) = read_live_pid(&paths.pid) {
         return Err(format!("goal daemon is already running (pid {pid})"));
