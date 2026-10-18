@@ -3450,6 +3450,112 @@ where
     Ok(value)
 }
 
+fn goal_target_for_id(agent: &Agent, goal_id: &str) -> Result<String, String> {
+    let store = DomainStore::open_read_only(domain_store::path_for_session(agent.session().path()))
+        .map_err(|error| error.to_string())?;
+    let goal = store
+        .goal(goal_id)
+        .ok_or_else(|| format!("goal `{goal_id}` is not found"))?;
+    Ok(format!(
+        "{}@{}",
+        goal.blueprint_id, goal.blueprint_version
+    ))
+}
+
+fn agent_worker_config(agent: &Agent) -> crate::goal_daemon::WorkerConfig {
+    let overrides = agent.project_overrides();
+    crate::goal_daemon::WorkerConfig {
+        tools: crate::tools::current_builtin_allowlist(),
+        backend: overrides.backend,
+        profile: overrides.profile,
+        model: agent.model().map(str::to_owned),
+    }
+}
+
+pub fn spawn_goal_daemon_for_tui(
+    agent: &Agent,
+    goal_id: &str,
+) -> Result<serde_json::Value, String> {
+    let target = goal_target_for_id(agent, goal_id)?;
+    let session = agent.session().path();
+    let workspace = PathBuf::from(&agent.session().header().cwd);
+    let mut value = crate::goal_daemon::spawn_detached(
+        session,
+        &workspace,
+        &target,
+        &agent_worker_config(agent),
+        std::time::Duration::from_millis(1_000),
+        3,
+    )?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("command".into(), json!("goal"));
+        object.insert("route".into(), json!("local"));
+        object.insert("action".into(), json!("daemon"));
+        object.insert("accepted".into(), json!(true));
+        object.insert("goal_id".into(), json!(goal_id));
+    }
+    Ok(value)
+}
+
+pub fn goal_daemon_status_for_tui(
+    agent: &Agent,
+    goal_id: &str,
+) -> Result<serde_json::Value, String> {
+    let target = goal_target_for_id(agent, goal_id)?;
+    let mut value = crate::goal_daemon::daemon_status(agent.session().path(), &target)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("command".into(), json!("goal"));
+        object.insert("route".into(), json!("local"));
+        object.insert("action".into(), json!("daemon-status"));
+        object.insert("accepted".into(), json!(true));
+        object.insert("goal_id".into(), json!(goal_id));
+    }
+    Ok(value)
+}
+
+pub fn stop_goal_daemon_for_tui(
+    agent: &Agent,
+    goal_id: &str,
+) -> Result<serde_json::Value, String> {
+    let target = goal_target_for_id(agent, goal_id)?;
+    let mut value = crate::goal_daemon::request_stop(agent.session().path(), &target)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("command".into(), json!("goal"));
+        object.insert("route".into(), json!("local"));
+        object.insert("action".into(), json!("daemon-stop"));
+        object.insert("accepted".into(), json!(true));
+        object.insert("goal_id".into(), json!(goal_id));
+    }
+    Ok(value)
+}
+
+/// One supervised attempt.  The daemon supervisor starts a fresh process for
+/// each call, so the durable Goal status and receipts are the only checkpoint.
+pub fn run_goal_worker_once(agent: &mut Agent, target: &str) -> Result<serde_json::Value, String> {
+    let state = crate::goal_daemon::goal_state(agent.session().path(), target)?;
+    if state.terminal {
+        return Ok(json!({
+            "command": "goal",
+            "route": "local",
+            "action": "worker",
+            "target": target,
+            "goal_id": state.goal_id,
+            "status": state.goal_status,
+            "goal_status": state.goal_status,
+            "terminal": true,
+            "skipped": true,
+            "receipt_count": state.receipt_count,
+        }));
+    }
+    let mut value = run_goal_steps_for_tui(agent, target, 1)?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("action".into(), json!("worker"));
+        object.insert("worker".into(), json!(true));
+        object.insert("target".into(), json!(target));
+    }
+    Ok(value)
+}
+
 pub fn run_goal_steps_for_tui(
     agent: &mut Agent,
     target: &str,
@@ -7384,6 +7490,15 @@ enum GoalOwnerAction {
         id: String,
         target: String,
     },
+    Daemon {
+        id: String,
+    },
+    DaemonStatus {
+        id: String,
+    },
+    DaemonStop {
+        id: String,
+    },
 }
 
 fn parse_goal_owner_action(
@@ -7402,6 +7517,9 @@ fn parse_goal_owner_action(
         && !action.eq_ignore_ascii_case("resume")
         && !action.eq_ignore_ascii_case("run")
         && !action.eq_ignore_ascii_case("create")
+        && !action.eq_ignore_ascii_case("daemon")
+        && !action.eq_ignore_ascii_case("daemon-status")
+        && !action.eq_ignore_ascii_case("daemon-stop")
     {
         return Ok(None);
     }
@@ -7409,7 +7527,7 @@ fn parse_goal_owner_action(
     let invalid_usage = || {
         SlashDispatchError {
         code: "goal_status_usage",
-        message: "use `/goal status [<goal-id>]`, `/goal run|resume|cancel <goal-id> [until|N]`, or `/goal transition <goal-id> <queued|running|paused|blocked|cancelled|done>`".into(),
+        message: "use `/goal status [<goal-id>]`, `/goal run|resume|cancel|daemon|daemon-status|daemon-stop <goal-id> [until|N]`, or `/goal transition <goal-id> <queued|running|paused|blocked|cancelled|done>`".into(),
     }
     };
     let validate_id = |raw: &str| {
@@ -7476,6 +7594,23 @@ fn parse_goal_owner_action(
             }
             _ => Err(invalid_usage()),
         };
+    }
+
+    if action.eq_ignore_ascii_case("daemon")
+        || action.eq_ignore_ascii_case("daemon-status")
+        || action.eq_ignore_ascii_case("daemon-stop")
+    {
+        if tokens.len() != 2 {
+            return Err(invalid_usage());
+        }
+        let id = validate_id(tokens[1])?;
+        return Ok(Some(if action.eq_ignore_ascii_case("daemon") {
+            GoalOwnerAction::Daemon { id }
+        } else if action.eq_ignore_ascii_case("daemon-status") {
+            GoalOwnerAction::DaemonStatus { id }
+        } else {
+            GoalOwnerAction::DaemonStop { id }
+        }));
     }
 
     if action.eq_ignore_ascii_case("cancel")
@@ -8138,6 +8273,57 @@ fn execute_headless_slash(
                     return Ok(SlashExecution::Response(create_goal_from_blueprint(
                         agent, &id, &target,
                     )?));
+                }
+                Some(GoalOwnerAction::Daemon { id }) => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "goal daemon is temporarily unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    return Ok(SlashExecution::Response(
+                        spawn_goal_daemon_for_tui(agent, &id).map_err(|message| {
+                            SlashDispatchError {
+                                code: "goal_daemon_failed",
+                                message,
+                            }
+                        })?,
+                    ));
+                }
+                Some(GoalOwnerAction::DaemonStatus { id }) => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "goal daemon status is temporarily unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    return Ok(SlashExecution::Response(
+                        goal_daemon_status_for_tui(agent, &id).map_err(|message| {
+                            SlashDispatchError {
+                                code: "goal_daemon_status_failed",
+                                message,
+                            }
+                        })?,
+                    ));
+                }
+                Some(GoalOwnerAction::DaemonStop { id }) => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "goal daemon stop is temporarily unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    return Ok(SlashExecution::Response(
+                        stop_goal_daemon_for_tui(agent, &id).map_err(|message| {
+                            SlashDispatchError {
+                                code: "goal_daemon_stop_failed",
+                                message,
+                            }
+                        })?,
+                    ));
                 }
                 Some(GoalOwnerAction::Resume { id }) => {
                     let Some(agent) = agent else {

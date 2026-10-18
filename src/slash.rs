@@ -636,7 +636,7 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "goal",
         aliases: NO_ALIASES,
         route: SlashRoute::Local,
-        usage: "/goal [show|list|status|run GOAL_ID [STEPS|until]|resume|cancel|transition|create GOAL_ID BLUEPRINT[@VERSION]] [STATE] | /goal put <json-path>",
+        usage: "/goal [show|list|status|run GOAL_ID [STEPS|until]|daemon|daemon-status|daemon-stop|resume|cancel|transition|create GOAL_ID BLUEPRINT[@VERSION]] [STATE] | /goal put <json-path>",
         summary: "inspect, execute, retry, cancel, or persist a bounded b3ehive goal",
     },
     SlashCommandSpec {

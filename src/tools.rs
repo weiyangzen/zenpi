@@ -1200,6 +1200,11 @@ pub fn set_builtin_allowlist(only: Option<Vec<String>>) {
     }
 }
 
+/// Return the process-wide `--tools` allow-list, if the host installed one.
+pub fn current_builtin_allowlist() -> Option<Vec<String>> {
+    BUILTIN_ALLOWLIST.lock().ok().and_then(|guard| guard.clone())
+}
+
 /// Parse a `--tools a,b` value into known builtin names (unknown → error).
 pub fn parse_builtin_allowlist(value: &str) -> Result<Vec<String>, String> {
     if matches!(value.trim(), "none" | "off" | "no-tools") {

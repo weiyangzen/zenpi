@@ -18,6 +18,7 @@ pub mod error;
 pub mod extension_runtime;
 pub mod extensions;
 pub mod folder_source;
+pub mod goal_daemon;
 pub mod governance;
 pub mod headless;
 #[cfg(feature = "remote")]

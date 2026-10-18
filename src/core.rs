@@ -7164,6 +7164,16 @@ pub struct CliOptions {
     pub max_tool_iterations: usize,
     /// `--tools a,b`: advertise exactly these builtin tools (ZE-214).
     pub tools: Option<Vec<String>>,
+    /// `--goal-daemon TARGET`: run the detached goal supervisor.
+    pub goal_daemon: Option<String>,
+    /// Internal `--goal-worker TARGET`: execute one supervised goal attempt.
+    pub goal_worker: Option<String>,
+    /// `--goal-detach`: spawn the supervisor and return.
+    pub goal_detach: bool,
+    /// Supervisor poll interval in milliseconds.
+    pub goal_poll_ms: Option<u64>,
+    /// Consecutive no-progress worker exits before the supervisor gives up.
+    pub goal_max_errors: Option<usize>,
     /// `--eof-drain-secs N`: headless drain bound after stdin EOF (ZE-242);
     /// overrides `ZENPI_HEADLESS_EOF_DRAIN_SECS`.
     pub eof_drain_secs: Option<u64>,
@@ -7233,6 +7243,11 @@ impl Default for CliOptions {
             auto: false,
             max_tool_iterations: 1000,
             tools: None,
+            goal_daemon: None,
+            goal_worker: None,
+            goal_detach: false,
+            goal_poll_ms: None,
+            goal_max_errors: None,
             eof_drain_secs: None,
             backend: "openai".into(),
             backend_explicit: false,
@@ -7908,6 +7923,7 @@ where
                 "session gc requires --retain-newest N --older-than-seconds N --yes",
             ));
         }
+        validate_goal_options(&options)?;
         return Ok(options);
     }
     while let Some(argument) = args.next() {
@@ -7990,6 +8006,64 @@ where
                     crate::tools::parse_builtin_allowlist(&value).map_err(ZenpiError::arguments)?;
                 options.tools = Some(names);
             }
+            "--goal-daemon" => {
+                let value = inline
+                    .map(str::to_owned)
+                    .or_else(|| args.next())
+                    .ok_or_else(|| ZenpiError::arguments("--goal-daemon requires a target"))?;
+                if value.trim().is_empty() {
+                    return Err(ZenpiError::arguments("--goal-daemon target is empty"));
+                }
+                options.goal_daemon = Some(value);
+            }
+            "--goal-worker" => {
+                let value = inline
+                    .map(str::to_owned)
+                    .or_else(|| args.next())
+                    .ok_or_else(|| ZenpiError::arguments("--goal-worker requires a target"))?;
+                if value.trim().is_empty() {
+                    return Err(ZenpiError::arguments("--goal-worker target is empty"));
+                }
+                options.goal_worker = Some(value);
+            }
+            "--goal-detach" => {
+                if inline.is_some() {
+                    return Err(ZenpiError::arguments("--goal-detach does not take a value"));
+                }
+                options.goal_detach = true;
+            }
+            "--goal-poll-ms" => {
+                let value = inline
+                    .map(str::to_owned)
+                    .or_else(|| args.next())
+                    .ok_or_else(|| ZenpiError::arguments("--goal-poll-ms requires a number"))?;
+                let millis = value
+                    .trim()
+                    .parse::<u64>()
+                    .map_err(|_| ZenpiError::arguments("--goal-poll-ms must be an integer"))?;
+                if !(100..=600_000).contains(&millis) {
+                    return Err(ZenpiError::arguments(
+                        "--goal-poll-ms must be between 100 and 600000",
+                    ));
+                }
+                options.goal_poll_ms = Some(millis);
+            }
+            "--goal-max-errors" => {
+                let value = inline
+                    .map(str::to_owned)
+                    .or_else(|| args.next())
+                    .ok_or_else(|| ZenpiError::arguments("--goal-max-errors requires a number"))?;
+                let errors = value
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|_| ZenpiError::arguments("--goal-max-errors must be an integer"))?;
+                if !(1..=100).contains(&errors) {
+                    return Err(ZenpiError::arguments(
+                        "--goal-max-errors must be between 1 and 100",
+                    ));
+                }
+                options.goal_max_errors = Some(errors);
+            }
             "--eof-drain-secs" => {
                 let value = inline
                     .map(str::to_owned)
@@ -8071,7 +8145,54 @@ where
             }
         }
     }
+    validate_goal_options(&options)?;
     Ok(options)
+}
+
+
+fn validate_goal_options(options: &CliOptions) -> Result<(), ZenpiError> {
+    if options.goal_daemon.is_some() && options.goal_worker.is_some() {
+        return Err(ZenpiError::arguments(
+            "--goal-daemon and --goal-worker are mutually exclusive",
+        ));
+    }
+    if options.goal_detach && options.goal_daemon.is_none() {
+        return Err(ZenpiError::arguments(
+            "--goal-detach requires --goal-daemon",
+        ));
+    }
+    if (options.goal_poll_ms.is_some() || options.goal_max_errors.is_some())
+        && options.goal_daemon.is_none()
+    {
+        return Err(ZenpiError::arguments(
+            "--goal-poll-ms and --goal-max-errors require --goal-daemon",
+        ));
+    }
+    if (options.goal_daemon.is_some() || options.goal_worker.is_some()) && options.no_session {
+        return Err(ZenpiError::arguments(
+            "goal daemon/worker requires a durable session; omit --no-session",
+        ));
+    }
+    if let Some(target) = options.goal_daemon.as_deref().or(options.goal_worker.as_deref()) {
+        let (blueprint_id, version) = target
+            .split_once('@')
+            .map_or((target, None), |(id, version)| (id, Some(version)));
+        let bounded = !blueprint_id.is_empty()
+            && blueprint_id.len() <= crate::domains::MAX_ID_BYTES
+            && version.is_none_or(|version| {
+                !version.is_empty()
+                    && version.len() <= crate::domains::MAX_VERSION_BYTES
+                    && !version.chars().any(char::is_control)
+            })
+            && !blueprint_id.chars().any(char::is_control)
+            && !blueprint_id.chars().any(char::is_whitespace);
+        if !bounded {
+            return Err(ZenpiError::arguments(
+                "goal target must be a bounded blueprint id or id@version",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn make_backend(options: &CliOptions) -> Result<Box<dyn Backend>, ZenpiError> {
@@ -8250,6 +8371,9 @@ fn print_help() {
     );
     println!(
         "zenpi [--mode tui|headless] [--session PATH | -s NAME|ID | -c | --no-session] [--auto] [--eof-drain-secs N] [--max-tool-iterations N] [--tools a,b|none] [--backend openai|anthropic|google] [--profile NAME] [--model NAME]"
+    );
+    println!(
+        "zenpi --goal-daemon TARGET [--session PATH] [--goal-detach] [--goal-poll-ms N] [--goal-max-errors N] [--tools a,b|none]"
     );
     println!("zenpi config import-codex [--profile NAME]");
     println!("zenpi config doctor [--profile NAME] [--json]");
@@ -8629,7 +8753,11 @@ pub fn run() -> Result<(), ZenpiError> {
     // is merely broken still propagates as itself rather than as "not logged
     // in".
     // The dev-fixture echo backend needs no connection, so it skips the gate.
-    if options.mode == RunMode::Tui && !(options.backend_explicit && options.backend == "echo") {
+    if options.mode == RunMode::Tui
+        && options.goal_daemon.is_none()
+        && options.goal_worker.is_none()
+        && !(options.backend_explicit && options.backend == "echo")
+    {
         let paths = crate::config::ConfigPaths::discover()?;
         if let crate::tui::bootstrap::AuthGate::NeedsAuth(reason) =
             crate::tui::bootstrap::auth_gate(&paths, options.profile.as_deref())?
@@ -8715,7 +8843,6 @@ fn tempfile_dir_for_no_session(enabled: bool) -> Result<EphemeralSessionDir, Zen
 fn run_host(options: CliOptions) -> Result<(), ZenpiError> {
     // ZE-214: `--tools a,b` scopes every owner this process prepares.
     crate::tools::set_builtin_allowlist(options.tools.clone());
-    let backend = make_backend(&options)?;
     // `--no-session` journals live in a private temp dir removed on exit.
     let ephemeral = tempfile_dir_for_no_session(options.no_session)?;
     // `-s NAME|ID` resolves against the cached zenpi sessions; `--session PATH`
@@ -8751,6 +8878,44 @@ fn run_host(options: CliOptions) -> Result<(), ZenpiError> {
             }
         }
     };
+    if let Some(target) = options.goal_daemon.as_deref() {
+        let workspace = std::env::current_dir()?;
+        let config = crate::goal_daemon::WorkerConfig {
+            tools: options.tools.clone(),
+            backend: options.backend_explicit.then(|| options.backend.clone()),
+            profile: options.profile.clone(),
+            model: options.model.clone(),
+        };
+        let poll = Duration::from_millis(options.goal_poll_ms.unwrap_or(1_000));
+        let max_errors = options.goal_max_errors.unwrap_or(3);
+        if options.goal_detach {
+            let value = crate::goal_daemon::spawn_detached(
+                &session_path,
+                &workspace,
+                target,
+                &config,
+                poll,
+                max_errors,
+            )
+            .map_err(ZenpiError::Message)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&value)
+                    .map_err(|error| ZenpiError::Message(error.to_string()))?
+            );
+            return Ok(());
+        }
+        return crate::goal_daemon::run_supervisor(
+            &session_path,
+            &workspace,
+            target,
+            &config,
+            poll,
+            max_errors,
+        )
+        .map_err(ZenpiError::Message);
+    }
+    let backend = make_backend(&options)?;
     let session = SessionStore::open(&session_path)?;
     let mut agent = Agent::new(session, backend);
     // `[compaction]` from the user/project config; pi defaults otherwise.
@@ -8811,6 +8976,16 @@ fn run_host(options: CliOptions) -> Result<(), ZenpiError> {
         agent.set_model(Some(model))?;
     } else {
         agent.restore_model_selection()?;
+    }
+    if let Some(target) = options.goal_worker.as_deref() {
+        let value = crate::headless::run_goal_worker_once(&mut agent, target)
+            .map_err(ZenpiError::Message)?;
+        println!(
+            "{}",
+            serde_json::to_string(&value)
+                .map_err(|error| ZenpiError::Message(error.to_string()))?
+        );
+        return Ok(());
     }
     match options.mode {
         RunMode::Headless => {

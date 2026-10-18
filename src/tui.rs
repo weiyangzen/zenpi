@@ -12557,6 +12557,9 @@ enum TuiGoalOwnerAction {
     Create(String, String),
     Run(String, usize),
     Resume(String),
+    Daemon(String),
+    DaemonStatus(String),
+    DaemonStop(String),
 }
 
 fn parse_tui_goal_owner_action(
@@ -12574,7 +12577,19 @@ fn parse_tui_goal_owner_action(
     let is_resume = action.eq_ignore_ascii_case("resume");
     let is_run = action.eq_ignore_ascii_case("run");
     let is_create = action.eq_ignore_ascii_case("create");
-    if !is_show && !is_status && !is_transition && !is_cancel && !is_resume && !is_run && !is_create
+    let is_daemon = action.eq_ignore_ascii_case("daemon");
+    let is_daemon_status = action.eq_ignore_ascii_case("daemon-status");
+    let is_daemon_stop = action.eq_ignore_ascii_case("daemon-stop");
+    if !is_show
+        && !is_status
+        && !is_transition
+        && !is_cancel
+        && !is_resume
+        && !is_run
+        && !is_create
+        && !is_daemon
+        && !is_daemon_status
+        && !is_daemon_stop
     {
         return Ok(None);
     }
@@ -12590,7 +12605,7 @@ fn parse_tui_goal_owner_action(
         }
         Ok(raw.to_owned())
     };
-    let usage = || "use `/goal status [<goal-id>]`, `/goal run|resume|cancel <goal-id> [until|N]`, or `/goal transition <goal-id> <state>`";
+    let usage = || "use `/goal status [<goal-id>]`, `/goal run|resume|cancel|daemon|daemon-status|daemon-stop <goal-id> [until|N]`, or `/goal transition <goal-id> <state>`";
 
     if is_create {
         if tokens.len() != 3 {
@@ -12627,6 +12642,19 @@ fn parse_tui_goal_owner_action(
             }
             _ => Err(usage()),
         };
+    }
+    if is_daemon || is_daemon_status || is_daemon_stop {
+        if tokens.len() != 2 {
+            return Err(usage());
+        }
+        let id = valid_id(tokens[1])?;
+        return Ok(Some(if is_daemon {
+            TuiGoalOwnerAction::Daemon(id)
+        } else if is_daemon_status {
+            TuiGoalOwnerAction::DaemonStatus(id)
+        } else {
+            TuiGoalOwnerAction::DaemonStop(id)
+        }));
     }
     if is_cancel || is_resume || is_run {
         if is_run {
@@ -13528,6 +13556,69 @@ pub fn dispatch_slash_command(
                 None => state.push_message(
                     MessageRole::Error,
                     "goal execution is unavailable while the agent is busy",
+                ),
+            },
+            Ok(Some(TuiGoalOwnerAction::Daemon(id))) => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::spawn_goal_daemon_for_tui(agent, &id) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "goal daemon:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("goal daemon failed: {error}"),
+                    ),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "goal daemon is unavailable while the agent is busy",
+                ),
+            },
+            Ok(Some(TuiGoalOwnerAction::DaemonStatus(id))) => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::goal_daemon_status_for_tui(agent, &id) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "goal daemon status:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("goal daemon status failed: {error}"),
+                    ),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "goal daemon status is unavailable while the agent is busy",
+                ),
+            },
+            Ok(Some(TuiGoalOwnerAction::DaemonStop(id))) => match agent.as_deref_mut() {
+                Some(agent) => match crate::headless::stop_goal_daemon_for_tui(agent, &id) {
+                    Ok(data) => state.push_message(
+                        MessageRole::System,
+                        format!(
+                            "goal daemon stop:\n{}",
+                            bounded_display(
+                                &serde_json::to_string(&data).unwrap_or_else(|_| "{}".into())
+                            )
+                        ),
+                    ),
+                    Err(error) => state.push_message(
+                        MessageRole::Error,
+                        format!("goal daemon stop failed: {error}"),
+                    ),
+                },
+                None => state.push_message(
+                    MessageRole::Error,
+                    "goal daemon stop is unavailable while the agent is busy",
                 ),
             },
             Ok(Some(TuiGoalOwnerAction::Resume(id))) => match agent.as_deref_mut() {
@@ -24193,5 +24284,31 @@ mod render_cost_tests {
             Duration::from_secs(60),
             "no deadline once flushed"
         );
+    }
+
+    #[test]
+    fn goal_owner_daemon_actions_and_until_parse() {
+        assert!(matches!(
+            parse_tui_goal_owner_action("daemon goal-a"),
+            Ok(Some(TuiGoalOwnerAction::Daemon(id))) if id == "goal-a"
+        ));
+        assert!(matches!(
+            parse_tui_goal_owner_action("daemon-status goal-a"),
+            Ok(Some(TuiGoalOwnerAction::DaemonStatus(id))) if id == "goal-a"
+        ));
+        assert!(matches!(
+            parse_tui_goal_owner_action("daemon-stop goal-a"),
+            Ok(Some(TuiGoalOwnerAction::DaemonStop(id))) if id == "goal-a"
+        ));
+        assert!(matches!(
+            parse_tui_goal_owner_action("run goal-a until"),
+            Ok(Some(TuiGoalOwnerAction::Run(id, 32))) if id == "goal-a"
+        ));
+        assert!(matches!(
+            parse_tui_goal_owner_action("run goal-a 4"),
+            Ok(Some(TuiGoalOwnerAction::Run(id, 4))) if id == "goal-a"
+        ));
+        assert!(parse_tui_goal_owner_action("run goal-a 99").is_err());
+        assert!(parse_tui_goal_owner_action("daemon").is_err());
     }
 }
