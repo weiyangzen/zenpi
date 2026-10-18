@@ -3730,6 +3730,20 @@ fn complete_goal_locally(agent: &Agent, goal_id: &str) -> Result<(), String> {
 /// commands in the session workspace.  This is the local executor used by
 /// `/goal run`; it is deliberately absent from the control-plane handoff
 /// path, which must never execute a task.
+fn latest_failed_acceptance(agent: &Agent, item_id: &str) -> Option<String> {
+    let path = crate::domain_execution::path_for_session(agent.session().path());
+    let store = crate::domain_execution::ExecutionStore::open_read_only(&path).ok()?;
+    store
+        .receipts()
+        .iter()
+        .rev()
+        .find(|receipt| {
+            receipt.item_id == item_id
+                && receipt.status == crate::domain_execution::ExecutionStatus::Failed
+        })
+        .and_then(|receipt| receipt.error.clone())
+}
+
 fn execute_blueprint_task(
     agent: &mut Agent,
     item: &crate::domains::BlueprintItem,
@@ -3750,12 +3764,20 @@ fn execute_blueprint_task(
         .map(|command| format!("- `{command}`"))
         .collect::<Vec<_>>()
         .join("\n");
+    let retry = latest_failed_acceptance(agent, &item.id)
+        .map(|error| {
+            let error = error.chars().take(2_000).collect::<String>();
+            format!(
+                "\nPrevious host acceptance failure (fix this exact failure; do not repeat the same proof step):\n{error}\n"
+            )
+        })
+        .unwrap_or_default();
     let prompt = format!(
         "You are executing one b3ehive Blueprint item.\n\
          Item: {item_id}\n\
          Workspace: {workspace}\n\n\
          Instruction:\n{instruction}\n\n\
-         The host will run these acceptance commands after your turn:\n{acceptance}\n\n\
+         The host will run these acceptance commands after your turn:\n{acceptance}\n{retry}\n\
          Use your tools to make the change and run the acceptance commands yourself when possible. \
          Do not reply with a plan only; leave the workspace in the stated condition. \
          Finish with a concise evidence summary.",
@@ -3763,6 +3785,7 @@ fn execute_blueprint_task(
         workspace = workspace.display(),
         instruction = task.instruction,
         acceptance = acceptance,
+        retry = retry,
     );
     let submission = agent
         .submit(TurnInputRequest::new(prompt))
