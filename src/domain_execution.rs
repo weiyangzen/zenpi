@@ -1356,9 +1356,7 @@ impl BlueprintExecutor {
             )
         } else {
             match execute(selection.item) {
-                Ok(()) => {
-                    receipt.terminalized(ExecutionStatus::Succeeded, None)
-                }
+                Ok(()) => receipt.terminalized(ExecutionStatus::Succeeded, None),
                 Err(error) => {
                     let error = if error.chars().count() > 4_096 {
                         error.chars().take(4_096).collect()
@@ -1370,9 +1368,10 @@ impl BlueprintExecutor {
             }
         };
         if executed {
-            terminal.evidence = terminal
-                .evidence
-                .replacen("control_plane_only", "local_goal_runner", 1);
+            terminal.evidence =
+                terminal
+                    .evidence
+                    .replacen("control_plane_only", "local_goal_runner", 1);
             terminal.evidence.push_str(" local_task_executed=true");
         }
         self.store.upsert_receipt(terminal.clone())?;

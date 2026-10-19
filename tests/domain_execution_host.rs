@@ -320,8 +320,7 @@ fn goal_run_executes_task_and_acceptance_until_done() {
     domains.put_goal(goal).unwrap();
 
     let mut agent = Agent::with_echo(SessionStore::open(&session).unwrap());
-    let result =
-        zenpi::headless::run_goal_steps_for_tui(&mut agent, "goal-plan@1", 1).unwrap();
+    let result = zenpi::headless::run_goal_steps_for_tui(&mut agent, "goal-plan@1", 1).unwrap();
     assert_eq!(result["status"], "complete");
     assert_eq!(result["goal_status"], "done");
     assert_eq!(result["completion_basis"], "local_acceptance_commands");
@@ -383,7 +382,12 @@ fn goal_run_records_a_failed_acceptance_without_claiming_completion() {
         zenpi::headless::run_goal_steps_for_tui(&mut agent, "goal-failed-plan@1", 1).unwrap();
     assert_eq!(result["status"], "blocked");
     assert_eq!(result["receipt"]["status"], "failed");
-    assert!(result["receipt"]["error"].as_str().unwrap().contains("false"));
+    assert!(
+        result["receipt"]["error"]
+            .as_str()
+            .unwrap()
+            .contains("false")
+    );
     assert_eq!(result["goal_status"], "blocked");
     assert_eq!(result["completion_basis"], "attempts_exhausted");
     assert_eq!(result["goal_outcome"], "could_not_be_achieved");
@@ -447,12 +451,8 @@ fn goal_run_blocks_without_a_model_turn_when_attempts_are_exhausted() {
         .unwrap();
 
     let mut agent = Agent::with_echo(SessionStore::open(&session).unwrap());
-    let result = zenpi::headless::run_goal_steps_for_tui(
-        &mut agent,
-        "goal-exhausted-plan@1",
-        1,
-    )
-    .unwrap();
+    let result =
+        zenpi::headless::run_goal_steps_for_tui(&mut agent, "goal-exhausted-plan@1", 1).unwrap();
     assert_eq!(result["status"], "blocked");
     assert_eq!(result["goal_status"], "blocked");
     assert_eq!(result["completion_basis"], "attempts_exhausted");

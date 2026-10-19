@@ -8176,7 +8176,6 @@ where
     Ok(options)
 }
 
-
 fn validate_goal_options(options: &CliOptions) -> Result<(), ZenpiError> {
     let modes = [
         options.goal_daemon.is_some(),
@@ -8208,10 +8207,10 @@ fn validate_goal_options(options: &CliOptions) -> Result<(), ZenpiError> {
             "goal daemon/worker/exploration requires a durable session; omit --no-session",
         ));
     }
-    if let Some(path) = options.goal_explore.as_deref() {
-        if path.len() > 4_096 || path.chars().any(char::is_control) {
-            return Err(ZenpiError::arguments("--goal-explore path is not bounded"));
-        }
+    if let Some(path) = options.goal_explore.as_deref()
+        && (path.len() > 4_096 || path.chars().any(char::is_control))
+    {
+        return Err(ZenpiError::arguments("--goal-explore path is not bounded"));
     }
     if let Some(target) = options
         .goal_daemon
@@ -8236,18 +8235,17 @@ fn validate_goal_options(options: &CliOptions) -> Result<(), ZenpiError> {
             ));
         }
     }
-    if let Some(goal_id) = options.goal_worker_id.as_deref() {
-        if goal_id.is_empty()
+    if let Some(goal_id) = options.goal_worker_id.as_deref()
+        && (goal_id.is_empty()
             || goal_id.len() > crate::domains::MAX_ID_BYTES
             || goal_id.chars().any(char::is_control)
             || !goal_id
                 .chars()
-                .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character))
-        {
-            return Err(ZenpiError::arguments(
-                "--goal-worker-id is not a bounded goal id",
-            ));
-        }
+                .all(|character| character.is_ascii_alphanumeric() || "._:/-".contains(character)))
+    {
+        return Err(ZenpiError::arguments(
+            "--goal-worker-id is not a bounded goal id",
+        ));
     }
     Ok(())
 }

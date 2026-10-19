@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
     b3::ResourceBudget,
@@ -75,8 +75,8 @@ fn default_budget() -> ResourceBudget {
 
 pub fn read_plan(path: &Path) -> Result<ExplorationPlan, String> {
     let bytes = fs::read(path).map_err(|error| error.to_string())?;
-    let plan: ExplorationPlan =
-        serde_json::from_slice(&bytes).map_err(|error| format!("invalid exploration plan: {error}"))?;
+    let plan: ExplorationPlan = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("invalid exploration plan: {error}"))?;
     validate_plan(&plan)?;
     Ok(plan)
 }
@@ -388,13 +388,8 @@ fn make_replan_batch(
         .cloned()
         .ok_or_else(|| "replan blueprint disappeared".to_owned())?;
     if store.goal(&new_goal_id).is_none() {
-        let goal = Goal::new(
-            new_goal_id.clone(),
-            &blueprint,
-            plan.direction_budget,
-            None,
-        )
-        .map_err(|error| error.to_string())?;
+        let goal = Goal::new(new_goal_id.clone(), &blueprint, plan.direction_budget, None)
+            .map_err(|error| error.to_string())?;
         store.put_goal(goal).map_err(|error| error.to_string())?;
     }
     let mut updated = plan.clone();
@@ -406,6 +401,7 @@ fn make_replan_batch(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_status(
     paths: &goal_daemon::DaemonPaths,
     session: &Path,

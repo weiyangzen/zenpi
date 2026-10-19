@@ -3479,10 +3479,7 @@ fn goal_target_for_id(agent: &Agent, goal_id: &str) -> Result<String, String> {
     let goal = store
         .goal(goal_id)
         .ok_or_else(|| format!("goal `{goal_id}` is not found"))?;
-    Ok(format!(
-        "{}@{}",
-        goal.blueprint_id, goal.blueprint_version
-    ))
+    Ok(format!("{}@{}", goal.blueprint_id, goal.blueprint_version))
 }
 
 fn agent_worker_config(agent: &Agent) -> crate::goal_daemon::WorkerConfig {
@@ -3536,10 +3533,7 @@ pub fn goal_daemon_status_for_tui(
     Ok(value)
 }
 
-pub fn stop_goal_daemon_for_tui(
-    agent: &Agent,
-    goal_id: &str,
-) -> Result<serde_json::Value, String> {
+pub fn stop_goal_daemon_for_tui(agent: &Agent, goal_id: &str) -> Result<serde_json::Value, String> {
     let target = goal_target_for_id(agent, goal_id)?;
     let mut value = crate::goal_daemon::request_stop(agent.session().path(), &target)?;
     if let Some(object) = value.as_object_mut() {
@@ -3645,9 +3639,7 @@ pub fn run_goal_steps_for_tui(
             .and_then(|receipt| receipt.get("status"))
             .and_then(serde_json::Value::as_str)
             == Some("failed");
-        if failed
-            && let Some(goal_id) = value.get("goal_id").and_then(serde_json::Value::as_str)
-        {
+        if failed && let Some(goal_id) = value.get("goal_id").and_then(serde_json::Value::as_str) {
             let attempt = value
                 .get("receipt")
                 .and_then(|receipt| receipt.get("attempt"))
@@ -3793,20 +3785,19 @@ fn snapshot_skip(relative: &Path) -> bool {
     {
         return true;
     }
-    relative.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
-        name == "domains.jsonl"
-            || name == "execution.json"
-            || name.starts_with("session.")
-            || name.starts_with("goal-daemon-")
-            || name.starts_with("explore-")
-    })
+    relative
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            name == "domains.jsonl"
+                || name == "execution.json"
+                || name.starts_with("session.")
+                || name.starts_with("goal-daemon-")
+                || name.starts_with("explore-")
+        })
 }
 
-fn copy_workspace_tree(
-    source: &Path,
-    destination: &Path,
-    root: &Path,
-) -> Result<(), String> {
+fn copy_workspace_tree(source: &Path, destination: &Path, root: &Path) -> Result<(), String> {
     fs::create_dir_all(destination)
         .map_err(|error| format!("snapshot create {}: {error}", destination.display()))?;
     for entry in fs::read_dir(source)
@@ -3822,22 +3813,16 @@ fn copy_workspace_tree(
         let target = destination.join(relative);
         if file_type.is_dir() {
             copy_workspace_tree(&path, &target, root)?;
-        } else if file_type.is_file() {
-            if let Err(error) = fs::copy(&path, &target) {
-                eprintln!(
-                    "goal snapshot skipped {}: {error}",
-                    path.display()
-                );
-            }
+        } else if file_type.is_file()
+            && let Err(error) = fs::copy(&path, &target)
+        {
+            eprintln!("goal snapshot skipped {}: {error}", path.display());
         }
     }
     Ok(())
 }
 
-fn restore_workspace_snapshot(
-    snapshot: &Path,
-    workspace: &Path,
-) -> Result<(), String> {
+fn restore_workspace_snapshot(snapshot: &Path, workspace: &Path) -> Result<(), String> {
     // Best-effort ratchet: restore every file captured in the snapshot.
     // Files the snapshot could not read, and files created by the failed
     // attempt, are left in place rather than risking deletion of source.
@@ -3873,13 +3858,13 @@ fn execute_blueprint_task(
         None
     };
     let result = (|| -> Result<(), String> {
-    let acceptance = task
-        .acceptance_commands
-        .iter()
-        .map(|command| format!("- `{command}`"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let retry = latest_failed_acceptance(agent, &item.id)
+        let acceptance = task
+            .acceptance_commands
+            .iter()
+            .map(|command| format!("- `{command}`"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let retry = latest_failed_acceptance(agent, &item.id)
         .map(|error| {
             let error = error.chars().take(2_000).collect::<String>();
             format!(
@@ -3887,8 +3872,8 @@ fn execute_blueprint_task(
             )
         })
         .unwrap_or_default();
-    let prompt = format!(
-        "You are executing one b3ehive Blueprint item.\n\
+        let prompt = format!(
+            "You are executing one b3ehive Blueprint item.\n\
          Item: {item_id}\n\
          Workspace: {workspace}\n\n\
          Instruction:\n{instruction}\n\n\
@@ -3896,39 +3881,43 @@ fn execute_blueprint_task(
          Use your tools to make the change and run the acceptance commands yourself when possible. \
          Do not reply with a plan only; leave the workspace in the stated condition. \
          Finish with a concise evidence summary.",
-        item_id = item.id,
-        workspace = workspace.display(),
-        instruction = task.instruction,
-        acceptance = acceptance,
-        retry = retry,
-    );
-    let submission = agent
-        .submit(TurnInputRequest::new(prompt))
-        .map_err(|error| error.to_string())?;
-    if !submission.accepted() {
-        return Err(format!("agent refused the goal turn: {submission:?}"));
-    }
-    let _turn = agent
-        .run_active_turn()
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "agent completed the goal turn without an assistant response".to_owned())?;
-    for command in &task.acceptance_commands {
-        let output = std::process::Command::new("sh")
-            .arg("-lc")
-            .arg(command)
-            .current_dir(&workspace)
-            .output()
-            .map_err(|error| format!("could not run acceptance command `{command}`: {error}"))?;
-        if !output.status.success() {
-            let stdout = bounded_command_output(&output.stdout);
-            let stderr = bounded_command_output(&output.stderr);
-            return Err(format!(
-                "acceptance command `{command}` failed with {}; stdout: {stdout}; stderr: {stderr}",
-                output.status
-            ));
+            item_id = item.id,
+            workspace = workspace.display(),
+            instruction = task.instruction,
+            acceptance = acceptance,
+            retry = retry,
+        );
+        let submission = agent
+            .submit(TurnInputRequest::new(prompt))
+            .map_err(|error| error.to_string())?;
+        if !submission.accepted() {
+            return Err(format!("agent refused the goal turn: {submission:?}"));
         }
-    }
-    Ok(())
+        let _turn = agent
+            .run_active_turn()
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| {
+                "agent completed the goal turn without an assistant response".to_owned()
+            })?;
+        for command in &task.acceptance_commands {
+            let output = std::process::Command::new("sh")
+                .arg("-lc")
+                .arg(command)
+                .current_dir(&workspace)
+                .output()
+                .map_err(|error| {
+                    format!("could not run acceptance command `{command}`: {error}")
+                })?;
+            if !output.status.success() {
+                let stdout = bounded_command_output(&output.stdout);
+                let stderr = bounded_command_output(&output.stderr);
+                return Err(format!(
+                    "acceptance command `{command}` failed with {}; stdout: {stdout}; stderr: {stderr}",
+                    output.status
+                ));
+            }
+        }
+        Ok(())
     })();
     match result {
         Ok(()) => {
@@ -8472,8 +8461,9 @@ fn execute_headless_slash(
                     let Some(agent) = agent else {
                         return Err(SlashDispatchError {
                             code: "agent_busy",
-                            message: "goal daemon is temporarily unavailable while the agent is busy"
-                                .into(),
+                            message:
+                                "goal daemon is temporarily unavailable while the agent is busy"
+                                    .into(),
                         });
                     };
                     return Ok(SlashExecution::Response(

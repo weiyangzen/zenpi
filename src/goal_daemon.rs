@@ -139,7 +139,11 @@ fn state_for_goal(session: &Path, goal: &Goal) -> Result<GoalState, String> {
             GoalStatus::Done | GoalStatus::Blocked | GoalStatus::Cancelled
         ),
         receipt_count: receipts.len(),
-        attempts_used: receipts.iter().map(|receipt| receipt.attempt).max().unwrap_or(0),
+        attempts_used: receipts
+            .iter()
+            .map(|receipt| receipt.attempt)
+            .max()
+            .unwrap_or(0),
         latest_receipt_status: latest.map(|receipt| receipt.status.as_str().to_owned()),
         latest_receipt_error: latest.and_then(|receipt| receipt.error.clone()),
     })
@@ -512,10 +516,7 @@ pub(crate) fn session_cwd(session: &Path) -> Option<PathBuf> {
     let mut line = String::new();
     BufReader::new(file).read_line(&mut line).ok()?;
     let value: Value = serde_json::from_str(&line).ok()?;
-    value
-        .get("cwd")
-        .and_then(Value::as_str)
-        .map(PathBuf::from)
+    value.get("cwd").and_then(Value::as_str).map(PathBuf::from)
 }
 
 fn appended_log_contains(path: &Path, offset: u64, needle: &str) -> bool {
@@ -584,10 +585,12 @@ mod tests {
         let blueprint = Blueprint::new(
             "daemon-plan",
             "1",
-            vec![BlueprintItem::new("work", 2).with_task(crate::domains::BlueprintTask {
-                instruction: "do the work".into(),
-                acceptance_commands: vec!["true".into()],
-            })],
+            vec![
+                BlueprintItem::new("work", 2).with_task(crate::domains::BlueprintTask {
+                    instruction: "do the work".into(),
+                    acceptance_commands: vec!["true".into()],
+                }),
+            ],
         )
         .unwrap();
         let goal = Goal::new(
@@ -606,8 +609,7 @@ mod tests {
         domains.put_blueprint(blueprint.clone()).unwrap();
         domains.put_goal(goal.clone()).unwrap();
         let item = &blueprint.items[0];
-        let mut execution =
-            ExecutionStore::open(execution_path_for_session(&session)).unwrap();
+        let mut execution = ExecutionStore::open(execution_path_for_session(&session)).unwrap();
         execution
             .upsert_receipt(ExecutionReceipt {
                 execution_id: "daemon-execution".into(),
@@ -633,6 +635,9 @@ mod tests {
         assert_eq!(state.receipt_count, 1);
         assert_eq!(state.attempts_used, 1);
         assert_eq!(state.latest_receipt_status.as_deref(), Some("failed"));
-        assert_eq!(state.latest_receipt_error.as_deref(), Some("acceptance failed"));
+        assert_eq!(
+            state.latest_receipt_error.as_deref(),
+            Some("acceptance failed")
+        );
     }
 }

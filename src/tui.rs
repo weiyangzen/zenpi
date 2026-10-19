@@ -13569,10 +13569,8 @@ pub fn dispatch_slash_command(
                             )
                         ),
                     ),
-                    Err(error) => state.push_message(
-                        MessageRole::Error,
-                        format!("goal daemon failed: {error}"),
-                    ),
+                    Err(error) => state
+                        .push_message(MessageRole::Error, format!("goal daemon failed: {error}")),
                 },
                 None => state.push_message(
                     MessageRole::Error,
