@@ -3450,6 +3450,29 @@ where
     Ok(value)
 }
 
+pub fn spawn_exploration_for_tui(
+    agent: &Agent,
+    raw_path: &str,
+) -> Result<serde_json::Value, String> {
+    let workspace = owner_workspace(Some(agent)).map_err(|error| error.message)?;
+    let plan_path = resolve_workspace_path_at(raw_path, &workspace)?;
+    let mut value = crate::exploration::spawn_detached(
+        agent.session().path(),
+        &workspace,
+        &plan_path,
+        &agent_worker_config(agent),
+        std::time::Duration::from_millis(1_000),
+        3,
+    )?;
+    if let Some(object) = value.as_object_mut() {
+        object.insert("command".into(), json!("goal"));
+        object.insert("route".into(), json!("local"));
+        object.insert("action".into(), json!("explore"));
+        object.insert("accepted".into(), json!(true));
+    }
+    Ok(value)
+}
+
 fn goal_target_for_id(agent: &Agent, goal_id: &str) -> Result<String, String> {
     let store = DomainStore::open_read_only(domain_store::path_for_session(agent.session().path()))
         .map_err(|error| error.to_string())?;
@@ -3527,6 +3550,14 @@ pub fn stop_goal_daemon_for_tui(
         object.insert("goal_id".into(), json!(goal_id));
     }
     Ok(value)
+}
+
+pub fn run_goal_worker_by_id(
+    agent: &mut Agent,
+    goal_id: &str,
+) -> Result<serde_json::Value, String> {
+    let target = goal_target_for_id(agent, goal_id)?;
+    run_goal_worker_once(agent, &target)
 }
 
 /// One supervised attempt.  The daemon supervisor starts a fresh process for
@@ -3744,6 +3775,75 @@ fn latest_failed_acceptance(agent: &Agent, item_id: &str) -> Option<String> {
         .and_then(|receipt| receipt.error.clone())
 }
 
+fn snapshot_skip(relative: &Path) -> bool {
+    let first = relative
+        .components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .unwrap_or("");
+    if matches!(
+        first,
+        ".lake" | ".git" | ".zenpi" | "target" | "node_modules" | "vendor" | ".venv" | "dist"
+    ) {
+        return true;
+    }
+    if relative
+        .components()
+        .any(|component| component.as_os_str() == ".zenpi-snapshots")
+    {
+        return true;
+    }
+    relative.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
+        name == "domains.jsonl"
+            || name == "execution.json"
+            || name.starts_with("session.")
+            || name.starts_with("goal-daemon-")
+            || name.starts_with("explore-")
+    })
+}
+
+fn copy_workspace_tree(
+    source: &Path,
+    destination: &Path,
+    root: &Path,
+) -> Result<(), String> {
+    fs::create_dir_all(destination)
+        .map_err(|error| format!("snapshot create {}: {error}", destination.display()))?;
+    for entry in fs::read_dir(source)
+        .map_err(|error| format!("snapshot read {}: {error}", source.display()))?
+    {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let relative = path.strip_prefix(root).map_err(|error| error.to_string())?;
+        if snapshot_skip(relative) {
+            continue;
+        }
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        let target = destination.join(relative);
+        if file_type.is_dir() {
+            copy_workspace_tree(&path, &target, root)?;
+        } else if file_type.is_file() {
+            if let Err(error) = fs::copy(&path, &target) {
+                eprintln!(
+                    "goal snapshot skipped {}: {error}",
+                    path.display()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn restore_workspace_snapshot(
+    snapshot: &Path,
+    workspace: &Path,
+) -> Result<(), String> {
+    // Best-effort ratchet: restore every file captured in the snapshot.
+    // Files the snapshot could not read, and files created by the failed
+    // attempt, are left in place rather than risking deletion of source.
+    copy_workspace_tree(snapshot, workspace, snapshot)
+}
+
 fn execute_blueprint_task(
     agent: &mut Agent,
     item: &crate::domains::BlueprintItem,
@@ -3758,6 +3858,21 @@ fn execute_blueprint_task(
         return Err("goal execution requires an idle agent".into());
     }
     let workspace = PathBuf::from(&agent.session().header().cwd);
+    let session_path = agent.session().path();
+    let session_in_workspace = session_path
+        .canonicalize()
+        .ok()
+        .is_some_and(|session| session.starts_with(&workspace));
+    let snapshot = if session_in_workspace {
+        let snapshot = std::env::temp_dir()
+            .join("zenpi-goal-snapshots")
+            .join(format!("{}-{}", std::process::id(), unix_time_ms()));
+        copy_workspace_tree(&workspace, &snapshot, &workspace)?;
+        Some(snapshot)
+    } else {
+        None
+    };
+    let result = (|| -> Result<(), String> {
     let acceptance = task
         .acceptance_commands
         .iter()
@@ -3814,6 +3929,22 @@ fn execute_blueprint_task(
         }
     }
     Ok(())
+    })();
+    match result {
+        Ok(()) => {
+            if let Some(snapshot) = &snapshot {
+                let _ = fs::remove_dir_all(snapshot);
+            }
+            Ok(())
+        }
+        Err(error) => {
+            if let Some(snapshot) = &snapshot {
+                let _ = restore_workspace_snapshot(snapshot, &workspace);
+                let _ = fs::remove_dir_all(snapshot);
+            }
+            Err(error)
+        }
+    }
 }
 
 fn bounded_command_output(bytes: &[u8]) -> String {
@@ -7522,6 +7653,9 @@ enum GoalOwnerAction {
     DaemonStop {
         id: String,
     },
+    Explore {
+        path: String,
+    },
 }
 
 fn parse_goal_owner_action(
@@ -7543,6 +7677,7 @@ fn parse_goal_owner_action(
         && !action.eq_ignore_ascii_case("daemon")
         && !action.eq_ignore_ascii_case("daemon-status")
         && !action.eq_ignore_ascii_case("daemon-stop")
+        && !action.eq_ignore_ascii_case("explore")
     {
         return Ok(None);
     }
@@ -7550,7 +7685,7 @@ fn parse_goal_owner_action(
     let invalid_usage = || {
         SlashDispatchError {
         code: "goal_status_usage",
-        message: "use `/goal status [<goal-id>]`, `/goal run|resume|cancel|daemon|daemon-status|daemon-stop <goal-id> [until|N]`, or `/goal transition <goal-id> <queued|running|paused|blocked|cancelled|done>`".into(),
+        message: "use `/goal status [<goal-id>]`, `/goal run|resume|cancel|daemon|daemon-status|daemon-stop <goal-id> [until|N]`, `/goal explore PLAN`, or `/goal transition <goal-id> <queued|running|paused|blocked|cancelled|done>`".into(),
     }
     };
     let validate_id = |raw: &str| {
@@ -7617,6 +7752,25 @@ fn parse_goal_owner_action(
             }
             _ => Err(invalid_usage()),
         };
+    }
+
+    if action.eq_ignore_ascii_case("explore") {
+        if tokens.len() != 2 {
+            return Err(invalid_usage());
+        }
+        let path = tokens[1];
+        if path.is_empty()
+            || path.len() > MAX_WORKSPACE_PATH_BYTES
+            || path.chars().any(char::is_control)
+        {
+            return Err(SlashDispatchError {
+                code: "goal_explore_path",
+                message: "exploration plan path is not bounded".into(),
+            });
+        }
+        return Ok(Some(GoalOwnerAction::Explore {
+            path: path.to_owned(),
+        }));
     }
 
     if action.eq_ignore_ascii_case("daemon")
@@ -8296,6 +8450,23 @@ fn execute_headless_slash(
                     return Ok(SlashExecution::Response(create_goal_from_blueprint(
                         agent, &id, &target,
                     )?));
+                }
+                Some(GoalOwnerAction::Explore { path }) => {
+                    let Some(agent) = agent else {
+                        return Err(SlashDispatchError {
+                            code: "agent_busy",
+                            message: "goal exploration is temporarily unavailable while the agent is busy"
+                                .into(),
+                        });
+                    };
+                    return Ok(SlashExecution::Response(
+                        spawn_exploration_for_tui(agent, &path).map_err(|message| {
+                            SlashDispatchError {
+                                code: "goal_explore_failed",
+                                message,
+                            }
+                        })?,
+                    ));
                 }
                 Some(GoalOwnerAction::Daemon { id }) => {
                     let Some(agent) = agent else {

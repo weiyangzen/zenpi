@@ -15,6 +15,7 @@ pub mod domain_execution;
 pub mod domain_store;
 pub mod domains;
 pub mod error;
+pub mod exploration;
 pub mod extension_runtime;
 pub mod extensions;
 pub mod folder_source;

@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use crate::{
     domain_execution::{ExecutionStore, path_for_session as execution_path_for_session},
     domain_store::{self, DomainStore},
-    domains::GoalStatus,
+    domains::{Goal, GoalStatus},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -30,7 +30,7 @@ pub struct WorkerConfig {
 }
 
 impl WorkerConfig {
-    fn append_args(&self, command: &mut Command) {
+    pub(crate) fn append_args(&self, command: &mut Command) {
         if let Some(tools) = &self.tools {
             let value = if tools.is_empty() {
                 "none".to_owned()
@@ -52,7 +52,7 @@ impl WorkerConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct DaemonPaths {
+pub(crate) struct DaemonPaths {
     pub pid: PathBuf,
     pub status: PathBuf,
     pub log: PathBuf,
@@ -60,7 +60,7 @@ pub struct DaemonPaths {
 }
 
 impl DaemonPaths {
-    pub fn for_session(session: &Path, target: &str) -> Result<Self, String> {
+    pub(crate) fn for_session(session: &Path, target: &str) -> Result<Self, String> {
         let parent = session
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
@@ -110,6 +110,19 @@ pub fn goal_state(session: &Path, target: &str) -> Result<GoalState, String> {
             ));
         }
     };
+    state_for_goal(session, goal)
+}
+
+pub(crate) fn goal_state_by_id(session: &Path, goal_id: &str) -> Result<GoalState, String> {
+    let domains = DomainStore::open_read_only(domain_store::path_for_session(session))
+        .map_err(|error| error.to_string())?;
+    let goal = domains
+        .goal(goal_id)
+        .ok_or_else(|| format!("goal `{goal_id}` is not found"))?;
+    state_for_goal(session, goal)
+}
+
+fn state_for_goal(session: &Path, goal: &Goal) -> Result<GoalState, String> {
     let executions = ExecutionStore::open_read_only(execution_path_for_session(session))
         .map_err(|error| error.to_string())?;
     let receipts = executions
@@ -423,7 +436,7 @@ fn status_value(
     })
 }
 
-fn write_status(paths: &DaemonPaths, value: Value) -> Result<(), String> {
+pub(crate) fn write_status(paths: &DaemonPaths, value: Value) -> Result<(), String> {
     let temporary = paths.status.with_extension("json.tmp");
     let bytes = serde_json::to_vec_pretty(&value).map_err(|error| error.to_string())?;
     fs::write(&temporary, bytes).map_err(|error| error.to_string())?;
@@ -431,7 +444,7 @@ fn write_status(paths: &DaemonPaths, value: Value) -> Result<(), String> {
     fs::rename(&temporary, &paths.status).map_err(|error| error.to_string())
 }
 
-struct PidGuard {
+pub(crate) struct PidGuard {
     path: PathBuf,
     pid: u32,
 }
@@ -446,7 +459,7 @@ impl Drop for PidGuard {
     }
 }
 
-fn acquire_pid(paths: &DaemonPaths) -> Result<PidGuard, String> {
+pub(crate) fn acquire_pid(paths: &DaemonPaths) -> Result<PidGuard, String> {
     if let Some(pid) = read_live_pid(&paths.pid) {
         return Err(format!("goal daemon is already running (pid {pid})"));
     }
@@ -465,7 +478,7 @@ fn acquire_pid(paths: &DaemonPaths) -> Result<PidGuard, String> {
     })
 }
 
-fn read_live_pid(path: &Path) -> Option<u32> {
+pub(crate) fn read_live_pid(path: &Path) -> Option<u32> {
     let pid = fs::read_to_string(path).ok()?.trim().parse::<u32>().ok()?;
     process_alive(pid).then_some(pid)
 }
@@ -481,11 +494,11 @@ fn process_alive(pid: u32) -> bool {
         .is_ok_and(|status| status.success())
 }
 
-fn current_exe() -> Result<PathBuf, String> {
+pub(crate) fn current_exe() -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|error| error.to_string())
 }
 
-fn absolute_path(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn absolute_path(path: &Path) -> Result<PathBuf, String> {
     if path.is_absolute() {
         return Ok(path.to_path_buf());
     }
@@ -494,7 +507,7 @@ fn absolute_path(path: &Path) -> Result<PathBuf, String> {
         .map_err(|error| error.to_string())
 }
 
-fn session_cwd(session: &Path) -> Option<PathBuf> {
+pub(crate) fn session_cwd(session: &Path) -> Option<PathBuf> {
     let file = fs::File::open(session).ok()?;
     let mut line = String::new();
     BufReader::new(file).read_line(&mut line).ok()?;
@@ -532,7 +545,7 @@ fn sanitize_target(target: &str) -> String {
         .collect()
 }
 
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
