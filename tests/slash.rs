@@ -300,7 +300,7 @@ fn history_default_and_completion_are_bounded() {
     assert!(
         help(None)
             .unwrap()
-            .contains("/goal [show|list|status|run|resume|cancel")
+            .contains("/goal [show|list|status|run GOAL_ID")
     );
     assert!(help(Some("loop")).unwrap().contains("b3ehive runtime"));
     assert!(help(Some("missing")).is_none());
