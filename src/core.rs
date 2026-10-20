@@ -609,6 +609,12 @@ pub struct Agent {
     /// the worker pool continues to use the agent's active `model`.
     zone_models: crate::view_model::ZoneModels,
     last_error: Option<String>,
+    /// Prompt-prefix fingerprint of the previous provider request, compared
+    /// against the next one for the trajectory KV-cache check.
+    last_request_fingerprint: Option<(String, crate::trajectory::RequestFingerprint)>,
+    /// Timing/fingerprint metadata of the request whose completion
+    /// `complete_with_tools` returned, consumed when the answer is persisted.
+    pending_request_metadata: Option<Value>,
     events: Vec<AgentEvent>,
     live_tool_sink: Option<LiveToolEventSink>,
     tools: Option<ToolRuntime>,
@@ -937,6 +943,8 @@ impl Agent {
             zone_models: crate::view_model::ZoneModels::default(),
             max_tool_iterations: 1000,
             last_error: None,
+            last_request_fingerprint: None,
+            pending_request_metadata: None,
             events: Vec::new(),
             live_tool_sink: None,
             tools: None,
@@ -3349,6 +3357,7 @@ impl Agent {
                 total_usage.total_tokens += usage.total_tokens;
                 total_usage.cache_read_tokens += usage.cache_read_tokens;
                 total_usage.cache_write_tokens += usage.cache_write_tokens;
+                total_usage.reasoning_tokens += usage.reasoning_tokens;
                 reported_model = reported_model.or(response.model);
                 summaries.push((part, summary));
             }
@@ -4927,6 +4936,9 @@ impl Agent {
         if let Some(usage) = completion.usage {
             metadata.insert("usage".into(), serde_json::json!(usage));
         }
+        if let Some(request) = self.pending_request_metadata.take() {
+            metadata.insert(crate::trajectory::REQUEST_METADATA_KEY.into(), request);
+        }
         if let Some(response_id) = completion.response_id {
             metadata.insert("response_id".into(), serde_json::json!(response_id));
         }
@@ -5263,6 +5275,7 @@ impl Agent {
             };
             let request_scope = self.provider_request_scope(turn_id, purpose)?;
             let deadline = self.provider_request_deadline(&request_scope);
+            let session_id = self.session.session_id().to_owned();
             let pump = crate::input_queue::InputPump::new(
                 &mut self.session,
                 self.input_port.clone(),
@@ -5300,12 +5313,49 @@ impl Agent {
                 scope: request_scope.clone(),
                 before_send: &mut before_send,
             };
+            let fingerprint = crate::trajectory::RequestFingerprint::new(
+                &instructions,
+                &definitions,
+                &prepared.turns,
+            );
+            let started_ms = unix_time_ms();
+            let mut first_token_ms = None;
             let completion =
                 self.backend
                     .complete_with_request_control(request, &mut control, &mut |event| {
+                        if first_token_ms.is_none()
+                            && matches!(
+                                event,
+                                ProviderEvent::TextDelta { .. }
+                                    | ProviderEvent::ReasoningDelta { .. }
+                                    | ProviderEvent::ToolCallDelta { .. }
+                            )
+                        {
+                            first_token_ms = Some(unix_time_ms());
+                        }
                         provider_sink(event)?;
                         Ok(())
                     });
+            let timing = crate::trajectory::RequestTiming {
+                started_ms,
+                first_token_ms,
+                completed_ms: unix_time_ms(),
+            };
+            let previous = self
+                .last_request_fingerprint
+                .as_ref()
+                .filter(|(owner, _)| *owner == session_id)
+                .map(|(_, fingerprint)| fingerprint);
+            let mut request_metadata = serde_json::json!({
+                crate::trajectory::REQUEST_METADATA_KEY: fingerprint.metadata(previous, timing),
+            });
+            if let Some(usage) = completion.as_ref().ok().and_then(|c| c.usage) {
+                request_metadata["usage"] = serde_json::json!(usage);
+            }
+            // Only a request the provider answered can have warmed its cache.
+            if completion.is_ok() {
+                self.last_request_fingerprint = Some((session_id, fingerprint));
+            }
             pump.finish()?;
             if let Some(error) = admission_error {
                 return Err(error);
@@ -5343,6 +5393,8 @@ impl Agent {
                 if completion.content.trim().is_empty() {
                     completion.content = refusal.clone();
                 }
+                self.pending_request_metadata =
+                    Some(request_metadata[crate::trajectory::REQUEST_METADATA_KEY].take());
                 return Ok(completion);
             }
             if completion.tool_calls.is_empty() {
@@ -5362,6 +5414,8 @@ impl Agent {
                     if tool_iterations == 0 && completion.content.trim().is_empty() {
                         return Err(BackendError::EmptyResponse.into());
                     }
+                    self.pending_request_metadata =
+                        Some(request_metadata[crate::trajectory::REQUEST_METADATA_KEY].take());
                     return Ok(completion);
                 }
                 if input_continuations == max_input_continuations {
@@ -5376,9 +5430,9 @@ impl Agent {
                     TurnRole::Assistant,
                     &completion.content,
                 );
-                assistant.metadata = Some(
-                    serde_json::json!({"input_boundary_completion": true, "annotations": completion.annotations, "model": completion.model}),
-                );
+                let mut metadata = serde_json::json!({"input_boundary_completion": true, "annotations": completion.annotations, "model": completion.model});
+                merge_object(&mut metadata, request_metadata);
+                assistant.metadata = Some(metadata);
                 self.session.append_turn(assistant)?;
                 gate = new_gate()?;
                 if is_cancelled() {
@@ -5455,15 +5509,11 @@ impl Agent {
                 TurnRole::Assistant,
                 completion.content,
             );
-            assistant_call.metadata = Some(
-                serde_json::json!({ "tool_calls": call_metadata, "annotations": completion.annotations, "model": completion.model }),
-            );
-            // Real usage anchors the next compaction check (pi).
-            if let (Some(usage), Some(metadata)) =
-                (completion.usage, assistant_call.metadata.as_mut())
-            {
-                metadata["usage"] = serde_json::json!(usage);
-            }
+            let mut metadata = serde_json::json!({ "tool_calls": call_metadata, "annotations": completion.annotations, "model": completion.model });
+            // Real usage anchors the next compaction check (pi); the request
+            // record feeds the trajectory view.
+            merge_object(&mut metadata, request_metadata);
+            assistant_call.metadata = Some(metadata);
             self.session.append_turn(assistant_call)?;
             gate = new_gate()?;
             let batch_ids: Vec<_> = calls.iter().map(|call| call.id.clone()).collect();
@@ -7061,6 +7111,12 @@ fn admit_provider_send(
     }
     *governance = candidate;
     Ok(())
+}
+
+fn merge_object(target: &mut Value, source: Value) {
+    if let (Some(target), Value::Object(source)) = (target.as_object_mut(), source) {
+        target.extend(source);
+    }
 }
 
 fn unix_time_ms() -> u64 {

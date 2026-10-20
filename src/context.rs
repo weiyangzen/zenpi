@@ -38,7 +38,20 @@ pub struct PreparedContext {
 pub fn estimate_tokens(turns: &[Turn]) -> TokenEstimate {
     let bytes = turns.iter().fold(0_u64, |total, turn| {
         let metadata = turn.metadata.as_ref().map_or(0, |value| {
-            serde_json::to_vec(value).map_or(u64::MAX, |data| data.len() as u64)
+            let size = |value: &serde_json::Value| {
+                serde_json::to_vec(value).map_or(u64::MAX, |data| data.len() as u64)
+            };
+            // The trajectory request record is local bookkeeping that is never
+            // sent to a provider, so it must not move compaction thresholds.
+            let bookkeeping =
+                value
+                    .get(crate::trajectory::REQUEST_METADATA_KEY)
+                    .map_or(0, |request| {
+                        let key = crate::trajectory::REQUEST_METADATA_KEY.len() as u64;
+                        // `"request":` plus the separating comma.
+                        size(request).saturating_add(key + 4)
+                    });
+            size(value).saturating_sub(bookkeeping)
         });
         total
             .saturating_add(turn.content.len() as u64)

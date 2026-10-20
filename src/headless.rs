@@ -8350,6 +8350,22 @@ fn execute_headless_slash(
         }
         SlashCommand::Layout { action } => headless_layout_action(action),
         SlashCommand::Pane { action } => headless_pane_action(action),
+        SlashCommand::Trajectory => {
+            let Some(agent) = agent else {
+                return Err(SlashDispatchError {
+                    code: "agent_busy",
+                    message: "trajectory is temporarily unavailable while the agent is busy".into(),
+                });
+            };
+            let history = agent
+                .selected_history()
+                .map_err(|error| SlashDispatchError {
+                    code: "session_error",
+                    message: error.to_string(),
+                })?;
+            let trajectory = crate::trajectory::Trajectory::from_turns(&history, None);
+            Ok(SlashExecution::Response(trajectory.summary_json()))
+        }
         SlashCommand::Clear => Ok(SlashExecution::Response(json!({
             "command": "clear",
             "cleared": true,

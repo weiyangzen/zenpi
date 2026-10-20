@@ -788,18 +788,20 @@ impl LayoutPreset {
     pub fn for_tab(tab: TabId) -> Self {
         let ratios = ColumnRatios::default();
         let panes = match tab {
+            // The conversation sits at the bottom of the left column, right
+            // above the docked prompt; the Arch console tops the column.
             TabId::Project => vec![
+                pane(PaneId::Arch, Column::Left, 0, 40, 24, 4, false),
+                pane(PaneId::Resources, Column::Left, 1, 45, 22, 3, false),
                 pane(
                     PaneId::ProjectConversation,
                     Column::Left,
-                    0,
+                    2,
                     55,
                     24,
                     4,
                     false,
                 ),
-                pane(PaneId::Resources, Column::Left, 1, 45, 22, 3, false),
-                pane(PaneId::Arch, Column::Left, 2, 40, 24, 4, false),
                 pane(PaneId::Gantt, Column::Center, 0, 100, 36, 6, false),
                 pane(PaneId::Execution, Column::Center, 1, 30, 36, 4, false),
                 pane(PaneId::Browser, Column::Right, 0, 55, 32, 6, true),

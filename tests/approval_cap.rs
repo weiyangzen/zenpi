@@ -122,6 +122,12 @@ fn file_diff_is_not_buried_below_repeated_content_arguments() {
     complete_preview(&request);
     let mut state = TuiState::default();
     state.present_approval(request);
+    // The prompt form names the file and the size of the change ...
+    let inline = frame(&mut state, 84, 30, false, "inline-head");
+    assert!(inline.contains("review.txt"), "{inline:?}");
+    assert!(inline.contains("v shows the diff"), "{inline:?}");
+    // ... and `v` opens the review with the diff at the top.
+    key(&mut state, KeyCode::Char('v'));
     let body = frame(&mut state, 84, 30, false, "normal-head");
     assert!(
         body.contains("review.txt"),
@@ -158,10 +164,19 @@ fn real_owner_truncation_is_visible_before_allowing() {
     ));
     let mut state = TuiState::default();
     state.present_approval(request);
-    let body = frame(&mut state, 84, 30, false, "owner-truncated-head");
+    // The warning is part of the prompt form at the bottom of the screen.
+    let mut terminal = Terminal::new(TestBackend::new(84, 30)).unwrap();
+    terminal.draw(|f| state.render(f, "zenpi")).unwrap();
+    let screen: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
     assert!(
-        body.contains("Preview truncated"),
-        "owner truncation must be visible without scrolling through raw arguments"
+        screen.contains("Preview truncated"),
+        "owner truncation must be visible without scrolling through raw arguments; screen={screen:?}"
     );
     // A bare Enter decides in one press: denial is the default selection.
     assert!(matches!(

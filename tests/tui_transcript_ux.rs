@@ -499,7 +499,8 @@ fn approval_terminal_clears_modal_and_stale_job_cannot_reopen_it() {
         policy_digest: None,
         lease_id: None,
     });
-    assert!(render(&mut state, 180, 40).contains("visible-approval"));
+    // The pending request is answered in the prompt form.
+    assert!(render(&mut state, 180, 40).contains("Approval required 1/1 · write_file"));
     let terminal = ViewEvent::with_context(
         1,
         None,

@@ -823,6 +823,12 @@ pub enum ViewEventKind {
         input_tokens: u64,
         output_tokens: u64,
         total_tokens: u64,
+        #[serde(default, skip_serializing_if = "is_zero_u64")]
+        cache_read_tokens: u64,
+        #[serde(default, skip_serializing_if = "is_zero_u64")]
+        cache_write_tokens: u64,
+        #[serde(default, skip_serializing_if = "is_zero_u64")]
+        reasoning_tokens: u64,
     },
     Handoff {
         handoff_id: String,
@@ -1225,6 +1231,9 @@ impl ViewEvent {
                 input_tokens: usage.input_tokens,
                 output_tokens: usage.output_tokens,
                 total_tokens: usage.total_tokens,
+                cache_read_tokens: usage.cache_read_tokens,
+                cache_write_tokens: usage.cache_write_tokens,
+                reasoning_tokens: usage.reasoning_tokens,
             },
             ProviderEvent::Warning { message } => ViewEventKind::Warning {
                 message: message.clone(),
@@ -1729,4 +1738,8 @@ fn format_bus_bytes(bytes: u64) -> String {
         }
     }
     "0 B".to_owned()
+}
+
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
 }

@@ -369,7 +369,7 @@ def queued_shell_paste_smoke(binary, evidence):
                 t.wait(lambda:len(saved()['scheduled_inputs'])==count+1);wait_draft('');entry=saved()['scheduled_inputs'][-1]
                 result['accepted'].append({'entry':entry,'draft_before':snapshot});return entry,snapshot
             def finish(release,allow):
-                release.set();t.wait(lambda:'Approval required' in screen_text(bytes(t.output)).decode().splitlines()[1])
+                release.set();t.wait(lambda:'Approval required 1/' in screen_text(bytes(t.output)).decode())
                 t.write(b'y\r' if allow else b'n\r')
                 if allow:t.wait(lambda:'Local shell exit 0' in screen_text(bytes(t.output)).decode().splitlines()[1])
                 else:t.wait(lambda:'Request failed' in screen_text(bytes(t.output)).decode().splitlines()[1])
@@ -409,9 +409,9 @@ def queued_shell_paste_smoke(binary, evidence):
             release=start_gate();first_entry,first=enqueue(duplicate);second_entry,second=enqueue(duplicate,False)
             t.command('/scheduled edit '+second_entry['id']+' 0 printf identity-edited > duplicate-edited.txt');t.wait(lambda:saved()['scheduled_inputs'][1]['revision']==1);wait_draft('')
             result['identity_edit']={'edited_id':second_entry['id'],'remaining':saved()['scheduled_inputs'],'expected_first_draft':first}
-            release.set();t.wait(lambda:'Approval required' in screen_text(bytes(t.output)).decode().splitlines()[1]);t.write(b'n\r');t.wait(lambda:bool(draft()['input']))
+            release.set();t.wait(lambda:'Approval required 1/' in screen_text(bytes(t.output)).decode());t.write(b'n\r');t.wait(lambda:bool(draft()['input']))
             actual=draft();assert actual['input']==duplicate and actual['paste_folds']==first['paste_folds'] and actual['cursor']==first['cursor']
-            t.wait(lambda:'Approval required' in screen_text(bytes(t.output)).decode().splitlines()[1]);t.write(b'y\r');t.wait(lambda:(root/'initial/duplicate-edited.txt').exists());t.wait(lambda:not saved()['scheduled_inputs'])
+            t.wait(lambda:'Approval required 1/' in screen_text(bytes(t.output)).decode());t.write(b'y\r');t.wait(lambda:(root/'initial/duplicate-edited.txt').exists());t.wait(lambda:not saved()['scheduled_inputs'])
             assert (root/'initial/duplicate-edited.txt').read_text()=='identity-edited' and not (root/'initial/duplicate-edit-must-not-exist').exists();clear()
             result['journal_records']=[json.loads(line) for line in journal.read_text().splitlines()]
             result['actual_files']={path.name:{'text':path.read_text(),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for path in (root/'initial').iterdir() if path.is_file()}
@@ -727,7 +727,7 @@ def main():
             terminal.command(f'/project select {original_project}')
             terminal.wait(lambda: json.loads(checkpoint.read_text())['active'] == 0)
             gates['SCHEDULE_GATE_ONE'][1].set()
-            terminal.wait(lambda: 'Approval required' in screen_text(bytes(terminal.output)).decode().splitlines()[1])
+            terminal.wait(lambda: 'Approval required 1/' in screen_text(bytes(terminal.output)).decode())
             assert not (root/'initial/scheduled-edited.txt').exists()
             terminal.write(b'y\r')
             terminal.wait(lambda: (root/'initial/scheduled-edited.txt').read_text() == 'edited')

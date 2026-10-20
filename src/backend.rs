@@ -468,6 +468,10 @@ impl ProviderEvent {
 }
 
 /// Optional usage information returned by a provider.
+///
+/// `input_tokens` always counts the whole prompt, cached or not. The cache and
+/// reasoning counters are a breakdown reported by providers that expose one;
+/// they stay zero (and are omitted on the wire) when a provider does not.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Usage {
     /// All prompt tokens, cached ones included.
@@ -480,6 +484,27 @@ pub struct Usage {
     /// Prompt tokens written to the provider's prompt cache (Anthropic).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub cache_write_tokens: u64,
+    /// Output tokens spent on reasoning, already included in `output_tokens`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub reasoning_tokens: u64,
+}
+
+impl Usage {
+    pub const fn new(input_tokens: u64, output_tokens: u64, total_tokens: u64) -> Self {
+        Self {
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            reasoning_tokens: 0,
+        }
+    }
+
+    /// True when the provider reported any prefix-cache counter.
+    pub const fn reports_cache(&self) -> bool {
+        self.cache_read_tokens > 0 || self.cache_write_tokens > 0
+    }
 }
 
 fn is_zero(value: &u64) -> bool {

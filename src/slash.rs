@@ -178,6 +178,8 @@ pub enum SlashCommand {
     Status,
     /// Clear the visible transcript without deleting the durable journal.
     Clear,
+    /// Open the trajectory viewer (TUI) or report trajectory/KV-cache stats.
+    Trajectory,
     /// Ask the active request to stop.
     Cancel,
     /// Create, select, or close a top-level project workspace tab.
@@ -510,6 +512,7 @@ impl SlashCommand {
             Self::Approve { .. } => "approve",
             Self::Status => "status",
             Self::Clear => "clear",
+            Self::Trajectory => "trajectory",
             Self::Cancel => "cancel",
             Self::Project { .. } => "project",
             Self::Exit => "exit",
@@ -778,6 +781,13 @@ pub const COMMAND_SPECS: &[SlashCommandSpec] = &[
         route: SlashRoute::Local,
         usage: "/clear",
         summary: "clear the visible transcript",
+    },
+    SlashCommandSpec {
+        name: "trajectory",
+        aliases: NO_ALIASES,
+        route: SlashRoute::Local,
+        usage: "/trajectory",
+        summary: "inspect the agent trajectory, token usage and KV-cache reuse",
     },
     SlashCommandSpec {
         name: "cancel",
@@ -1408,6 +1418,7 @@ pub fn parse(input: &str) -> Result<Option<SlashCommand>, SlashError> {
         },
         "status" => unit_command(args, "status", SlashCommand::Status)?,
         "clear" => unit_command(args, "clear", SlashCommand::Clear)?,
+        "trajectory" => unit_command(args, "trajectory", SlashCommand::Trajectory)?,
         "cancel" => unit_command(args, "cancel", SlashCommand::Cancel)?,
         "exit" => unit_command(args, "exit", SlashCommand::Exit)?,
         "compete" => SlashCommand::Compete {

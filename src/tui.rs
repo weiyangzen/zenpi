@@ -7,7 +7,12 @@
 //! cells; resize notifications are coalesced by [`RenderScheduler`] so a
 //! resize drag or a burst of stream chunks does not cause a draw per event.
 
+mod agents;
 pub(crate) mod bootstrap;
+mod trajectory;
+
+pub use agents::AgentState;
+pub use trajectory::TrajectoryLevel;
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -1032,6 +1037,21 @@ struct CopyEntry {
     label: String,
     text: String,
 }
+/// The live session's selected history as last seen by the host.
+#[derive(Debug)]
+struct TrajectoryHistory {
+    turns: Vec<crate::core::Turn>,
+}
+
+impl TrajectoryHistory {
+    fn project(&self, busy: bool) -> crate::trajectory::Trajectory {
+        let root = busy
+            .then(|| crate::trajectory::open_root(&self.turns))
+            .flatten();
+        crate::trajectory::Trajectory::from_turns(&self.turns, root)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct TranscriptBrowser {
     entries: Vec<CopyEntry>,
@@ -1206,15 +1226,101 @@ struct ApprovalView {
     /// second confirm, reject collects optional feedback for the model.
     stage: ApprovalStage,
     message: String,
+    /// Requests raised by the project's arch owner; they are answered in the
+    /// Arch prompt instead of the discussion prompt.
+    arch_requests: BTreeSet<String>,
+    /// The full-screen review (`v`) instead of the inline prompt form.
+    expanded: bool,
 }
 
-/// The three approval confirmation stages (ZS1-182).
+/// `/new` refused because received inputs were never used by a turn: the
+/// prompt offers to discard them and retry, Claude Code style.
+#[derive(Debug, Clone)]
+struct NewSessionChoice {
+    project: String,
+    /// `(input id, text)` of every pending input.
+    inputs: Vec<(String, String)>,
+    /// Highlighted option: discard (1) or keep (2).
+    discard: bool,
+}
+
+/// Which prompt answers an approval: the one whose owner raised it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalLane {
+    Discussion,
+    Arch,
+}
+
+/// Approval stages (ZS1-182): choosing an option, or writing the optional
+/// note that goes back to the model with a denial.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum ApprovalStage {
     #[default]
     Select,
-    ConfirmRemember,
     RejectMessage,
+}
+
+/// One answer in the approval choice list, Claude Code style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ApprovalChoice {
+    Allow,
+    AllowAlways,
+    Deny,
+}
+
+impl ApprovalChoice {
+    /// The options offered for a request; blueprint workers are once-only.
+    fn options(worker: bool) -> &'static [Self] {
+        if worker {
+            &[Self::Allow, Self::Deny]
+        } else {
+            &[Self::Allow, Self::AllowAlways, Self::Deny]
+        }
+    }
+
+    fn label(self, tool: &str) -> String {
+        match self {
+            Self::Allow => "Yes".into(),
+            Self::AllowAlways => format!("Yes, and don't ask again for {tool}"),
+            Self::Deny => "No, and tell zenpi what to do differently".into(),
+        }
+    }
+}
+
+impl ApprovalView {
+    fn worker(&self) -> bool {
+        self.requests
+            .get(self.index)
+            .is_some_and(|r| r.origin == crate::tools::ToolOrigin::BlueprintWorker)
+    }
+
+    /// The highlighted option; `allow`/`remember` are its stored form.
+    fn choice(&self) -> ApprovalChoice {
+        match (self.allow, self.remember) {
+            (true, true) if !self.worker() => ApprovalChoice::AllowAlways,
+            (true, _) => ApprovalChoice::Allow,
+            (false, _) => ApprovalChoice::Deny,
+        }
+    }
+
+    fn set_choice(&mut self, choice: ApprovalChoice) {
+        self.allow = choice != ApprovalChoice::Deny;
+        self.remember = choice == ApprovalChoice::AllowAlways;
+    }
+
+    fn move_choice(&mut self, down: bool) {
+        let options = ApprovalChoice::options(self.worker());
+        let at = options
+            .iter()
+            .position(|option| *option == self.choice())
+            .unwrap_or(0);
+        let next = if down {
+            (at + 1).min(options.len() - 1)
+        } else {
+            at.saturating_sub(1)
+        };
+        self.set_choice(options[next]);
+    }
 }
 
 impl TuiState {
@@ -1240,6 +1346,16 @@ impl TuiState {
         project: String,
         request: crate::approval::ApprovalRequest,
     ) {
+        self.present_approval_in(project, request, ApprovalLane::Discussion);
+    }
+
+    /// File a request and remember which prompt answers it.
+    pub fn present_approval_in(
+        &mut self,
+        project: String,
+        request: crate::approval::ApprovalRequest,
+        lane: ApprovalLane,
+    ) {
         if let Err(error) = request.validate() {
             self.push_message(MessageRole::Error, format!("Invalid approval: {error}"));
             return;
@@ -1255,9 +1371,16 @@ impl TuiState {
         }
         if view.requests.len() < 128 {
             let first = view.requests.is_empty();
+            let requests = &view.requests;
+            view.arch_requests
+                .retain(|id| requests.iter().any(|r| &r.request_id == id));
+            if lane == ApprovalLane::Arch {
+                view.arch_requests.insert(request.request_id.clone());
+            }
             view.requests.push(request);
             if first {
                 view.focused = can_focus;
+                view.expanded = false;
                 view.index = 0;
                 view.scroll = 0;
                 view.allow = false;
@@ -1370,10 +1493,57 @@ impl TuiState {
         self.sync_activity_timer();
     }
 
-    fn sync_activity_timer(&mut self) {
-        let waiting = self.approval_count() > 0
+    /// The active turn is blocked on an approval decision, not on the model.
+    fn approval_waiting(&self) -> bool {
+        self.approval_count() > 0
             || !self.transcript_ux.canonical_approvals.is_empty()
-            || self.transcript_ux.approval_tracking_saturated;
+            || self.transcript_ux.approval_tracking_saturated
+    }
+
+    /// Whether a request answered in `lane`'s prompt is pending in the active
+    /// project. Canonical (host-tracked) approvals belong to the discussion.
+    fn approval_waiting_in(&self, lane: ApprovalLane) -> bool {
+        let pending = self
+            .approval_views
+            .get(self.active_project())
+            .is_some_and(|view| {
+                view.requests.iter().any(|request| {
+                    view.arch_requests.contains(&request.request_id) == (lane == ApprovalLane::Arch)
+                })
+            });
+        pending
+            || (lane == ApprovalLane::Discussion
+                && (!self.transcript_ux.canonical_approvals.is_empty()
+                    || self.transcript_ux.approval_tracking_saturated))
+    }
+
+    /// A bare `y`/`n` typed in the prompt while an approval is pending means
+    /// the decision, not a steering message: open the review with that choice
+    /// preselected so Enter confirms it. Returns false when nothing is pending.
+    fn select_pending_approval(&mut self, allow: bool) -> bool {
+        let project = self.active_project().to_owned();
+        let Some(view) = self.approval_views.get_mut(&project) else {
+            return false;
+        };
+        if view.requests.is_empty() || view.focused {
+            return false;
+        }
+        view.focused = true;
+        view.allow = allow;
+        view.remember = false;
+        view.stage = ApprovalStage::Select;
+        view.message.clear();
+        self.set_status(if allow {
+            "Approval: ALLOW selected · Enter confirms · Esc back"
+        } else {
+            "Approval: DENY selected · Enter confirms · n adds a note · Esc back"
+        });
+        self.dirty = true;
+        true
+    }
+
+    fn sync_activity_timer(&mut self) {
+        let waiting = self.approval_waiting();
         if !self.busy || self.transcript_ux.activity_ended || waiting {
             self.transcript_ux.pause();
         } else if self.transcript_ux.started.is_none() {
@@ -1424,29 +1594,6 @@ impl TuiState {
         // ZS1-182 staged confirm: once submits directly, remember asks for a
         // second confirm, reject collects optional feedback for the model.
         match view.stage {
-            ApprovalStage::ConfirmRemember => {
-                return match key.code {
-                    KeyCode::Enter => {
-                        let r = &view.requests[view.index];
-                        view.remember = true;
-                        view.allow = true;
-                        view.stage = ApprovalStage::Select;
-                        Some(TuiAction::RespondApproval {
-                            project,
-                            request_id: r.request_id.clone(),
-                            turn_id: r.turn_id.clone(),
-                            call_id: r.call_id.clone(),
-                            allow: true,
-                            remember: true,
-                        })
-                    }
-                    KeyCode::Esc => {
-                        view.stage = ApprovalStage::Select;
-                        Some(TuiAction::Redraw)
-                    }
-                    _ => Some(TuiAction::Redraw),
-                };
-            }
             ApprovalStage::RejectMessage => {
                 return match key.code {
                     KeyCode::Enter => {
@@ -1483,71 +1630,190 @@ impl TuiState {
             }
             ApprovalStage::Select => {}
         }
+        // Claude Code style choice list: arrows move, a digit picks and
+        // confirms, Enter confirms the highlighted option. Denial is the
+        // default highlight, so a bare Enter never allows (ZS1-182).
+        let respond = |view: &mut ApprovalView, project: String| {
+            let r = &view.requests[view.index];
+            view.stage = ApprovalStage::Select;
+            Some(TuiAction::RespondApproval {
+                project,
+                request_id: r.request_id.clone(),
+                turn_id: r.turn_id.clone(),
+                call_id: r.call_id.clone(),
+                allow: view.allow,
+                remember: view.remember,
+            })
+        };
         match key.code {
+            KeyCode::Esc if view.expanded => view.expanded = false,
             KeyCode::Esc => {
                 view.focused = false;
                 self.set_status("Approval pending · Alt-A opens review · draft kept");
             }
+            KeyCode::Char('v') => view.expanded = !view.expanded,
             KeyCode::Char('/') => {
                 view.focused = false;
                 return None;
             }
-            KeyCode::Char('y') => {
-                view.allow = true;
-                view.remember = false;
+            KeyCode::Up | KeyCode::Char('k') => view.move_choice(false),
+            KeyCode::Down | KeyCode::Char('j') => view.move_choice(true),
+            KeyCode::Char(digit @ '1'..='9') => {
+                let options = ApprovalChoice::options(view.worker());
+                let Some(choice) = options.get(usize::from(digit as u8 - b'1')) else {
+                    return Some(TuiAction::Redraw);
+                };
+                view.set_choice(*choice);
+                return respond(view, project);
             }
+            KeyCode::Char('y') => view.set_choice(ApprovalChoice::Allow),
+            KeyCode::Char('r') if !view.worker() => view.set_choice(ApprovalChoice::AllowAlways),
             KeyCode::Char('n') => {
-                view.allow = false;
-                view.remember = false;
+                view.set_choice(ApprovalChoice::Deny);
                 view.stage = ApprovalStage::RejectMessage;
                 view.message.clear();
-            }
-            KeyCode::Char('r')
-                if view.requests[view.index].origin
-                    != crate::tools::ToolOrigin::BlueprintWorker =>
-            {
-                view.allow = true;
-                view.remember = true;
-                view.stage = ApprovalStage::ConfirmRemember;
             }
             KeyCode::Tab | KeyCode::Right => {
                 view.index = (view.index + 1) % view.requests.len();
                 view.scroll = 0;
-                view.allow = false;
-                view.remember = false;
+                view.set_choice(ApprovalChoice::Deny);
             }
             KeyCode::BackTab | KeyCode::Left => {
                 view.index = (view.index + view.requests.len() - 1) % view.requests.len();
                 view.scroll = 0;
-                view.allow = false;
-                view.remember = false;
+                view.set_choice(ApprovalChoice::Deny);
             }
-            KeyCode::Up => view.scroll = view.scroll.saturating_sub(1),
-            KeyCode::Down => view.scroll = view.scroll.saturating_add(1),
-            KeyCode::PageUp => view.scroll = view.scroll.saturating_sub(10),
-            KeyCode::PageDown => view.scroll = view.scroll.saturating_add(10),
-            KeyCode::Home => view.scroll = 0,
-            KeyCode::End => view.scroll = usize::MAX,
-            KeyCode::Enter => {
-                // Enter confirms the current selection in one press.  Denial
-                // is the default selection, so a bare Enter denies; leaving a
-                // note for the model is an explicit choice (`n`), not a step
-                // every denial has to walk through first.
-                let r = &view.requests[view.index];
-                view.stage = ApprovalStage::Select;
-                return Some(TuiAction::RespondApproval {
-                    project,
-                    request_id: r.request_id.clone(),
-                    turn_id: r.turn_id.clone(),
-                    call_id: r.call_id.clone(),
-                    allow: view.allow,
-                    remember: view.remember,
-                });
+            // Scrolling only makes sense in the full review, so it opens it.
+            KeyCode::PageUp => {
+                view.expanded = true;
+                view.scroll = view.scroll.saturating_sub(10);
             }
+            KeyCode::PageDown => {
+                view.expanded = true;
+                view.scroll = view.scroll.saturating_add(10);
+            }
+            KeyCode::Home => {
+                view.expanded = true;
+                view.scroll = 0;
+            }
+            KeyCode::End => {
+                view.expanded = true;
+                view.scroll = usize::MAX;
+            }
+            KeyCode::Enter => return respond(view, project),
             _ => {}
         }
         Some(TuiAction::Redraw)
     }
+    /// The prompt that answers the focused approval inline, if any: the arch
+    /// prompt for arch-owner requests, the discussion prompt otherwise.
+    pub fn inline_approval_lane(&self) -> Option<ApprovalLane> {
+        let view = self.approval_views.get(self.active_project())?;
+        if !view.focused || view.expanded {
+            return None;
+        }
+        let request = view.requests.get(view.index)?;
+        Some(if view.arch_requests.contains(&request.request_id) {
+            ApprovalLane::Arch
+        } else {
+            ApprovalLane::Discussion
+        })
+    }
+
+    /// Title and body of the inline approval form, wrapped to `width`:
+    /// what the tool will do, then the Claude Code style choice list.
+    fn inline_approval_form(&self, width: usize) -> Option<(String, Vec<Line<'static>>)> {
+        let view = self.approval_views.get(self.active_project())?;
+        let r = view.requests.get(view.index)?;
+        let width = width.max(8);
+        let title = format!(
+            " Approval required {}/{} · {} ",
+            view.index + 1,
+            view.requests.len(),
+            r.tool
+        );
+        let (what, incomplete) = match &r.preview {
+            Some(crate::tools::ToolPreview::Diff {
+                path,
+                patch,
+                truncated,
+                before_bytes,
+                after_bytes,
+                ..
+            }) => {
+                let count = |sign: char, header: &str| {
+                    patch
+                        .lines()
+                        .filter(|line| line.starts_with(sign) && !line.starts_with(header))
+                        .count()
+                };
+                (
+                    format!(
+                        "{path} · +{} −{} lines · {before_bytes} → {after_bytes} bytes · v shows the diff",
+                        count('+', "+++"),
+                        count('-', "---")
+                    ),
+                    *truncated,
+                )
+            }
+            _ => {
+                let arguments = crate::security::redact_json(&r.arguments, &[]);
+                // A shell command reads best as the command itself.
+                let text = arguments
+                    .get("command")
+                    .and_then(serde_json::Value::as_str)
+                    .map_or_else(|| arguments.to_string(), str::to_owned);
+                (text, false)
+            }
+        };
+        let mut lines = vec![Line::styled(
+            r.tool.clone(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )];
+        let mut body = wrap_plain(&what, width.saturating_sub(2));
+        if body.len() > 3 {
+            body.truncate(3);
+            body[2] = format!(
+                "{}… v shows all",
+                truncate_to_width(&body[2], width.saturating_sub(16))
+            );
+        }
+        lines.extend(body.into_iter().map(|line| Line::raw(format!("  {line}"))));
+        lines.push(Line::raw(""));
+        lines.extend(approval_choice_lines(view, incomplete, width));
+        Some((title, lines))
+    }
+
+    /// Rows a prompt needs to show the inline approval form at `width`.
+    fn inline_approval_rows(&self, lane: ApprovalLane, width: u16) -> Option<u16> {
+        if self.inline_approval_lane() != Some(lane) {
+            return None;
+        }
+        let (_, lines) = self.inline_approval_form(usize::from(width.saturating_sub(2)))?;
+        Some(
+            u16::try_from(lines.len())
+                .unwrap_or(u16::MAX)
+                .saturating_add(2),
+        )
+    }
+
+    /// Draw the focused approval as the prompt itself.
+    fn render_inline_approval(&self, frame: &mut Frame<'_>, area: Rect) {
+        let Some((title, lines)) =
+            self.inline_approval_form(usize::from(area.width.saturating_sub(2)))
+        else {
+            return;
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(title);
+        frame.render_widget(Clear, area);
+        frame.render_widget(Paragraph::new(lines).block(block), area);
+    }
+
     fn render_approval(&mut self, frame: &mut Frame<'_>) {
         let project = self.active_project().to_owned();
         let Some(view) = self.approval_views.get_mut(&project) else {
@@ -1557,9 +1823,10 @@ impl TuiState {
             return;
         }
         let area = frame.area();
-        if !view.focused {
-            // The footer owns the pending hint and its priority relative to
-            // save failures; drawing it here would overwrite existing text.
+        if !view.focused || !view.expanded {
+            // Pending-but-unfocused requests are hinted by the footer, and a
+            // focused one is answered inline in its prompt; only the detail
+            // review (`v`) takes over the screen.
             return;
         }
         if area.width < 4 || area.height < 5 {
@@ -1624,7 +1891,15 @@ impl TuiState {
                 "Display truncated; inspect full arguments before allowing.\n\n",
             );
         }
-        let height = inner.height.saturating_sub(2);
+        let mut choices = approval_choice_lines(view, owner_truncated, usize::from(inner.width));
+        // A short review keeps the evidence and folds the list into a line.
+        if choices.len() > usize::from(inner.height / 3) {
+            choices = compact_choice_lines(view, usize::from(inner.width));
+        }
+        let footer = u16::try_from(choices.len())
+            .unwrap_or(u16::MAX)
+            .min(inner.height.saturating_sub(1));
+        let height = inner.height.saturating_sub(footer);
         let window = crate::render::render_plain_window(
             &text,
             usize::from(inner.width),
@@ -1637,37 +1912,13 @@ impl TuiState {
             Paragraph::new(window.lines),
             Rect::new(inner.x, inner.y, inner.width, height),
         );
-        let remember = if r.origin == crate::tools::ToolOrigin::BlueprintWorker {
-            "Worker: once only".to_owned()
+        let choices = if incomplete && !owner_truncated && footer > 2 {
+            approval_choice_lines(view, true, usize::from(inner.width))
         } else {
-            format!("r remember: {}", view.remember)
-        };
-        let decision_hint = if incomplete {
-            "INCOMPLETE preview · inspect source · n deny".to_owned()
-        } else {
-            match view.stage {
-                ApprovalStage::ConfirmRemember => {
-                    "Confirm remember? Enter allow+remember · Esc cancel".to_owned()
-                }
-                ApprovalStage::RejectMessage => format!(
-                    "Reject message (optional): {}▏ · Enter deny · Esc back",
-                    view.message
-                ),
-                ApprovalStage::Select => {
-                    // Name the selection Enter would commit: "confirm" alone
-                    // leaves the user guessing which way the key goes.
-                    format!(
-                        "Enter {} now · y allow · n deny with a note · r remember · {remember}",
-                        if view.allow { "ALLOW" } else { "DENY" }
-                    )
-                }
-            }
+            choices
         };
         frame.render_widget(
-            Paragraph::new(format!(
-                "{decision_hint}\nTab next · PgUp/PgDn scroll · Esc draft · Ctrl-C cancel"
-            ))
-            .style(Style::default().fg(Color::Yellow)),
+            Paragraph::new(choices),
             Rect::new(
                 inner.x,
                 inner.y + height,
@@ -1676,6 +1927,110 @@ impl TuiState {
             ),
         );
     }
+}
+
+/// The choice list folded into at most two rows for a cramped review.
+fn compact_choice_lines(view: &ApprovalView, width: usize) -> Vec<Line<'static>> {
+    let text = if view.stage == ApprovalStage::RejectMessage {
+        format!("Note: {}▏ · Enter deny · Esc back", view.message)
+    } else {
+        let current = view.choice();
+        let options = ApprovalChoice::options(view.worker())
+            .iter()
+            .enumerate()
+            .map(|(index, option)| {
+                let name = match option {
+                    ApprovalChoice::Allow => "Yes",
+                    ApprovalChoice::AllowAlways => "Always",
+                    ApprovalChoice::Deny => "No",
+                };
+                let mark = if *option == current { "❯" } else { "" };
+                format!("{mark}{} {name}", index + 1)
+            })
+            .collect::<Vec<_>>()
+            .join(" · ");
+        format!("{options} · Enter confirm · Esc back")
+    };
+    wrap_plain(&text, width.max(1))
+        .into_iter()
+        .take(2)
+        .map(|line| Line::styled(line, Style::default().fg(Color::Yellow)))
+        .collect()
+}
+
+/// The question, the numbered options and the keys, shared by the inline
+/// prompt form and the full review.
+fn approval_choice_lines(
+    view: &ApprovalView,
+    incomplete: bool,
+    width: usize,
+) -> Vec<Line<'static>> {
+    let hint = Style::default().fg(Color::DarkGray);
+    let mut lines = Vec::new();
+    if view.stage == ApprovalStage::RejectMessage {
+        lines.push(Line::styled(
+            "Tell zenpi what to do differently (optional):",
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        for line in wrap_plain(&format!("> {}▏", view.message), width) {
+            lines.push(Line::styled(line, Style::default().fg(Color::Cyan)));
+        }
+        lines.push(Line::styled("Enter deny · Esc back", hint));
+        return lines;
+    }
+    if incomplete {
+        lines.push(Line::styled(
+            "Preview truncated by owner: press v to inspect the source before allowing.",
+            Style::default().fg(Color::Red),
+        ));
+    }
+    lines.push(Line::styled(
+        "Do you want to proceed?",
+        Style::default().add_modifier(Modifier::BOLD),
+    ));
+    let tool = view
+        .requests
+        .get(view.index)
+        .map_or("this tool", |r| r.tool.as_str());
+    let current = view.choice();
+    let options = ApprovalChoice::options(view.worker());
+    for (index, option) in options.iter().enumerate() {
+        let text = format!("{}. {}", index + 1, option.label(tool));
+        lines.push(if *option == current {
+            Line::from(vec![
+                Span::styled(
+                    "❯ ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    text,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])
+        } else {
+            Line::raw(format!("  {text}"))
+        });
+    }
+    let mut keys = format!(
+        "↑↓ select · Enter confirm · 1-{} choose · n deny with a note · v details",
+        options.len()
+    );
+    if view.requests.len() > 1 {
+        keys.push_str(" · Tab next request");
+    }
+    keys.push_str(if view.expanded {
+        " · Esc back"
+    } else {
+        " · Esc later"
+    });
+    for line in wrap_plain(&keys, width) {
+        lines.push(Line::styled(line, hint));
+    }
+    lines
 }
 
 /// Exact host correlation; coordinator remains the atomic decision authority.
@@ -2074,6 +2429,9 @@ const INTERRUPT_WINDOW: Duration = Duration::from_millis(1200);
 const WORKER_STDIO_TAIL_BYTES: usize = 512 * 1024;
 /// Bound on one displayed worker input/output excerpt.
 const WORKER_STDIO_EXCERPT_BYTES: usize = 4 * 1024;
+/// How often the Gantt agent rows re-read the DAG store (only when it changed)
+/// and re-join process liveness.
+const AGENTS_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
 /// One local headless worker matched to the active project, with the last
 /// input/output excerpt read from its session journal.
@@ -2782,6 +3140,19 @@ pub struct TuiState {
     command_resources: Vec<CommandResource>,
     transcript_ux: TranscriptUx,
     transcript_browser: Option<TranscriptBrowser>,
+    trajectory_viewer: Option<trajectory::TrajectoryViewer>,
+    new_session_choice: Option<NewSessionChoice>,
+    /// Inputs the operator chose to discard before the retried `/new`.
+    discard_before_new: Option<(String, Vec<String>)>,
+    /// Latest selected history of the live session, for the trajectory viewer.
+    trajectory_history: Option<Arc<TrajectoryHistory>>,
+    trajectory_revision: u64,
+    /// Multi-agent rows of the Gantt pane: the master plus DAG workers.
+    agents: agents::AgentsView,
+    agents_refreshed: Option<Instant>,
+    gantt_agent_cursor: usize,
+    /// Inner height of the Gantt pane at the last draw, for cursor follow.
+    gantt_view_height: std::cell::Cell<u16>,
     follow_hit: Option<Rect>,
     project_workspace: Option<crate::project_workspace::ProjectWorkspace>,
     directory_picker: Option<crate::directory_picker::DirectoryPicker>,
@@ -3028,6 +3399,15 @@ impl TuiState {
             command_resources: Vec::new(),
             transcript_ux: TranscriptUx::default(),
             transcript_browser: None,
+            trajectory_viewer: None,
+            new_session_choice: None,
+            discard_before_new: None,
+            trajectory_history: None,
+            trajectory_revision: 0,
+            agents: agents::AgentsView::default(),
+            agents_refreshed: None,
+            gantt_agent_cursor: 0,
+            gantt_view_height: std::cell::Cell::new(0),
             follow_hit: None,
             project_workspace: None,
             directory_picker: None,
@@ -5884,6 +6264,30 @@ impl TuiState {
         if !key.modifiers.is_empty() {
             return false;
         }
+        let agents = self.agents.rows.len();
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') if agents > 0 => {
+                self.gantt_agent_cursor = self.gantt_agent_cursor.saturating_sub(1);
+                self.follow_gantt_agent();
+                self.dirty = true;
+                return true;
+            }
+            KeyCode::Down | KeyCode::Char('j') if agents > 0 => {
+                self.gantt_agent_cursor = (self.gantt_agent_cursor + 1).min(agents - 1);
+                self.follow_gantt_agent();
+                self.dirty = true;
+                return true;
+            }
+            KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') if agents > 0 => {
+                self.open_trajectory_viewer_at(self.gantt_agent_cursor, true);
+                return true;
+            }
+            KeyCode::Char('z') => {
+                self.open_trajectory_viewer_at(self.gantt_agent_cursor, false);
+                return true;
+            }
+            _ => {}
+        }
         let scroll = self.pane_scroll.entry(PaneId::Gantt).or_insert(0);
         match key.code {
             KeyCode::Up => *scroll = scroll.saturating_sub(1),
@@ -6233,6 +6637,18 @@ impl TuiState {
         // draft from the arch console is routed to the host with the arch
         // transcript as its feedback target; everything else keeps the
         // master-session bash/steer classification.
+        let shorthand = match self.arch_input.trim().to_ascii_lowercase().as_str() {
+            "y" | "yes" => Some(true),
+            "n" | "no" => Some(false),
+            _ => None,
+        };
+        if let Some(allow) = shorthand
+            && self.select_pending_approval(allow)
+        {
+            self.arch_input.clear();
+            self.arch_cursor = 0;
+            return Ok(TuiAction::Redraw);
+        }
         let trimmed = self.arch_input.trim();
         if trimmed.starts_with('/')
             && let Ok(InputRoute::Slash(command)) = slash::route_input(trimmed)
@@ -6620,13 +7036,16 @@ impl TuiState {
                 input_tokens,
                 output_tokens,
                 total_tokens,
+                cache_read_tokens,
+                cache_write_tokens,
+                reasoning_tokens,
             } => {
                 if self.streaming_job_id == Some(job_id) {
                     self.transcript_ux.usage = Some(crate::backend::Usage {
-                        input_tokens: *input_tokens,
-                        output_tokens: *output_tokens,
-                        total_tokens: *total_tokens,
-                        ..Default::default()
+                        cache_read_tokens: *cache_read_tokens,
+                        cache_write_tokens: *cache_write_tokens,
+                        reasoning_tokens: *reasoning_tokens,
+                        ..crate::backend::Usage::new(*input_tokens, *output_tokens, *total_tokens)
                     });
                     self.dirty = true;
                 }
@@ -6840,6 +7259,366 @@ impl TuiState {
         self.transcript_browser = Some(TranscriptBrowser::new(&self.messages));
         self.dirty = true;
     }
+
+    /// Record the live session's selected history for the trajectory viewer.
+    pub fn set_trajectory_history(&mut self, turns: Vec<crate::core::Turn>) {
+        self.trajectory_history = Some(Arc::new(TrajectoryHistory { turns }));
+        self.trajectory_revision = self.trajectory_revision.wrapping_add(1);
+        if self.trajectory_viewer.is_some() {
+            self.dirty = true;
+        }
+    }
+
+    /// Open the trajectory zoom on the master's records (Alt-T, `/trajectory`).
+    pub fn open_trajectory_viewer(&mut self) {
+        self.open_trajectory_viewer_at(0, true);
+    }
+
+    /// Open the trajectory zoom for the Gantt agent at `index`: its records,
+    /// or the agent overview when `records` is false.
+    fn open_trajectory_viewer_at(&mut self, index: usize, records: bool) {
+        self.refresh_agents();
+        let session_path = self
+            .project_metadata(self.active_project())
+            .and_then(|metadata| metadata.session_path.clone());
+        let mut master = match (&self.trajectory_history, &session_path) {
+            (Some(history), _) => Some(history.project(self.busy)),
+            (None, Some(path)) => crate::session::inspect_session(path)
+                .ok()
+                .map(|inspection| {
+                    crate::trajectory::Trajectory::from_turns(&inspection.turns, None)
+                }),
+            // A fresh session has an empty trajectory, not a missing one.
+            (None, None) => Some(crate::trajectory::Trajectory::default()),
+        };
+        let sources = self
+            .agents
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(position, row)| trajectory::AgentSource {
+                name: row.id.clone(),
+                tree: row.tree.clone(),
+                state: row.state,
+                session: row.session.clone(),
+                trajectory: if position == 0 { master.take() } else { None },
+            })
+            .collect();
+        let viewer = trajectory::TrajectoryViewer::new(sources, self.trajectory_revision)
+            .select_agent(index);
+        self.trajectory_viewer = Some(if records {
+            viewer.open_records()
+        } else {
+            viewer
+        });
+        self.dirty = true;
+    }
+
+    /// Re-project the Gantt agent rows from the live session, the project's
+    /// DAG store and the headless process table.
+    pub fn refresh_agents(&mut self) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| {
+                elapsed.as_millis().min(u128::from(u64::MAX)) as u64
+            });
+        let master = self.master_agent_info();
+        let dag_path = self.dag_store_path();
+        let workers = self.project_worker_processes();
+        self.agents
+            .refresh(master, dag_path.as_deref(), &workers, now_ms);
+        self.gantt_agent_cursor = self
+            .gantt_agent_cursor
+            .min(self.agents.rows.len().saturating_sub(1));
+        self.agents_refreshed = Some(Instant::now());
+    }
+
+    fn refresh_agents_if_due(&mut self) {
+        if self
+            .agents_refreshed
+            .is_none_or(|at| at.elapsed() >= AGENTS_REFRESH_INTERVAL)
+        {
+            self.refresh_agents();
+        }
+    }
+
+    /// Agent ids in Gantt order, master first.
+    pub fn gantt_agents(&self) -> Vec<(String, AgentState)> {
+        self.agents
+            .rows
+            .iter()
+            .map(|row| (row.id.clone(), row.state))
+            .collect()
+    }
+
+    pub fn gantt_agent_cursor(&self) -> usize {
+        self.gantt_agent_cursor
+    }
+
+    fn master_agent_info(&self) -> agents::MasterInfo {
+        let turns = self
+            .trajectory_history
+            .as_ref()
+            .map_or(&[][..], |history| history.turns.as_slice());
+        let summary = crate::trajectory::open_root(turns)
+            .and_then(|root| turns.iter().rev().find(|turn| turn.id == root))
+            .map(|turn| inline_token(&turn.content, 80));
+        agents::MasterInfo {
+            state: if self.busy && self.approval_waiting() {
+                AgentState::Waiting
+            } else if self.busy {
+                AgentState::Running
+            } else {
+                AgentState::Idle
+            },
+            summary,
+            session: self
+                .project_metadata(self.active_project())
+                .and_then(|metadata| metadata.session_path.clone())
+                .map(Into::into),
+            started_ms: turns.first().map(|turn| turn.created_at_ms),
+            updated_ms: turns.last().map(|turn| turn.created_at_ms),
+            tokens: self
+                .transcript_ux
+                .history_tokens
+                .filter(|tokens| *tokens > 0),
+        }
+    }
+
+    /// `ZENPI_DAG_STORE`, else `<project>/.zenpi/dag.json`; none without a
+    /// known project directory.
+    fn dag_store_path(&self) -> Option<std::path::PathBuf> {
+        if let Ok(path) = std::env::var(crate::dag::DAG_STORE_ENV)
+            && !path.trim().is_empty()
+        {
+            return Some(path.trim().into());
+        }
+        self.project_metadata(self.active_project())
+            .map(|metadata| metadata.cwd.as_str())
+            .filter(|cwd| !cwd.is_empty() && *cwd != ".")
+            .map(|cwd| std::path::Path::new(cwd).join(".zenpi").join("dag.json"))
+    }
+
+    /// Headless processes of the active project, without reading their stdio.
+    fn project_worker_processes(&self) -> Vec<agents::WorkerProcess> {
+        let Some(snapshot) = self.resource_snapshot.as_ref() else {
+            return Vec::new();
+        };
+        let metadata = self.project_metadata(self.active_project());
+        let session_path = metadata.and_then(|metadata| metadata.session_path.as_deref());
+        let cwd = metadata
+            .map(|metadata| metadata.cwd.as_str())
+            .filter(|cwd| !cwd.is_empty() && *cwd != ".");
+        snapshot
+            .headless
+            .rows
+            .iter()
+            .filter(|row| {
+                row.session.as_deref().is_some_and(|session| {
+                    session_path == Some(session) || cwd.is_some_and(|cwd| session.starts_with(cwd))
+                })
+            })
+            .map(|row| agents::WorkerProcess {
+                pid: row.pid,
+                busy: row.phase == crate::resources::FootprintPhase::Busy,
+                session: row.session.clone(),
+            })
+            .collect()
+    }
+
+    /// Keep the selected agent row inside the Gantt pane's visible window.
+    fn follow_gantt_agent(&mut self) {
+        // Content line 0 is the Agents header.
+        let line = self.gantt_agent_cursor + 1;
+        let height = usize::from(self.gantt_view_height.get()).max(1);
+        let scroll = self.pane_scroll.entry(PaneId::Gantt).or_insert(0);
+        let top = usize::from(*scroll);
+        if self.gantt_agent_cursor == 0 {
+            *scroll = 0;
+        } else if line < top {
+            *scroll = line as u16;
+        } else if line >= top + height {
+            *scroll = (line + 1 - height).min(usize::from(u16::MAX)) as u16;
+        }
+    }
+
+    /// Ask in the prompt whether to discard `inputs` and retry `/new`.
+    pub fn offer_new_session_choice(&mut self, project: String, inputs: Vec<(String, String)>) {
+        self.new_session_choice = Some(NewSessionChoice {
+            project,
+            inputs,
+            discard: true,
+        });
+        self.dirty = true;
+    }
+
+    pub fn new_session_choice_open(&self) -> bool {
+        self.new_session_choice_active().is_some()
+    }
+
+    fn new_session_choice_active(&self) -> Option<&NewSessionChoice> {
+        self.new_session_choice
+            .as_ref()
+            .filter(|choice| choice.project == self.active_project())
+    }
+
+    /// Input ids to cancel before running `/new` for `project`.
+    pub fn take_discard_before_new(&mut self, project: &str) -> Vec<String> {
+        match self.discard_before_new.take() {
+            Some((owner, ids)) if owner == project => ids,
+            other => {
+                self.discard_before_new = other;
+                Vec::new()
+            }
+        }
+    }
+
+    fn new_session_choice_key(&mut self, key: KeyEvent) -> TuiAction {
+        let Some(choice) = self.new_session_choice.as_mut() else {
+            return TuiAction::None;
+        };
+        self.dirty = true;
+        let commit = match (key.modifiers, key.code) {
+            (KeyModifiers::CONTROL, KeyCode::Char('c')) | (_, KeyCode::Esc) => Some(false),
+            (_, KeyCode::Up | KeyCode::Char('k')) => {
+                choice.discard = true;
+                None
+            }
+            (_, KeyCode::Down | KeyCode::Char('j')) => {
+                choice.discard = false;
+                None
+            }
+            (_, KeyCode::Char('1')) => Some(true),
+            (_, KeyCode::Char('2')) => Some(false),
+            (_, KeyCode::Enter) => Some(choice.discard),
+            _ => None,
+        };
+        let Some(discard) = commit else {
+            return TuiAction::Redraw;
+        };
+        let choice = self.new_session_choice.take().expect("open choice");
+        if discard {
+            let ids = choice.inputs.into_iter().map(|(id, _)| id).collect();
+            self.discard_before_new = Some((choice.project, ids));
+            TuiAction::Submit("/new".into())
+        } else {
+            self.push_message(
+                MessageRole::System,
+                format!(
+                    "Kept {} pending input(s); no new session was started.",
+                    choice.inputs.len()
+                ),
+            );
+            TuiAction::Redraw
+        }
+    }
+
+    fn new_session_choice_lines(&self, width: usize) -> Option<(String, Vec<Line<'static>>)> {
+        let choice = self.new_session_choice_active()?;
+        let width = width.max(8);
+        let count = choice.inputs.len();
+        let title = format!(
+            " New session · {count} pending input{} ",
+            if count == 1 { "" } else { "s" }
+        );
+        let mut lines = vec![Line::raw(
+            "Received but never used by a turn; a new session would drop them:",
+        )];
+        for (id, text) in choice.inputs.iter().take(4) {
+            let text = inline_token(text, 60);
+            lines.push(Line::from(vec![
+                Span::raw("  • "),
+                Span::styled(text, Style::default().fg(Color::White)),
+                Span::styled(format!("  ({id})"), Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+        if count > 4 {
+            lines.push(Line::raw(format!("  … {} more", count - 4)));
+        }
+        lines.push(Line::raw(""));
+        lines.push(Line::styled(
+            "Start a new session?",
+            Style::default().add_modifier(Modifier::BOLD),
+        ));
+        let selected = Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD);
+        for (number, label, chosen) in [
+            (1, "Discard them and start a new session", choice.discard),
+            (2, "Keep them and cancel /new", !choice.discard),
+        ] {
+            let text = format!("{number}. {label}");
+            lines.push(if chosen {
+                Line::from(vec![
+                    Span::styled("❯ ", selected),
+                    Span::styled(text, selected),
+                ])
+            } else {
+                Line::raw(format!("  {text}"))
+            });
+        }
+        for line in wrap_plain("↑↓ select · Enter confirm · 1-2 choose · Esc keep", width) {
+            lines.push(Line::styled(line, Style::default().fg(Color::DarkGray)));
+        }
+        Some((title, lines))
+    }
+
+    fn render_new_session_choice(&self, frame: &mut Frame<'_>, area: Rect) {
+        let Some((title, lines)) =
+            self.new_session_choice_lines(usize::from(area.width.saturating_sub(2)))
+        else {
+            return;
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .title(title);
+        frame.render_widget(Clear, area);
+        frame.render_widget(Paragraph::new(lines).block(block), area);
+    }
+
+    /// Whether the trajectory viewer owns the screen and keyboard.
+    pub fn trajectory_open(&self) -> bool {
+        self.trajectory_viewer.is_some()
+    }
+
+    pub fn trajectory_level(&self) -> Option<TrajectoryLevel> {
+        self.trajectory_viewer.as_ref().map(|viewer| viewer.level())
+    }
+
+    fn render_trajectory_viewer(&mut self, frame: &mut Frame<'_>) {
+        let Some(viewer) = self.trajectory_viewer.as_mut() else {
+            return;
+        };
+        if viewer.master_revision() != self.trajectory_revision
+            && let Some(history) = self.trajectory_history.as_ref()
+        {
+            viewer.sync_master(self.trajectory_revision, history.project(self.busy));
+        }
+        viewer.render(frame);
+    }
+
+    fn trajectory_key(&mut self, key: KeyEvent) -> TuiAction {
+        let Some(viewer) = self.trajectory_viewer.as_mut() else {
+            return TuiAction::None;
+        };
+        self.dirty = true;
+        let interrupt = key.code == KeyCode::Char('c')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && self.busy;
+        match viewer.key(key) {
+            trajectory::ViewerKey::Stay => TuiAction::Redraw,
+            trajectory::ViewerKey::Action(action) => action,
+            trajectory::ViewerKey::Close => {
+                self.trajectory_viewer = None;
+                if interrupt {
+                    TuiAction::Interrupt
+                } else {
+                    TuiAction::Redraw
+                }
+            }
+        }
+    }
     pub fn copy_latest_answer(&self) -> Option<String> {
         self.messages
             .iter()
@@ -6880,6 +7659,7 @@ impl TuiState {
                 .find_map(|m| m.get("usage"))
                 .and_then(|v| serde_json::from_value(v.clone()).ok());
         }
+        self.set_trajectory_history(history);
     }
 
     pub fn update_input_queue(&mut self, reply: &crate::input_queue::InputQueueReply) {
@@ -7097,6 +7877,7 @@ impl TuiState {
             || self.directory_picker.is_some()
             || self.history_search.is_some()
             || self.transcript_browser.is_some()
+            || self.trajectory_viewer.is_some()
             || !self.slash_choices().is_empty()
             || self
                 .approval_views
@@ -7224,6 +8005,7 @@ impl TuiState {
             || self.cursor != self.input.len()
             || self.directory_picker.is_some()
             || self.transcript_browser.is_some()
+            || self.trajectory_viewer.is_some()
         {
             return None;
         }
@@ -7790,6 +8572,11 @@ impl TuiState {
         if self.resources_zoom.is_some() {
             return self.resources_zoom_mouse(mouse, double_click);
         }
+        if let Some(viewer) = self.trajectory_viewer.as_mut() {
+            viewer.mouse(mouse);
+            self.dirty = true;
+            return TuiAction::Redraw;
+        }
         if let Some(picker) = self.directory_picker.as_mut() {
             let result = picker.mouse(mouse);
             self.picker_result(result);
@@ -8142,6 +8929,19 @@ impl TuiState {
                         return TuiAction::Redraw;
                     }
                 }
+                if pane.id == PaneId::Gantt {
+                    // Content line 0 is the Agents header; agent rows follow.
+                    let scroll = usize::from(*self.pane_scroll.get(&PaneId::Gantt).unwrap_or(&0));
+                    let line = usize::from(mouse.row.saturating_sub(pane.rect.y + 1)) + scroll;
+                    if (1..=self.agents.rows.len()).contains(&line) {
+                        self.gantt_agent_cursor = line - 1;
+                        if double_click {
+                            self.open_trajectory_viewer_at(self.gantt_agent_cursor, true);
+                        }
+                        self.dirty = true;
+                        return TuiAction::Redraw;
+                    }
+                }
                 if pane.id == PaneId::Resources {
                     // A double click enlarges the pane into the worker/stdio
                     // overlay; a single click keeps block selection.
@@ -8425,6 +9225,7 @@ impl TuiState {
                     view.focused = false;
                 }
                 if self.transcript_browser.is_some()
+                    || self.trajectory_viewer.is_some()
                     || self.goal_edit.is_some()
                     || self.resources_zoom.is_some()
                     || self.subtab_concurrency_edit.is_some()
@@ -8474,8 +9275,10 @@ impl TuiState {
     /// Whether a modal owns the keyboard right now. A modal must be consulted
     /// before any hot zone, or the zone swallows keys the modal is showing.
     fn modal_active(&self) -> bool {
-        self.directory_picker.is_some()
+        self.new_session_choice_open()
+            || self.directory_picker.is_some()
             || self.transcript_browser.is_some()
+            || self.trajectory_viewer.is_some()
             || self.history_search.is_some()
             || self.goal_edit.is_some()
             || self.resources_zoom.is_some()
@@ -8503,6 +9306,14 @@ impl TuiState {
         // The enlarged Resources overlay is modal over every hot zone.
         if self.resources_zoom.is_some() {
             return self.resources_zoom_key(key);
+        }
+        // So is the full-screen trajectory viewer.
+        if self.trajectory_viewer.is_some() {
+            return self.trajectory_key(key);
+        }
+        // A pending `/new` decision is answered before anything else.
+        if self.new_session_choice_open() {
+            return self.new_session_choice_key(key);
         }
         // The inline layer-2 concurrency number editor is modal (ZS1-174).
         if self.subtab_concurrency_edit.is_some() {
@@ -8635,6 +9446,10 @@ impl TuiState {
                 }
                 KeyCode::Char('b') => {
                     self.open_transcript_browser();
+                    return TuiAction::Redraw;
+                }
+                KeyCode::Char('t') => {
+                    self.open_trajectory_viewer();
                     return TuiAction::Redraw;
                 }
                 KeyCode::Char('c') => {
@@ -9136,6 +9951,21 @@ impl TuiState {
                 // a code-oriented prompt and must not be rewritten by the
                 // terminal host.
                 if !self.input.trim().is_empty() {
+                    let shorthand = match self.input.trim().to_ascii_lowercase().as_str() {
+                        "y" | "yes" => Some(true),
+                        "n" | "no" => Some(false),
+                        _ => None,
+                    };
+                    if let Some(allow) = shorthand
+                        && self.paste.folds.is_empty()
+                        && self.select_pending_approval(allow)
+                    {
+                        self.input.clear();
+                        self.cursor = 0;
+                        self.input_scroll = 0;
+                        self.preferred_column = None;
+                        return TuiAction::Redraw;
+                    }
                     let text = self.input.clone();
                     if !self.paste.folds.is_empty() {
                         self.submitted_pastes.push_back(SubmittedPaste {
@@ -9711,7 +10541,21 @@ impl TuiState {
         }
         let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
         let prompt_lines = wrap_plain(&self.projection().text, prompt_width).len();
-        let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
+        let choice_rows = self
+            .new_session_choice_lines(usize::from(area.width.saturating_sub(2)))
+            .map(|(_, lines)| {
+                u16::try_from(lines.len())
+                    .unwrap_or(u16::MAX)
+                    .saturating_add(2)
+            });
+        // Inline forms (approval, /new choice) may use up to half the screen.
+        let desired_input_height = match self
+            .inline_approval_rows(ApprovalLane::Discussion, area.width)
+            .or(choice_rows)
+        {
+            Some(rows) => usize::from(rows).min(usize::from(area.height / 2).max(3)),
+            None => prompt_lines.min(MAX_INPUT_LINES).saturating_add(2),
+        };
         // Keep header/footer visible whenever there is room, and let the
         // transcript yield rows to the prompt first.  Tiny resize states can
         // legitimately collapse the prompt to zero rows.
@@ -9739,6 +10583,7 @@ impl TuiState {
             browser.render(frame);
         }
         self.render_approval(frame);
+        self.render_trajectory_viewer(frame);
     }
 
     fn render_header(&self, frame: &mut Frame<'_>, area: Rect, title: &str) {
@@ -9850,6 +10695,8 @@ impl TuiState {
         }
         let title = if goal {
             " Goal ".to_owned()
+        } else if self.busy && self.approval_waiting_in(ApprovalLane::Discussion) {
+            " Conversation \u{b7} ⏸ 等待审批 ".to_owned()
         } else if self.busy {
             // ZS1-181: the production path shows the thinking animation.
             format!(" Conversation \u{b7} {} 思考中 ", self.spinner_frame())
@@ -10015,6 +10862,14 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        if self.inline_approval_lane() == Some(ApprovalLane::Discussion) {
+            self.render_inline_approval(frame, area);
+            return;
+        }
+        if self.new_session_choice_open() {
+            self.render_new_session_choice(frame, area);
+            return;
+        }
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(if self.busy {
@@ -10022,32 +10877,36 @@ impl TuiState {
             } else {
                 Color::Cyan
             }))
-            .title(if self.busy {
-                format!(
-                    " Prompt · {} 思考中 {}s · Ctrl-C 中断 ",
-                    self.spinner_frame(),
-                    self.transcript_ux.seconds()
-                )
-            } else if let Some(search) = &self.history_search {
-                format!(
-                    " History search: {} · {} · Ctrl-R older · Enter select · Esc restore ",
-                    inline_token(&search.query, 40),
-                    if search.matched.is_some() {
-                        "match"
-                    } else {
-                        "no match"
-                    }
-                )
-            } else if self.paste.folds.is_empty() && self.input.starts_with('/') {
-                " Prompt  • command palette active ".to_owned()
-            } else if self.goal_text.is_empty() {
-                " Prompt · Goal: — · Alt-G edit · Ctrl-R history · Ctrl-J newline ".to_owned()
-            } else {
-                format!(
-                    " Prompt · Goal: {} · Alt-G edit · Ctrl-R history ",
-                    inline_token(&self.goal_text, 48)
-                )
-            });
+            .title(
+                if self.busy && self.approval_waiting_in(ApprovalLane::Discussion) {
+                    " Prompt · ⏸ 等待审批 · Alt-A 审批 · 或输入 y / n ".to_owned()
+                } else if self.busy {
+                    format!(
+                        " Prompt · {} 思考中 {}s · Ctrl-C 中断 ",
+                        self.spinner_frame(),
+                        self.transcript_ux.seconds()
+                    )
+                } else if let Some(search) = &self.history_search {
+                    format!(
+                        " History search: {} · {} · Ctrl-R older · Enter select · Esc restore ",
+                        inline_token(&search.query, 40),
+                        if search.matched.is_some() {
+                            "match"
+                        } else {
+                            "no match"
+                        }
+                    )
+                } else if self.paste.folds.is_empty() && self.input.starts_with('/') {
+                    " Prompt  • command palette active ".to_owned()
+                } else if self.goal_text.is_empty() {
+                    " Prompt · Goal: — · Alt-G edit · Ctrl-R history · Ctrl-J newline ".to_owned()
+                } else {
+                    format!(
+                        " Prompt · Goal: {} · Alt-G edit · Ctrl-R history ",
+                        inline_token(&self.goal_text, 48)
+                    )
+                },
+            );
         let inner = block.inner(area);
         let width = usize::from(inner.width).max(1);
         let projection = self.projection();
@@ -10204,7 +11063,9 @@ impl TuiState {
             } else {
                 Color::DarkGray
             }))
-            .title(if self.master_busy {
+            .title(if self.approval_waiting_in(ApprovalLane::Arch) {
+                " Arch · ⏸ 等待审批 · 在 Arch prompt 输入 y / n ".to_owned()
+            } else if self.master_busy {
                 format!(" Arch · {} 思考中 ", self.spinner_frame())
             } else {
                 " Arch · master session ".to_owned()
@@ -10251,6 +11112,10 @@ impl TuiState {
     /// one group.
     fn render_arch_input(&mut self, frame: &mut Frame<'_>, area: Rect) {
         if area.width == 0 || area.height == 0 {
+            return;
+        }
+        if self.inline_approval_lane() == Some(ApprovalLane::Arch) {
+            self.render_inline_approval(frame, area);
             return;
         }
         let focused = self.arch_prompt_focused();
@@ -10374,7 +11239,9 @@ impl TuiState {
             HotZone::Arch => {
                 " Arch 热区 · Enter send · Shift-Enter 换行 · Esc 返回 Conversation · 双击 Ctrl-C 强杀 "
             }
-            HotZone::Gantt => " Gantt 热区 · ↑↓/PgUp/PgDn 滚动 · Esc 退出热区 · Tab 切区 ",
+            HotZone::Gantt => {
+                " Gantt 热区 · ↑↓ 选择 agent · Enter 轨迹 · z 放大 · PgUp/PgDn 滚动 · Esc 退出热区 · Tab 切区 "
+            }
             HotZone::Shell => {
                 " Shell 热区 · 直接输入进 PTY · Ctrl-C 发送 SIGINT · 双击 Ctrl-C 强杀 · Tab 切区 "
             }
@@ -10403,6 +11270,7 @@ impl TuiState {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        self.refresh_agents_if_due();
         if area != self.last_area {
             self.last_area = area;
             self.invalidate_transcript();
@@ -10410,7 +11278,21 @@ impl TuiState {
         }
         let prompt_width = usize::from(area.width.saturating_sub(2)).max(1);
         let prompt_lines = wrap_plain(&self.projection().text, prompt_width).len();
-        let desired_input_height = prompt_lines.min(MAX_INPUT_LINES).saturating_add(2);
+        let choice_rows = self
+            .new_session_choice_lines(usize::from(area.width.saturating_sub(2)))
+            .map(|(_, lines)| {
+                u16::try_from(lines.len())
+                    .unwrap_or(u16::MAX)
+                    .saturating_add(2)
+            });
+        // Inline forms (approval, /new choice) may use up to half the screen.
+        let desired_input_height = match self
+            .inline_approval_rows(ApprovalLane::Discussion, area.width)
+            .or(choice_rows)
+        {
+            Some(rows) => usize::from(rows).min(usize::from(area.height / 2).max(3)),
+            None => prompt_lines.min(MAX_INPUT_LINES).saturating_add(2),
+        };
         // The prompt always keeps the full-width bottom strip: a fixed home
         // never jumps when overlays (palette, completion, history search,
         // pickers) open or close, and menus retain their room above it.
@@ -10458,6 +11340,7 @@ impl TuiState {
         self.render_tab_rename(frame);
         self.render_approval(frame);
         self.render_resources_zoom(frame);
+        self.render_trajectory_viewer(frame);
     }
 
     /// Draw the inline tab-rename overlay when a header card is being renamed.
@@ -10848,7 +11731,15 @@ impl TuiState {
                 // same x/width, never spilling into the center column.
                 let source =
                     PaneRect::new(pane.rect.x, pane.rect.y, pane.rect.width, pane.rect.height);
-                let (conversation, prompt) = arch_prompt_group(source, ARCH_PROMPT_PANE_ROWS);
+                // An arch-owner approval is answered in this prompt, which grows
+                // to fit the form while leaving the transcript some rows.
+                let rows = self
+                    .inline_approval_rows(ApprovalLane::Arch, pane.rect.width)
+                    .map_or(ARCH_PROMPT_PANE_ROWS, |rows| {
+                        rows.min(pane.rect.height.saturating_sub(2))
+                            .max(ARCH_PROMPT_PANE_ROWS)
+                    });
+                let (conversation, prompt) = arch_prompt_group(source, rows);
                 let conversation = Rect::new(
                     conversation.x,
                     conversation.y,
@@ -10951,7 +11842,21 @@ impl TuiState {
             usize::from(*self.pane_scroll.get(&id).unwrap_or(&0))
         };
         let text = match id {
-            PaneId::Gantt => style_status_marks(&content),
+            PaneId::Gantt => {
+                let width = usize::from(area.width.saturating_sub(2));
+                self.gantt_view_height.set(area.height.saturating_sub(2));
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |elapsed| {
+                        elapsed.as_millis().min(u128::from(u64::MAX)) as u64
+                    });
+                let selected = (self.workspace_layout.focused == Some(PaneId::Gantt))
+                    .then_some(self.gantt_agent_cursor);
+                let mut lines = agents::section_lines(&self.agents, selected, width, now_ms);
+                lines.push(Line::raw(""));
+                lines.extend(style_status_marks(&content).lines);
+                ratatui::text::Text::from(lines)
+            }
             PaneId::Resources => style_resource_pane(&content),
             _ => ratatui::text::Text::from(content),
         };
@@ -10964,7 +11869,11 @@ impl TuiState {
         let paragraph = if id == PaneId::SessionList {
             paragraph
         } else {
-            paragraph.wrap(Wrap { trim: true })
+            // The Gantt agent rows align on a selection gutter and tree
+            // indentation, which trimming would eat.
+            paragraph.wrap(Wrap {
+                trim: id != PaneId::Gantt,
+            })
         };
         frame.render_widget(paragraph, area);
     }
@@ -13405,6 +14314,12 @@ pub fn dispatch_slash_command(
         SlashCommand::Clear => {
             state.clear_messages();
             state.set_status("Ready");
+        }
+        SlashCommand::Trajectory => {
+            if let Some(agent) = agent.as_deref() {
+                state.refresh_transcript_status(agent);
+            }
+            state.open_trajectory_viewer();
         }
         SlashCommand::Cancel => {
             state.set_status("Interrupt requested");
@@ -16690,9 +17605,34 @@ impl NewSessionControl {
                     state.set_status("New session ready");
                 }
                 JobOutcome::Failed(error) => {
-                    state.restore_submitted_input(job.submitted);
-                    state.push_message(MessageRole::Error, error.to_string());
-                    state.set_status("Request failed");
+                    // Received-but-unused inputs are the one refusal the
+                    // operator can resolve on the spot: offer to drop them.
+                    let pending: Vec<(String, String)> = job
+                        .owner
+                        .try_lock()
+                        .ok()
+                        .and_then(|agent| {
+                            crate::input_queue::InputQueue::recover(
+                                agent.session(),
+                                Default::default(),
+                            )
+                            .ok()
+                        })
+                        .map(|queue| {
+                            queue
+                                .pending_received()
+                                .map(|input| (input.id.clone(), input.text.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    if !pending.is_empty() && error.to_string().contains("pending input") {
+                        state.offer_new_session_choice(job.project.clone(), pending);
+                        state.set_status("New session needs a decision");
+                    } else {
+                        state.restore_submitted_input(job.submitted);
+                        state.push_message(MessageRole::Error, error.to_string());
+                        state.set_status("Request failed");
+                    }
                 }
                 JobOutcome::Cancelled => {
                     state.restore_submitted_input(job.submitted);
@@ -19292,19 +20232,26 @@ fn run_tui_loop(
                     pending_approvals.retain(|r| !TuiState::same_approval_request(r, &request));
                 }
                 let mut drained = Vec::new();
-                for control in approvals.values() {
+                for (key, control) in &approvals {
                     let Some(coordinator) = control.approval.as_ref() else {
                         continue;
+                    };
+                    // Arch owners are keyed `arch:<project>`; their requests
+                    // are answered in the Arch prompt.
+                    let lane = if key.starts_with("arch:") {
+                        ApprovalLane::Arch
+                    } else {
+                        ApprovalLane::Discussion
                     };
                     drained.extend(
                         coordinator
                             .drain_pending()
                             .into_iter()
-                            .map(|request| (control.project.clone(), request)),
+                            .map(|request| (control.project.clone(), request, lane)),
                     );
                 }
-                for (project, request) in drained {
-                    state.present_approval_for(project, request.clone());
+                for (project, request, lane) in drained {
+                    state.present_approval_in(project, request.clone(), lane);
                     let preview = request.preview.as_ref().map(|preview| {
                         let text = format!("\n\nProposed change:\n{}", preview.display_text());
                         let block = match preview {
@@ -19322,15 +20269,22 @@ fn run_tui_loop(
                         .as_ref()
                         .map(|(text, _)| text.as_str())
                         .unwrap_or("");
+                    // Request and policy digests stay in the review overlay; the
+                    // transcript only says what is asked and how to answer.
                     let prompt = format!(
-                        "Approval required: {} {}\nRequest: {}\nPolicy: {}{}\nAlt-A reviews this request; y/n selects, Enter confirms.",
+                        "Approval required: {} {}{}\nChoose in the {} prompt below: ↑↓ and Enter, or 1-3.",
                         request.tool,
                         safe_arguments,
-                        request.request_id,
-                        request.policy_digest.as_deref().unwrap_or("unbound"),
                         suffix,
+                        if lane == ApprovalLane::Arch {
+                            "Arch"
+                        } else {
+                            "discussion"
+                        },
                     );
-                    if let Some((_, block)) = preview {
+                    if lane == ApprovalLane::Arch {
+                        state.push_arch_message(MessageRole::System, prompt);
+                    } else if let Some((_, block)) = preview {
                         state.push_message_block(MessageRole::System, prompt, block);
                     } else {
                         state.push_message(
@@ -20092,6 +21046,31 @@ fn run_tui_loop(
                                     }
                                 ) {
                                     let project = state.active_project().to_owned();
+                                    // The operator chose to discard these inputs
+                                    // in the /new prompt choice. The owner is
+                                    // idle here, so each cancel commits at once.
+                                    for input_id in state.take_discard_before_new(&project) {
+                                        input_controls.submit(
+                                            &mut state,
+                                            &shared,
+                                            crate::protocol::InputQueueAction::Cancel {
+                                                input_id: input_id.clone(),
+                                            },
+                                            format!("/input cancel {input_id}"),
+                                        );
+                                    }
+                                    // A periodic resource snapshot only reads the
+                                    // project directory and process table; its
+                                    // result would merely be stale for the new
+                                    // session, so drop it and refresh afterwards
+                                    // instead of refusing `/new` while it runs.
+                                    if active_resource_job.is_some()
+                                        && active_resource_project == project
+                                    {
+                                        active_resource_job = None;
+                                        last_resource_refresh =
+                                            Instant::now() - RESOURCE_REFRESH_INTERVAL;
+                                    }
                                     let busy_reasons: Vec<&str> = [
                                         (active_job.is_some()
                                             && active_job_project.as_deref()
@@ -20113,9 +21092,6 @@ fn run_tui_loop(
                                             .approval_views
                                             .contains_key(&project)
                                             .then_some("pending approvals"),
-                                        (active_resource_job.is_some()
-                                            && active_resource_project == project)
-                                            .then_some("active resource job"),
                                         editor
                                             .active()
                                             .then_some("external editor (save and close)"),

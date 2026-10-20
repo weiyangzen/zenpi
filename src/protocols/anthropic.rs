@@ -841,6 +841,7 @@ impl Fold {
             total_tokens: total,
             cache_read_tokens: self.usage[2],
             cache_write_tokens: self.usage[3],
+            reasoning_tokens: 0,
         });
         let native_history = json!({"type":"native_history","wire":WIRE,"provider":provider,"model":self.model,"requested_model":self.requested_model,"blocks":blocks});
         let mut completion = Completion {

@@ -166,30 +166,30 @@ fn pane_focus_cycles_in_preset_order_and_skips_collapsed_or_unavailable_panes() 
     assert_eq!(
         model.focusable_panes(viewport.0, viewport.1),
         vec![
-            PaneId::ProjectConversation,
-            PaneId::Resources,
             PaneId::Arch,
+            PaneId::Resources,
+            PaneId::ProjectConversation,
             PaneId::Gantt,
             PaneId::Execution,
             PaneId::Browser,
             PaneId::Terminal,
         ]
     );
-    assert_eq!(
-        model.focus_next(viewport.0, viewport.1),
-        Some(PaneId::ProjectConversation)
-    );
+    assert_eq!(model.focus_next(viewport.0, viewport.1), Some(PaneId::Arch));
     assert_eq!(
         model.focus_next(viewport.0, viewport.1),
         Some(PaneId::Resources)
     );
     assert_eq!(
         model.focus_previous(viewport.0, viewport.1),
-        Some(PaneId::ProjectConversation)
+        Some(PaneId::Arch)
     );
 
     model.set_collapsed(PaneId::Resources, true);
-    assert_eq!(model.focus_next(viewport.0, viewport.1), Some(PaneId::Arch));
+    assert_eq!(
+        model.focus_next(viewport.0, viewport.1),
+        Some(PaneId::ProjectConversation)
+    );
     model.set_capabilities(PaneCapabilities::default());
     assert!(
         !model
@@ -209,7 +209,7 @@ fn directional_focus_prefers_same_row_or_column_before_falling_back() {
         browser: true,
         terminal: true,
     });
-    model.set_focused(Some(PaneId::ProjectConversation));
+    model.set_focused(Some(PaneId::Arch));
     assert_eq!(
         model.focus_direction(FocusDirection::Down, 200, 40),
         Some(PaneId::Resources)
@@ -218,14 +218,14 @@ fn directional_focus_prefers_same_row_or_column_before_falling_back() {
         model.focus_direction(FocusDirection::Right, 200, 40),
         Some(PaneId::Gantt)
     );
-    // From the center column, `Left` re-enters the left column at the nearest
-    // pane; with the baseline preset that is the top-left conversation.
+    // From the center column, `Left` re-enters the left column at the
+    // vertically nearest pane; beside the tall Gantt pane that is Resources.
     assert_eq!(
         model.focus_direction(FocusDirection::Left, 200, 40),
-        Some(PaneId::ProjectConversation)
+        Some(PaneId::Resources)
     );
-    // Up from the top-left conversation wraps to the last focusable pane.
-    model.set_focused(Some(PaneId::ProjectConversation));
+    // Up from the top-left Arch console wraps to the last focusable pane.
+    model.set_focused(Some(PaneId::Arch));
     assert_eq!(
         model.focus_direction(FocusDirection::Up, 200, 40),
         Some(PaneId::Terminal)
@@ -233,7 +233,7 @@ fn directional_focus_prefers_same_row_or_column_before_falling_back() {
 
     // At a narrow width only the focused rectangle is rendered, but keyboard
     // navigation still cycles through the bounded single-pane stack.
-    model.set_focused(Some(PaneId::ProjectConversation));
+    model.set_focused(Some(PaneId::Arch));
     assert_eq!(
         model.focus_direction(FocusDirection::Down, 60, 20),
         Some(PaneId::Resources)

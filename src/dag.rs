@@ -174,6 +174,21 @@ struct DagFile {
     next_message_id: u64,
 }
 
+/// Observer view of the store: nodes and mailbox activity per node.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DagSnapshot {
+    pub nodes: Vec<DagNode>,
+    pub mailbox: BTreeMap<String, MailboxCounts>,
+}
+
+/// Mailbox counters for one node. `last_ms` covers messages sent or received.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MailboxCounts {
+    pub unread: usize,
+    pub claimed: usize,
+    pub last_ms: u64,
+}
+
 /// File-locked view of the shared DAG store.
 #[derive(Debug, Clone)]
 pub struct DagStore {
@@ -292,6 +307,42 @@ impl DagStore {
 
     pub fn nodes(&self) -> Result<Vec<DagNode>, String> {
         Ok(self.read_locked()?.nodes.into_values().collect())
+    }
+
+    /// One lock-free read for observers such as the TUI Gantt: every node
+    /// plus per-node mailbox counters. Larger stores are refused rather than
+    /// parsed on an interactive thread.
+    pub fn snapshot(&self, max_bytes: u64) -> Result<DagSnapshot, String> {
+        match fs::metadata(&self.path) {
+            Ok(metadata) if metadata.len() > max_bytes => {
+                return Err(format!(
+                    "dag store is {} bytes (limit {max_bytes})",
+                    metadata.len()
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(DagSnapshot::default());
+            }
+            Err(error) => return Err(format!("dag store read: {error}")),
+        }
+        let state = self.read_locked()?;
+        let mut mailbox: BTreeMap<String, MailboxCounts> = BTreeMap::new();
+        for message in &state.messages {
+            let inbox = mailbox.entry(message.to.clone()).or_default();
+            if message.claimed_by.is_some() {
+                inbox.claimed += 1;
+            } else {
+                inbox.unread += 1;
+            }
+            inbox.last_ms = inbox.last_ms.max(message.ts_ms);
+            let outbox = mailbox.entry(message.from.clone()).or_default();
+            outbox.last_ms = outbox.last_ms.max(message.ts_ms);
+        }
+        Ok(DagSnapshot {
+            nodes: state.nodes.into_values().collect(),
+            mailbox,
+        })
     }
 
     pub fn node(&self, id: &str) -> Result<Option<DagNode>, String> {

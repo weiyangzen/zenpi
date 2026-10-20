@@ -1,0 +1,32 @@
+path	type	note
+src/client/code-program.ts	file	Code program handling
+src/client/copy-codes.ts	file	Copy functionality
+src/client/duration-store.ts	file	Duration tracking
+src/client/index.ts	file	Module exports
+src/client/layout.ts	file	Layout configuration
+src/client/locales.ts	file	Localization
+src/client/string-wrapping-store.ts	file	String wrapping state
+src/client/timeline.ts	file	Timeline logic
+src/client/trajectory-assistant-definition.ts	file	Assistant record definition
+src/client/trajectory-compaction-definition.ts	file	Compaction record definition
+src/client/trajectory-contract.ts	file	Type contracts
+src/client/trajectory-definition-common.ts	file	Shared definitions
+src/client/trajectory-event-projection.ts	file	Event projection
+src/client/trajectory-message-definitions.ts	file	Message definitions
+src/client/trajectory-preview.ts	file	Preview generation
+src/client/trajectory-record.ts	file	Core record types
+src/client/trajectory-request-header-definition.ts	file	Request header definition
+src/client/trajectory-search-index.ts	file	Search indexing
+src/client/trajectory-snapshot-builder.ts	file	Snapshot builder
+src/client/trajectory-tool-definition.ts	file	Tool record definition
+src/client/trajectory-virtual-rows.ts	file	Virtual row rendering
+src/client/TrajectoryCell.tsx	file	Cell component
+src/client/TrajectoryGroupHeader.tsx	file	Group header component
+src/client/TrajectoryTable.tsx	file	Table component
+src/client/TrajectoryTimeline.tsx	file	Timeline component
+src/client/TrajectoryToolbar.tsx	file	Toolbar component
+src/client/TrajectoryTurn.tsx	file	Turn component
+src/client/TrajectoryTurnHeader.tsx	file	Turn header component
+src/client/TrajectoryView.tsx	file	Main view component
+src/css-modules.d.ts	file	CSS module types
+src/index.ts	file	Package entry

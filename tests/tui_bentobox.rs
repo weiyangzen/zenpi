@@ -562,8 +562,9 @@ fn workspace_keyboard_controls_focus_and_split_without_touching_prompt() {
         state.focused_workspace_pane(),
         Some(PaneId::ProjectConversation)
     );
+    // The conversation is the bottom-left pane; Resources sits above it.
     assert_eq!(
-        state.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::CONTROL)),
+        state.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::CONTROL)),
         TuiAction::Redraw
     );
     assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
@@ -605,8 +606,9 @@ fn workspace_keyboard_controls_focus_and_split_without_touching_prompt() {
 #[test]
 fn terminal_backtab_moves_workspace_focus_backwards() {
     let mut state = TuiState::default();
+    // Preset order is Arch, Resources, Conversation, Gantt, ...
     state.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
-    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
 
     assert_eq!(
         state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT)),
@@ -785,8 +787,8 @@ fn short_workspace_narrow_cycle_reveals_each_selected_pane() {
     terminal
         .draw(|frame| state.render_bentobox(frame, "zenpi"))
         .unwrap();
-    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Resources));
-    assert!(rendered(&terminal).contains("Resources"));
+    assert_eq!(state.focused_workspace_pane(), Some(PaneId::Gantt));
+    assert!(rendered(&terminal).contains("Gantt"));
     state.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     terminal
         .draw(|frame| state.render_bentobox(frame, "zenpi"))

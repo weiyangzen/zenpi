@@ -219,6 +219,8 @@ fn full_diff_scroll_is_independent_from_folded_transcript_and_resize() {
     use ratatui::{Terminal, backend::TestBackend};
     let mut s = TuiState::default();
     s.present_approval(request("review-exact"));
+    // The full review (with the request id) opens with `v`.
+    plain(&mut s, KeyCode::Char('v'));
     let mut t = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let render = |s: &mut TuiState, t: &mut Terminal<TestBackend>| {
         t.draw(|f| s.render_bentobox(f, "test")).unwrap();
@@ -487,15 +489,25 @@ fn directory_picker_owns_keys_over_existing_or_new_approval_view() {
 }
 
 #[test]
-fn remember_confirm_and_reject_feedback_are_explicit_steps() {
+fn remember_choice_and_reject_feedback_are_explicit_steps() {
     let mut s = TuiState::default();
     s.present_approval(request("stage"));
-    // Remember asks for a confirmation step; Esc returns to the selector.
+    // "Don't ask again" is its own option: highlighting it commits nothing,
+    // Enter commits it; the digit picks and commits it in one press.
     plain(&mut s, KeyCode::Char('r'));
-    assert_eq!(plain(&mut s, KeyCode::Esc), TuiAction::Redraw);
-    plain(&mut s, KeyCode::Char('r'));
+    plain(&mut s, KeyCode::Down);
+    plain(&mut s, KeyCode::Up);
     assert!(matches!(
         plain(&mut s, KeyCode::Enter),
+        TuiAction::RespondApproval {
+            allow: true,
+            remember: true,
+            ..
+        }
+    ));
+    s.present_approval(request("digit"));
+    assert!(matches!(
+        plain(&mut s, KeyCode::Char('2')),
         TuiAction::RespondApproval {
             allow: true,
             remember: true,
@@ -539,27 +551,40 @@ fn approval_view_shows_the_current_stage_and_its_keys() {
     };
     let mut s = TuiState::default();
     s.present_approval(request("hints"));
+    // Claude Code style list; the safe answer starts highlighted.
     let select = screen(&mut s);
-    assert!(select.contains("Enter DENY now"), "{select}");
-    assert!(select.contains("r remember"), "{select}");
-
-    plain(&mut s, KeyCode::Char('r'));
-    let confirm = screen(&mut s);
+    assert!(select.contains("Do you want to proceed?"), "{select}");
+    assert!(select.contains("  1. Yes"), "{select}");
     assert!(
-        confirm.contains("Confirm remember? Enter allow+remember · Esc cancel"),
-        "{confirm}"
+        select.contains("  2. Yes, and don't ask again for write_file"),
+        "{select}"
+    );
+    assert!(
+        select.contains("❯ 3. No, and tell zenpi what to do differently"),
+        "{select}"
+    );
+    assert!(
+        select.contains("↑↓ select · Enter confirm · 1-3 choose"),
+        "{select}"
     );
 
-    plain(&mut s, KeyCode::Esc);
+    plain(&mut s, KeyCode::Up);
+    let moved = screen(&mut s);
+    assert!(
+        moved.contains("❯ 2. Yes, and don't ask again for write_file"),
+        "{moved}"
+    );
+
     plain(&mut s, KeyCode::Char('n'));
     for character in "why".chars() {
         plain(&mut s, KeyCode::Char(character));
     }
     let reject = screen(&mut s);
     assert!(
-        reject.contains("Reject message (optional): why"),
+        reject.contains("Tell zenpi what to do differently (optional):"),
         "{reject}"
     );
+    assert!(reject.contains("> why"), "{reject}");
     assert!(reject.contains("Enter deny · Esc back"), "{reject}");
 }
 

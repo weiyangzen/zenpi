@@ -516,7 +516,8 @@ fn horizontal_split_drag_is_persisted_without_overlaps() {
         .draw(|f| state.render_bentobox(f, "zenpi"))
         .unwrap();
     let adapter = BentoBoxLayoutAdapter::new(state.workspace_layout(), Rect::new(0, 5, 140, 31));
-    let upper = adapter.pane(PaneId::ProjectConversation).unwrap().rect;
+    // The top-left pane's bottom edge is the first row split.
+    let upper = adapter.pane(PaneId::Arch).unwrap().rect;
     state.handle_mouse(mouse(
         MouseEventKind::Down(MouseButton::Left),
         upper.x + 3,

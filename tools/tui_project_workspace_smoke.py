@@ -369,9 +369,9 @@ class Terminal:
         mark=len(self.output);self.write(('!'+command).encode())
         self.wait(lambda:self.draft().endswith('!'+command))
         self.deliberate_enter()
-        self.wait(lambda:b'Approvalrequired' in b''.join(screen_text(bytes(self.output)).splitlines()[1].split()))
+        self.wait(lambda:b'Approvalrequired1/' in b''.join(screen_text(bytes(self.output)).split()))
         self.write(b'y\r')
-        self.wait(lambda:b'Approvalrequired' not in b''.join(screen_text(bytes(self.output)).splitlines()[1].split()))
+        self.wait(lambda:b'Approvalrequired1/' not in b''.join(screen_text(bytes(self.output)).split()))
     def close(self,preserve_draft=False):
         if self.pid is None:return
         if preserve_draft:os.kill(self.pid,signal.SIGTERM)

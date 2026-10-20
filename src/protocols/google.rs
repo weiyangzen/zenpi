@@ -613,6 +613,7 @@ impl Fold {
                 total_tokens: reported.flatten().unwrap_or(total),
                 cache_read_tokens: cached,
                 cache_write_tokens: 0,
+                reasoning_tokens: thoughts,
             });
         }
         Ok(())

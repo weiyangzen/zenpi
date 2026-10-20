@@ -745,19 +745,36 @@ fn parse_usage(value: &Value) -> Option<Usage> {
         .get("total_tokens")
         .and_then(Value::as_u64)
         .unwrap_or(input.saturating_add(output));
-    // Chat reports `prompt_tokens_details`, Responses `input_tokens_details`.
-    let cached = value
-        .get("prompt_tokens_details")
-        .or_else(|| value.get("input_tokens_details"))
-        .and_then(|details| details.get("cached_tokens"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
+    let counter = |paths: &[&[&str]]| -> u64 {
+        paths
+            .iter()
+            .find_map(|path| {
+                path.iter()
+                    .try_fold(value, |node, key| node.get(*key))
+                    .and_then(Value::as_u64)
+            })
+            .unwrap_or(0)
+    };
+    // Chat reports `prompt_tokens_details`, Responses `input_tokens_details`;
+    // DeepSeek and Anthropic-compatible proxies use their own spellings.
+    let cache_read_tokens = counter(&[
+        &["prompt_tokens_details", "cached_tokens"],
+        &["input_tokens_details", "cached_tokens"],
+        &["prompt_cache_hit_tokens"],
+        &["cache_read_input_tokens"],
+    ])
+    .min(input);
+    let cache_write_tokens = counter(&[&["cache_creation_input_tokens"]]);
+    let reasoning_tokens = counter(&[
+        &["completion_tokens_details", "reasoning_tokens"],
+        &["output_tokens_details", "reasoning_tokens"],
+    ])
+    .min(output);
     Some(Usage {
-        input_tokens: input,
-        output_tokens: output,
-        total_tokens: total,
-        cache_read_tokens: cached.min(input),
-        cache_write_tokens: 0,
+        cache_read_tokens,
+        cache_write_tokens,
+        reasoning_tokens,
+        ..Usage::new(input, output, total)
     })
 }
 
@@ -1740,6 +1757,46 @@ mod catalog_tests {
         assert_eq!(
             body["generationConfig"]["thinkingConfig"],
             json!({"thinkingBudget":2048,"includeThoughts":true})
+        );
+    }
+}
+
+#[cfg(test)]
+mod usage_tests {
+    use super::parse_usage;
+    use serde_json::json;
+
+    #[test]
+    fn cache_and_reasoning_breakdowns_are_read_for_each_wire_spelling() {
+        let chat = parse_usage(&json!({
+            "prompt_tokens": 2000, "completion_tokens": 300, "total_tokens": 2300,
+            "prompt_tokens_details": {"cached_tokens": 1536},
+            "completion_tokens_details": {"reasoning_tokens": 120}
+        }))
+        .unwrap();
+        assert_eq!((chat.cache_read_tokens, chat.reasoning_tokens), (1536, 120));
+        let responses = parse_usage(&json!({
+            "input_tokens": 900, "output_tokens": 50,
+            "input_tokens_details": {"cached_tokens": 800},
+            "output_tokens_details": {"reasoning_tokens": 10}
+        }))
+        .unwrap();
+        assert_eq!(responses.total_tokens, 950);
+        assert_eq!(
+            (responses.cache_read_tokens, responses.reasoning_tokens),
+            (800, 10)
+        );
+        let deepseek = parse_usage(&json!({
+            "prompt_tokens": 4096, "completion_tokens": 8,
+            "prompt_cache_hit_tokens": 3968, "prompt_cache_miss_tokens": 128
+        }))
+        .unwrap();
+        assert_eq!(deepseek.cache_read_tokens, 3968);
+        let plain = parse_usage(&json!({"prompt_tokens": 10, "completion_tokens": 2})).unwrap();
+        assert!(!plain.reports_cache());
+        assert_eq!(
+            serde_json::to_value(plain).unwrap(),
+            json!({"input_tokens": 10, "output_tokens": 2, "total_tokens": 12})
         );
     }
 }

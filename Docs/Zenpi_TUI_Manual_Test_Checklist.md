@@ -45,10 +45,10 @@ tmux send-keys -t zenpi Tab | C-Down | Escape | M-r | C-c
 - [ ] `n` 进入拒绝理由输入 → 输入理由 → Enter 提交拒绝
 - [x] 裸 Enter 一按确认（当前选择 = 拒绝）— 一次按键即拒绝，`a.txt` 未创建
 - [x] `r` remember → 二次确认阶段 → Enter → 允许并记住（`b.txt` 落盘）
-- [ ] `Tab` / `←` `→` 在多条待审批之间切换 —— **未能构造**：一个 turn 内模型是串行发工具调用的，只出现一条待批
+- [ ] `Tab` / `←` `→` 在多条待审批之间切换 —— **单卡片下按键已实测**（不崩、footer 显示 `Tab next · PgUp/PgDn scroll · Esc draft`），但**多条之间未能构造**：单个 owner 一次只有一条待批（turn 内工具调用串行）。需**两个 owner 同时待批**
 - [x] `↑` `↓` `PgUp` `PgDn` `Home` `End` 滚动 diff 预览 —— 用 40 行 diff 实测：`PgDn`×2 → LINE_09、`Down` → LINE_10、`Home` → LINE_01、`End` → **LINE_37–40**（到底）
 - [x] `Esc` 失焦 → footer `1 approvals pending · Alt-A review`，卡片收起但请求仍待批；`Alt-A` 重新聚焦 → 卡片复现 → `n`+Enter 拒绝生效
-- [ ] `/` 从审批视图逃回 prompt —— **未能验证**：小视口下 `Proposed change` 不在可视区，探针探不到卡片内容
+- [x] `/` 从审批视图逃回 prompt —— **大视口（180x50）实测通过**：按 `/` 后输入框出现 `│/`，卡片失焦但保留（符合设计：unfocus 不 retire）
 
 ### 其他面板与流程
 - [x] Shell 面板：`echo SHELL_OK_MARKER` → 输出 `SHELL_OK_MARKER` → 新提示符（真实 PTY）
@@ -204,3 +204,27 @@ tmux 里无法模拟鼠标，因此**这条只有单测覆盖**（`a_key_sweep_l
 （footer 显示 `1 approvals pending · Alt-A review`），需要用户按 `Alt-A`。
 这与 `present_approval` 只在"首个请求且无 picker/browser"时自动聚焦一致。
 **未判定这是否符合预期**——记下来供判断。
+
+---
+
+## 第六轮：`/` 已验证；多条待批仍无法构造
+
+**✅ `/` 从审批视图逃回 prompt —— 通过**（需 **大视口 180x50**；120x34 下卡片内容不在可视区，探针探不到）
+
+按 `/` 后：
+- 输入框出现 `│/` → **确认逃到了 prompt**
+- 卡片**仍然可见但已失焦**（`unfocus` 不 `retire`，请求仍待批）——符合 `approval_key` 里 `Char('/')` 的既有实现
+
+### 多条待批为什么构造不出来（确认，不是"没试"）
+
+我让模型在**同一条消息里发两个 `write_file`**，结果仍然**只有一条待批**：
+`turn` 内工具调用是**串行**的——第一条批完才发第二条。
+
+所以 `Tab`/`←`/`→` 的**多条切换**只能靠**两个 owner 同时待批**来触发，可能的构造方式：
+
+1. **两个项目标签**：在项目 A 挂一条待批 → `Ctrl-T` 打开另一个目录成为项目 B → 在 B 再挂一条。
+   这正是 **W3b（多 owner 审批归属）** 要覆盖的场景，值得单独排一次测试。
+2. 或让模型的单个 assistant 消息里带**多个 tool call**（取决于该 provider 是否会合批）。
+
+**单卡片下的按键已实测**：`Alt-A` 聚焦 → `Tab`/`Right`/`Left` 不崩，footer 正确切到
+`Tab next · PgUp/PgDn scroll · Esc draft · …`。**能验的是"按键通"，不能验的是"多条之间切得对"。**
